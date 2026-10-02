@@ -1,0 +1,85 @@
+**
+* Macros
+*
+       .defm call
+       li   r11,$+10
+       mov  r11,*sp+
+       b    #1
+       .endm
+
+       .defm ret
+       dect sp
+       mov  *sp,r11
+       b    *r11
+       .endm
+
+       .defm proc
+       mov  r11,*sp+
+       .endm
+
+       .defm endproc
+       dect sp
+       mov  *sp,r11
+       b    *r11
+       .endm
+
+       .defm push
+       mov  #1,*sp+
+       .endm
+
+       .defm pop
+       dect sp
+       mov  *sp,#1
+       .endm
+
+       .defm peek
+       mov  @-2(sp),#1
+       .endm
+
+       .defm ldir
+       bl   @ldir_pad
+;!      movb *hl+,*de+
+;       dec  bc
+;       jne  -!
+       .endm
+
+       .defm lddr
+!      movb *hl,*de
+       dec  hl
+       dec  de
+       dec  bc
+       jne  -!
+       .endm
+
+       .defm exx
+       bl   @exx_routine
+       .endm
+
+       .defm ex_de_hl
+       mov  de,r0
+       mov  hl,de
+       mov  r0,hl
+       .endm
+
+       .defm ex_af_af_
+       mov  af,r0
+       mov  af_,af
+       mov  r0,af_
+       .endm
+
+       .defm ex_sp_hl
+       mov  hl,r0
+       mov  @-2(sp),hl
+       mov  r0,@-2(sp)
+       .endm
+
+       .defm daa
+       bl   @daa_routine
+       .endm
+
+       .defm halt
+       nop
+       .endm
+
+       .defm rst
+       .endm

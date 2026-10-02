@@ -1,0 +1,10 @@
+       limi 0
+       lwpi wrksp
+       bl   @ti_setup_environment
+       b    @main_loop_start
+
+       copy "ti-routines.a99"
+       copy "ti-tables.a99"
+
+lower_memory_max:
+       equ  $

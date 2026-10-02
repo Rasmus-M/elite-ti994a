@@ -1,0 +1,131 @@
+**
+* Memory mapped addresses
+*
+vdpwd:                                 ; VDP write data
+       equ  >8c00
+vdpwa:                                 ; VDP set read/write address
+       equ  >8c02
+vdprd:                                 ; VDP read data
+       equ  >8800
+vdpsta:                                ; VDP status
+       equ  >8802
+sound:                                 ; Sound
+       equ  >8400
+spchwt:
+       equ  >9400
+spchrd:
+       equ  >9000
+rndsd:
+       equ  >83c0                      ; Random number seed
+kscan:
+       equ  >02b2
+
+**
+* Scratch pad
+*
+;ti_wrksp:
+;       equ  >8300
+;sndws:
+;       equ  ti_wrksp
+;ti_r0lb:
+;       equ  ti_wrksp+1
+;ti_r1lb:
+;       equ  ti_wrksp+3
+;wrksp:
+;       equ  ti_wrksp+>1a               ; r0-r2 overlaps ti_wrksp r13-r15
+wrksp:
+       equ  >8300
+r0lb:
+       equ  wrksp+1
+r1lb:
+       equ  wrksp+3
+r2lb:
+       equ  wrksp+5
+bits:
+       equ  wrksp+>20
+bit0:
+       equ  wrksp+>20
+bit1:
+       equ  bit0+2
+bit2:
+       equ  bit1+2
+bit3:
+       equ  bit2+2
+bit4:
+       equ  bit3+2
+bit5:
+       equ  bit4+2
+bit6:
+       equ  bit5+2
+bit7:
+       equ  bit6+2
+stack:
+       equ  bit7+2
+b255:
+       equ  stack+>30
+b254:
+       equ  b255+1
+pad_vars:
+       equ  b254+1
+copy_to_vdp_unrolled:
+       equ  pad_vars
+ldir_pad:
+       equ  copy_to_vdp_unrolled+>38
+pad_max:
+       equ  ldir_pad+>50
+kscan_device:
+       equ  >8374
+kscan_key:
+       equ  >8375
+kscan_status:
+       equ  >837c
+gplws:
+       equ  >83e0
+
+
+**
+* Z80 register mapping
+*
+one    requ 3                          ; >0100
+zero   equ wrksp+7
+af     requ 4
+a      requ 4
+f      equ wrksp+9
+bc     requ 5
+b      requ 5
+c      equ wrksp+11
+de     requ 6
+d      requ 6
+e      equ wrksp+13
+hl     requ 7
+h      requ 7
+l      equ wrksp+15
+ix     requ 8
+iy     requ 9
+sp     requ 10
+af_    requ 12
+a_     requ 12
+bc_    requ 13
+b_     requ 13
+c_     equ wrksp+27
+de_    requ 14
+d_     requ 14
+e_     equ wrksp+29
+hl_    requ 15
+h_     requ 15
+l_     equ wrksp+31
+r      requ 0
+
+**
+* VDP memory map
+*
+pattern_table:                         ; Pattern table
+       equ  >0000
+sprite_pattern_table:                  ; Sprite pattern table
+       equ  >3800
+color_table:                           ; Color table
+       equ  >2000
+name_table:                            ; Name table 1
+       equ  >1C00
+sprite_attr_table:                     ; Sprite attribute table
+       equ  >1F00

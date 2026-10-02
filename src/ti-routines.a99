@@ -1,0 +1,913 @@
+*********************************************************************
+*
+* Setup environment
+*
+ti_setup_environment:
+;       mov  @rndsd,@pseudo_random_scrolling_counter
+       li   one,>0100
+       li   r0,>fffe
+       mov  r0,@b255
+       li   sp,stack
+       .proc
+       bl   @init_bits
+       bl   @clear_pad
+       bl   @copy_to_pad
+;      bl   @graphics_mode
+       .endproc
+*// ti_setup_environment
+
+*********************************************************************
+*
+* Init bits for bit operations
+*
+init_bits:
+       li   r0,>0100
+       li   r1,bits
+       li   r2,8
+init_bits_1:
+       mov  r0,*r1+
+       sla  r0,1
+       dec  r2
+       jne  init_bits_1
+       rt
+*// init_bits
+
+*********************************************************************
+*
+* Clear scratchpad
+*
+clear_pad:
+       li   r0,pad_vars
+       li   r2,pad_max-pad_vars
+clear_pad_1:
+       clr  *r0+
+       dect r2
+       jne  clear_pad_1
+       rt
+*// clear_pad
+
+*********************************************************************
+*
+* Copy routines to pad
+*
+copy_to_pad:
+       li   r0,copy_bc_bytes_from_hl_to_vdp_unrolled
+       li   r1,copy_to_vdp_unrolled
+       li   r2,copy_bc_bytes_from_hl_to_vdp_unrolled_end-copy_bc_bytes_from_hl_to_vdp_unrolled
+copy_to_pad_1:
+       mov  *r0+,*r1+
+       dect r2
+       jne  copy_to_pad_1
+
+       li   r0,ti_ldir
+       li   r1,ldir_pad
+       li   r2,ti_ldir_end-ti_ldir
+copy_to_pad_2:
+       mov  *r0+,*r1+
+       dect r2
+       jne  copy_to_pad_2
+       rt
+*// copy_to_pad
+
+*********************************************************************
+*
+* Set graphics mode
+*
+;graphics_mode:
+;       lwpi ti_wrksp
+;       clr  r0
+;       li   r1,vdp_registers
+;       li   r2,8
+;graphics_mode_1:
+;       movb *r1+,@ti_r0lb
+;       bl   @vwtr                      ; Set register
+;       ai   r0,>0100
+;       dec  r2
+;       jne  graphics_mode_1
+;*      Clear VDP RAM
+;       clr  r0
+;       clr  r1
+;       li   r2,>4000
+;       bl   @vsmw
+;*      Disable sprites
+;       li   r0,sprite_attr_table
+;       li   r1,>d000
+;       bl   @vsbw
+;*      Init color table
+;       li   r0,color_table
+;       li   r1,>f100
+;       li   r2,>1800
+;       bl   @vsmw
+;*      Init name tables
+;       li   r0,name_table
+;       bl   @vwad
+;       bl   @ti_init_name_table
+;       li   r0,name_table_2
+;       bl   @vwad
+;       bl   @ti_init_name_table
+;*      Sprite patterns
+;;       li   r0,sprite_pattern_table
+;;       li   r1,SPR0
+;;       li   r2,32
+;;       bl   @vmbw
+;       lwpi wrksp
+;       rt
+;*      VDP registers
+;vdp_registers:
+;       byte >02                        ; Graphics II mode
+;       byte >e2                        ; 16K, display on, interrupt enabled
+;       byte name_table/>400            ; Name table
+;       byte >ff                        ; Color table
+;       byte pattern_table/>800+>03     ; Pattern table
+;       byte sprite_attr_table/>80      ; Sprite attribute table
+;       byte sprite_pattern_table/>800  ; Sprite pattern table
+;       byte >00                        ; Backdrop color
+;*// graphics_mode
+
+*********************************************************************************
+*
+* Initialize name table for bitmap drawing
+*
+;ti_init_name_table:
+;       clr  r1
+;       li   r2,768
+;ti_init_name_table_1:
+;       movb r1,@vdpwd
+;       ai   r1,>0100
+;       dec  r2
+;       jne  ti_init_name_table_1
+;       rt
+;*// ti_init_name_table
+
+;*********************************************************************************
+;*
+;* Select name table 1
+;*
+;ti_select_name_table_1:
+;       lwpi ti_wrksp
+;       li   r0,>020e
+;       bl   @vwtr
+;       lwpi wrksp
+;       rt
+;*// ti_select_name_table_1
+;
+;*********************************************************************************
+;*
+;* Select name table 2
+;*
+;ti_select_name_table_2:
+;       lwpi ti_wrksp
+;       li   r0,>020f
+;       bl   @vwtr
+;       lwpi wrksp
+;       rt
+;*// ti_select_name_table_2
+
+*********************************************************************************
+*
+* Display off
+*
+;ti_display_off:
+;       lwpi ti_wrksp
+;       li   r0,>01a2
+;       bl   @vwtr
+;       lwpi wrksp
+;       rt
+;*// ti_display_off
+
+*********************************************************************************
+*
+* Display off
+*
+;ti_display_on:
+;       lwpi ti_wrksp
+;       li   r0,>01e2
+;       bl   @vwtr
+;       lwpi wrksp
+;       rt
+;*// ti_display_on
+
+;*********************************************************************************
+;*
+;* Clear screen
+;*
+;ti_clear_screen:
+;       .proc
+;       bl   @ti_display_off
+;;       bl   @module_player
+;       li   r1,vdpwd
+;       li   r0,pattern_table
+;       bl   @vwad
+;       bl   @ti_clear_screen_part
+;       bl   @ti_clear_screen_part
+;       bl   @ti_clear_screen_part
+;       li   r0,color_table
+;       bl   @vwad
+;       bl   @ti_clear_screen_part
+;       bl   @ti_clear_screen_part
+;       bl   @ti_clear_screen_part
+;       bl   @ti_display_on
+;       .endproc
+;*// ti_clear_screen
+;
+;ti_clear_screen_part:
+;       .proc
+;       li   r2,>800
+;ti_clear_screen_part_1:
+;       clr  *r1
+;       dec  r2
+;       jne  ti_clear_screen_part_1
+;;       bl   @module_player
+;       .endproc
+
+;*********************************************************************************
+;*
+;* Set color of whole screen
+;*
+;* a: zx attribute
+;*
+;ti_set_screen_color:
+;       .proc
+;       movb @ti_colors(a),r1
+;       li   r0,color_table+(3*256)
+;       li   r2,5*256
+;       bl   @vsmw
+;;       bl   @module_player
+;       li   r0,color_table+(8*256)
+;       li   r2,5*256
+;       bl   @vsmw
+;;       bl   @module_player
+;       li   r0,color_table+(13*256)
+;       li   r2,5*256
+;       bl   @vsmw
+;;       bl   @module_player
+;       .endproc
+;*// ti_set_screen_color
+
+*********************************************************************
+*
+* VDP Write To Register
+*
+* R0 MSB: VDP register to write to
+* R0 LSB: Value to write
+*
+vwtr:
+       swpb r0
+       movb r0,@vdpwa                  ; Send low byte (value) to write to VDP register
+       swpb r0
+       ori  r0,>8000                   ; Set up a VDP register write operation (10)
+       movb r0,@vdpwa                  ; Send high byte (address) of VDP register
+       rt
+*// vwtr
+
+;*********************************************************************
+;*
+;* VDP Set Write Address
+;*
+;* R0: Write address in VDP RAM
+;*
+;vwad:
+;       swpb r0
+;       movb r0,@vdpwa                  ; Send low byte of VDP RAM write address
+;       swpb r0
+;       ori  r0,>4000                   ; Set read/write bits 14 and 15 to write (01)
+;       movb r0,@vdpwa                  ; Send high byte of VDP RAM write address
+;       rt
+;*// vwad
+
+*********************************************************************
+*
+* VDP Single Byte Write
+*
+* R0: Write address in VDP RAM
+* R1: MSB of R1 sent to VDP RAM
+*
+;vsbw:
+;       swpb r0
+;       movb r0,@vdpwa                  ; Send low byte of VDP RAM write address
+;       swpb r0
+;       ori  r0,>4000                   ; Set read/write bits 14 and 15 to write (01)
+;       movb r0,@vdpwa                  ; Send high byte of VDP RAM write address
+;       movb r1,@vdpwd                  ; Write byte to VDP RAM
+;       rt
+;*// vsbw
+
+;*********************************************************************
+;*
+;* VDP multiple Byte Write
+;*
+;* R0: Write address in VDP RAM
+;* R1: Starting read address in CPU RAM
+;* R2: Number of bytes to send
+;*
+;vmbw:
+;       swpb r0
+;       movb r0,@vdpwa                  ; Send low byte of VDP RAM write address
+;       swpb r0
+;       ori  r0,>4000                   ; Set read/write bits 14 and 15 to write (01)
+;       movb r0,@vdpwa                  ; Send high byte of VDP RAM write address
+;       li   r0,vdpwd
+;vmbw_1:
+;       movb *r1+,*r0                   ; Write byte to VDP RAM
+;       dec  r2
+;       jne  vmbw_1
+;       rt
+;*// vmbw
+
+;*********************************************************************
+;*
+;* VDP multiple Byte Write (unrolled)
+;*
+;* R0: Write address in VDP RAM
+;* R1: Starting read address in CPU RAM
+;* R2: Number of bytes to send
+;*
+;vmbw_unrolled:
+;       swpb r0
+;       movb r0,@vdpwa                  ; Send low byte of VDP RAM write address
+;       swpb r0
+;       ori  r0,>4000                   ; Set read/write bits 14 and 15 to write (01)
+;       movb r0,@vdpwa                  ; Send high byte of VDP RAM write address
+;       li   r0,vdpwd
+;       srl  r2,3
+;vmbw_unrolled_1:
+;       movb *r1+,*r0                   ; Write byte to VDP RAM
+;       movb *r1+,*r0                   ; Write byte to VDP RAM
+;       movb *r1+,*r0                   ; Write byte to VDP RAM
+;       movb *r1+,*r0                   ; Write byte to VDP RAM
+;       movb *r1+,*r0                   ; Write byte to VDP RAM
+;       movb *r1+,*r0                   ; Write byte to VDP RAM
+;       movb *r1+,*r0                   ; Write byte to VDP RAM
+;       movb *r1+,*r0                   ; Write byte to VDP RAM
+;       dec  r2
+;       jne  vmbw_unrolled_1
+;       rt
+;*// vmbw_unrolled
+
+*********************************************************************
+*
+* Copy B bytes from address in HL to VDP unrolled.
+* r0 is expected to contain VDPWD.
+*
+copy_bc_bytes_from_hl_to_vdp_unrolled:
+       mov  bc,r2
+       srl  r2,4
+       jeq  copy_bc_bytes_from_hl_to_vdp_unrolled_2
+copy_bc_bytes_from_hl_to_vdp_unrolled_1:
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       movb *hl+,*r0
+       dec  r2
+       jne  copy_bc_bytes_from_hl_to_vdp_unrolled_1
+copy_bc_bytes_from_hl_to_vdp_unrolled_2:
+       andi bc,>000f
+       jeq  copy_bc_bytes_from_hl_to_vdp_unrolled_4
+copy_bc_bytes_from_hl_to_vdp_unrolled_3:
+       movb *hl+,*r0
+       dec  bc
+       jne  copy_bc_bytes_from_hl_to_vdp_unrolled_3
+copy_bc_bytes_from_hl_to_vdp_unrolled_4:
+       rt
+copy_bc_bytes_from_hl_to_vdp_unrolled_end:
+       equ  $
+
+;*********************************************************************
+;*
+;* VDP Single Byte Multiple Write
+;*
+;* R0: Write address in VDP RAM
+;* R1: MSB of R1 sent to VDP RAM
+;* R2: Number of bytes to write to VDP RAM
+;*
+;vsmw:
+;       swpb r0
+;       movb  r0,@vdpwa                 ; Send low byte of VDP RAM write address
+;       swpb r0
+;       ori  r0,>4000                   ; Set read/write bits 14 and 15 to write (01)
+;       movb r0,@vdpwa                  ; Send high byte of VDP RAM write address
+;       li   r0,vdpwd
+;vsmw_1:
+;       movb r1,*r0                     ; Write byte to VDP RAM
+;       dec  r2                         ; Byte counter
+;       jne  vsmw_1
+;       rt
+;*// vsmw
+
+;*********************************************************************
+;*
+;* VDP Single Byte Multiple Write (unrolled)
+;*
+;* R0: Write address in VDP RAM
+;* R1: MSB of R1 sent to VDP RAM
+;* R2: Number of bytes to write to VDP RAM
+;*
+;vsmw_unrolled:
+;       swpb r0
+;       movb  r0,@vdpwa                 ; Send low byte of VDP RAM write address
+;       swpb r0
+;       ori  r0,>4000                   ; Set read/write bits 14 and 15 to write (01)
+;       movb r0,@vdpwa                  ; Send high byte of VDP RAM write address
+;       li   r0,vdpwd
+;       srl  r2,3
+;vsmw_unrolled_1:
+;       movb r1,*r0                     ; Write byte to VDP RAM
+;       movb r1,*r0                     ; Write byte to VDP RAM
+;       movb r1,*r0                     ; Write byte to VDP RAM
+;       movb r1,*r0                     ; Write byte to VDP RAM
+;       movb r1,*r0                     ; Write byte to VDP RAM
+;       movb r1,*r0                     ; Write byte to VDP RAM
+;       movb r1,*r0                     ; Write byte to VDP RAM
+;       movb r1,*r0                     ; Write byte to VDP RAM
+;       dec  r2                         ; Byte counter
+;       jne  vsmw_unrolled_1
+;       rt
+;*// vsmw_unrolled
+
+*********************************************************************
+*
+* VDP Set Read Address
+*
+* R0: Read address in VDP RAM
+*
+;vrad:
+;       swpb r0
+;       movb r0,@vdpwa                  ; Send low byte of VDP RAM read address
+;       swpb r0
+;       movb r0,@vdpwa                  ; Send high byte of VDP RAM read address
+;       rt
+;*// vrad
+
+;*********************************************************************
+;*
+;* VDP Single Byte Read
+;*
+;* R0:  Read address in VDP RAM
+;* R1:  MSB of R1 set to byte from VDP RAM
+;*
+;vsbr:
+;       swpb r0
+;       movb r0,@vdpwa                  ; Send low byte of VDP RAM read address
+;       swpb r0
+;       movb r0,@vdpwa                  ; Send high byte of VDP RAM read address
+;       nop
+;       movb @vdprd,r1                  ; Read byte from VDP RAM
+;       rt
+;*// vsbr
+
+*********************************************************************
+*
+* VDP Multiple Byte Read
+*
+* R0: Starting read address in VDP RAM
+* R1: Starting write address in CPU RAM
+* R2: Number of bytes to read from VDP RAM
+*
+* Modifies R0-R2
+*
+;vmbr:
+;       swpb r0
+;       movb  r0,@vdpwa                 ; Send low byte of VDP RAM read address
+;       swpb r0
+;       andi r0,>3fff                   ; Set read/write bits 14 and 15 to read (00)
+;       movb r0,@vdpwa                  ; Send high byte of VDP RAM read address
+;       li   r0,vdprd
+;vmbr_1:
+;       movb *r0,*r1+                   ; Read byte from VDP RAM
+;       dec  r2                         ; Byte counter
+;       jne  vmbr_1                     ; Check if finished
+;       rt
+;*// vmbr
+
+*********************************************************************
+*
+* Check key
+*
+* r0: Column in MSB: >0000 - >0700, Row in LSB: >0006 - >0014
+*
+*       Column   0      1    2    3    4    5     6       7
+*     Row
+*     >0006      =      .    ,    M    N    /    Fire    Fire
+*     >0008    Space    L    K    J    H    ;    Left    Left
+*     >000A    Enter    O    I    U    Y    P    Right   Right
+*     >000C             9    8    7    6    0    Down    Down
+*     >000E    Fctn     2    3    4    5    1    Up      Up
+*     >0010    Shift    S    D    F    G    A
+*     >0012    Ctrl     W    E    R    T    Q
+*     >0014             X    C    V    B    Z
+*
+* On return NEQ means that the key is pressed
+*
+KEY_FI EQU  >0606
+KEY_LF EQU  >0608
+KEY_RG EQU  >060A
+KEY_DN EQU  >060C
+KEY_UP EQU  >060E
+KEY_CM EQU  >0206
+KEY_FS EQU  >0106
+KEY_0  EQU  >050C
+KEY_1  EQU  >050E
+KEY_2  EQU  >010E
+KEY_3  EQU  >020E
+KEY_4  EQU  >030E
+KEY_5  EQU  >040E
+KEY_6  EQU  >040C
+KEY_7  EQU  >030C
+KEY_8  EQU  >020C
+KEY_9  EQU  >010C
+KEY_A  EQU  >0510
+KEY_B  EQU  >0414
+KEY_C  EQU  >0214
+KEY_D  EQU  >0210
+KEY_E  EQU  >0212
+KEY_F  EQU  >0310
+KEY_G  EQU  >0410
+KEY_H  EQU  >0408
+KEY_I  EQU  >020A
+KEY_J  EQU  >0308
+KEY_K  EQU  >0208
+KEY_L  EQU  >0108
+KEY_M  EQU  >0306
+KEY_N  EQU  >0406
+KEY_O  EQU  >010A
+KEY_P  EQU  >050A
+KEY_Q  EQU  >0512
+KEY_R  EQU  >0312
+KEY_S  EQU  >0110
+KEY_T  EQU  >0412
+KEY_U  EQU  >030A
+KEY_V  EQU  >0314
+KEY_W  EQU  >0112
+KEY_X  EQU  >0114
+KEY_Y  EQU  >040A
+KEY_Z  EQU  >0514
+KEY_SP EQU  >0008
+KEY_EN EQU  >000A
+KEY_FN EQU  >000E
+KEY_SH EQU  >0010
+KEY_CT EQU  >0012
+JOY_FI EQU  >0606
+JOY_LT EQU  >0608
+JOY_RT EQU  >060A
+JOY_DN EQU  >060C
+JOY_UP EQU  >060E
+JOY_1  EQU  >0606
+JOY_2  EQU  >0706
+*
+ti_check_key:
+       li   r12,>0024                  ; CRU address of the column decoder
+       ldcr r0,3                       ; Select column
+       andi r0,>00ff
+       mov  r0,r12                     ; Select row
+       tb   0                          ; Test key, EQ if not pressed
+       rt
+*// ti_check_key
+
+ti_read_joystick:
+       li   r12,>0024                  ; CRU address of the column decoder
+       ldcr r0,3                       ; Select column
+       andi r0,>00ff
+       mov  r0,r12                     ; Select row
+       stcr r0,8                       ; Read 8 bits
+       rt
+*// ti_read_joystick
+
+***************************************************************************
+*
+* Wait for fire key
+*
+;ti_wait_fire:
+;       .proc
+;ti_wait_fire_1:
+;       li   r0,KEY_SP
+;       bl   @ti_check_key
+;       jne  ti_wait_fire_2
+;       li   r0,KEY_FI
+;       bl   @ti_check_key
+;       jne  ti_wait_fire_2
+;       li   r0,KEY_0
+;       bl   @ti_check_key
+;       jne  ti_wait_fire_2
+;       li   r0,KEY_EN
+;       bl   @ti_check_key
+;       jeq  ti_wait_fire_1
+;ti_wait_fire_2:
+;       .endproc
+;*// ti_wait_fire
+
+***************************************************************************
+*
+* Check quit
+*
+ti_check_quit:
+       clr  r1                         ; Test column 0
+       li   r12,>0024                  ; Address for column selection
+       ldcr r1,3                       ; Select column
+       li   r12,>0006                  ; Address to read rows
+       stcr r1,8
+       andi r1,>1100
+       jeq  ti_quit
+*      Return
+       rt
+*      Quit
+ti_quit:
+       clr  @>83c4                     ; Reset user ISR address
+       seto @>6000                     ; Select first ROM bank
+       blwp @>0000
+*// ti_check_quit
+
+;***************************************************************************
+;*
+;* Check pause
+;*
+;ti_check_pause:
+;       .proc
+;       li   r0,KEY_P
+;       bl   @ti_check_key
+;       jeq  ti_check_pause_6
+;       bl   @ti_mute_sound
+;       bl   @ti_wait_vsync
+;ti_check_pause_1:
+;       bl   @ti_wait_vsync
+;       li   r0,KEY_P
+;       bl   @ti_check_key
+;       jne  ti_check_pause_1
+;       li   r2,30
+;ti_check_pause_2:
+;       bl   @ti_wait_vsync
+;       dec  r2
+;       jne  ti_check_pause_2
+;ti_check_pause_3:
+;       li   r0,KEY_P
+;       bl   @ti_check_key
+;       jeq  ti_check_pause_3
+;       bl   @ti_wait_vsync
+;ti_check_pause_4:
+;       bl   @ti_wait_vsync
+;       li   r0,KEY_P
+;       bl   @ti_check_key
+;       jne  ti_check_pause_4
+;       li   r2,30
+;ti_check_pause_5:
+;       bl   @wait_int_play_sound
+;       dec  r2
+;       jne  ti_check_pause_5
+;ti_check_pause_6:
+;       .endproc
+;*// ti_check_pause
+
+;*********************************************************************
+;*
+;* Scan keyboard
+;*
+;ti_keyscan:
+;       .proc
+;       lwpi gplws
+;       movb @zero,@kscan_device
+;       bl   @kscan
+;       lwpi wrksp
+;       movb @kscan_status,a
+;       andi a,>2000
+;       jeq  !
+;       movb @kscan_key,a
+;!      .endproc
+;*// ti_keyscan
+
+;*********************************************************************
+;*
+;* Mute sound
+;*
+;ti_mute_sound:
+;       li   r0,mute_table              ; Mute all
+;       li   r2,4
+;mute_sound_1:
+;       movb *r0+,@sound
+;       dec  r2
+;       jne  mute_sound_1
+;       rt
+;mute_table:
+;       byte >9f, >bf, >df, >ff
+;*// ti_mute_sound
+
+;*********************************************************************
+;*
+;* Generate a pseudo random number within the given limit
+;*
+;* a: Maximum number (0 - 255) exclusive
+;*
+;* On return a contains the number [0; a[
+;*
+;ti_rnd_range:
+;       .proc                           ; Push return address onto the stack
+;       bl   @ti_rnd                    ; Generate a random number in r0
+;       andi r0,>00ff                 ; Clear MSB: [0-255]
+;       mov  af,r1                    ; range in MSB
+;       srl  r1,8                     ; range in LSB
+;       mpy  r1,r0                  ; range * [0-255]
+;       srl  r1,8                     ; (range * [0-255]) / 256
+;       mov  r1,a                     ; Copy result back
+;       swpb a                          ; to MSB
+;       .endproc                        ; Pop return address off the stack
+;*// ti_rnd_range
+
+;*********************************************************************
+;*
+;* Generate a pseudo random number
+;*
+;* On return r0 contains the number, which is also stored at @rnd_seed
+;*
+;* r1 and r2 are modified
+;*
+;ti_rnd:
+;       li   r1,28643                 ; A prime number to multiply by
+;       mpy  @random_number,r1        ; Multiply by last random number
+;       ai   r2,31873                 ; Add a prime number
+;       src  r2,7                     ; Mix up the number to break odd/even pattern
+;       mov  r2,@random_number        ; Save this number for next time
+;       movb r2,a
+;       rt
+;*// ti_rnd
+
+;*********************************************************************
+;*
+;* Wait for vertical retrace
+;*
+;ti_wait_vsync:
+;       movb @vdpsta,r0
+;ti_check_vsync:
+;       movb @vdpsta,r0
+;       andi r0,>8000
+;       jeq  ti_check_vsync
+;       rt
+;*// ti_vsync
+
+*********************************************************************
+*
+* CPU space clear
+*
+;ti_clear:
+;       mov  hl,r0
+;       andi r0,1
+;       jeq  ti_clear_1
+;       movb r0,*hl+
+;       dec  bc
+;       mov  bc,r0
+;       srl  bc,1
+;ti_clear_1:
+;       clr  *hl+
+;       dec  bc
+;       jne  ti_clear_1
+;       andi r0,1
+;       jeq  ti_clear_2
+;       movb r0,*hl+
+;ti_clear_2:
+;       rt
+*// ti_clear
+
+*********************************************************************
+*
+* Faster replacement for LDIR
+*
+ti_ldir:
+       mov  hl,r0                      ; Check source
+       srl  r0,1
+       joc  ti_ldir_3
+       mov  de,r0                      ; Check destination
+       srl  r0,1
+       joc  ti_ldir_4
+*      Source and destination are word aligned - use word copy
+ti_ldir_1
+       mov  bc,r0
+       srl  r0,2
+       jeq  ti_ldir_8
+ti_ldir_2:
+       mov  *hl+,*de+
+       mov  *hl+,*de+
+       dec  r0
+       jne  ti_ldir_2
+       jmp  ti_ldir_8                  ; Copy remainder as bytes
+*      Source is not aligned
+ti_ldir_3:
+       mov  de,r0                      ; Check destination
+       srl  r0,1
+       jnc  ti_ldir_6
+       jmp  ti_ldir_5
+*      Destination is not aligned
+ti_ldir_4:
+       mov  hl,r0                      ; Check source
+       srl  r0,1
+       jnc  ti_ldir_6
+*      Neither source or destination are aligned
+ti_ldir_5:
+       movb *hl+,*de+                  ; Write first byte, now both are aligned
+       dec  bc
+       jmp  ti_ldir_1
+*      One of destination or source is not aligned - use an unrolled byte copy loop
+ti_ldir_6:
+       mov  bc,r0
+       srl  r0,2
+       jeq  ti_ldir_9
+ti_ldir_7:
+       movb *hl+,*de+
+       movb *hl+,*de+
+       movb *hl+,*de+
+       movb *hl+,*de+
+       dec  r0
+       jne  ti_ldir_7
+ti_ldir_8:
+       andi bc,>0003
+       jeq  ti_ldir_10
+ti_ldir_9:
+       movb *hl+,*de+
+       dec  bc
+       jne  ti_ldir_9
+ti_ldir_10:
+       rt
+ti_ldir_end:
+       equ  $
+*// ti_ldir
+
+;*********************************************************************
+;*
+;* Wait for r0 frames
+;*
+;ti_delay:
+;       .proc
+;ti_delay_1:
+;       bl   @ti_vsync
+;       dec  r0
+;       jne  ti_delay_1
+;       .endproc
+;*// ti_delay
+
+*********************************************************************
+*
+* For routines that set or reset the carry flag on return
+*
+return_with_eq:
+       .pop  r11
+return_with_eq_1:
+       c    r0,r0
+       rt
+
+return_with_carry:
+       .pop  r11
+return_with_carry_1:
+       seto r0
+       inc  r0
+       rt
+
+return_without_carry:
+       .pop  r11
+return_without_carry_1:
+       clr  r0
+       inc  r0
+       rt
+
+*********************************************************************
+*
+* EXX
+*
+exx_routine:
+       mov  bc,r0
+       mov  bc_,bc
+       mov  r0,bc_
+       mov  hl,r0
+       mov  hl_,hl
+       mov  r0,hl_
+       mov  de,r0
+       mov  de_,de
+       mov  r0,de_
+       rt
+*// exx_routine
+
+*********************************************************************
+*
+* DAA
+*
+daa_routine:
+       mov  a,r0
+       andi r0,>0f00
+       cb   r0,@bytes+>09
+       jle  !
+       ab   @bytes+>06,a
+!      mov  a,r0
+       andi r0,>f000                   ; Ensure carry is cleared by shift
+       srl  r0,4
+       cb   r0,@bytes+>09
+       jle  !
+       ab   @bytes+>60,a
+!      rt
+*// daa_routine

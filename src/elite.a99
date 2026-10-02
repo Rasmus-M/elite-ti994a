@@ -1,0 +1,8 @@
+       copy "macros.a99"
+       copy "equates.a99"
+
+       aorg >2000
+       copy "lower-memory.a99"
+
+       aorg >a000
+       copy "upper-memory.a99"

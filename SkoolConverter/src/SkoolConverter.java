@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 public class SkoolConverter {
 
     private final static Pattern commentReferencePattern = Pattern.compile("#R([0-9]{4,5}|\\$[0-9a-fA-F]{4})");
-    private final static Pattern lsbRegisterPattern = Pattern.compile("[cel]");
+    private final static Pattern lsbRegisterPattern = Pattern.compile("[cel]|ixl|iyl");
     private final static int[] labelsExcludedFromReferencing = {
         0x8000
     };
@@ -270,7 +270,7 @@ public class SkoolConverter {
                 additionalLines.add(new TMS9900Line(TMS9900Line.Type.Instruction, null, "jne  " + getTMS9900Equivalent(opr1)));
                 break;
             case "ex":
-                tms9900Line.setInstruction(".ex_" + getTMS9900Equivalent(opr1) + "_" + getTMS9900Equivalent(opr2));
+                tms9900Line.setInstruction(".ex_" + getTMS9900Equivalent(opr1).replace("*", "") + "_" + getTMS9900Equivalent(opr2));
                 break;
             case "exx":
                 tms9900Line.setInstruction(".exx");
@@ -347,6 +347,9 @@ public class SkoolConverter {
                 break;
             case "lddr":
                 tms9900Line.setInstruction(".lddr");
+                break;
+            case "ldi":
+                tms9900Line.setInstruction(".ldi");
                 break;
             case "ldir":
                 tms9900Line.setInstruction(".ldir");

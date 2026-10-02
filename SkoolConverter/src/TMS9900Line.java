@@ -11,6 +11,9 @@ public class TMS9900Line {
         Instruction
     }
 
+    private static final int INSTR_COMMENT_INDENT = 60;
+    private static final int DATA_COMMENT_INDENT = 70;
+
     private final Type type;
     private String label;
     private String directive;
@@ -83,7 +86,7 @@ public class TMS9900Line {
                 return "";
             case Label:
                 String labelWithColon = label + (label.equals("!") ? "" : ":");
-                return labelWithColon + (comment != null ? Util.space(39 - labelWithColon.length()) + "; " + comment : "");
+                return labelWithColon + (comment != null ? Util.space(INSTR_COMMENT_INDENT - 1 - labelWithColon.length()) + "; " + comment : "");
             case Directive:
                 return Util.space(7) + directive;
             case Comment:
@@ -93,10 +96,10 @@ public class TMS9900Line {
             case ContinuationCommentInstruction:
                 return Util.space(59) + "; " + comment;
             case Data:
-                String dataCommentIndent = Util.space(Math.max(69 - 7 - instruction.length(), 1));
+                String dataCommentIndent = Util.space(Math.max(DATA_COMMENT_INDENT - 8 - instruction.length(), 1));
                 return Util.space(7) + instruction + (comment != null ? dataCommentIndent + "; " + comment : "");
             case Instruction:
-                String commentIndent = Util.space(Math.max(39 - 7 - instruction.length(), 1));
+                String commentIndent = Util.space(Math.max(INSTR_COMMENT_INDENT - 8 - instruction.length(), 1));
                 String combinedComment = Util.fit(z80Instruction != null ? z80Instruction : "", 17) + " " + (comment != null ? "; " + comment : "");
                 return Util.space(7) + instruction + commentIndent + "; " + combinedComment;
         }

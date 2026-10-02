@@ -36,6 +36,11 @@
        mov  @-2(sp),#1
        .endm
 
+       .defm ldi
+       movb *hl+,*de+
+       dec  bc
+       .endm
+
        .defm ldir
        bl   @ldir_pad
 ;!      movb *hl+,*de+

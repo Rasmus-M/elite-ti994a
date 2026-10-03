@@ -37,20 +37,28 @@ public class SkoolConverter {
     private Set<Integer> findReferences(List<Z80Line> z80Lines, int startAddress, int endAddress) {
         Set<Integer> references = new HashSet<>();
         for (Z80Line z80Line : z80Lines) {
+            if (z80Line.isTarget()) {
+                references.add(z80Line.getAddress());
+            }
             switch (z80Line.getType()) {
-                case Instruction:
-                    Instruction instruction = new Instruction(z80Line.getInstruction());
-                    Operand opr1 = instruction.getOpr1();
-                    if (opr1 != null && opr1.isWordOperand() && (opr1.getType() == Operand.Type.Immediate || opr1.getType() == Operand.Type.Indirect)) {
-                        references.add(opr1.getValue());
-                    }
-                    Operand opr2 = instruction.getOpr2();
-                    if (opr2 != null && opr2.isWordOperand() && (opr2.getType() == Operand.Type.Immediate || opr2.getType() == Operand.Type.Indirect)) {
-                        references.add(opr2.getValue());
+                case Directive:
+                    if (z80Line.getDirective().equals("keep")) {
+                        numberOfLinesToKeepAddresses = 2;
                     }
                     break;
+//                case Instruction:
+//                    Instruction instruction = new Instruction(z80Line.getInstruction());
+//                    Operand opr1 = instruction.getOpr1();
+//                    if (opr1 != null && opr1.isWordOperand() && (opr1.getType() == Operand.Type.Immediate || opr1.getType() == Operand.Type.Indirect)) {
+//                        references.add(opr1.getValue());
+//                    }
+//                    Operand opr2 = instruction.getOpr2();
+//                    if (opr2 != null && opr2.isWordOperand() && (opr2.getType() == Operand.Type.Immediate || opr2.getType() == Operand.Type.Indirect)) {
+//                        references.add(opr2.getValue());
+//                    }
+//                    break;
                 case Data:
-                    if (z80Line.getInstruction().startsWith("DEFW")) {
+                    if (z80Line.getInstruction().startsWith("DEFW") && numberOfLinesToKeepAddresses == 0) {
                         String[] words = z80Line.getInstruction().substring(4).trim().split(",");
                         for (String word : words) {
                             int addr = Util.parseInt(word);
@@ -69,6 +77,9 @@ public class SkoolConverter {
                         }
                     }
                     break;
+            }
+            if (numberOfLinesToKeepAddresses > 0) {
+                numberOfLinesToKeepAddresses--;
             }
         }
         return references;
@@ -278,6 +289,15 @@ public class SkoolConverter {
             case "halt":
                 tms9900Line.setInstruction(".halt");
                 break;
+            case "in":
+                if (opr1 != null && opr1.getType() == Operand.Type.Register && opr2 != null && opr2.getType() == Operand.Type.Indirect) {
+                    if (opr2.getValue() == 0x98 || opr2.getValue() == 0x99) {
+                        tms9900Line.setInstruction("movb @vdp" + (opr2.getValue() == 0x98 ? "rd" : "sta") + "," + getTMS9900Equivalent(opr1));
+                    } else {
+                        unhandledInstruction(tms9900Line, instruction);
+                    }
+                }
+                break;
             case "inc":
                 if (opr1 != null) {
                     boolean isWord = opr1.isWordOperand();
@@ -362,6 +382,15 @@ public class SkoolConverter {
                 break;
             case "or":
                 tms9900Line.setInstruction("socb " + getTMS9900Equivalent(opr1) + ",a");
+                break;
+            case "out":
+                if (opr1 != null && opr1.getType() == Operand.Type.Indirect && opr2 != null && opr2.getType() == Operand.Type.Register) {
+                    if (opr1.getValue() == 0x98 || opr1.getValue() == 0x99) {
+                        tms9900Line.setInstruction("movb " + getTMS9900Equivalent(opr2) + ",@vdpw" + (opr1.getValue() == 0x98 ? "d" : "a"));
+                    } else {
+                        unhandledInstruction(tms9900Line, instruction);
+                    }
+                }
                 break;
             case "push":
                 tms9900Line.setInstruction(".push " + getTMS9900Equivalent(opr1));

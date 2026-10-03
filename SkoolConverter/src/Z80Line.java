@@ -22,6 +22,7 @@ public class Z80Line {
     private String directive;
     private String comment;
     private String label;
+    private boolean target;
 
     public Z80Line(String line) {
         parseLine(line);
@@ -49,6 +50,9 @@ public class Z80Line {
                 comment = line.length() > 1 ? line.substring( 1).trim() : "";
                 type = Type.Comment;
             } else {
+                if (typeChar == '*') {
+                    target = true;
+                }
                 int commentPos = line.indexOf(" ;");
                 if (commentPos != -1) {
                     if (line.length() > commentPos + 2) {
@@ -105,5 +109,9 @@ public class Z80Line {
 
     public String getLabel() {
         return label;
+    }
+
+    public boolean isTarget() {
+        return target;
     }
 }

@@ -254,9 +254,13 @@ unused_0184:                                               ; >0184
 * Entry n (0-255) is the number of bits needed to hold n, i.e. the
 * position of its highest set bit plus one (with entry 0 = 1): 1 for
 * 0-1, 2 for 2-3, 3 for 4-7, and so on up to 8 for 128-255. Page-aligned
-* so that it can be read with `LD H,$02 / LD L,n / LD A,(HL)`. Used as a
-* loop count by the multiply routines (e.g. at #R$1F60) and by the stardust
-* code (#R$6520, #R$6805).
+* so that it can be read with `LD H,$02 / LD L,n / LD A,(HL)` (or through BC
+* or DE). Used as a loop or shift count - how many times to halve something
+* until it fits - by the multiply routines (#R$1F5E, #R$1F73, #R$200A), the
+* drawing of an object (#R$422E, for its normals' scale) and its size on
+* screen (#R$46CA), the projection of points (#R$47C4, #R$47F0), the
+* stardust (#R$64F1, #R$656B, #R$6805), the length of a vector (#R$84A6) and
+* the compass (#R$8570).
 bit_length_table:                                          ; >0200
        byte >01,>01,>02,>02,>03,>03,>03,>03,>04,>04,>04,>04,>04,>04,>04,>04
        byte >05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05
@@ -277,12 +281,14 @@ bit_length_table:                                          ; >0200
 
 * Signed 3/4 scaling table
 * 
-* Entry n is the signed byte n * 3/4, rounded down: $00-$7F map to
-* $00-$5F, and $80-$FF (-128 to -1) map to $A0-$FF (-96 to -1).
-* Page-aligned so that it can be read with `LD H,$03 / LD L,n`. Used
-* by #R$3C29 and #R$3DD7 (and at #R$3F06) to turn a signed X coordinate
-* into a screen column: the result plus $57 (87, the centre of the
-* 176-pixel-wide space view) gives a column from -9 to 182.
+* Entry n is the signed byte n * 3/4, rounded to the nearest (halves away
+* from zero): $00-$7F map to $00-$5F, and $80-$FF (-128 to -1) map to
+* $A0-$FF (-96 to -1). Page-aligned so that it can be read with `LD H,$03 /
+* LD L,n` (or through DE). Used by #R$3C29, #R$3DD7 and #R$3EAD (at $3F06
+* and $3F28) to turn a signed X coordinate into a screen column: the result
+* plus $57 (87, the centre of the 176-pixel-wide space view) gives a column
+* from -9 to 182. #R$5524 also uses it to scale the first coordinate of each
+* point of the jump-range circle by 3/4.
 scale_3_4_table:                                           ; >0300
        byte >00,>01,>02,>02,>03,>04,>05,>05,>06,>07,>08,>08,>09,>0A,>0B,>0B
        byte >0C,>0D,>0E,>0E,>0F,>10,>11,>11,>12,>13,>14,>14,>15,>16,>17,>17
@@ -2394,7 +2400,6 @@ _196f:                                                     ; >196f
        .ret                                                ;                   
 !
 _197e:                                                     ; >197e
-       equ  $
        .call @random_byte                                  ; CALL $2176        ; 
        andi a,>0f00                                        ; AND $0F           ; 
        cb   a,@bytes+>0d                                   ; CP $0D            ; 
@@ -2580,7 +2585,7 @@ key_f5_info:                                               ; >1a8a
        socb a,a                                            ; OR A              ; 
        jne  key_f5_score                                   ; JR NZ,$1AD6       ; not the game time
        movb @bytes+>30,a                                   ; LD A,$30          ; '0': zero-pad the fields formatted below
-       movb a,@ef96_fill_char                              ; LD ($EF96),A      ; 
+       movb a,@number_fill_char                            ; LD ($EF96),A      ; 
        li   ix,game_time_digits                            ; LD IX,$1BB1       ; IX -> the message's embedded digit buffer
        movb @clock_days,a                                  ; LD A,($F745)      ; C = game_clock's days field
        movb a,@c                                           ; LD C,A            ; 
@@ -2602,7 +2607,7 @@ key_f5_info:                                               ; >1a8a
        movb @bytes+>82,a                                   ; LD A,$82          ; 
        .call @format_number                                ; CALL $3675        ; format it into (IX)
        movb @bytes+>20,a                                   ; LD A,$20          ; restore the default fill character (space)
-       movb a,@ef96_fill_char                              ; LD ($EF96),A      ; 
+       movb a,@number_fill_char                            ; LD ($EF96),A      ; 
        li   hl,msg_game_time                               ; LD HL,$1BA6       ; the clock-display message
        jmp  _1afa                                          ; JR $1AFA          ; show it
 key_f5_score:                                              ; >1ad6
@@ -3122,7 +3127,6 @@ title_screen_next_letter:                                  ; >1e48
        b    @title_screen_add_letter                       ;                   
 !
 _1e4e:                                                     ; >1e4e
-       equ  $
        dec  bc                                             ; DEC BC            ; 
        movb b,a                                            ; LD A,B            ; 
        socb @c,a                                           ; OR C              ; 
@@ -4936,7 +4940,6 @@ _25e1:                                                     ; >25e1
        .ret                                                ;                   
 !
 _25ed:                                                     ; >25ed
-       equ  $
        movb @ecm_countdown,a                               ; LD A,($E912)      ; 
        socb a,a                                            ; OR A              ; 
        jeq  !                                              ; RET NZ            ; 
@@ -5005,7 +5008,6 @@ handler_turn_then_attack:                                  ; >2641
        .ret                                                ;                   
 !
 _2656:                                                     ; >2656
-       equ  $
        movb @bytes+>08,a                                   ; LD A,$08          ; 
        movb a,@next_handler_type                           ; LD ($F7F3),A      ; type 8 after turning away
        b    @start_turning_away                            ; JP $281E          ; turn away (type 7)
@@ -5029,7 +5031,6 @@ handler_turn_then_leave:                                   ; >265e
        .ret                                                ;                   
 !
 _2673:                                                     ; >2673
-       equ  $
        li   hl,>0168                                       ; LD HL,$0168       ; 
        movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
        sb   @bytes+>0e,a                                   ; SUB $0E           ; 
@@ -5118,7 +5119,7 @@ _26c2:                                                     ; >26c2
        jeq  _2713                                          ; JR Z,$2713        ; yes - damage 6
        mov  @combat_rank,hl                                ; LD HL,($EB12)     ; 
        sb   h,h                                            ; LD H,$00          ; 
-       li   bc,per_rank_reject_sample_bound                ; LD BC,$28CB       ; 
+       li   bc,laser_damage_by_rank                        ; LD BC,$28CB       ; 
        a    bc,hl                                          ; ADD HL,BC         ; 
        movb *hl,@c                                         ; LD C,(HL)         ; 
 _270a:                                                     ; >270a
@@ -5144,7 +5145,6 @@ attack_steer:                                              ; >2723
        .call @every_third_frame                            ;                   
 !
 _272f:                                                     ; >272f
-       equ  $
        li   hl,reference_point_x                           ; LD HL,$EB88       ; HL -> the reference-point vector
        sb   *hl,*hl                                        ; LD (HL),$00       ; zero its first byte
        li   de,reference_point_x+>0001                     ; LD DE,$EB89       ; DE -> the rest of it
@@ -5495,22 +5495,16 @@ msg_credits:                                               ; >28b9
 msg_no_bounty:                                             ; >28c1
        text 'NO BOUNTY',>a1
 
-* Per-rank reject-sample upper bound (3 entries)
+* Maximum laser damage by combat rank
 * 
-* #R$26A9 (handler_attack, at $2705) indexes this table with
-* #R$EB12 (the player's combat rank) to get an exclusive upper
-* bound for a 3-bit reject-sampled random roll (0-7, rerolled until
-* below this bound), which then feeds #R$193F's shield-damage routine.
-* All 3 entries are the same value here, so this capture doesn't show
-* the bound actually varying by rank.
-per_rank_reject_sample_bound:                              ; >28cb
-       byte >02,>02,>02
-
-* Unused
-* 
-* Nothing has been found that reads these bytes.
-unused_28ce:                                               ; >28ce
-       byte >03,>03,>03,>04,>04,>04
+* When a ship's laser hits the player (#R$26A9), the damage to the shields
+* (#R$193F) is a random number from 1 up to this table's entry for the
+* player's combat rank (#R$EB12), so the higher the rank, the harder ships
+* hit. A Constrictor always does 6 instead.
+laser_damage_by_rank:                                      ; >28cb
+       byte >02,>02,>02                                              ; ranks 0-2 (Harmless to Poor): 1-2
+       byte >03,>03,>03                                              ; ranks 3-5 (Average to Competent): 1-3
+       byte >04,>04,>04                                              ; ranks 6-8 (Dangerous to E-L-I-T-E): 1-4
 
 * Clear the object table
 * 
@@ -6227,7 +6221,6 @@ _2c64:                                                     ; >2c64
        .ret                                                ;                   
 !
 _2cb0:                                                     ; >2cb0
-       equ  $
        .call @work_out_roof                                ; CALL $4599        ; work out its roof vector
        .call @save_working_object_to_scratch               ; CALL $3341        ; save it as the leader
        li   hl,escort_formation                            ; LD HL,$343B       ; 
@@ -6954,7 +6947,6 @@ _301f:                                                     ; >301f
        .ret                                                ;                   
 !
 _3031:                                                     ; >3031
-       equ  $
        a    de,ix                                          ; ADD IX,DE         ; next slot
        sb   one,b                                          ; DJNZ $301F        ; 
        jne  _301f                                          ;                   
@@ -7536,7 +7528,6 @@ right_on_commander:                                        ; >331b
        .ret                                                ;                   
 !
 _3320:                                                     ; >3320
-       equ  $
        li   hl,msg_right_commander                         ; LD HL,$3396       ; "Right On Commander"
        b    @show_view_message                             ; JP $39C8          ; display it
 
@@ -7840,7 +7831,6 @@ read_keyboard:                                             ; >347a
        .ret                                                ;                   
 !
 read_keyboard_scan:                                        ; >3490
-       equ  $
        .call @scan_keyboard                                ; CALL $344F        ; scan the keyboard
        jne  cache_key_and_translate_to_action              ; JR NZ,$349B       ; found a key
        movb @b255,a                                        ; LD A,$FF          ; 
@@ -8084,7 +8074,6 @@ skip_tokenised_strings_advancing_hl_past:                  ; >358d
        .ret                                                ;                   
 !
 _358f:                                                     ; >358f
-       equ  $
        movb *hl,r0                                         ; BIT 7,(HL)        ; 
        andi r0,>8000                                       ;                   
        inc  hl                                             ; INC HL            ; 
@@ -8308,7 +8297,7 @@ step_cursor_blink:                                         ; >3619
 * I:E Highest character code accepted
 * O:F Carry set if Enter was pressed, clear for ESC
 read_line_keyboard_input:                                  ; >3631
-       li   hl,keyboard_line_input_buffer_11_bytes         ; LD HL,$E8F7       ; HL -> the input buffer
+       li   hl,keyboard_input_buffer                       ; LD HL,$E8F7       ; HL -> the input buffer
        sb   b,b                                            ; LD B,$00          ; B = characters read so far
 _3636:                                                     ; >3636
        .call @wait_for_keypress_blinking_cursor            ; CALL $35E7        ; A = the next key (blocks until one is available)
@@ -8406,7 +8395,7 @@ _3696:                                                     ; >3696
        sb   @e,a                                           ; SUB E             ; minus the digits actually produced
        jeq  format_number_digits                           ; JR Z,$36AA        ; exactly enough already - no padding needed
        movb a,b                                            ; LD B,A            ; B = the padding count
-       movb @ef96_fill_char,a                              ; LD A,($EF96)      ; A = the fill character
+       movb @number_fill_char,a                            ; LD A,($EF96)      ; A = the fill character
 _36a3:                                                     ; >36a3
        movb a,*ix                                          ; LD (IX+$00),A     ; write B fill bytes
        inc  ix                                             ; INC IX            ; 
@@ -8656,7 +8645,6 @@ plot_line_pixel:                                           ; >3793
        .ret                                                ;                   
 !
 _37ad:                                                     ; >37ad
-       equ  $
        movb @c,a                                           ; LD A,C            ; 
        andi a,>0700                                        ; AND $07           ; the column's bit position within its byte (0-7)
        movb a,@plot_pixel_op+>0002                         ; LD ($37C1),A      ; point the OR at the column's mask (#R$37BF+2)
@@ -8685,7 +8673,7 @@ plot_pixel_op:                                             ; >37bf
 
 * Get the address of a pixel in the pattern table
 * 
-* Used by the routines at #R$3793, #R$50CE, #R$512F and #R$8204.
+* Used by the routines at #R$3793, #R$50CE, #R$512F and #R$8205.
 * .
 * For screen 2: (y / 8) * 256 + (x AND $F8) + (y AND 7).
 * 
@@ -9904,7 +9892,6 @@ shallow_line_rotate:                                       ; >3c93
        b    @shallow_line_error_term                       ;                   
 !
 shallow_line_step_column:                                  ; >3c98
-       equ  $
        sb   one,@l                                         ; DEC L             ; crossed a byte boundary - step the buffer pointer
 shallow_line_error_term:                                   ; >3c99
        .exx                                                ; EXX               ; back to the shadow set (H' = the error term)
@@ -9971,7 +9958,6 @@ steep_line_rotate:                                         ; >3cdc
        b    @steep_line_plot                               ;                   
 !
 steep_line_step_column:                                    ; >3ce1
-       equ  $
        ab   one,@l                                         ; INC L             ; crossed a byte boundary - step the buffer pointer
 steep_line_plot:                                           ; >3ce2
        jmp  _3ce6                                          ; JR $3CE6          ; join the shared plot
@@ -10818,7 +10804,6 @@ read_controls:                                             ; >401c
        .call @engage_torus_jump_drive                      ;                   
 !
 _4077:                                                     ; >4077
-       equ  $
        movb @pending_debounced_keypress_byte_status,a      ; LD A,($E8F5)      ; A = key typed, if any
        socb a,a                                            ; OR A              ; 
        jne  !                                              ; RET Z             ; none
@@ -10836,7 +10821,6 @@ _4077:                                                     ; >4077
        .ret                                                ;                   
 !
 _408b:                                                     ; >408b
-       equ  $
        li   hl,key_table                                   ; LD HL,$419B       ; HL -> the key table
        li   de,>0003                                       ; LD DE,$0003       ; 
        movb @c,a                                           ; LD A,C            ; 
@@ -11320,8 +11304,8 @@ _4303:                                                     ; >4303
        inc  hl                                             ; INC HL            ; 
        movb a,@face_scale                                  ; LD ($E7E8),A      ; the normal's scale
        movb a,@e                                           ; LD E,A            ; E = that byte, used as a table index
-       movb @bytes+>02,d                                   ; LD D,$02          ; D = $02 (table page)
-       movb *de,a                                          ; LD A,(DE)         ; A = table[D:E] entry
+       movb @bytes+>02,d                                   ; LD D,$02          ; 
+       movb *de,a                                          ; LD A,(DE)         ; A = the scale's bit length (#R$0200)
        movb a,@face_scale_bits                             ; LD ($E7E9),A      ; 
        li   de,rotated_vector                              ; LD DE,$E7EA       ; DE -> the $E7EA staging buffer
        .ldi                                                ; LDI               ; copy 6 bytes from (HL) into the staging buffer...
@@ -11339,7 +11323,6 @@ _4325:                                                     ; >4325
        b    @draw_ship_skip_face                           ;                   
 !
 _4331:                                                     ; >4331
-       equ  $
        .call @draw_face_edges                              ; CALL $491A        ; yes - draw its edges
        jmp  _433b                                          ; JR $433B          ; join the shared loop-advance tail
 draw_ship_skip_face:                                       ; >4336
@@ -11476,7 +11459,6 @@ draw_ship_laser:                                           ; >43c2
        b    @draw_ship_laser_2                             ;                   
 !
 _43fc:                                                     ; >43fc
-       equ  $
        movb @bp_gun_vertex,a                               ; LD A,($F803)      ; the gun vertex
        movb a,@e                                           ; LD E,A            ; E = that index
        .call @vertex_relative                              ; CALL $4A5C        ; relative to the player
@@ -12575,7 +12557,7 @@ draw_face_edge_drawn:                                      ; >4942
        movb one,@>05(ix)                                   ; LD (IX+$05),$01   ; the edge is drawn
        jmp  _4955                                          ; JR $4955          ; 
 draw_face_edges_2:                                         ; >4948
-       li   hl,culling_negative_counter                    ; LD HL,$E6EE       ; 
+       li   hl,skipped_edges_count                         ; LD HL,$E6EE       ; 
        ab   one,*hl                                        ; INC (HL)          ; one more edge skipped
        .pop hl                                             ; POP HL            ; 
        movb *hl,a                                          ; LD A,(HL)         ; 
@@ -12592,9 +12574,9 @@ draw_face_edges_3:                                         ; >4957
        movb a,@draw_face_edge_drawn_2+>0002                ; LD ($4960),A      ; point (IX+d) at the edge's flag (#R$495E+2)
 draw_face_edge_drawn_2:                                    ; >495e
        movb one,*ix                                        ; LD (IX+$00),$01   ; the edge is drawn
-       movb @culling_negative_counter,a                    ; LD A,($E6EE)      ; one fewer edge skipped
+       movb @skipped_edges_count,a                         ; LD A,($E6EE)      ; one fewer edge skipped
        sb   one,a                                          ; DEC A             ; 
-       movb a,@culling_negative_counter                    ; LD ($E6EE),A      ; 
+       movb a,@skipped_edges_count                         ; LD ($E6EE),A      ; 
 draw_face_next_edge:                                       ; >4969
        inc  hl                                             ; INC HL            ; 
        sb   one,b                                          ; DJNZ $491C        ; next edge
@@ -14298,7 +14280,6 @@ continue_512f_settle_candidate_column:                     ; >5180
        .ret                                                ;                   
 !
 _5182:                                                     ; >5182
-       equ  $
        movb a,@c                                           ; LD C,A            ; 
        li   hl,ring_position_scale_limit                   ; LD HL,$E835       ; 
        sb   *hl,a                                          ; SUB (HL)          ; check against the scale/limit value
@@ -14342,7 +14323,6 @@ continue_5180_subtract_row_offset:                         ; >51b2
        .ret                                                ;                   
 !
 _51b4:                                                     ; >51b4
-       equ  $
        sb   @bytes+>04,a                                   ; SUB $04           ; finish settling the row
        jnc  !                                              ; RET C             ; TODO: check code. out of range - reject this candidate
        .ret                                                ;                   
@@ -14455,7 +14435,6 @@ _521f:                                                     ; >521f
        .call @draw_marker_stroke_vertical                  ;                   
 !
 _522a:                                                     ; >522a
-       equ  $
        movb @chart_marker_screen_position,a                ; LD A,($E82E)      ; A = the marker's X
        ab   *hl,a                                          ; ADD A,(HL)        ; +offsetX
        joc  _5235                                          ; JR C,$5235        ; TODO: check code. overflowed - too close to the right edge, skip
@@ -14585,7 +14564,6 @@ select_current_system_3:                                   ; >52c8
        .call @galactic_chart_cursor_to_selected            ;                   
 !
 _52cd:                                                     ; >52cd
-       equ  $
        .ret                                                ; RET               ; 
 
 * Key 'D': show the distance to the selected system
@@ -15018,10 +14996,10 @@ _5536:                                                     ; >5536
        .call @multiply_a_e_16bit                           ; CALL $1F60        ; 
        ; RL L                                              ; RL L              ; TODO: check code. 
        sla  h,1                                            ; RL H              ; TODO: check code. 
-       movb h,@l                                           ; LD L,H            ; 
+       movb h,@l                                           ; LD L,H            ; L = the scaled first component
        movb @bytes+>03,h                                   ; LD H,$03          ; 
        movb @c,@e                                          ; LD E,C            ; 
-       movb *hl,@c                                         ; LD C,(HL)         ; 
+       movb *hl,@c                                         ; LD C,(HL)         ; C = 3/4 of it (#R$0300)
        movb @fuel_level,a                                  ; LD A,($F775)      ; scale the second component by the fuel level
        .call @multiply_a_e_16bit                           ; CALL $1F60        ; 
        ; RL L                                              ; RL L              ; TODO: check code. 
@@ -15130,14 +15108,13 @@ key_find_system:                                           ; >55a3
        joc  !                                              ; RET NC            ; TODO: check code. ESC
        .ret                                                ;                   
 !
-       li   hl,keyboard_line_input_buffer_11_bytes         ; LD HL,$E8F7       ; the typed name
+       li   hl,keyboard_input_buffer                       ; LD HL,$E8F7       ; the typed name
        movb *hl,a                                          ; LD A,(HL)         ; 
        socb a,a                                            ; OR A              ; 
        jne  !                                              ; RET Z             ; nothing typed
        .ret                                                ;                   
 !
 _55c8:                                                     ; >55c8
-       equ  $
        inc  hl                                             ; INC HL            ; lower-case all but the first letter
        movb *hl,a                                          ; LD A,(HL)         ; 
        socb a,a                                            ; OR A              ; 
@@ -15153,13 +15130,13 @@ _55d5:                                                     ; >55d5
        li   hl,system_name                                 ; LD HL,$F756       ; 
        .call @expand_name                                  ; CALL $4CB8        ; its name
        li   hl,text_buffer                                 ; LD HL,$E717       ; 
-       li   de,keyboard_line_input_buffer_11_bytes         ; LD DE,$E8F7       ; the name typed
+       li   de,keyboard_input_buffer                       ; LD DE,$E8F7       ; the name typed
        .call @compare_null_terminated_strings              ; CALL $3A69        ; the same?
        jeq  continue_55d2_match_found                      ; JR Z,$55F6        ; yes - select it
        .pop bc                                             ; POP BC            ; 
        sb   one,b                                          ; DJNZ $55D5        ; next system
        jne  _55d5                                          ;                   
-       li   hl,keyboard_line_input_buffer_11_bytes         ; LD HL,$E8F7       ; the name typed
+       li   hl,keyboard_input_buffer                       ; LD HL,$E8F7       ; the name typed
        .rst >08                                            ; RST $08           ; 
        li   hl,msg_not_found                               ; LD HL,$56B1       ; " not found."
        .rst >08                                            ; RST $08           ; 
@@ -15673,9 +15650,17 @@ msg_kg:                                                    ; >5ac0
 mass_unit_suffix_g:                                        ; >5ac2
        text 'G+>8'
 
-* Small 4-byte data table, pointed to directly by `LD HL,$5AC3` at $5F85
-small_4_byte_data_table_pointed:                           ; >5ac3
-       byte >04,>0C,>05,>0D
+* Equipment item numbers of the four lasers
+* 
+* Each is also the offset of the laser's entry in the equipment (#R$F775),
+* which has a bit for each mount it's fitted to. They're in the order of
+* the laser types 0-3 (#R$F818). When a laser is bought, #R$5EFE checks
+* the other three for one fitted to the same mount, and removes it.
+laser_items:                                               ; >5ac3
+       byte >04                                                      ; pulse laser (#R$F779)
+       byte >0C                                                      ; mining laser (#R$F781)
+       byte >05                                                      ; beam laser (#R$F77A)
+       byte >0D                                                      ; military laser (#R$F782)
 
 * Ask for a number
 * 
@@ -15696,7 +15681,7 @@ ask_for_number:                                            ; >5ac7
        joc  !                                              ; RET NC            ; TODO: check code. ESC
        .ret                                                ;                   
 !
-       li   de,keyboard_line_input_buffer_11_bytes         ; LD DE,$E8F7       ; DE -> the buffer
+       li   de,keyboard_input_buffer                       ; LD DE,$E8F7       ; DE -> the buffer
        movb *de,a                                          ; LD A,(DE)         ; A = its first byte
        socb a,a                                            ; OR A              ; empty (just Enter, no digits)?
        ; SCF                                               ; SCF               ; TODO: check code. 
@@ -16547,7 +16532,7 @@ _5f0f:                                                     ; >5f0f
        jmp  _5f0f                                          ; JR $5F0F          ; 
 single_remaining_slot_or_menu:                             ; >5f18
        movb @c,a                                           ; LD A,C            ; 
-       movb a,@view_laser_type                             ; LD ($F818),A      ; the group this flow started from
+       movb a,@view_laser_type                             ; LD ($F818),A      ; keep the item number of the laser being bought
        movb b,a                                            ; LD A,B            ; 
        cb   a,@bytes+>03                                   ; CP $03            ; exactly 3 installed?
        jne  offer_free_slots_menu                          ; JR NZ,$5F28       ; no - offer a menu of the free slots
@@ -16566,7 +16551,7 @@ _5f2d:                                                     ; >5f2d
        li   hl,msg_position                                ; LD HL,$5782       ; a header message
        .rst >08                                            ; RST $08           ; print it
        li   hl,msg_fblr                                    ; LD HL,$57DD       ; the 4-letter option array
-       li   de,offered_group_letters                       ; LD DE,$E745       ; the buffer of offered letters
+       li   de,offered_mount_letters                       ; LD DE,$E745       ; the buffer of offered letters
 _5f38:                                                     ; >5f38
        ; RR C                                              ; RR C              ; TODO: check code. test the next bit
        jnc  continue_5f28_offer_letter_read_choice         ; JR NC,$5F3F       ; TODO: check code. clear (not installed) - offer it
@@ -16596,13 +16581,13 @@ _5f4c:                                                     ; >5f4c
        joc  !                                              ; RET NC            ; TODO: check code. Esc - cancel
        .ret                                                ;                   
 !
-       movb @keyboard_line_input_buffer_11_bytes,a         ; LD A,($E8F7)      ; A = the typed character
+       movb @keyboard_input_buffer,a                       ; LD A,($E8F7)      ; A = the typed character
        socb a,a                                            ; OR A              ; 
        jne  !                                              ; RET Z             ; empty - cancel
        .ret                                                ;                   
 !
        .push bc                                            ; PUSH BC           ; 
-       li   hl,offered_group_letters                       ; LD HL,$E745       ; the offered-letters buffer
+       li   hl,offered_mount_letters                       ; LD HL,$E745       ; the offered-letters buffer
        movb b,@c                                           ; LD C,B            ; C = how many were offered
        sb   b,b                                            ; LD B,$00          ; 
        ; CPIR                                              ; CPIR              ; TODO: check code. search for the typed letter
@@ -16623,72 +16608,72 @@ _5f7d:                                                     ; >5f7d
        ; SLA C                                             ; SLA C             ; TODO: check code. 
        jmp  _5f7d                                          ; JR $5F7D          ; 
 auto_sell_conflict_buy_install:                            ; >5f85
-       li   hl,small_4_byte_data_table_pointed             ; LD HL,$5AC3       ; the group-ID table
+       li   hl,laser_items                                 ; LD HL,$5AC3       ; the four lasers' item numbers
        sb   a,a                                            ; XOR A             ; 
-       movb a,@equipment_prerefund_flag                    ; LD ($E74D),A      ; clear "a conflict was resolved" flag
-       movb @bytes+>04,b                                   ; LD B,$04          ; 4 groups
+       movb a,@equipment_prerefund_flag                    ; LD ($E74D),A      ; no laser removed yet
+       movb @bytes+>04,b                                   ; LD B,$04          ; 4 lasers
 _5f8e:                                                     ; >5f8e
-       movb @view_laser_type,a                             ; LD A,($F818)      ; A = the group this flow started from
-       cb   a,*hl                                          ; CP (HL)           ; this table entry's group?
-       jeq  _5fcd                                          ; JR Z,$5FCD        ; yes - skip it, don't conflict-check against itself
+       movb @view_laser_type,a                             ; LD A,($F818)      ; A = the laser being bought
+       cb   a,*hl                                          ; CP (HL)           ; is it this one?
+       jeq  _5fcd                                          ; JR Z,$5FCD        ; yes - skip it
        .push hl                                            ; PUSH HL           ; 
-       movb *hl,@e                                         ; LD E,(HL)         ; DE = this other group's $F775 index
+       movb *hl,@e                                         ; LD E,(HL)         ; DE = the other laser's item number
        sb   d,d                                            ; LD D,$00          ; 
        li   hl,fuel_level                                  ; LD HL,$F775       ; 
-       a    de,hl                                          ; ADD HL,DE         ; HL -> that group's flags byte
+       a    de,hl                                          ; ADD HL,DE         ; HL -> its entry in the equipment
        movb *hl,a                                          ; LD A,(HL)         ; 
-       ; AND C                                             ; AND C             ; TODO: check code. does it also have this bit set?
-       jeq  continue_5f85_buy_install_or_rollback          ; JR Z,$5FCC        ; no conflict - next group
-       mov  hl,@equipment_conflict_flags_ptr               ; LD ($E74E),HL     ; conflict: cache its address (for a possible rollback)
+       ; AND C                                             ; AND C             ; TODO: check code. is it fitted to this mount?
+       jeq  continue_5f85_buy_install_or_rollback          ; JR Z,$5FCC        ; no - try the next laser
+       mov  hl,@equipment_conflict_flags_ptr               ; LD ($E74E),HL     ; yes: remember the entry's address...
        movb *hl,a                                          ; LD A,(HL)         ; 
-       movb a,@equipment_prerefund_flag                    ; LD ($E74D),A      ; cache its pre-refund value too
+       movb a,@equipment_prerefund_flag                    ; LD ($E74D),A      ; ...and its old value, in case they need putting back
        movb @c,a                                           ; LD A,C            ; 
        inv  a                                              ; CPL               ; 
-       ; AND (HL)                                          ; AND (HL)          ; TODO: check code. clear the conflicting bit (auto-uninstall it)
+       ; AND (HL)                                          ; AND (HL)          ; TODO: check code. remove it from the mount
        movb a,*hl                                          ; LD (HL),A         ; 
 _5fab:                                                     ; >5fab
-       li   hl,equipment_prices                            ; LD HL,$116B       ; that item's price
+       li   hl,equipment_prices                            ; LD HL,$116B       ; its price
        a    de,hl                                          ; ADD HL,DE         ; 
        a    de,hl                                          ; ADD HL,DE         ; 
        movb *hl,@e                                         ; LD E,(HL)         ; 
        inc  hl                                             ; INC HL            ; 
        movb *hl,d                                          ; LD D,(HL)         ; 
-       mov  @player_cash,hl                                ; LD HL,($EB16)     ; cache the pre-refund cash (for a possible rollback)
+       mov  @player_cash,hl                                ; LD HL,($EB16)     ; remember the cash, in case it needs putting back
        movb @cash_2,a                                      ; LD A,($EB18)      ; 
        mov  hl,@equipment_prerefund_cash_lo                ; LD ($E750),HL     ; 
        movb a,@equipment_prerefund_cash_hi_or_qty          ; LD ($E752),A      ; 
-       a    de,hl                                          ; ADD HL,DE         ; refund the conflicting item's price
+       a    de,hl                                          ; ADD HL,DE         ; refund the removed laser's price
        ab   @zero,a                                        ; ADC A,$00         ; 
        mov  hl,@player_cash                                ; LD ($EB16),HL     ; 
        movb a,@cash_2                                      ; LD ($EB18),A      ; 
        .pop hl                                             ; POP HL            ; 
-       b    @buy_laser_install                             ; JP $5FD0          ; buy and install the new item
+       b    @buy_laser_install                             ; JP $5FD0          ; buy and fit the new laser
 continue_5f85_buy_install_or_rollback:                     ; >5fcc
-       .pop hl                                             ; POP HL            ; not a conflict - discard the stashed address
+       .pop hl                                             ; POP HL            ; 
 _5fcd:                                                     ; >5fcd
-       inc  hl                                             ; INC HL            ; -> the next group-ID table entry
-       sb   one,b                                          ; DJNZ $5F8E        ; next group
+       inc  hl                                             ; INC HL            ; the next laser
+       sb   one,b                                          ; DJNZ $5F8E        ; 
        jne  _5f8e                                          ;                   
 buy_laser_install:                                         ; >5fd0
-       mov  @equipment_install_flags_ptr,hl                ; LD HL,($E749)     ; HL -> the flags byte being installed into
+       mov  @equipment_install_flags_ptr,hl                ; LD HL,($E749)     ; HL -> the new laser's entry in the equipment
        .push bc                                            ; PUSH BC           ; 
        .push hl                                            ; PUSH HL           ; 
-       movb @view_laser_type,a                             ; LD A,($F818)      ; A = the priced item's index
+       movb @view_laser_type,a                             ; LD A,($F818)      ; A = its item number
        .call @buy_equipment                                ; CALL $6002        ; buy it
        .pop hl                                             ; POP HL            ; 
        .pop bc                                             ; POP BC            ; 
-       joc  rollback_conflict_refund_on_failure            ; JR C,$5FE4        ; TODO: check code. couldn't afford it - roll back any conflict refund
-       movb *hl,a                                          ; LD A,(HL)         ; affordable - set the new bit
+       joc  rollback_conflict_refund_on_failure            ; JR C,$5FE4        ; TODO: check code. can't pay for it
+       movb *hl,a                                          ; LD A,(HL)         ; fit it to the mount
        socb @c,a                                           ; OR C              ; 
        movb a,*hl                                          ; LD (HL),A         ; 
        jmp  _5ffa                                          ; JR $5FFA          ; 
 rollback_conflict_refund_on_failure:                       ; >5fe4
-       movb @equipment_prerefund_flag,a                    ; LD A,($E74D)      ; A = the pre-refund flag byte (0 if no conflict)
+       movb @equipment_prerefund_flag,a                    ; LD A,($E74D)      ; A = the removed laser's old entry
        socb a,a                                            ; OR A              ; 
-       jeq  _5ffa                                          ; JR Z,$5FFA        ; no conflict was resolved - nothing to undo
-       mov  @equipment_conflict_flags_ptr,hl               ; LD HL,($E74E)     ; restore the conflicting group's flags byte
+       jeq  _5ffa                                          ; JR Z,$5FFA        ; no laser was removed
+       mov  @equipment_conflict_flags_ptr,hl               ; LD HL,($E74E)     ; put the removed laser back
        movb a,*hl                                          ; LD (HL),A         ; 
-       mov  @equipment_prerefund_cash_lo,hl                ; LD HL,($E750)     ; restore the pre-refund cash total
+       mov  @equipment_prerefund_cash_lo,hl                ; LD HL,($E750)     ; and the cash
        movb @equipment_prerefund_cash_hi_or_qty,a          ; LD A,($E752)      ; 
        mov  hl,@player_cash                                ; LD ($EB16),HL     ; 
        movb a,@cash_2                                      ; LD ($EB18),A      ; 
@@ -17037,7 +17022,6 @@ key_data_on_system_2:                                      ; >6170
        .call @constrictor_trail                            ;                   
 !
 _6175:                                                     ; >6175
-       equ  $
        movb @current_screen,a                              ; LD A,($E902)      ; A = the current screen
        cb   a,one                                          ; CP $01            ; Data on System showing?
        jne  !                                              ; RET Z             ; yes - nothing to do
@@ -17053,7 +17037,6 @@ key_data_on_system_3:                                      ; >6184
        .call @local_chart_select                           ;                   
 !
 show_system_data_screen:                                   ; >6189
-       equ  $
        .call @hide_sprites_clear_page                      ; CALL $608C        ; hide sprites
        li   ix,data_on_system_frame                        ; LD IX,$59B7       ; 
        .rst >28                                            ; RST $28           ; draw a frame
@@ -17562,12 +17545,12 @@ switch_view:                                               ; >645b
        .push bc                                            ; PUSH BC           ; 
        .call @enter_flight_mode                            ; CALL $63F1        ; no: set up the cockpit screen (#R$63F1)
        movb @b255,a                                        ; LD A,$FF          ; 
-       movb a,@eb9a_dispatch_index                         ; LD ($EB9A),A      ; and make sure the view counts as changed
+       movb a,@current_view                                ; LD ($EB9A),A      ; and make sure the view counts as changed
        .pop bc                                             ; POP BC            ; 
 _646f:                                                     ; >646f
        .pop de                                             ; POP DE            ; DE -> the view's name
        movb b,a                                            ; LD A,B            ; A = the new view
-       li   hl,eb9a_dispatch_index                         ; LD HL,$EB9A       ; 
+       li   hl,current_view                                ; LD HL,$EB9A       ; 
        cb   a,*hl                                          ; CP (HL)           ; the same as the current view?
        jeq  _6496                                          ; JR Z,$6496        ; yes - skip
        movb a,*hl                                          ; LD (HL),A         ; set the current view
@@ -18195,7 +18178,7 @@ stardust_move_abs_x:                                       ; >679b
 * I:HL Address of a table of 4 handler addresses (front, rear, left,
 * .    right)
 jump_to_view_handler:                                      ; >67a8
-       movb @eb9a_dispatch_index,a                         ; LD A,($EB9A)      ; A = current view
+       movb @current_view,a                                ; LD A,($EB9A)      ; A = current view
        ab   a,a                                            ; ADD A,A           ; 
        movb a,@c                                           ; LD C,A            ; 
        sb   b,b                                            ; LD B,$00          ; 
@@ -18546,7 +18529,7 @@ stardust_check_top_edge_and_plot:                          ; >6911
        cb   a,@bytes+>c1                                   ; CP $C1            ; Y < -63?
        jl   stardust_flag_respawn                          ; JR C,$6950        ; yes - off the top edge, respawn it
 _6915:                                                     ; >6915
-       movb @eb9a_dispatch_index,a                         ; LD A,($EB9A)      ; A = current view
+       movb @current_view,a                                ; LD A,($EB9A)      ; A = current view
        sb   one,a                                          ; DEC A             ; 
        jne  _6931                                          ; JR NZ,$6931       ; not the rear view - go plot it
        movb @e,a                                           ; LD A,E            ; 
@@ -19415,13 +19398,13 @@ tunnel_rings_show:                                         ; >6d0d
 * between shots (#R$F819) and power (#R$F81A), and its crosshair pattern
 * (#R$6DEB), which it uploads to the sprite patterns at $3800 (#R$39B9);
 * then sets up the crosshair as four 16x16 sprites around the middle of the
-* view (#R$39A4).
+* view (#R$39A4), in the laser type's colour.
 view_laser:                                                ; >6d24
        movb @b255,@c                                       ; LD C,$FF          ; no laser yet
        movb @e940_gate_flag,a                              ; LD A,($E940)      ; 
        socb a,a                                            ; OR A              ; 
        jne  _6d6e                                          ; JR NZ,$6D6E       ; the title screen - no laser
-       movb @eb9a_dispatch_index,a                         ; LD A,($EB9A)      ; A = current view
+       movb @current_view,a                                ; LD A,($EB9A)      ; A = current view
        movb a,b                                            ; LD B,A            ; 
        ab   one,b                                          ; INC B             ; 
        movb @bytes+>80,a                                   ; LD A,$80          ; 
@@ -19487,7 +19470,7 @@ set_up_laser:                                              ; >6d82
        ab   @e,a                                           ; ADD A,E           ; 
        movb a,@e                                           ; LD E,A            ; 
        sb   d,d                                            ; LD D,$00          ; 
-       li   hl,laser_types                                 ; LD HL,$6EB3       ; the per-mount-type record table
+       li   hl,laser_types                                 ; LD HL,$6EB3       ; the laser types
        a    de,hl                                          ; ADD HL,DE         ; HL -> this type's record
        movb *hl,a                                          ; LD A,(HL)         ; 
        inc  hl                                             ; INC HL            ; 
@@ -19495,7 +19478,7 @@ set_up_laser:                                              ; >6d82
        movb *hl,a                                          ; LD A,(HL)         ; 
        inc  hl                                             ; INC HL            ; 
        movb a,@laser_power                                 ; LD ($F81A),A      ; laser power
-       movb *hl,@e                                         ; LD E,(HL)         ; E = crosshair pattern size
+       movb *hl,@e                                         ; LD E,(HL)         ; E = the crosshair colour
        inc  hl                                             ; INC HL            ; 
        movb *hl,a                                          ; LD A,(HL)         ; 
        inc  hl                                             ; INC HL            ; 
@@ -19561,65 +19544,74 @@ gauge_bar_patterns:                                        ; >6de3
 
 * Crosshair patterns
 * 
-* The crosshair sprite patterns for the four laser types, run-length
-* encoded (#R$39B9): pulse laser at #R$6DEB, mining laser at #R$6E1A, beam
-* laser at #R$6E47 and military laser at #R$6E80 (see #R$6EB3).
+* The crosshair sprite patterns for the four laser types (#R$6EB3), which
+* #R$6D82 uploads to sprite patterns 0-15 at $3800 and shows as four 16x16
+* sprites making up a 32x32 crosshair. Each is a run-length encoded stream
+* (#R$39B9) of (count, value) pairs, ending with 0, that expands to the 128
+* bytes of the four sprite patterns: pulse laser at #R$6DEB, mining laser
+* at #R$6E1A, beam laser at #R$6E47 and military laser at #R$6E80.
+* .
+* The beam laser's stream expands to only 127 bytes, so the last byte of
+* sprite pattern 15 keeps whatever the previous crosshair left there. The
+* other three streams all end with a run of zeros, so it's 0.
 crosshair_patterns:                                        ; >6deb
-       byte >0F,>00,>01,>3F,>02,>00,>07,>01
+       byte >0F,>00,>01,>3F,>02,>00,>07,>01                          ; pulse laser: a cross with a gap in the middle
        byte >06,>00,>01,>80,>01,>3F,>0F,>00
        byte >01,>80,>06,>00,>07,>01,>04,>00
        byte >07,>80,>06,>00,>01,>01,>0F,>00
        byte >01,>FC,>01,>01,>06,>00,>07,>80
-       byte >02,>00,>01,>FC,>0F,>00,>00                              ; 
+       byte >02,>00,>01,>FC,>0F,>00
+       byte >00                                                      ; end
 crosshair_mining:                                          ; >6e1a
-       byte >05                                                      ; the mining laser's crosshair
-       byte >00,>01,>0F,>05,>0C,>05,>00,>05
-       byte >00,>01,>FF,>0F,>00,>05,>0C,>01
-       byte >0F,>0F,>00,>01,>FF,>0A,>00,>01
-       byte >FF,>0F,>00,>01,>F0,>05,>30,>0F
-       byte >00,>01,>FF,>0A,>00,>05,>30,>01
-       byte >F0,>05,>00,>00                                          ; 
+       byte >05,>00,>01,>0F,>05,>0C,>05,>00                          ; mining laser: a box, open at the sides
+       byte >05,>00,>01,>FF,>0F,>00,>05,>0C
+       byte >01,>0F,>0F,>00,>01,>FF,>0A,>00
+       byte >01,>FF,>0F,>00,>01,>F0,>05,>30
+       byte >0F,>00,>01,>FF,>0A,>00,>05,>30
+       byte >01,>F0,>05,>00
+       byte >00                                                      ; end
 crosshair_beam:                                            ; >6e47
-       byte >01,>00,>01,>60                                          ; the beam laser's crosshair
-       byte >01,>30,>01,>18,>01,>0C,>01,>06
-       byte >01,>03,>22,>00,>01,>03,>01,>06
+       byte >01,>00,>01,>60,>01,>30,>01,>18                          ; beam laser: an X with a gap in the middle (127 bytes)
+       byte >01,>0C,>01,>06,>01,>03,>22,>00
+       byte >01,>03,>01,>06,>01,>0C,>01,>18
+       byte >01,>30,>01,>60,>22,>00,>01,>06
        byte >01,>0C,>01,>18,>01,>30,>01,>60
-       byte >22,>00,>01,>06,>01,>0C,>01,>18
-       byte >01,>30,>01,>60,>01,>C0,>22,>00
-       byte >01,>C0,>01,>60,>01,>30,>01,>18
-       byte >01,>0C,>01,>06,>00                                      ; 
+       byte >01,>C0,>22,>00,>01,>C0,>01,>60
+       byte >01,>30,>01,>18,>01,>0C,>01,>06
+       byte >00                                                      ; end
 crosshair_military:                                        ; >6e80
-       byte >07,>00,>01                                              ; the military laser's crosshair
-       byte >0F,>03,>0C,>09,>00,>03,>01,>01
-       byte >FF,>0D,>00,>03,>0C,>01,>0F,>0F
-       byte >00,>01,>FF,>03,>01,>08,>00,>03
-       byte >80,>01,>FF,>0F,>00,>01,>F0,>03
-       byte >30,>0D,>00,>01,>FF,>03,>80,>09
-       byte >00,>03,>30,>01,>F0,>07,>00,>00
+       byte >07,>00,>01,>0F,>03,>0C,>09,>00                          ; military laser: a box with a tick above and below
+       byte >03,>01,>01,>FF,>0D,>00,>03,>0C
+       byte >01,>0F,>0F,>00,>01,>FF,>03,>01
+       byte >08,>00,>03,>80,>01,>FF,>0F,>00
+       byte >01,>F0,>03,>30,>0D,>00,>01,>FF
+       byte >03,>80,>09,>00,>03,>30,>01,>F0
+       byte >07,>00
+       byte >00                                                      ; end
 
 * Laser types
 * 
 * Five bytes for each type of laser, read by #R$6D82: the cooldown between
-* shots (#R$F819), the power (#R$F81A), the size and address of the
-* crosshair pattern (#R$6DEB).
+* shots (#R$F819), the power (#R$F81A), the colour of the crosshair
+* sprites, and the address of the crosshair pattern (#R$6DEB).
 laser_types:                                               ; >6eb3
-       byte >05,>05,>02                                              ; 0: pulse laser
+       byte >05,>05,>02                                              ; 0: pulse laser - cooldown 5, power 5, medium green
        data crosshair_patterns                                       ; the crosshair pattern
-       byte >04,>0A,>06                                              ; 1: mining laser
+       byte >04,>0A,>06                                              ; 1: mining laser - cooldown 4, power 10, dark red
        data crosshair_mining                                         ; the crosshair pattern
-       byte >02,>05,>07                                              ; 2: beam laser
+       byte >02,>05,>07                                              ; 2: beam laser - cooldown 2, power 5, cyan
        data crosshair_beam                                           ; the crosshair pattern
-       byte >00,>0A,>0D                                              ; 3: military laser
+       byte >00,>0A,>0D                                              ; 3: military laser - cooldown 0, power 10, magenta
        data crosshair_military                                       ; the crosshair pattern
 
 * Flight sprite patterns
 * 
 * Two run-length encoded sprite pattern streams (see #R$39B9), each ending
-* with 0, uploaded by #R$63F1 on entering flight. The first fills the 16x16
-* sprite patterns $10 and $14 at $3880: a filled 5x5 square (a missile
-* the ship has) and a hollow one (an empty missile slot), as used by
-* #R$6B6E. The second fills pattern $18 at $38C0: the compass dot used by
-* #R$85FB.
+* with 0, uploaded whenever the cockpit screen is set up (#R$63F1). The
+* first fills the 16x16 sprite patterns $10 and $14 at $3880: a filled 5x5
+* square (a missile the ship has) and a hollow one (an empty missile slot),
+* as used by #R$6B6E. The second fills pattern $18 at $38C0: the compass
+* dot used by #R$85FB.
 flight_sprite_patterns:                                    ; >6ec7
        byte >05,>F8,>1B,>00,>01,>F8,>03,>88,>01,>F8,>1B,>00,>00      ; $3880: missile, empty missile slot
 compass_dot_pattern:                                       ; >6ed4
@@ -19705,6 +19697,26 @@ stardust_directions:                                       ; >6f1f
 * 15 particles here (11 bytes each). So in this snapshot these bytes are
 * the stardust table.
 * .
+* Each particle's 11 bytes:
+* .
+* #TABLE
+* { =h Offset | =h Contents }
+* { $00-$01 | X: the horizontal position relative to the centre of the space
+* view (#R$68CD), in signed 8.8 fixed point - the high byte is the pixel
+* offset, negative to the left; the view is 176 pixels across }
+* { $02-$03 | Y: the vertical position, in the same format - negative
+* upwards; the view is 128 pixels high }
+* { $04-$05 | The X velocity: the amount added to X each time the
+* particle moves, in the same format (#R$6805) }
+* { $06-$07 | The Y velocity, likewise }
+* { $08 | The respawn flag: $FF when the particle has left the view and
+* needs a new position (#R$68CD), 0 once it has one (#R$6805) }
+* { $09 | The amount added to the X velocity for each step up in the
+* ship's speed, and taken away for each step down (#R$6956, #R$699C): a
+* quarter of the direction vector's X component (#R$6F1F) }
+* { $0A | The same for the Y velocity }
+* TABLE#
+* .
 * The startup code:
 * .
 * 1. Saves HL (the address of the cockpit screen picture) in #R$F740.
@@ -19720,27 +19732,21 @@ stardust_directions:                                       ; >6f1f
 * 8. Fills the explosion's table of random numbers (#R$EEC6).
 * 9. Sets the sprite size to 16x16 (VDP register 1, #R$F3E0).
 startup_code_stardust_table:                               ; >6f9f
-       byte >00,>15,>00,>19,>28,>00,>30,>00
-       byte >00,>0A,>0C,>00,>37,>00,>CB,>2D
-       byte >00,>D3,>FF,>00,>0B,>F4,>00,>EB
-       byte >00,>1B,>D8,>FF,>30,>00,>00,>F6
-       byte >0C,>00,>3B,>00,>E0,>37,>00,>E1
-       byte >FF,>00,>0D,>F8,>00,>13,>00,>EC
-       byte >27,>00,>CF,>FF,>00,>09,>F3,>00
-       byte >3F,>00,>DD,>37,>00,>E1,>FF,>00
-       byte >0D,>F8,>00,>30,>00,>2C,>30,>00
-       byte >28,>00,>00,>0C,>0A,>00,>EF,>00
-       byte >16,>D9,>FF,>31,>00,>00,>F6,>0C
-       byte >00,>DD,>00,>2F,>D9,>FF,>31,>00
-       byte >00,>F6,>0C,>00,>E8,>00,>12,>CC
-       byte >FF,>23,>00,>00,>F3,>08,>00,>29
-       byte >00,>C7,>25,>00,>CD,>FF,>00,>09
-       byte >F3,>00,>CB,>00,>32,>D3,>FF,>2D
-       byte >00,>00,>F4,>0B,>00,>3E,>00,>35
-       byte >30,>00,>29,>00,>00,>0C,>0A,>00
-       byte >24,>00,>CA,>23,>00,>CC,>FF,>00
-       byte >08,>F3,>00,>3F,>00,>21,>37,>00
-       byte >1F,>00,>00,>0D,>07
+       byte >00,>15,>00,>19,>28,>00,>30,>00,>00,>0A,>0C              ; particle 0
+       byte >00,>37,>00,>CB,>2D,>00,>D3,>FF,>00,>0B,>F4              ; particle 1
+       byte >00,>EB,>00,>1B,>D8,>FF,>30,>00,>00,>F6,>0C              ; particle 2
+       byte >00,>3B,>00,>E0,>37,>00,>E1,>FF,>00,>0D,>F8              ; particle 3
+       byte >00,>13,>00,>EC,>27,>00,>CF,>FF,>00,>09,>F3              ; particle 4
+       byte >00,>3F,>00,>DD,>37,>00,>E1,>FF,>00,>0D,>F8              ; particle 5
+       byte >00,>30,>00,>2C,>30,>00,>28,>00,>00,>0C,>0A              ; particle 6
+       byte >00,>EF,>00,>16,>D9,>FF,>31,>00,>00,>F6,>0C              ; particle 7
+       byte >00,>DD,>00,>2F,>D9,>FF,>31,>00,>00,>F6,>0C              ; particle 8
+       byte >00,>E8,>00,>12,>CC,>FF,>23,>00,>00,>F3,>08              ; particle 9
+       byte >00,>29,>00,>C7,>25,>00,>CD,>FF,>00,>09,>F3              ; particle 10
+       byte >00,>CB,>00,>32,>D3,>FF,>2D,>00,>00,>F4,>0B              ; particle 11
+       byte >00,>3E,>00,>35,>30,>00,>29,>00,>00,>0C,>0A              ; particle 12
+       byte >00,>24,>00,>CA,>23,>00,>CC,>FF,>00,>08,>F3              ; particle 13
+       byte >00,>3F,>00,>21,>37,>00,>1F,>00,>00,>0D,>07              ; particle 14
 
 * #R$6F9F's original RET, deliberately excluded from its self-reclaimed
 * range (see step 7 there: the reclaimed span is $6F9F-$7043, this byte
@@ -20102,7 +20108,6 @@ _723f:                                                     ; >723f
        .call @move_chart_cursor                            ;                   
 !
 _7246:                                                     ; >7246
-       equ  $
        movb @ecm_countdown,a                               ; LD A,($E912)      ; A = ECM countdown
        socb a,a                                            ; OR A              ; 
        jeq  vblank_clock                                   ; JR Z,$7256        ; not running
@@ -20538,7 +20543,7 @@ stop_all_sound:                                            ; >7438
        jlt  !                                              ; JP P,$745F        ; not playing sound effects
        b    @stop_all_sound_silence                        ;                   
 !
-       li   ix,e8a3_channel_records                        ; LD IX,$E8A3       ; IX -> the 3 channels
+       li   ix,sound_channel_records                       ; LD IX,$E8A3       ; IX -> the 3 channels
        li   de,>000f                                       ; LD DE,$000F       ; 
        movb @bytes+>03,b                                   ; LD B,$03          ; 
 _7449:                                                     ; >7449
@@ -20633,7 +20638,7 @@ _7492:                                                     ; >7492
        movb a,@c                                           ; LD C,A            ; C = $08, $10 or $20
        inv  a                                              ; CPL               ; 
        movb a,b                                            ; LD B,A            ; B = the mask
-       movb @e8d7_psg_mixer_cache,a                        ; LD A,($E8D7)      ; A = the mixer's value
+       movb @psg_mixer_copy,a                              ; LD A,($E8D7)      ; A = the mixer's value
        .ret                                                ; RET               ; 
 
 * Turn the channel's noise on
@@ -20671,7 +20676,7 @@ sound_effects_0_1_handler:                                 ; >74a6
 * #R$E894, remembering its address in $E8D3 for #R$7505.
 claim_sound_channel:                                       ; >74ae
        limi 0                                              ; DI                ; 
-       li   hl,e8a3_channel_records                        ; LD HL,$E8A3       ; HL -> the first channel's record
+       li   hl,sound_channel_records                       ; LD HL,$E8A3       ; HL -> the first channel's record
        li   de,>000f                                       ; LD DE,$000F       ; 15 bytes a record
        movb @bytes+>03,b                                   ; LD B,$03          ; 3 channels
 _74b7:                                                     ; >74b7
@@ -20704,7 +20709,7 @@ _74cc:                                                     ; >74cc
        jne  _74be                                          ; JR NZ,$74BE       ; set - try the next channel
        .ex_de_hl                                           ; EX DE,HL          ; HL -> the record
 _74d9:                                                     ; >74d9
-       mov  hl,@e8d3_active_record_pointer                 ; LD ($E8D3),HL     ; remember which channel it is
+       mov  hl,@active_channel_record                      ; LD ($E8D3),HL     ; remember which channel it is
        li   bc,>000f                                       ; LD BC,$000F       ; 
        li   de,sound_channel_active                        ; LD DE,$E894       ; 
        .ldir                                               ; LDIR              ; copy it into the channel context (#R$E894)
@@ -20754,7 +20759,7 @@ write_16_bit_tone_period_psg:                              ; >74f6
 * .
 * Sets ($E894)=$FF (marking the slot active on the way out), then
 * copies 15 bytes FROM $E894-$E8A2 TO the slot pointer cached at
-* ($E8D3) by #R$74AE (find_free_e8a3_slot) - the mirror-image copy to
+* ($E8D3) by #R$74AE (claim_sound_channel) - the mirror-image copy to
 * that routine's own "swap a free slot into $E894" direction, not a
 * template load (`LD HL,$E894` is the source, `LD DE,($E8D3)` the
 * destination). Re-enables interrupts unless ($E91E) is set. Part of
@@ -20763,7 +20768,7 @@ save_active_sound_channel_context_back:                    ; >7505
        movb @b255,a                                        ; LD A,$FF          ; the channel is active
        movb a,@sound_channel_active                        ; LD ($E894),A      ; 
        li   hl,sound_channel_active                        ; LD HL,$E894       ; 
-       mov  @e8d3_active_record_pointer,de                 ; LD DE,($E8D3)     ; DE -> the channel's record (#R$E8D3)
+       mov  @active_channel_record,de                      ; LD DE,($E8D3)     ; DE -> the channel's record (#R$E8D3)
        li   bc,>000f                                       ; LD BC,$000F       ; 
        .ldir                                               ; LDIR              ; copy the channel context back to it
        movb @vblank_isr_progress_flag,a                    ; LD A,($E91E)      ; 
@@ -20793,7 +20798,7 @@ write_psg_register:                                        ; >751d
        cb   a,@bytes+>07                                   ; CP $07            ; the mixer?
        movb @c,a                                           ; LD A,C            ; 
        jne  _7528                                          ; JR NZ,$7528       ; no
-       movb a,@e8d7_psg_mixer_cache                        ; LD ($E8D7),A      ; yes: keep a copy of it
+       movb a,@psg_mixer_copy                              ; LD ($E8D7),A      ; yes: keep a copy of it
 _7528:                                                     ; >7528
        ; OUT ($A1),A                                       ; OUT ($A1),A       ; TODO: check code. write the value
        .pop bc                                             ; POP BC            ; 
@@ -21028,7 +21033,7 @@ sound_effect_mode:                                         ; >75c3
 reset_sound_channels:                                      ; >75cd
        limi 0                                              ; DI                ; 
        movb a,@sound_mode                                  ; LD ($E8D6),A      ; set the sound mode
-       li   hl,e8a3_channel_records                        ; LD HL,$E8A3       ; 
+       li   hl,sound_channel_records                       ; LD HL,$E8A3       ; 
        sb   *hl,*hl                                        ; LD (HL),$00       ; 
        li   de,channel_1_tone_register                     ; LD DE,$E8A4       ; 
        li   bc,>002c                                       ; LD BC,$002C       ; 
@@ -21067,25 +21072,30 @@ reset_sound_channels:                                      ; >75cd
 * .
 * Bug: #R$75B6 switches to music mode and re-enables interrupts (#R$75CD)
 * before the tune's address ($E8D0) and channel count ($E8D2) are stored.
-* The first time the title screen starts the music, both are still 0, so
-* if the interrupt arrives in that gap, #R$7645 takes the tune to have
-* ended and restarts it from address 0. The channel count there is $C3
-* (the JP at #R$0000), so it sets up 195 channel records, writing over
-* $E8A3-$F409 (including #R$EFAB, #R$F380 and #R$F3FC) and sending 195
-* values to PSG registers 8 upwards. Then the original call carries on
-* and starts the title music properly. Whether it happens depends on when
-* the interrupt arrives: it did in the boot that produced this snapshot,
-* but not in the one that produced the in-flight snapshot. Once $E8D0
-* holds a tune's address, the same restart just replays the tune.
+* The first time the title screen starts the music, both are still 0, so if
+* the interrupt arrives in that gap, #R$7645 takes the tune to have ended
+* and restarts it from address 0. The channel count there is $C3 (the JP at
+* #R$0000), so it sets up 195 channel records, writing over $E8A3-$F409
+* (including #R$EFAB, #R$F380 and #R$F3FC) and sending 195 values to PSG
+* registers 8 upwards. One of those records sets the sound mode ($E8D6) to
+* 0, so when the original call carries on and sets up the title music's
+* channels, they aren't played: the title music is silent. Whether it
+* happens depends on when the interrupt arrives: it did in the boot that
+* produced this snapshot, but not in the one that produced the in-flight
+* snapshot. Once $E8D0 holds a tune's address, the same restart just replays
+* the tune. This snapshot was taken on the title screen before "Load New
+* Commander ?" was answered, so the bytes it wrote are still there;
+* answering it unpacks the commander file (#R$A469) over the commander's
+* variables, the cargo hold (#R$EB19) among them.
 * 
 * I:HL Address of the tune header
 start_tune:                                                ; >7603
        .call @music_mode                                   ; CALL $75B6        ; conditionally run #R$75CD (no-op if $E8D6=1); HL = the source table either way
-       mov  hl,@e8d0_source_table_pointer                  ; LD ($E8D0),HL     ; save the table pointer
-       li   ix,e8a3_channel_records                        ; LD IX,$E8A3       ; IX -> the first destination record
+       mov  hl,@tune_address                               ; LD ($E8D0),HL     ; save the table pointer
+       li   ix,sound_channel_records                       ; LD IX,$E8A3       ; IX -> the first destination record
        movb *hl,a                                          ; LD A,(HL)         ; A = record count (the table's first byte)
        inc  hl                                             ; INC HL            ; HL -> the per-record data that follows
-       movb a,@e8d2_record_count                           ; LD ($E8D2),A      ; cache the record count too
+       movb a,@tune_channels_playing                       ; LD ($E8D2),A      ; cache the record count too
        movb a,b                                            ; LD B,A            ; B = loop counter, one pass per record
        movb @bytes+>08,@c                                  ; LD C,$08          ; C = PSG register 8 (channel A volume) for the first record
 _7615:                                                     ; >7615
@@ -21130,13 +21140,13 @@ _7615:                                                     ; >7615
 * setting up the first tune, it restarts a "tune" at $0000 (see #R$7603).
 play_sound_channels:                                       ; >7645
        movb @b255,a                                        ; LD A,$FF          ; A = $FF
-       movb a,@per_channel_dispatch_tick_drivers_own       ; LD ($E8D8),A      ; mark this tick's dispatch pass as running
+       movb a,@unused_flag_e8d8                            ; LD ($E8D8),A      ; mark this tick's dispatch pass as running
        movb @sound_mode,a                                  ; LD A,($E8D6)      ; A = the sound-system mode/silence flag
        socb a,a                                            ; OR A              ; 
        jne  !                                              ; RET Z             ; 0 = silenced - nothing to do
        .ret                                                ;                   
 !
-       li   hl,e8a3_channel_records                        ; LD HL,$E8A3       ; HL -> the first of the 3 $E8A3-array records
+       li   hl,sound_channel_records                       ; LD HL,$E8A3       ; HL -> the first of the 3 $E8A3-array records
        movb @bytes+>03,b                                   ; LD B,$03          ; B = 3 channels to service
 _7654:                                                     ; >7654
        movb *hl,a                                          ; LD A,(HL)         ; A = this record's active flag
@@ -21174,10 +21184,10 @@ _7685:                                                     ; >7685
        movb @sound_mode,a                                  ; LD A,($E8D6)      ; re-check the mode flag
        sb   one,a                                          ; DEC A             ; 
        jne  _7699                                          ; JR NZ,$7699       ; not exactly 1 - done
-       movb @e8d2_record_count,a                           ; LD A,($E8D2)      ; A = the cached source-table record count (#R$7603)
+       movb @tune_channels_playing,a                       ; LD A,($E8D2)      ; A = the cached source-table record count (#R$7603)
        socb a,a                                            ; OR A              ; 
        jne  _7699                                          ; JR NZ,$7699       ; still nonzero - done
-       mov  @e8d0_source_table_pointer,hl                  ; LD HL,($E8D0)     ; HL = the cached source table pointer (#R$7603)
+       mov  @tune_address,hl                               ; LD HL,($E8D0)     ; HL = the cached source table pointer (#R$7603)
        .call @start_tune                                   ; CALL $7603        ; queue's run dry - restart it from the top
 _7699:                                                     ; >7699
        .ret                                                ; RET               ; 
@@ -21228,7 +21238,7 @@ _76b3:                                                     ; >76b3
        movb d,a                                            ; LD A,D            ; 
        socb @e,a                                           ; OR E              ; 
        jne  sound_loop_jump_taken                          ; JR NZ,$76CD       ; nonzero - take the loop
-       li   hl,e8d2_record_count                           ; LD HL,$E8D2       ; zero - the loop's exhausted: decrement the cached
+       li   hl,tune_channels_playing                       ; LD HL,$E8D2       ; zero - the loop's exhausted: decrement the cached
        sb   one,*hl                                        ; DEC (HL)          ; source-table record count (#R$7603)...
        b    @silence_sound_channel                         ; JP $76F4          ; ...and silence this channel
 sound_loop_jump_taken:                                     ; >76cd
@@ -21960,17 +21970,37 @@ title_music:                                               ; >7ae4
 * One list per channel: the addresses of the patterns (note data in
 * #R$7B18) to play in turn, ending with 0.
 title_music_patterns:                                      ; >7aee
-       data title_music_pattern_1,title_music_pattern_2,title_music_pattern_3,title_music_pattern_4,title_music_pattern_3,title_music_end,>0000 ; channel 1
+       data title_music_pattern_1                                    ; channel 1: pattern 1
+       data title_music_pattern_2                                    ; pattern 2
+       data title_music_pattern_3                                    ; pattern 3
+       data title_music_pattern_4                                    ; pattern 4
+       data title_music_pattern_3                                    ; pattern 3
+       data title_music_end                                          ; a long rest
+       data >0000                                                    ; end of list
 title_music_channel_2:                                     ; >7afc
-       data title_music_pattern_5,title_music_pattern_6,title_music_pattern_7,title_music_pattern_8,title_music_pattern_7,title_music_end,>0000 ; channel 2
+       data title_music_pattern_5                                    ; channel 2: pattern 5
+       data title_music_pattern_6                                    ; pattern 6
+       data title_music_pattern_7                                    ; pattern 7
+       data title_music_pattern_8                                    ; pattern 8
+       data title_music_pattern_7                                    ; pattern 7
+       data title_music_end                                          ; a long rest
+       data >0000                                                    ; end of list
 title_music_channel_3:                                     ; >7b0a
-       data title_music_pattern_9,title_music_pattern_10,title_music_pattern_11,title_music_pattern_12,title_music_pattern_11,title_music_end,>0000 ; channel 3
+       data title_music_pattern_9                                    ; channel 3: pattern 9
+       data title_music_pattern_10                                   ; pattern 10
+       data title_music_pattern_11                                   ; pattern 11
+       data title_music_pattern_12                                   ; pattern 12
+       data title_music_pattern_11                                   ; pattern 11
+       data title_music_end                                          ; a long rest
+       data >0000                                                    ; end of list
 
 * Title music: note data
 * 
 * The patterns listed in #R$7AEE, played by the channel code from
-* #R$769B: (note, duration) byte pairs (#R$76D3), with $91 marking a
-* loop (#R$76CD). Runs to $8203.
+* #R$769B: (note, duration) byte pairs (#R$76D3), each pattern ending with
+* $91 (#R$76CD). The last pattern, at $8202, is a rest of about four
+* seconds that every channel plays before its list ends and the tune
+* starts again (#R$7645).
 title_music_pattern_1:                                     ; >7b18
        byte >90,>04,>46,>04,>42,>04,>40,>04
        byte >42,>08,>90,>04,>4A,>04,>46,>04
@@ -22216,13 +22246,12 @@ title_music_pattern_12:                                    ; >81a3
        byte >08,>1C,>08,>2A,>88,>2A,>08,>2A
        byte >88,>91                                                  ; 
 title_music_end:                                           ; >8202
-       byte >90,>7F                                                  ; 
+       byte >90,>7F,>91                                              ; a long rest, then the end of the pattern
 
 
 * Add an object to the 3D scanner
 * 
-* $8204 itself is dead code: the sole call site ($1477) calls $8205, and
-* the `SUB C` result here is discarded by the very next instruction.
+* Used by the routine at #R$13FD.
 * .
 * Called for each object by the main loop (#R$13FD). Works out where the
 * object's blip and stick go on the scanner and adds a 7-byte record for
@@ -22283,9 +22312,6 @@ title_music_end:                                           ; >8202
 * provided the list of saved background bytes at #R$E9D6 has room for it
 * (#R$EB03, 300 bytes a frame): ($E602)+5 bytes. Otherwise the object just
 * isn't shown this frame.
-scanner_add_object_dead:                                   ; >8204
-       sb   @c,a                                           ; SUB C             ; 
-* This entry point is used by the routine at #R$13FD.
 scanner_add_object:                                        ; >8205
        movb @options,a                                     ; LD A,($E914)      ; skip on alternate frames if bit 5
        andi a,>2000                                        ; AND $20           ; 
@@ -22296,7 +22322,6 @@ scanner_add_object:                                        ; >8205
        .ret                                                ;                   
 !
 _8212:                                                     ; >8212
-       equ  $
        movb @object_status_byte,a                          ; LD A,($F7CD)      ; A = object status byte
        czc  @bit3,a                                        ; BIT 3,A           ; 
        jeq  !                                              ; RET NZ            ; bit 3 set - not shown on the scanner
@@ -22332,7 +22357,6 @@ _8212:                                                     ; >8212
        .ret                                                ;                   
 !
 _8238:                                                     ; >8238
-       equ  $
        movb @object_z_sign,a                               ; LD A,($F7D3)      ; A = sign of Z
        mov  @abs_delta_z,hl                                ; LD HL,($EB86)     ; HL = |Z|
        movb @bytes+>0f,@c                                  ; LD C,$0F          ; 
@@ -22443,7 +22467,7 @@ _82a7:                                                     ; >82a7
        inc  hl                                             ; INC HL            ; 
        movb a,@e                                           ; LD E,A            ; 
        inc  hl                                             ; INC HL            ; (byte 3 unused)
-       li   ix,scanner_masks                               ; LD IX,$8654       ; 
+       li   ix,scanner_blip_masks                          ; LD IX,$8654       ; 
        movb a,@scanner_blip_mask+>0002                     ; LD ($82E0),A      ; point (IX+d) at the blip mask for the position (#R$82DE+2)
 scanner_blip_mask:                                         ; >82de
        movb *ix,a                                          ; LD A,(IX+$00)     ; 
@@ -22472,7 +22496,7 @@ scanner_queue_object_two_columns:                          ; >82f3
        socb @bit7,@e                                       ; SET 7,E           ; 
        movb @e,*hl                                         ; LD (HL),E         ; byte 2: heights, bit 7 = two columns
        inc  hl                                             ; INC HL            ; 
-       li   ix,scanner_masks                               ; LD IX,$8654       ; 
+       li   ix,scanner_blip_masks                          ; LD IX,$8654       ; 
        movb d,a                                            ; LD A,D            ; 
        movb a,@scanner_blip_mask_2+>0002                   ; LD ($8310),A      ; point (IX+d) at the blip mask for D (#R$830E+2)
 scanner_blip_mask_2:                                       ; >830e
@@ -22723,7 +22747,6 @@ scanner_draw_next:                                         ; >8456
        b    @scanner_draw_record                           ;                   
 !
 scanner_draw_done:                                         ; >845c
-       equ  $
        .ret                                                ; RET               ; 
 
 * Scanner: OR a blip into VRAM (first column)
@@ -22808,7 +22831,7 @@ scanner_or_stick_2:                                        ; >8481
 
 * Scale an unsigned magnitude by a fixed-point factor, then apply a sign
 * 
-* Used by the routine at #R$8204.
+* Used by the routine at #R$8205.
 * .
 * Computes a signed 8-bit result = +/-((HL * C) >> 12), where the sign
 * comes from the caller's A rather than from HL or C, which are both
@@ -23272,10 +23295,11 @@ compass_set_dot:                                           ; >8644
 * Scanner blip and stick masks
 * 
 * Two 8-entry tables indexed by the object's pixel position within its
-* screen byte (0-7), used by #R$82A0/#R$82F3. $8654 is the 3-pixel blip
-* mask ending at that pixel, $865C the 2-pixel stick mask; at positions
-* 0 and 1 the rest spills into the byte to the left (see #R$82F3).
-scanner_masks:                                             ; >8654
+* screen byte (0-7), used by #R$82A7 (positions 2-7) and #R$82F3 (positions
+* 0 and 1). $8654 is the 3-pixel blip mask ending at that pixel, $865C the
+* 2-pixel stick mask; at positions 0 and 1 the rest spills into the byte to
+* the left (see #R$82F3).
+scanner_blip_masks:                                        ; >8654
        byte >80,>C0,>E0,>70,>38,>1C,>0E,>07
 scanner_stick_masks:                                       ; >865c
        byte >80,>C0,>60,>30,>18,>0C,>06,>03
@@ -23546,7 +23570,6 @@ _879e:                                                     ; >879e
        .ret                                                ;                   
 !
 _87a2:                                                     ; >87a2
-       equ  $
        movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
        cb   a,one                                          ; CP $01            ; is it 1?
        jeq  _87cf                                          ; JR Z,$87CF        ; the station itself doesn't lose energy
@@ -23584,7 +23607,6 @@ check_docking:                                             ; >87dd
        .ret                                                ;                   
 !
 check_collision_in_front:                                  ; >87ea
-       equ  $
        mov  @abs_delta_x,hl                                ; LD HL,($EB82)     ; HL = X distance
        li   de,>001e                                       ; LD DE,$001E       ; DE = $001E (30)
        socb a,a                                            ; OR A              ; clear carry
@@ -23741,7 +23763,6 @@ key_handler_h:                                             ; >88ac
        b    @trigger_sfx_6                                 ;                   
 !
 _88c3:                                                     ; >88c3
-       equ  $
        movb @hyperspace_target_selected,a                  ; LD A,($E91A)      ; 
        socb a,a                                            ; OR A              ; 
        jne  _88d2                                          ; JR NZ,$88D2       ; 
@@ -24411,7 +24432,6 @@ _8c9c:                                                     ; >8c9c
        b    @place_planet_station_and_sun                  ;                   
 !
 _8caf:                                                     ; >8caf
-       equ  $
        jmp  _8c9c                                          ; JR $8C9C          ; no - reroll
 place_planet_station_and_sun:                              ; >8cb1
        sb   a,a                                            ; LD A,$00          ; handler type 0
@@ -24626,7 +24646,6 @@ _8dd7:                                                     ; >8dd7
        .ret                                                ;                   
 !
 _8dd9:                                                     ; >8dd9
-       equ  $
        movb a,b                                            ; LD B,A            ; B = number of canisters
        movb @c,a                                           ; LD A,C            ; A = the original pack-size/type byte
        srl  a,1                                            ; RRA               ; TODO: check code. shift the high nibble (type/subtype) down...
@@ -25125,7 +25144,7 @@ start_next_mission:                                        ; >908c
 * mission ends at the next hyperspace jump (#R$8AC8) without a reward.
 * .
 * At $90B8, fills the hold's free space with refugees (the cargo entry at
-* $EB5D, see #R$EB19), moves on to state $33 - in which the sun gets closer
+* #R$EB5D), moves on to state $33 - in which the sun gets closer
 * (#R$883D) until the player hyperspaces out - and thanks the player. The
 * entry at $90CD shows the message at HL, then waits for a key (#R$922D).
 supernova_briefing:                                        ; >909f
@@ -25142,7 +25161,7 @@ supernova_briefing:                                        ; >909f
 supernova_take_refugees:                                   ; >90b8
        .call @work_out_free_space                          ; CALL $63BA        ; recompute the hold's free space
        li   hl,free_space                                  ; LD HL,$EB61       ; 
-       li   de,cached_cargo_hold_free_space                ; LD DE,$EB5D       ; refugees fill it
+       li   de,cargo_refugees                              ; LD DE,$EB5D       ; refugees fill it
        li   bc,>0004                                       ; LD BC,$0004       ; 
        .ldir                                               ; LDIR              ; 
        li   hl,mission_state                               ; LD HL,$E93D       ; mission state
@@ -25194,19 +25213,18 @@ show_mission_screen:                                       ; >90d3
 * Used by the routine at #R$1896.
 * .
 * On docking in another system (state $34, see #R$8AC8): thanks the
-* player, unloads the refugees ($EB5D, see #R$EB19), and gives them some
-* gem-stones (the cargo entry at $EB55, set from $9A46). The mission is
-* over.
+* player, unloads the refugees (#R$EB5D), and puts 50 grams of gem-stones
+* in the hold (#R$EB55, from #R$9A46). The mission is over.
 supernova_complete:                                        ; >90fb
        li   hl,msg_supernova_complete                      ; LD HL,$92E3       ; "TASK COMPLETE - CONGRATULATIONS..."
        .call @show_mission_screen                          ; CALL $90D3        ; show it
-       li   hl,cached_cargo_hold_free_space                ; LD HL,$EB5D       ; 
+       li   hl,cargo_refugees                              ; LD HL,$EB5D       ; 
        sb   *hl,*hl                                        ; LD (HL),$00       ; unload the refugees
-       li   de,cached_cargo_hold_free_space+>0001          ; LD DE,$EB5E       ; 
+       li   de,cargo_refugees+>0001                        ; LD DE,$EB5E       ; 
        li   bc,>0003                                       ; LD BC,$0003       ; 
        .ldir                                               ; LDIR              ; 
-       li   hl,mission_state_initializer_record_copied     ; LD HL,$9A46       ; 
-       li   de,mission_state_initializer_dest              ; LD DE,$EB55       ; load the gem-stones
+       li   hl,mission_3_gem_stones                        ; LD HL,$9A46       ; 
+       li   de,cargo_gem_stones                            ; LD DE,$EB55       ; load the gem-stones
        li   bc,>0004                                       ; LD BC,$0004       ; 
        .ldir                                               ; LDIR              ; 
        sb   a,a                                            ; XOR A             ; 
@@ -25240,7 +25258,7 @@ _912e:                                                     ; >912e
        mov  @current_system_x,bc                           ; LD BC,($F760)     ; the current system's coordinates
        .call @nearest_and_furthest_systems                 ; CALL $5325        ; find the furthest system
        movb a,@mission_system                              ; LD ($EFA2),A      ; remember it
-       li   hl,empty_rst20_list_supernova_briefing         ; LD HL,$9A4A       ; 
+       li   hl,empty_mission_message                       ; LD HL,$9A4A       ; an empty message
        .call @show_mission_screen                          ; CALL $90D3        ; show the mission screen
        li   bc,>0f0b                                       ; LD BC,$0F0B       ; the default message's position
        li   hl,msg_constrictor_briefing                    ; LD HL,$9483       ; "A prototype of the new military ship, the CONSTRICTOR..."
@@ -25621,25 +25639,24 @@ msg_thargoid_base_reward:                                  ; >997a
        text >05,>0e,'BY THE L KEY',>ae
        byte >FF
 
-* Mission-state initializer record, copied to $EB55
+* Mission 3 reward: 50 grams of gem-stones
 * 
-* #R$90FB (at $910E, `LD HL,$9A46 / LD DE,$EB55 / LD BC,$0004 / LDIR`)
-* copies these 4 bytes ($32,$00,$00,$00) into the mission workspace at
-* $EB55.
-mission_state_initializer_record_copied:                   ; >9a46
-       byte >32,>00,>00,>00
+* When the player delivers the refugees, #R$90FB copies these 4 bytes into
+* the hold's gem-stones (#R$EB55), replacing any the player already had
+* rather than adding to them.
+mission_3_gem_stones:                                      ; >9a46
+       byte >32,>00,>00,>00                                          ; 50 grams
 
-* Empty RST $20 list: the supernova mission's "main briefing" pointer
+* Empty message for the mission 1 and 2 briefings
 * 
-* Immediately follows #R$9A46's 4-byte initializer (not part of that
-* LDIR copy). Loaded into HL by #R$9120 (`LD HL,$9A4A`) and passed to
-* #R$90D3 as its "message", which prints it via RST $20 - but this
-* single $FF byte is already a negative row byte, so the list is
-* empty: #R$90D3 draws its frame/header but nothing from this pointer.
-* The actual affected-system message is printed separately, right
-* after, from $9483 or $96DA.
-empty_rst20_list_supernova_briefing:                       ; >9a4a
-       byte >FF
+* #R$9120 passes this to #R$90D3 as the message to show on the mission
+* screen. #R$90D3 prints it with RST $20 (#R$3596), whose list ends at the
+* first record with a negative column byte - this one - so all it shows is
+* the frame and the header. #R$9120 then prints the briefing itself: the
+* name of the system it has picked, followed by #R$9483 (mission 1) or
+* #R$96DA (mission 2).
+empty_mission_message:                                     ; >9a4a
+       byte >FF                                                      ; the end of the list
 
 * Goatsoup: show the system's description
 * 
@@ -25820,9 +25837,8 @@ goatsoup_dispatch_trampoline:                              ; >9b34
 
 * Goatsoup Ctrl-A: expand $E717's contents into the output, plus a space
 * 
-* Reached only via a 7-entry word table at $A2F2 (inside #R$A200's data
-* region, char code doubled as index; index 0 is an unused placeholder
-* value $002E, not a real handler) - not a literal CALL/JP. Never
+* Reached only through the control-code handler table at #R$A2F2, indexed
+* by the code doubled - not a literal CALL/JP. Never
 * triggered in this capture. #R$E717 is the same buffer #R$4C9B/$4CB8
 * and the value-formatting helpers write generated names/numbers into,
 * so this control code inserts whatever was most recently generated
@@ -25915,9 +25931,9 @@ line_editor_ctrl_c:                                        ; >9b7c
        ; XOR E                                             ; XOR E             ; TODO: check code. 
        movb a,@l                                           ; LD L,A            ; 
        mov  hl,@seed_s2                                    ; LD ($E908),HL     ; ...into rotating_accumulator
-       li   ix,goatsoup_digit_scratch                      ; LD IX,$EADB       ; 
+       li   ix,goatsoup_name_pairs                         ; LD IX,$EADB       ; 
        .call @system_name_from_seeds                       ; CALL $4CE7        ; build 4 more name-seed bytes
-       li   hl,goatsoup_digit_scratch                      ; LD HL,$EADB       ; expand the name-seed digrams via $E717...
+       li   hl,goatsoup_name_pairs                         ; LD HL,$EADB       ; expand the name-seed digrams via $E717...
        .call @expand_name                                  ; CALL $4CB8        ; 
        li   ix,text_buffer                                 ; LD IX,$E717       ; ...and expand the generated name into the output
        .call @goatsoup_expand_one_byte                     ; CALL $9AB9        ; 
@@ -26027,13 +26043,7 @@ goatsoup_symbol_36:                                        ; >a183
 goatsoup_symbol_37:                                        ; >a1aa
        text 'DENSE ',>00,'LUSH ',>00,'RAIN ',>00,'BAMBOO ',>00,'DECIDUOUS ',>00 ; symbol $A5
 goatsoup_symbol_38:                                        ; >a1d0
-       text 'GREEN ',>00,'BLACK ',>00,'YELLOW STRIPEY ',>00,'PINKY GREY ',>00,'WHITE ' ; symbol $A6
-
-* Unused
-* 
-* Nothing reads this byte; the goatsoup symbol table starts at #R$A201.
-unused_a200:                                               ; >a200
-       byte >00
+       text 'GREEN ',>00,'BLACK ',>00,'YELLOW STRIPEY ',>00,'PINKY GREY ',>00,'WHITE ',>00 ; symbol $A6
 
 * Goatsoup: symbol table
 * 
@@ -26121,21 +26131,27 @@ goatsoup_symbols:                                          ; >a201
        data goatsoup_symbol_38                                       ; symbol $A6
        byte >07,>0E,>1E,>2A                                          ; 
 
-* Goatsoup: description template, expanded via #R$9AB9
+* Goatsoup: the system description template
 * 
-* One of the goatsoup engine's expansion templates - a short byte
-* string of literal characters and symbol/control codes consumed by
-* #R$9AB9. Reached via
-* #R$A200's phrase-pointer index table.
+* The top-level template for a system's description, which #R$9A4B (at
+* $9A81) expands with #R$9AB9. Control code 4 takes back the space after
+* the last word, so that the full stop follows it directly. The last two
+* bytes, at $A2F2, double as entry 0 of the control-code handler table
+* (#R$A2F4), which is never used.
 goatsoup_description_template_a2eb:                        ; >a2eb
-       byte >06,>92,>69,>73,>20,>93,>04
+       byte >06,>92                                                  ; control code 6 (#R$9B77), symbol $92
+       text 'IS '
+       byte >93,>04                                                  ; symbol $93, control code 4 (#R$9B6E)
+goatsoup_control_code_dispatch:                            ; >a2f2
+       text '.',>00                                                  ; a full stop, and the end
 
 * Goatsoup control code handlers
 * 
-* The routines for control codes 1-6 in the goatsoup templates, called by
-* #R$9AB9 (code 0 ends the text, so its entry is unused).
-goatsoup_control_code_dispatch:                            ; >a2f2
-       data >002E                                                    ; 0: unused
+* The routines for control codes 1-6 in the goatsoup templates: #R$9AB9
+* reads code n's entry at $A2F2+2n. Code 0 ends a template, so entry 0 is
+* never read; its two bytes, at $A2F2, are the end of the template at
+* #R$A2EB.
+_a2f4:                                                     ; >a2f4
        data line_editor_ctrl_a                                       ; 1: #R$9B35
        data goatsoup_adjective                                       ; 2: #R$9B43
        data line_editor_ctrl_c                                       ; 3: #R$9B7C
@@ -26259,7 +26275,6 @@ menu_load_commander:                                       ; >a377
        b    @commander_menu                                ;                   
 !
 _a37d:                                                     ; >a37d
-       equ  $
        li   hl,msg_searching                               ; LD HL,$A646       ; "Searching .. (CTRL-STOP to exit)"
        .rst >08                                            ; RST $08           ; print it
        .call @search_read_checksum_tape_record             ; CALL $A492        ; search the tape for a commander record
@@ -26271,7 +26286,7 @@ _a37d:                                                     ; >a37d
        .rst >08                                            ; RST $08           ; print it
        li   hl,tape_record                                 ; LD HL,$D606       ; the found record
        .call @show_message                                 ; CALL $5FFB        ; show it for a while
-       li   hl,keyboard_line_input_buffer_11_bytes         ; LD HL,$E8F7       ; A = the typed name
+       li   hl,keyboard_input_buffer                       ; LD HL,$E8F7       ; A = the typed name
        movb *hl,a                                          ; LD A,(HL)         ; 
        socb a,a                                            ; OR A              ; 
        jeq  continue_a377_adopt_saved_record               ; JR Z,$A3AB        ; empty (accept whatever was found) - adopt it
@@ -26336,10 +26351,10 @@ menu_save_commander:                                       ; >a3e0
        joc  !                                              ; JP NC,$A33A       ; TODO: check code. Esc - back to the menu
        b    @commander_menu_ask                            ;                   
 !
-       movb @keyboard_line_input_buffer_11_bytes,a         ; LD A,($E8F7)      ; A = the typed name
+       movb @keyboard_input_buffer,a                       ; LD A,($E8F7)      ; A = the typed name
        socb a,a                                            ; OR A              ; 
        jeq  _a3f7                                          ; JR Z,$A3F7        ; empty - keep the existing name
-       li   hl,keyboard_line_input_buffer_11_bytes         ; LD HL,$E8F7       ; typed - adopt it
+       li   hl,keyboard_input_buffer                       ; LD HL,$E8F7       ; typed - adopt it
        li   de,commander_name                              ; LD DE,$EB06       ; commander_name
        li   bc,>000b                                       ; LD BC,$000B       ; 11 bytes
        .ldir                                               ; LDIR              ; 
@@ -29892,7 +29907,7 @@ tape_record_data:                                          ; >d611
 * 
 * Used for different things at different times: #R$34A8 shifts a character's
 * pattern here before printing it; #R$3DF4 and #R$3EAD keep the filled disc's
-* ragged edge here ($E600-$E604); and #R$8204 and #R$8F25 use the first few
+* ragged edge here ($E600-$E604); and #R$8205 and #R$8F25 use the first few
 * bytes too. It is also the start of the vertex cache (#R$E61D).
 scratch_buffer:                                            ; >e600
        byte >FA                                                      ; 
@@ -30089,13 +30104,12 @@ face_visible_workspace_1:                                  ; >e6ea
 face_visible_workspace_2:                                  ; >e6ec
        data >0000
 
-* Counter incremented by #R$4948
+* Number of edges skipped
 * 
-* Incremented by #R$4948, and
-* decremented by the separate routine #R$4957
-* #R$4957. Not traced beyond that pair of
-* sites.
-culling_negative_counter:                                  ; >e6ee
+* #R$491A adds 1 for each edge it skips because the edge's first vertex has
+* bit 7 set (at $4948), and takes 1 off when the edge turns up again in
+* another face (at $4962). Nothing reads it otherwise, so it has no effect.
+skipped_edges_count:                                       ; >e6ee
        byte >00
 
 * Object's targetable area on the screen
@@ -30424,12 +30438,13 @@ equip_items_on_sale:                                       ; >e744
 * 
 * The letters of the free mounts ("F", "B", "L" or "R") offered by #R$5EFE,
 * searched for the one the player types.
-offered_group_letters:                                     ; >e745
+offered_mount_letters:                                     ; >e745
        byte >00,>00,>00,>00
 
-* Pointer to the equipment flags byte being installed into (word)
+* Equip Ship: address of the new laser's equipment entry (word)
 * 
-* See #R$5FCC's (continue_5f85_buy_install_or_rollback) own header.
+* Set by #R$5EFE to the laser's entry in the equipment (#R$F775), whose bit
+* for the chosen mount it sets once the laser is paid for.
 equipment_install_flags_ptr:                               ; >e749
        data >0000
 
@@ -30440,28 +30455,31 @@ equipment_install_flags_ptr:                               ; >e749
 status_equipment_position:                                 ; >e74b
        byte >00,>00
 
-* Pre-refund flag byte (0 if no conflict was resolved)
+* Equip Ship: old equipment entry of a removed laser
 * 
-* See #R$5F85's (auto_sell_conflict_buy_install) own header.
+* When #R$5EFE removes another laser from the mount it is fitting a new one
+* to, the old value of that laser's equipment entry (0 if no laser was
+* removed), put back if the new laser can't be paid for.
 equipment_prerefund_flag:                                  ; >e74d
        byte >00
 
-* Pointer to the conflicting group's equipment flags byte (word)
+* Equip Ship: address of a removed laser's equipment entry (word)
 * 
-* See #R$5F85's (auto_sell_conflict_buy_install) own header.
+* Set by #R$5EFE along with #R$E74D.
 equipment_conflict_flags_ptr:                              ; >e74e
        data >0000
 
-* Pre-refund cash total, low word
+* Equip Ship: cash before a refund, low word
 * 
-* See #R$5F85's (auto_sell_conflict_buy_install) own header.
+* With #R$E752, the cash (#R$EB16) before #R$5EFE refunded a removed laser,
+* put back if the new laser can't be paid for.
 equipment_prerefund_cash_lo:                               ; >e750
        byte >00,>00
 
 * Pre-refund cash total, high byte / cargo-buying quantity cache
 * 
-* High byte of #R$E750's pre-refund cash total (see #R$5F85's own
-* header). Separately reused by #R$5C01 (buying goods) to
+* High byte of #R$E750's pre-refund cash total (see #R$5EFE).
+* Separately reused by #R$5C01 (buying goods) to
 * cache the entered cargo quantity - two unrelated reuses of the same
 * byte.
 equipment_prerefund_cash_hi_or_qty:                        ; >e752
@@ -31114,10 +31132,10 @@ hyperspace_fuel_cost:                                      ; >e87f
 hyperspace_flash_colour:                                   ; >e880
        byte >00
 
-* Unreferenced bytes (screen-mode workspace)
+* Unused
 * 
-* No direct-address reference found anywhere in this disassembly.
-unreferenced_screen_mode_workspace_e881:                   ; >e881
+* Nothing in the game uses these bytes.
+unused_e881:                                               ; >e881
        byte >00,>00,>00
 
 * Title screen ship's wobble angles and targets
@@ -31164,10 +31182,10 @@ title_ship_frames:                                         ; >e88b
 title_ship_flying_off:                                     ; >e88c
        byte >00
 
-* Unreferenced byte (screen-mode workspace)
+* Unused
 * 
-* No direct-address reference found anywhere in this disassembly.
-unreferenced_screen_mode_workspace_e88d:                   ; >e88d
+* Nothing in the game uses this byte.
+unused_e88d:                                               ; >e88d
        byte >00
 
 * Title screen: slot of the letter being added (word)
@@ -31191,10 +31209,10 @@ title_ship_ptr:                                            ; >e890
 title_letter_being_added:                                  ; >e892
        byte >00
 
-* Unreferenced byte (screen-mode workspace)
+* Unused
 * 
-* No direct-address reference found anywhere in this disassembly.
-unreferenced_screen_mode_workspace_e893:                   ; >e893
+* Nothing in the game uses this byte.
+unused_e893:                                               ; >e893
        byte >00
 
 * Sound channel: active
@@ -31289,71 +31307,82 @@ sound_channel_envelope_flag:                               ; >e8a1
 sound_channel_keep:                                        ; >e8a2
        byte >00
 
-* $E8A3-array: 3x15-byte channel-marker records [sound]
+* Sound channel records
 * 
-* #R$75CD's own `LD BC,$002C` LDIR gives the 45-byte extent (1+44);
-* the per-record offset-1/offset-2 writes at $E8A4/$E8B3/$E8C2 and
-* $E8A5/$E8B4/$E8C3 confirm the 15-byte stride (records at $E8A3,
-* $E8B2, $E8C1). #R$7603 (start_e8a3_sound_channels) populates records
-* from a table and sets each channel's PSG volume, marking (IX+0)=1
-* active; #R$7505 (see its own header) also writes the currently-active
-* channel's record back here. Offsets 8/9 (#R$E89C) are
-* the current note's duration countdown when playing music (#R$769B),
-* and the address of the effect's "playing" flag (set by #R$755E, cleared
-* by #R$7438 or when the effect ends) when playing sound effects. Not
-* traced field by field beyond that.
-e8a3_channel_records:                                      ; >e8a3
-       byte >01                                                      ; 
+* One 15-byte record for each of the three sound channels, set up by
+* #R$75CD (which clears them and gives each its tone and volume registers),
+* #R$7603 (a tune) and #R$74AE (a sound effect). #R$7645 copies each active
+* channel's record to #R$E894 to work on it and back again afterwards, and
+* #R$74AE/#R$7505 do the same for the channel an effect is started on, so
+* the fields are those at #R$E894-#R$E8A2:
+* .
+* #TABLE
+* { =h Offset | =h Field }
+* { $00 | Nonzero while the channel is playing (#R$E894) }
+* { $01 | The first of its two PSG tone period registers (#R$E895) }
+* { $02 | Its PSG volume register (#R$E896) }
+* { $03-$04 | An effect's countdown (#R$E897); for a tune, the address of
+* the channel's entry in its list of patterns (#R$7AEE) }
+* { $05-$06 | The address of an effect's per-frame handler, or the
+* channel's position in the tune (#R$E899) }
+* { $07 | A parameter, or a pending rest (#R$E89B) }
+* { $08-$09 | The current note's duration countdown, or the address of an
+* effect's "playing" flag (#R$E89C) }
+* { $0A | A second parameter (#R$E89E) }
+* { $0B-$0C | The tone period (#R$E89F) }
+* { $0D | Set once the envelope registers have been written (#R$E8A1) }
+* { $0E | Set if another effect mustn't take the channel over (#R$E8A2) }
+* TABLE#
+sound_channel_records:                                     ; >e8a3
+       byte >01                                                      ; channel 1: active
 channel_1_tone_register:                                   ; >e8a4
-       byte >00                                                      ; 
+       byte >00                                                      ; tone register
 channel_1_volume_register:                                 ; >e8a5
-       byte >08,>EE,>7A,>18,>7B,>00                                  ; 
-       byte >00,>00,>00,>00,>00,>00,>00,>01
+       byte >08,>EE,>7A,>18,>7B,>00,>00,>00,>00,>00,>00,>00,>00      ; volume register, then the rest
+sound_channel_2_record:                                    ; >e8b2
+       byte >01                                                      ; channel 2: active
 channel_2_tone_register:                                   ; >e8b3
-       byte >02                                                      ; 
+       byte >02                                                      ; tone register
 channel_2_volume_register:                                 ; >e8b4
-       byte >09,>FC,>7A,>BA,>7D,>00,>00                              ; 
-       byte >00,>00,>00,>00,>00,>00,>01                              ; 
+       byte >09,>FC,>7A,>BA,>7D,>00,>00,>00,>00,>00,>00,>00,>00      ; volume register, then the rest
+sound_channel_3_record:                                    ; >e8c1
+       byte >01                                                      ; channel 3: active
 channel_3_tone_register:                                   ; >e8c2
-       byte >04                                                      ; 
+       byte >04                                                      ; tone register
 channel_3_volume_register:                                 ; >e8c3
-       byte >0A,>0A,>7B,>DE,>7F,>00,>00,>00
-       byte >00,>00,>00,>00,>00
+       byte >0A,>0A,>7B,>DE,>7F,>00,>00,>00,>00,>00,>00,>00,>00      ; volume register, then the rest
 
-* Source table pointer (word) [sound]
+* Address of the tune being played
 * 
-* #R$7603 (start_e8a3_sound_channels) caches its caller-supplied source
-* table pointer here (`LD ($E8D0),HL` at $7606) before walking it to
-* populate the $E8A3-array records. It is still 0 when the title music
+* Set by #R$7603 to the address of the tune header (#R$7AE4), so that #R$7645
+* can start the tune again when it ends. It is still 0 when the title music
 * first starts, which is what lets #R$7645 restart a "tune" at $0000 (see
 * #R$7603).
-e8d0_source_table_pointer:                                 ; >e8d0
+tune_address:                                              ; >e8d0
        data title_music
 
-* Record count for the most recent $7603 populate call [sound]
+* Number of the tune's channels still playing
 * 
-* #R$7603 caches its source table's record-count byte here (`LD
-* ($E8D2),A` at $760F) before using it as the loop counter B.
-e8d2_record_count:                                         ; >e8d2
+* Set by #R$7603 to the tune's number of channels, and decremented by
+* #R$769B when a channel reaches the end of its list of patterns; when it
+* gets to 0, #R$7645 starts the tune again.
+tune_channels_playing:                                     ; >e8d2
        byte >03
 
-* Active channel-record pointer (word) [sound]
+* Address of the record of the channel being worked on (word)
 * 
-* Set by #R$74AE (find_free_e8a3_slot) to whichever $E8A3-array slot
-* was just swapped into #R$E894's context (or forcibly reused, if none
-* were free); read back by #R$7505 to swap that same context out again
-* - see both routines' own headers.
-* .
-* This capture's snapshot value ($C335) isn't any legitimate slot
-* address ($E8A3/$E8B2/$E8C1) - likely stale from before this capture
-* point, since #R$7505 hasn't run yet to overwrite it with a real one.
-e8d3_active_record_pointer:                                ; >e8d3
+* Set by #R$74AE to the record (#R$E8A3) of the channel a sound effect is
+* started on, so that #R$7505 can copy the channel's fields at #R$E894 back
+* to it. In this snapshot it holds bytes written by the tune-restart bug
+* (#R$7603).
+active_channel_record:                                     ; >e8d3
        data >C335
 
-* Sound channel to take over next [sound]
+* Sound channel to take over next
 * 
 * Counts down 2, 1, 0, 2, ... each time #R$74AE has to take over a busy
-* channel, choosing which one.
+* channel, choosing which one. In this snapshot it holds a byte written by
+* the tune-restart bug (#R$7603).
 sound_channel_rotation:                                    ; >e8d5
        byte >06
 
@@ -31364,27 +31393,23 @@ sound_channel_rotation:                                    ; >e8d5
 sound_mode:                                                ; >e8d6
        byte >00
 
-* Cached PSG mixer/enable register (register 7) value [sound]
+* Copy of PSG register 7 (the mixer)
 * 
-* #R$751D's own header names it exactly: PSG registers are write-only,
-* so writes to register 7 (the mixer/enable register) get mirrored
-* here for readback. Read by #R$748A.
-e8d7_psg_mixer_cache:                                      ; >e8d7
+* The PSG's registers can't be read back, so #R$751D keeps a copy of what
+* it writes to register 7 here, for #R$748A to change.
+psg_mixer_copy:                                            ; >e8d7
        byte >00
 
-* Per-channel dispatch-tick driver's own-run flag [sound]
+* Unused flag
 * 
-* Set to $FF unconditionally by #R$7645 (the driver that LDIRs each
-* active $E8A3-array record into #R$E894's context, runs its command
-* stream via #R$766E/#R$769B, then LDIRs it back - one dispatch tick
-* per active channel). No read site found elsewhere in this capture.
-per_channel_dispatch_tick_drivers_own:                     ; >e8d8
+* Set to $FF by #R$7645 on every tick, but nothing reads it.
+unused_flag_e8d8:                                          ; >e8d8
        byte >FF
 
-* Unreferenced bytes (sound-driver workspace)
+* Unused
 * 
-* No direct-address reference found anywhere in this disassembly.
-unreferenced_sound_driver_workspace_e8d9:                  ; >e8d9
+* Nothing in the game uses these bytes.
+unused_e8d9:                                               ; >e8d9
        byte >00,>00,>00
 
 * Equipment-item-name text buffer [text]
@@ -31446,15 +31471,13 @@ pending_debounced_keypress_byte_status:                    ; >e8f5
 show_tunnel:                                               ; >e8f6
        byte >00
 
-* Keyboard-line-input buffer (11 bytes) [text]
+* Keyboard input buffer (11 bytes)
 * 
-* #R$3631's own header already documents the mechanism fully ("Read a
-* line of keyboard input into $E8F7"): filled one key at a time via
-* #R$35E7, Enter null-terminates it, ESC cancels. Used by 4 different
-* callers (#R$55A3, #R$5AC7, #R$5F3F, #R$A36B) for whatever text entry
-* each needs (name entry, market quantities, etc.) - not a single
-* fixed-purpose string.
-keyboard_line_input_buffer_11_bytes:                       ; >e8f7
+* #R$3631 reads a line of keyboard input into here, one key at a time
+* (#R$35E7), ending it with 0 when Enter is pressed. Used for a planet's name
+* on the chart (#R$55A3), numbers (#R$5AC7), a laser's mount (#R$5F3F) and
+* the commander's name (#R$A36B).
+keyboard_input_buffer:                                     ; >e8f7
        byte >00,>00,>00,>00,>00,>00,>01,>00
        byte >00,>D5,>7C
 
@@ -31506,7 +31529,7 @@ docked:                                                    ; >e90a
        byte >FF
 
 * VBlank frame counter
-* .
+* 
 * Incremented by the RST $38 handler (#R$7202, see #R$0038's own
 * header) on every VBlank interrupt - a second, simpler counter
 * alongside #R$F748's sub-tick counter.
@@ -31677,7 +31700,7 @@ countdown_shown:                                           ; >e91d
 * right before it restores registers and re-enables interrupts. Two
 * sound-driver routines check it before their own `EI` to decide
 * whether it's safe to re-enable interrupts mid-ISR rather than wait:
-* #R$7505 (sound-context save) and #R$75CD (reset_e8a3_and_silence).
+* #R$7505 (sound-context save) and #R$75CD (reset_sound_channels).
 vblank_isr_progress_flag:                                  ; >e91e
        byte >00
 
@@ -31723,10 +31746,10 @@ load_new_commander:                                        ; >e924
 galactic_jump_flag:                                        ; >e925
        byte >00
 
-* Unreferenced bytes (screen-mode/flight workspace)
+* Unused
 * 
-* No direct-address reference found anywhere in this disassembly.
-unreferenced_screen_mode_flight_e926:                      ; >e926
+* Nothing in the game uses these bytes.
+unused_e926:                                               ; >e926
        byte >00,>00
 
 * Missile target
@@ -31833,12 +31856,10 @@ secondary_flag_counter_pair:                               ; >e933
 police_to_launch:                                          ; >e934
        byte >00
 
-* Unreferenced byte (flight/game-state workspace)
+* Unused
 * 
-* No read or write site found anywhere in this disassembly. Sits
-* between the number of police ships still to launch (#R$E934) and the PRNG
-* state at #R$E936.
-unreferenced_flight_state_workspace_e935:                  ; >e935
+* Nothing in the game uses this byte.
+unused_e935:                                               ; >e935
        byte >00
 
 * PRNG state (3 bytes)
@@ -31996,7 +32017,7 @@ scanner_drawn_count:                                       ; >e949
 * Scanner queue
 * 
 * Room for 20 seven-byte records ($E94A-$E9D5), one for each slot of the
-* object table: built by #R$8204/#R$82A0 during the frame and drawn by
+* object table: built by #R$8205/#R$82A0 during the frame and drawn by
 * #R$8380 in the next VBlank. See #R$82A0 for the record format.
 scanner_queue:                                             ; >e94a
        byte >00,>35,>CB,>AA,>D5,>00,>00,>00
@@ -32100,18 +32121,18 @@ goatsoup_seed_word1:                                       ; >ead7
 goatsoup_seed_word2:                                       ; >ead9
        byte >00,>00
 
-* Scratch for $4CE7/$4CB8's digit formatting [text]
+* Goatsoup: letter pairs of a random name
 * 
-* #R$9B7C points IX and HL here before calling #R$4CE7 then #R$4CB8 -
-* see those routines' own headers for the general-purpose digit-
-* formatting they do (normally against $F756/$E717, retargeted here).
-goatsoup_digit_scratch:                                    ; >eadb
+* The four letter-pair indices of a random name in a system's description:
+* #R$9B7C works them out here (#R$4CE7) and expands them into #R$E717
+* (#R$4CB8).
+goatsoup_name_pairs:                                       ; >eadb
        byte >00,>00,>01,>00
 
-* Unreferenced bytes (workspace)
+* Unused
 * 
-* No direct-address reference found anywhere in this disassembly.
-unreferenced_workspace_eadf:                               ; >eadf
+* Nothing in the game uses these bytes.
+unused_eadf:                                               ; >eadf
        byte >00,>00,>00,>C3,>A8,>00,>00,>00
        byte >00,>00,>00,>00,>00,>01,>00,>00
        byte >00,>00,>C3,>A8,>00,>00,>00,>00
@@ -32208,41 +32229,34 @@ cash_2:                                                    ; >eb18
 
 * Cargo hold
 * 
-* How much of each of the goods is in the hold, in grams, 4 bytes each:
-* the 17 kinds of goods (Food ... Alien Items, see #R$0D9F), then the
-* refugees of the supernova mission at $EB5D (#R$909F). #R$63BA works out the free space from them. Cleared by
-* #R$9237.
+* How much of each of the goods is in the hold, in grams, 4 bytes each: the
+* 17 kinds of goods in the order of their names at #R$0D9F (Food ... Alien
+* Items), then the refugees of mission 3 (#R$909F). #R$63BA works out the
+* free space from them. Cleared by #R$9237, and saved in the commander file
+* (#R$A551). This snapshot was taken before the commander file was unpacked
+* (#R$A469), so the hold holds bytes written by the tune-restart bug
+* (#R$7603), not cargo.
 cargo_hold:                                                ; >eb19
-       byte >01,>00,>00,>00,>C3,>57,>0E,>00
-       byte >00,>00,>00,>00,>00,>00,>00,>01
-       byte >00,>00,>01,>00,>A8,>34,>00,>00
-       byte >00,>00,>00,>00,>00,>00,>01,>00
-       byte >00,>00,>00,>C3,>A8,>00,>00,>00
-       byte >00,>00,>00,>00,>00,>01,>00,>00
-       byte >C3,>32,>00,>DD,>00,>00,>00,>00
-       byte >00,>00,>00,>00
-
-* Mission-state initializer copy destination (4 bytes, see #R$9A46)
-* 
-* #R$90FB copies #R$9A46's 4-byte mission-state initializer record
-* here (`LD HL,$9A46 / LD DE,$EB55 / LD BC,$0004 / LDIR`) - within the
-* wider mission-state workspace, see #R$EB19's own comment.
-mission_state_initializer_dest:                            ; >eb55
-       byte >01,>00,>00,>00
-
-* Mission-state workspace (72 bytes)
-* 
-* Remainder of #R$EB19's workspace - see that entry's own comment.
-mission_state_workspace_eb59:                              ; >eb59
-       byte >00,>C3,>A8,>00
-
-* Refugees in the hold
-* 
-* The last entry in the cargo hold (#R$EB19): when the player takes the
-* refugees in mission 3, #R$909F (at $90B8) fills the hold's free space
-* (#R$63BA) with them here. Cleared by #R$90FB.
-cached_cargo_hold_free_space:                              ; >eb5d
-       byte >00,>00,>00,>00
+       byte >01,>00,>00,>00                                          ; 0: Food
+       byte >C3,>57,>0E,>00                                          ; 1: Textiles
+       byte >00,>00,>00,>00                                          ; 2: Radioactives
+       byte >00,>00,>00,>01                                          ; 3: Slaves
+       byte >00,>00,>01,>00                                          ; 4: Liquor/Wines
+       byte >A8,>34,>00,>00                                          ; 5: Luxuries
+       byte >00,>00,>00,>00                                          ; 6: Narcotics
+       byte >00,>00,>01,>00                                          ; 7: Computers
+       byte >00,>00,>00,>C3                                          ; 8: Machinery
+       byte >A8,>00,>00,>00                                          ; 9: Alloys
+       byte >00,>00,>00,>00                                          ; 10: Firearms
+       byte >00,>01,>00,>00                                          ; 11: Furs
+       byte >C3,>32,>00,>DD                                          ; 12: Minerals
+       byte >00,>00,>00,>00                                          ; 13: Gold
+       byte >00,>00,>00,>00                                          ; 14: Platinum
+cargo_gem_stones:                                          ; >eb55
+       byte >01,>00,>00,>00                                          ; 15: Gem-Stones
+       byte >00,>C3,>A8,>00                                          ; 16: Alien Items
+cargo_refugees:                                            ; >eb5d
+       byte >00,>00,>00,>00                                          ; 17: Refugees
 
 * Free space in the hold
 * 
@@ -32305,12 +32319,10 @@ reference_distance:                                        ; >eb6e
 reference_distance_hi:                                     ; >eb6f
        byte >00                                                      ; 
 
-* Unreferenced bytes
+* Unused
 * 
-* No read or write site found anywhere in this disassembly. Sits
-* between the cached magnitude at #R$EB6E and the live roll-rotation
-* table at #R$EB76.
-unreferenced_eb70:                                         ; >eb70
+* Nothing in the game uses these bytes.
+unused_eb70:                                               ; >eb70
        byte >00,>00,>00,>01,>00,>00
 
 * Live roll-rotation coefficient table
@@ -32395,7 +32407,7 @@ reference_point_z:                                         ; >eb8c
 * 
 * The working object's distance from the player (#R$84A6), stored on
 * every path through #R$883D/#R$88A1 (`LD ($EB8E),HL` at $88A8). Read back
-* by #R$8755 (threshold-compared against $F805), #R$8204/#R$8205's own
+* by #R$8755 (threshold-compared against $F805), #R$8205's own
 * header, #R$27F4/#R$2A3A (top-nibble-tested via the high byte alone),
 * and within #R$46CA (at $46D5) and #R$8B00 (at $8B32/$8B40).
 object_distance:                                           ; >eb8e
@@ -32456,13 +32468,15 @@ clip_point2_y:                                             ; >eb98
 clip_point2_y_hi:                                          ; >eb99
        byte >80                                                      ; 
 
-* Small dispatch/type index
+* Current view
 * 
-* #R$67A8's own title names this: "Jump-table dispatch: index HL's
-* table by ($EB9A)" - doubled to a byte offset for a `JP (HL)` jump
-* table. Also read by #R$6911/#R$6D24's flag-nibble search (see that
-* routine's own header) as what's likely a related index.
-eb9a_dispatch_index:                                       ; >eb9a
+* Which space view is showing: 0 front, 1 rear, 2 left, 3 right. Set by
+* #R$645B when the player switches view (and to $FF when the cockpit screen
+* is set up, so that the next view always counts as a change). Selects the
+* stardust's roll and pitch handlers (#R$67A8), the rear view's handling of
+* particles reaching the centre (#R$6915), and the mount whose laser is
+* used (#R$6D24).
+current_view:                                              ; >eb9a
        byte >00
 
 * Depth's shift
@@ -32482,10 +32496,10 @@ depth_shift:                                               ; >eb9b
 shared_normalize_mantissa:                                 ; >eb9c
        byte >00
 
-* Unreferenced byte (workspace)
+* Unused
 * 
-* No direct-address reference found anywhere in this disassembly.
-unreferenced_workspace_eb9d:                               ; >eb9d
+* Nothing in the game uses this byte.
+unused_eb9d:                                               ; >eb9d
        byte >00
 
 * Radius on screen
@@ -32786,17 +32800,12 @@ ef94_scaled_magnitude_3:                                   ; >ef94
 ef95_clock_divider:                                        ; >ef95
        byte >0A
 
-* Fill character for $3675's digit-formatting routine
+* Fill character for numbers
 * 
-* #R$3675's own header names the mechanism: "fill some number of bytes
-* at (IX) with ($EF96)". #R$1A8A (the $84/function-key handler) sets
-* it to $30 ('0', for leading-zero padding) before formatting the
-* #R$F742 clock's days/hours/minutes fields ($F745/$F744/$F743) via 3
-* back-to-back #R$3675 calls, then restores it to $20 (space,
-* presumably the default fill) afterward. Set to $20 at startup too
-* (#R$7045's step 5, see #R$6F9F's own header) - consistent with that
-* being the resting/default value.
-ef96_fill_char:                                            ; >ef96
+* The character #R$3675 pads numbers with on the left: a space normally (set
+* at start-up by #R$6F9F), or '0' while #R$1A8A shows the clock's days, hours
+* and minutes (#R$F742).
+number_fill_char:                                          ; >ef96
        byte >20
 
 * Copy of the legal status made by #R$291E
@@ -32867,22 +32876,14 @@ identify_target:                                           ; >ef9d
 vram_busy_flag:                                            ; >ef9e
        byte >00
 
-* Cloaking-device-active flag
+* Cloaking device active
 * 
-* Confirmed, not just named inline: #R$13FD (at $1415), when set,
-* decays #R$19EC's counter (draining the $F817 dashboard gauge) and
-* displays #R$1BE7's literal "Cloaking activ[ated]" message. Toggled
-* (CPL) by the 'Y'-key dispatch handler #R$1B13 - not #R$1B0D, which
-* is the unrelated 'I'-key handler for #R$EF9D - itself gated on
-* ($F784) being set (in the $F775+ equipment-array region, per Round
-* 48's field-copy decode; not otherwise identified), so likely an
-* equipment-fitted check before the toggle takes effect. Also read
-* within #R$26A9 (at $26D1, suppressing a random draw) and #R$2A3A
-* (at $2A40), and cleared at startup by #R$707D. This snapshot's value
-* ($38) doesn't fit a CPL-only $00/$FF writer - either something else
-* also writes it, or it wasn't reset to a clean state before capture;
-* every consumer just tests OR A/zero-vs-nonzero, so the identification
-* itself isn't affected.
+* Toggled between 0 and $FF by the 'Y' key (#R$1B13) in flight, if a cloaking
+* device is fitted (#R$F784), and cleared by #R$707D. While it's set, the
+* energy (#R$F817) drains by 1 every other frame and "Cloaking active" is
+* shown (#R$13FD, at $1415), attacking ships don't fire their lasers
+* (#R$26A9, at $26D1) and ships don't launch missiles (#R$2A3A). In this
+* snapshot it holds a byte written by the tune-restart bug (#R$7603).
 cloaking_active_flag:                                      ; >ef9f
        byte >38
 
@@ -33270,7 +33271,7 @@ main_loop_tick_counter:                                    ; >f746
        data >0000
 
 * VBlank sub-tick counter since the last loop pass
-* .
+* 
 * Incremented by the RST $38 handler (#R$7202, see #R$0038's own
 * comment) on every VBlank interrupt. Zeroed right after ($F746) is
 * advanced, at $0117 (and again at $1E61), then polled until >=7 at
@@ -33581,8 +33582,12 @@ cloaking_device_fitted:                                    ; >f784
 carrying_documents:                                        ; >f785
        byte >00
 
-* Sound data, game variables, buffers and MSX BIOS work area
-sound_vars_f786:                                           ; >f786
+* Unused: end of the saved equipment record
+* 
+* The last 3 bytes of the 20 bytes from #R$F775 that the commander file
+* saves (#R$A551). Nothing else in the game uses them, so they only ever
+* hold what #R$A469 loads into them.
+unused_f786:                                               ; >f786
        byte >00,>00,>00
 
 * Market
@@ -34050,8 +34055,9 @@ energy_gauge:                                              ; >f817
 * 
 * The type of laser fitted to the current view (#R$6D24): 0 pulse, 1
 * mining, 2 beam, 3 military, or $FF (negative) for none - when the laser
-* can't be fired (#R$2AD0) and nothing is in its sights (#R$4735). Also
-* used by the Equip Ship screen (#R$5F0D).
+* can't be fired (#R$2AD0) and nothing is in its sights (#R$4735). On the
+* Equip Ship screen, #R$5EFE uses it to hold the item number of the laser
+* being bought instead (4, 12, 5 or 13; see #R$5AC3).
 view_laser_type:                                           ; >f818
        byte >FF
 
@@ -34079,7 +34085,12 @@ laser_power:                                               ; >f81a
 laser_state:                                               ; >f81b
        byte >00
 
-* Sound data, game variables, buffers and MSX BIOS work area
+* MSX BIOS work area: BASIC, function-key and graphics variables
+* 
+* MSX BIOS and MSX-BASIC variables, from part-way through HOLD8 to QUEBAK.
+* They include the function-key strings (FNKSTR, $F87F-$F91E), the VDP
+* table addresses for screen 2 (CGPNT to ATRBAS, $F91F-$F929) and the PLAY
+* queue table (QUETAB, $F959). Nothing in the game uses them.
 
 * RAM slot-select byte, computed by the boot loader
 * 
@@ -34102,7 +34113,15 @@ laser_state:                                               ; >f81b
 * 
 * See #R$F976 - same mechanism, H=$80 (page 2).
 
-* Sound data, game variables, buffers and MSX BIOS work area
+* MSX BIOS work area: PLAY queues, keyboard state and screen variables
+* 
+* MSX BIOS and MSX-BASIC variables, from part-way through the first PLAY
+* queue (VOICAQ, whose start #R$F975 the boot loader reuses) to the end of
+* the screen variables. They include the PLAY queues and voice buffers, the
+* keyboard matrix (OLDKEY and NEWKEY, $FBDA-$FBEF), the key buffer (KEYBUF,
+* $FBF0), BOTTOM and HIMEM ($FC48), JIFFY ($FC9E) and SCRMOD ($FCAF).
+* Nothing in the game uses them, but the BIOS's TAPION sets LOWLIM ($FCA4)
+* and WINWID ($FCA5) when a commander is loaded (#R$A492).
 
 * EXPTBL: MSX primary-slot expansion-flag table (4 bytes)
 * 
@@ -34115,7 +34134,7 @@ laser_state:                                               ; >f81b
 * unindexed `LD A,($FCC1)` - slot 0's own flag), part of the slot-
 * lookup sequence #R$A492/#R$A4CA's tape save/load routines use to
 * access RAM outside the game's own currently-mapped slot. All 4 bytes
-* read $00 in this docked snapshot (no expanded slots in this machine
+* read $00 in this snapshot (no expanded slots in this machine
 * configuration).
 
 * SLTTBL: MSX secondary-slot register shadow table (4 bytes)
@@ -34131,7 +34150,13 @@ laser_state:                                               ; >f81b
 * via port $A8 - maintaining this shadow copy, the standard MSX
 * RDSLT/WRSLT convention.
 
-* Sound data, game variables, buffers and MSX BIOS work area
+* MSX BIOS work area: slot tables and hooks
+* 
+* MSX BIOS variables after #R$FCC5: the slot attribute and work tables
+* (SLTATR, $FCC9, and SLTWRK, $FD09), PROCNM ($FD89) and DEVICE ($FD99),
+* then the BIOS hooks from H.KEYI ($FD9A), which all hold RET
+* instructions except for a JP $11B4 at $FEE4. Nothing in the game uses
+* them: its own interrupt handler is at #R$0038.
 
 * Page-3 secondary-slot register readback, used by #R$A6F3
 * 
@@ -34140,4 +34165,4 @@ laser_state:                                               ; >f81b
 * secondary-slot register if it's expanded (see #R$FCC1) - the
 * standard MSX technique for cross-slot memory access, used here by
 * the same #R$A727/#R$A6F3 slot-lookup sequence that reads
-* #R$FCC1/#R$FCC5. Reads $00 in this docked snapshot.
+* #R$FCC1/#R$FCC5. Reads $00 in this snapshot.

@@ -134,7 +134,11 @@ public class SkoolConverter {
                 case Instruction:
                     if (z80Line.getAddress() >= startAddress && z80Line.getAddress() < endAddress) {
                         if (references.contains(z80Line.getAddress())) {
-                            boolean lastLineWasALabel = lastLineWasALabel(tms9900Lines);
+                            if (lastLineWasAGlobalLabel(tms9900Lines)) {
+                                TMS9900Line directive = new TMS9900Line(TMS9900Line.Type.Directive);
+                                directive.setDirective("equ  $");
+                                tms9900Lines.add(directive);
+                            }
                             TMS9900Line label = new TMS9900Line(TMS9900Line.Type.Label);
                             label.setLabel(getValidLabel(z80Line.getAddress(), true));
                             String addressString = Util.intToStr(z80Line.getAddress(), hexOutput, true);
@@ -142,11 +146,6 @@ public class SkoolConverter {
                                 label.setComment(addressString);
                             }
                             tms9900Lines.add(label);
-                            if (lastLineWasALabel) {
-                                TMS9900Line directive = new TMS9900Line(TMS9900Line.Type.Directive);
-                                directive.setDirective("equ  $");
-                                tms9900Lines.add(directive);
-                            }
                         }
                         if (z80Line.getType() == Z80Line.Type.Data) {
                             i += convertData(z80Line, tms9900Lines);
@@ -645,12 +644,12 @@ public class SkoolConverter {
         return "";
     }
 
-    private boolean lastLineWasALabel(List<TMS9900Line> tms9900Lines) {
+    private boolean lastLineWasAGlobalLabel(List<TMS9900Line> tms9900Lines) {
         for (int i = tms9900Lines.size() - 1; i >= 0; i--) {
             TMS9900Line tms9900Line = tms9900Lines.get(i);
             TMS9900Line.Type type = tms9900Line.getType();
             if (type == TMS9900Line.Type.Label) {
-                return true;
+                return !("!".equals(tms9900Line.getLabel()));
             } else if (type == TMS9900Line.Type.Instruction || type == TMS9900Line.Type.Data) {
                 return false;
             }

@@ -1,0 +1,143 @@
+* One-time startup code, as it actually reads before self-reclamation
+* 
+* This is #R$6F9F@main(startup_code_stardust_table) exactly as
+* it exists in snapshot/elite-dump-with-6f9f-routine.bin, captured at the
+* instant #R$0106@main(main_loop_start)'s `$0109 CALL $6F9F` first runs -
+* before this routine's own step 7 below declares its code as reclaimable
+* and later gameplay overwrites it. In the main disassembly's source
+* snapshot (snapshot/elite.bin, captured "docked, just after loading"),
+* this same $6F9F-$7043 range has already been overwritten by whatever
+* the stardust table (#R$68CD@main(move_and_plot_stardust)) now
+* occupying the reclaimed space, so it's disassembled there as inert
+* data, not code. This secondary disassembly exists purely to show the
+* original routine's real instructions instead of a prose paraphrase of
+* them.
+* .
+* Called once, from #R$0106@main(main_loop_start), before the main
+* per-tick loop starts:
+* .
+* 1. DI; save the caller's HL to $F740 (the address of the cockpit
+* screen picture, #R$CAD7@main(cockpit_picture)).
+* 2. Clear a ~6.5KB buffer: $D600 through $EFAA (`LD HL,$D600 / LD (HL),0 /
+* LD DE,$D601 / LD BC,$19AA / LDIR`).
+* 3. Generate the low-memory jump table: 24 `JP $XXXX` stubs, 8 bytes apart
+* from $0000 to $00B8, each built from a 2-byte pointer read from a
+* 48-byte table at $71F2 - 1 byte for the JP opcode, 2 for its operand,
+* then DE is advanced 5 more to reach the next 8-byte slot. Entries 0-7
+* are the RST $00-$38 vectors documented at
+* #R$0000@main(rst_00_target_load_character_glyph) onward; entries 8-22
+* continue the same table past the RST range ($0040 onward, see
+* #R$003B@main(unused_003b)).
+* 4. Copy 8 bytes from $1187 to $E700 - the pixel-bitmask table
+* #R$3C48@main(setup_bresenham_line)/#R$3CFD@main(plot_single_pixel)'s
+* line-drawing code looks up.
+* 5. Initialise several one-byte flags ($E92B/$E932=$FF, $E70C/$E708/
+* $E92A/$E92E/$E92F/$E944=1, $EF96=$20), call
+* #R$A433@main(default_commander) and
+* #R$7045@main(relocate_blueprints) (load the
+* default commander record, then relocate the ship-blueprint pointer
+* tables).
+* 6. Seed the #R$2176@main(random_byte) PRNG state ($E936-$E938) from the
+* Z80 refresh register R.
+* 7. Compute HL=$6F9F (this routine's own start) and store it to $EFA6,
+* then HL+$A5=$7044 (this routine's own end, exclusive) and store that
+* to $EFA4 - i.e. this routine declares its own code ($6F9F-$7043) as a
+* reusable memory range once it's done with it.
+* #R$EFA6@main(reclaimed_range_start) is documented as the ship-slot
+* table base (`IX,($EFA6)`), so that's what reclaims this space.
+* 8. Populate 100 (2-byte) records at $EEC6 (200 bytes): for each, picks a
+* random index via #R$2176@main(random_byte), looks it up in the
+* $0800-page table (the same idiom as
+* #R$1FCF@main(log_sign_tagged)), and randomises its sign via a
+* second #R$2176@main(random_byte) call.
+* 9. Adjust a cached VDP register value at $F3E0 and write it out (a
+* screen-mode change); EI; RET (the RET itself is
+* #R$7044@main(original_ret_deliberately_excluded_self), excluded from
+* this routine's own self-reclaimed range).
+* 
+* I:HL Address of the cockpit screen picture, saved to $F740
+* O:$EFA4/$EFA6 This routine's own address range ($6F9F-$7043), recorded so it can be reclaimed as the stardust table (#R$68CD@main(move_and_plot_stardust))
+one_time_startup:                                          ; >6f9f
+       limi 0                                              ; DI                ; Step 1
+       mov  hl,@>f740                                      ; LD ($F740),HL     ; 
+       li   hl,>d600                                       ; LD HL,$D600       ; Step 2
+       sb   *hl,*hl                                        ; LD (HL),$00       ; 
+       li   de,>d601                                       ; LD DE,$D601       ; 
+       li   bc,>19aa                                       ; LD BC,$19AA       ; 
+       .ldir                                               ; LDIR              ; 
+       li   hl,>71f2                                       ; LD HL,$71F2       ; Step 3: HL = the pointer table
+       li   de,>0000                                       ; LD DE,$0000       ; DE = the next stub's address (starts at $0000)
+       movb @bytes+>18,b                                   ; LD B,$18          ; B = 24 stubs to generate
+_6fb8:                                                     ; >6fb8
+       movb @bytes+>c3,a                                   ; LD A,$C3          ; A = the JP opcode
+       movb a,*de                                          ; LD (DE),A         ; write it to this stub's first byte
+       inc  de                                             ; INC DE            ; DE -> this stub's 2-byte operand
+       .ldi                                                ; LDI               ; copy the pointer table's low byte in
+       .ldi                                                ; LDI               ; ...then its high byte
+       movb @e,a                                           ; LD A,E            ; advance DE 5 more, to the next 8-byte stub slot
+       ab   @bytes+>05,a                                   ; ADD A,$05         ; 
+       movb a,@e                                           ; LD E,A            ; 
+       sb   one,b                                          ; DJNZ $6FB8        
+       jne  _6fb8                                          ;                   
+       li   hl,>1187                                       ; LD HL,$1187       ; Step 4
+       li   de,>e700                                       ; LD DE,$E700       ; 
+       li   bc,>0008                                       ; LD BC,$0008       ; 
+       .ldir                                               ; LDIR              ; 
+       movb @b255,a                                        ; LD A,$FF          ; Step 5
+       movb a,@>e92b                                       ; LD ($E92B),A      ; 
+       movb a,@>e932                                       ; LD ($E932),A      ; 
+       movb one,a                                          ; LD A,$01          ; 
+       movb a,@>e70c                                       ; LD ($E70C),A      ; 
+       movb a,@>e708                                       ; LD ($E708),A      ; 
+       movb a,@>e92a                                       ; LD ($E92A),A      ; 
+       movb a,@>e92e                                       ; LD ($E92E),A      ; 
+       movb a,@>e92f                                       ; LD ($E92F),A      ; 
+       movb a,@>e944                                       ; LD ($E944),A      ; 
+       movb @bytes+>20,a                                   ; LD A,$20          ; 
+       movb a,@>ef96                                       ; LD ($EF96),A      ; 
+       .call @>a433                                        ; CALL $A433        ; load the default commander (#R$A433@main(default_commander))
+       .call @>7045                                        ; CALL $7045        ; relocate the ship-blueprint pointer tables (#R$7045@main(relocate_blueprints))
+       movb r,a                                            ; LD A,R            ; Step 6
+       movb a,@>e936                                       ; LD ($E936),A      ; 
+       movb a,@>e937                                       ; LD ($E937),A      ; 
+       movb a,@>e938                                       ; LD ($E938),A      ; 
+       li   hl,one_time_startup                            ; LD HL,$6F9F       ; Step 7: HL = this routine's own start
+       mov  hl,@>efa6                                      ; LD ($EFA6),HL     ; 
+       li   de,>00a5                                       ; LD DE,$00A5       
+       a    de,hl                                          ; ADD HL,DE         ; HL = this routine's own end (exclusive)
+       mov  hl,@>efa4                                      ; LD ($EFA4),HL     
+       li   hl,>eec6                                       ; LD HL,$EEC6       ; Step 8
+       movb @bytes+>64,b                                   ; LD B,$64          ; B = 100 records
+_7015:                                                     ; >7015
+       .push hl                                            ; PUSH HL           
+       .call @>2176                                        ; CALL $2176        ; A = a random byte (#R$2176@main(random_byte))
+       movb a,@l                                           ; LD L,A            
+       sb   a,a                                            ; XOR A             
+       ; SLA L                                             ; SLA L             ; TODO: check code. 
+       ab   @bytes+>08,a                                   ; ADC A,$08         ; HL = $0800 + 2*A
+       movb a,h                                            ; LD H,A            ; 
+       movb *hl,@e                                         ; LD E,(HL)         
+       ab   one,@l                                         ; INC L             
+       movb *hl,d                                          ; LD D,(HL)         ; DE = that table entry's word
+       .call @>2176                                        ; CALL $2176        ; A = a second random byte, to randomise the sign
+       socb a,a                                            ; OR A              
+       jlt  !                                              ; JP P,$702C        ; positive - keep DE's sign as read
+       b    @_702c                                         ;                   
+!
+       socb @bit6,d                                        ; SET 6,D           ; negative - flip DE's sign bit
+_702c:                                                     ; >702c
+       .pop hl                                             ; POP HL            
+       movb @e,*hl                                         ; LD (HL),E         
+       inc  hl                                             ; INC HL            
+       movb d,*hl                                          ; LD (HL),D         
+       inc  hl                                             ; INC HL            
+       sb   one,b                                          ; DJNZ $7015        
+       jne  _7015                                          ;                   
+       movb @>f3e0,a                                       ; LD A,($F3E0)      ; Step 9
+       andi a,>fc00                                        ; AND $FC           ; 
+       socb @bytes+>02,a                                   ; OR $02            ; 
+       movb a,@>f3e0                                       ; LD ($F3E0),A      ; 
+       movb a,@vdpwa                                       ; OUT ($99),A       ; 
+       movb @bytes+>81,a                                   ; LD A,$81          ; 
+       movb a,@vdpwa                                       ; OUT ($99),A       ; 
+       ; EI                                                ; EI                ; TODO: check code. #R$7044@main(original_ret_deliberately_excluded_self)'s `RET` returns to #R$0106@main(main_loop_start)

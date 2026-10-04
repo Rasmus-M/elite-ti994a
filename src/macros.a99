@@ -87,4 +87,25 @@
        .endm
 
        .defm rst
+       .ifeq #1,>08
+       .call @print_char                           ; JP $9AB3          ; Add A to HL
+       .endif
+       .ifeq #1,>10
+       .call @rst_08_target_print_tokenised_string ; JP $9AC3          ; Write VDP byte (DE = address, A = value)
+       .endif
+       .ifeq #1,>18
+       .call @rst_10_target_print_ath_tokenised    ; JP $1FD9          ; WRITE_REGISTER (B = reg, C = value)
+       .endif
+       .ifeq #1,>20
+       .call @rst_20_target_print_list_positioned  ; JP $BFAE          ; Random number generator
+       .endif
+       .ifeq #1,>28
+       .call @rst_28_target_draw_list_tile         ; JP $AD49          ; Allocate_sprite
+       .endif
+       .ifeq #1,>30
+       .call @ask_for_number                       ; JP $AD8B          ; Load sprite pattern
+       .endif
+       .ifeq #1,>38
+       .call @vblank_handler                       ; JP $1FDF          ; WRITE_VRAM (HL = source, DE = dest, BC = count)
+       .endif
        .endm

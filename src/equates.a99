@@ -59,10 +59,10 @@ bit6:
        equ  bit5+2
 bit7:
        equ  bit6+2
-stack:
+pad_stack:
        equ  bit7+2
 b255:
-       equ  stack+>30
+       equ  pad_stack+>30
 b254:
        equ  b255+1
 pad_vars:

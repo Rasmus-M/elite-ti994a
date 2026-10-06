@@ -87,25 +87,28 @@
        .endm
 
        .defm rst
+       .ifeq #1,>00
+       .call @print_char                           ; JP $34A8          ; print character A
+       .endif
        .ifeq #1,>08
-       .call @print_char                           ; JP $9AB3          ; Add A to HL
+       .call @rst_08_target_print_tokenised_string ; JP $357A          ; print a tokenised string at HL
        .endif
        .ifeq #1,>10
-       .call @rst_08_target_print_tokenised_string ; JP $9AC3          ; Write VDP byte (DE = address, A = value)
+       .call @rst_10_target_print_ath_tokenised    ; JP $3588          ; print the A'th tokenised string in a list at HL
        .endif
        .ifeq #1,>18
-       .call @rst_10_target_print_ath_tokenised    ; JP $1FD9          ; WRITE_REGISTER (B = reg, C = value)
+       .call @rst_18_target_format_value_print     ; JP $36E1          ; format a value into $E717 and print it
        .endif
        .ifeq #1,>20
-       .call @rst_20_target_print_list_positioned  ; JP $BFAE          ; Random number generator
+       .call @rst_20_target_print_list_positioned  ; JP $3596          ; print a list of positioned tokenised strings
        .endif
        .ifeq #1,>28
-       .call @rst_28_target_draw_list_tile         ; JP $AD49          ; Allocate_sprite
+       .call @rst_28_target_draw_list_tile         ; JP $36F1          ; colour a list of rectangles
        .endif
        .ifeq #1,>30
-       .call @ask_for_number                       ; JP $AD8B          ; Load sprite pattern
+       .call @ask_for_number                       ; JP $5AC7          ; ask for a number
        .endif
        .ifeq #1,>38
-       .call @vblank_handler                       ; JP $1FDF          ; WRITE_VRAM (HL = source, DE = dest, BC = count)
+       .call @vblank_handler                       ; JP $7202          ; VBlank interrupt handler
        .endif
        .endm

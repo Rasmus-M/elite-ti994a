@@ -670,9 +670,18 @@ public class SkoolConverter {
 
     private void writeTMS9900File(File tms9900File, List<TMS9900Line> tms9900Lines) throws IOException {
         BufferedWriter writer = new BufferedWriter(new FileWriter(tms9900File));
+        int numberOfEmptyLines = 0;
         for (TMS9900Line tms9900Line : tms9900Lines) {
+            if (tms9900Line.getType() != TMS9900Line.Type.Empty && numberOfEmptyLines > 0) {
+                writer.write(Util.repeat("*", 80));
+                writer.newLine();
+                numberOfEmptyLines = 0;
+            }
             writer.write(tms9900Line.toString());
             writer.newLine();
+            if (tms9900Line.getType() == TMS9900Line.Type.Empty) {
+                numberOfEmptyLines++;
+            }
         }
         writer.close();
     }

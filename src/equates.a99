@@ -23,16 +23,6 @@ kscan:
 **
 * Scratch pad
 *
-;ti_wrksp:
-;       equ  >8300
-;sndws:
-;       equ  ti_wrksp
-;ti_r0lb:
-;       equ  ti_wrksp+1
-;ti_r1lb:
-;       equ  ti_wrksp+3
-;wrksp:
-;       equ  ti_wrksp+>1a               ; r0-r2 overlaps ti_wrksp r13-r15
 wrksp:
        equ  >8300
 r0lb:
@@ -86,6 +76,8 @@ gplws:
 **
 * Z80 register mapping
 *
+* r0-r2 scratch registers
+*
 one    requ 3                          ; >0100
 zero   equ wrksp+7
 af     requ 4
@@ -106,7 +98,7 @@ ixl    equ wrksp+17
 iy     requ 9
 iyh    requ 9
 iyl    equ wrksp+19
-sp     requ 10
+sp     requ 10                         ; Stack pointer. Stack grows up.
 af_    requ 12
 a_     requ 12
 bc_    requ 13

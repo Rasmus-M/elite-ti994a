@@ -1,0 +1,1989 @@
+********************************************************************************
+* Ship blueprint table
+*
+* The address of each ship type's blueprint (see #R$A817 for the layout),
+* indexed by ship type (#R$F7E7) by #R$2FE9. Entry 0 is unused. Relocated
+* at startup (#R$7045). Each blueprint ends with the ship's name, from
+* which the names here are taken. Ship types 8-11 are the letters E, L,
+* I and T shown on the title screen, which have no names.
+ship_blueprints:                                           ; >a7d7
+       data >0000                                                    ; $00: (none)
+       data ship_space_station_header                                ; $01: Space Station
+       data ship_missile_header                                      ; $02: Missile
+       data ship_cargo_canister_header                               ; $03: Cargo Canister
+       data ship_asteroid_header                                     ; $04: Asteroid
+       data ship_escape_capsule_header                               ; $05: Escape Capsule
+       data ship_thargon_header                                      ; $06: Thargon
+       data ship_platlet_header                                      ; $07: Platlet
+       data ship_letter_e_header                                     ; $08: letter E (title screen)
+       data ship_letter_l_header                                     ; $09: letter L (title screen)
+       data ship_letter_i_header                                     ; $0A: letter I (title screen)
+       data ship_letter_t_header                                     ; $0B: letter T (title screen)
+       data ship_viper_header                                        ; $0C: Viper
+       data ship_fer_de_lance_header                                 ; $0D: Fer-De-Lance
+       data ship_cobra_mkiii_header                                  ; $0E: Cobra MkIII
+       data ship_python_header                                       ; $0F: Python
+       data ship_anaconda_header                                     ; $10: Anaconda
+       data ship_cobra_mk1_header                                    ; $11: Cobra MK1
+       data ship_krait_header                                        ; $12: Krait
+       data ship_thargoid_header                                     ; $13: Thargoid
+       data ship_boa_class_cruiser_header                            ; $14: Boa Class Cruiser
+       data ship_gecko_header                                        ; $15: Gecko
+       data ship_moray_star_boat_header                              ; $16: Moray Star Boat
+       data ship_adder_header                                        ; $17: Adder
+       data ship_mamba_header                                        ; $18: Mamba
+       data ship_asp_mkii_header                                     ; $19: Asp MkII
+       data ship_sidewinder_header                                   ; $1A: Sidewinder
+       data ship_wolf_mkii_header                                    ; $1B: Wolf MkII
+       data ship_orbit_shuttle_header                                ; $1C: Orbit Shuttle
+       data ship_transporter_header                                  ; $1D: Transporter
+       data ship_cougar_header                                       ; $1E: Cougar
+       data ship_constrictor_header                                  ; $1F: Constrictor
+
+* Cougar: ship-blueprint header
+*
+* #TABLE
+* { =h Offset | =h Field }
+* { $00-$01 | #R$A837 - vertex array pointer (word) }
+* { $02-$03 | #R$A8A9 - edge array pointer (word) }
+* { $04-$05 | #R$A8DD - faces pointer (word; see #R$F7F9) }
+* { $06-$07 | #R$A831 - name text pointer (word; named ships only) }
+* { $08 | Number of faces (#R$F7FD) }
+* { $09 | Number of edges (#R$F7FE) }
+* { $0A | Number of vertices (#R$F7FF) }
+* { $0B | Targetable area (#R$F800): how close to the crosshairs it has to be to be hit by the laser (#R$46CA, #R$4735) }
+* { $0C | Energy (#R$F801): the energy (#R$F7E9) it starts with (#R$3037) }
+* { $0D | Maximum speed (#R$F802): the speed #R$2869 speeds up to, and the initial speed (#R$F7E6) at spawn unless the caller sets it to 0 }
+* { $0E | Gun vertex (#R$F803): the vertex its laser beam is drawn from (#R$43C2) }
+* { $0F | Faces have normals (#R$F804) }
+* { $10 | Size (#R$F805): the distance at which a missile hits it (#R$25FF), and how close it comes on the title screen (#R$1C5C) }
+* { $11 | Manoeuvrability (#R$F806): its turn rate, and how close it gets to the player before turning away (#R$2744, #R$281E) }
+* { $12 | Bits 2-4: class (#R$F807): 0 trader, 4 pirate, 8 shuttle/escape capsule, $0C asteroid, $10 police, $14 bounty hunter, $18 station/missile/cargo, $1C Thargoid/Constrictor (see #R$31AD, #R$26A9) }
+* { $13 | Bit 7: fitted with ECM (#R$25B9); bits 0-6 the number of missiles (#R$F7EA) }
+* { $14 | Cargo (#R$F809): the low nibble the most cargo canisters it leaves, the high nibble their cargo type; $FF one canister holding the cloaking device (#R$8DB9) }
+* { $15 | Aggression (#R$F80A): the chance of firing each frame (#R$26A9) }
+* { $16-$17 | Bounty (#R$F80B), paid when it's destroyed (#R$2578) }
+* { $18-$19 | Score value (#R$F80D), added to the score when it's destroyed (#R$32E7) }
+* TABLE#
+* .
+* The 26-byte header of a blueprint (see #R$A7D7). The vertices (#R$A837)
+* are 6 bytes each, and the edges (#R$A8A9) 2 bytes each: the numbers of
+* the two vertices at its ends. The blueprints' vertices, edges, faces
+* and names fill $A817-$CA61 with no gaps.
+ship_cougar_header:                                        ; >a817
+       data ship_cougar_vertices
+       data ship_cougar_edges
+       data ship_cougar_faces
+       data ship_cougar_name
+       byte >07,>1A,>13,>31,>FF,>28,>00,>01
+       byte >43,>24,>26,>87,>FF,>96,>88,>13
+       byte >E8,>03
+
+* Cougar name text
+*
+* The Cougar's name, which its blueprint header points to (#R$A817), ending
+* with a bit-7-set "r" like the other messages (see #R$4223).
+ship_cougar_name:                                          ; >a831
+       text 'COUGA',>f2
+
+* Cougar: vertex array (6 bytes/vertex)
+*
+* 19 vertices, each an x, y and z (words), which #R$49FD rotates into
+* the view (#R$4464).
+ship_cougar_vertices:                                      ; >a837
+       byte >FF,>FF,>4A,>09,>44,>18,>4A,>51
+       byte >FF,>FF,>4A,>15,>4A,>55,>FF,>FF
+       byte >4A,>55,>FF,>FF,>3B,>0F,>4A,>55
+       byte >FF,>FF,>3B,>4F,>4A,>55,>4A,>11
+       byte >FF,>FF,>4A,>15,>4A,>15,>FF,>FF
+       byte >4A,>55,>AE,>54,>FF,>FF,>3B,>17
+       byte >A1,>57,>FF,>FF,>4A,>51,>AE,>14
+       byte >FF,>FF,>3B,>17,>A1,>17,>FF,>FF
+       byte >4A,>51,>FF,>FF,>3B,>0B,>84,>14
+       byte >FF,>FF,>00,>0C,>93,>12,>57,>4E
+       byte >00,>04,>F8,>15,>57,>0E,>00,>04
+       byte >F8,>15,>4A,>4D,>57,>0A,>4A,>55
+       byte >4A,>4D,>57,>4A,>4A,>55,>4A,>0D
+       byte >57,>4A,>4A,>55,>4A,>0D,>57,>0A
+       byte >4A,>55
+
+* Cougar: edge array (2 bytes/edge)
+*
+* 26 edges, each the numbers of the two vertices at its ends. The last
+* one ($FB,$01) is an invisible edge: bit 7 of its first byte is set, so
+* #R$491A never draws it (and doesn't read its second byte). It is listed in
+* faces 5 and 6 (#R$A8DD), closing them.
+ship_cougar_edges:                                         ; >a8a9
+       byte >00,>01,>01,>07,>07,>08,>08,>02
+       byte >02,>03,>03,>06,>02,>04,>04,>06
+       byte >06,>0A,>0A,>09,>09,>05,>05,>00
+       byte >00,>03,>01,>04,>05,>04,>01,>02
+       byte >05,>06,>0C,>0D,>0D,>0B,>0B,>0E
+       byte >0E,>0C,>0F,>10,>10,>12,>12,>11
+       byte >11,>0F,>FB,>01
+
+* Cougar: faces (7 faces)
+*
+* Each face is a scale byte and a normal vector (three words), used to
+* hide the faces that face away (#R$4255, #R$4873), then a count and the
+* numbers of the face's edges (#R$491A). A blueprint without normals
+* (#R$F804) has just the edge lists (see #R$B3CC).
+* .
+* The title letters (#R$C91A) and the Platlet (#R$B3CC) have no normals.
+ship_cougar_faces:                                         ; >a8dd
+       byte >0A,>4D,>59,>A4,>1F,>F6,>12,>09
+       byte >00,>0F,>04,>0C,>01,>02,>03,>11
+       byte >12,>0A,>4D,>19,>A4,>1F,>F6,>12
+       byte >09,>0B,>0C,>05,>10,>08,>09,>0A
+       byte >14,>13,>28,>FF,>FF,>FF,>FF,>FA
+       byte >5F,>08,>05,>04,>06,>07,>15,>16
+       byte >17,>18,>0A,>4D,>59,>A4,>5F,>F6
+       byte >12,>06,>0D,>0F,>06,>01,>02,>03
+       byte >0A,>4D,>19,>A4,>5F,>F6,>12,>06
+       byte >0E,>10,>07,>08,>09,>0A,>07,>FF
+       byte >FF,>EB,>5F,>B1,>14,>03,>0E,>0D
+       byte >19,>07,>FF,>FF,>EB,>5F,>B1,>14
+       byte >03,>0B,>00,>19
+
+* Constrictor: ship-blueprint header
+*
+* See #R$A817 for the format. 24 vertices, 40 edges. The Constrictor is
+* the ship stolen in mission 1 (#R$9483).
+ship_constrictor_header:                                   ; >a941
+       data ship_constrictor_vertices
+       data ship_constrictor_edges
+       data ship_constrictor_faces
+       data ship_constrictor_name
+       byte >0A,>18,>12,>32,>FF,>28,>11,>01
+       byte >4B,>24,>3E,>FF,>72,>96,>A0,>0F
+       byte >88,>13
+
+* Constrictor name text
+*
+* The message "Constrictor".
+ship_constrictor_name:                                     ; >a95b
+       text 'CONSTRICTO',>f2
+
+* Constrictor: vertex array (6 bytes/vertex)
+ship_constrictor_vertices:                                 ; >a966
+       byte >4A,>11,>3B,>4B,>4A,>19,>4A,>51
+       byte >3B,>4B,>4A,>19,>05,>57,>3B,>4B
+       byte >4A,>15,>05,>57,>3B,>4B,>4A,>55
+       byte >4A,>51,>CD,>0E,>4A,>55,>4A,>11
+       byte >CD,>0E,>4A,>55,>05,>17,>3B,>4B
+       byte >4A,>55,>05,>17,>3B,>4B,>4A,>15
+       byte >4A,>11,>CD,>0E,>4A,>09,>4A,>51
+       byte >CD,>0E,>4A,>09,>4A,>11,>3B,>4B
+       byte >D1,>17,>4A,>51,>3B,>4B,>D1,>17
+       byte >93,>12,>3B,>4B,>93,>52,>93,>52
+       byte >3B,>4B,>93,>52,>A1,>0F,>3B,>4B
+       byte >A1,>4F,>A1,>4F,>3B,>4B,>A1,>4F
+       byte >FF,>FF,>3B,>4B,>FF,>FF,>FF,>FF
+       byte >3B,>4B,>4A,>19
+
+* Constrictor: edge array (2 bytes/edge)
+ship_constrictor_edges:                                    ; >a9d2
+       byte >00,>01,>01,>02,>01,>09,>00,>08
+       byte >00,>07,>07,>08,>02,>09,>02,>03
+       byte >06,>07,>06,>08,>05,>08,>04,>09
+       byte >03,>09,>03,>04,>04,>05,>05,>06
+       byte >03,>06,>08,>09,>0A,>0C,>0C,>0E
+       byte >0E,>0A,>0B,>0F,>0D,>0F,>0B,>0D
+
+* Constrictor: faces (10 faces)
+*
+* See #R$A8DD for the format.
+ship_constrictor_faces:                                    ; >aa02
+       byte >0E,>FF,>FF,>B7,>1F,>EA,>18,>04
+       byte >00,>02,>03,>11,>14,>24,>59,>7B
+       byte >1F,>16,>18,>03,>01,>02,>06,>14
+       byte >24,>19,>7B,>1F,>16,>18,>03,>03
+       byte >04,>05,>15,>38,>1C,>10,>1F,>FF
+       byte >FF,>03,>05,>08,>09,>15,>38,>5C
+       byte >10,>1F,>FF,>FF,>03,>06,>07,>0C
+       byte >15,>38,>5C,>10,>1F,>FF,>FF,>03
+       byte >0B,>0C,>0D,>0D,>FF,>FF,>FA,>1F
+       byte >FF,>FF,>04,>0A,>0B,>0E,>11,>15
+       byte >38,>1C,>10,>1F,>FF,>FF,>03,>09
+       byte >0A,>0F,>28,>FF,>FF,>FF,>FF,>FA
+       byte >5F,>04,>0D,>0E,>0F,>10,>07,>FF
+       byte >FF,>FA,>5F,>FF,>FF,>0C,>00,>01
+       byte >04,>07,>08,>10,>12,>13,>14,>15
+       byte >16,>17
+
+* Cobra MkIII: ship-blueprint header
+*
+* See #R$A817 for the format. 38 vertices, 56 edges. The name (#R$AA96)
+* is "Cobra MkII" followed by "I" with bit 7 set.
+ship_cobra_mkiii_header:                                   ; >aa7c
+       data ship_cobra_mkiii_vertices
+       data ship_cobra_mkiii_edges
+       data ship_cobra_mkiii_faces
+       data ship_cobra_mkiii_name
+       byte >0F,>26,>1C,>4D,>48,>1E,>15,>01
+       byte >86,>20,>02,>83,>73,>64,>32,>00
+       byte >50,>00
+
+* Cobra MkIII name text
+*
+* The message "Cobra MkIII".
+ship_cobra_mkiii_name:                                     ; >aa96
+       text 'COBRA MKII',>c9
+
+* Cobra MkIII: vertex array (6 bytes/vertex)
+ship_cobra_mkiii_vertices:                                 ; >aaa1
+       byte >00,>14,>FF,>FF,>FE,>18,>00,>54
+       byte >FF,>FF,>FE,>18,>FF,>FF,>CD,>12
+       byte >57,>12,>A1,>5B,>57,>46,>00,>4C
+       byte >A1,>1B,>57,>46,>00,>4C,>D6,>59
+       byte >00,>10,>4A,>55,>D6,>19,>00,>10
+       byte >4A,>55,>00,>1C,>00,>4C,>4A,>55
+       byte >00,>5C,>00,>4C,>4A,>55,>FF,>FF
+       byte >CD,>12,>4A,>55,>00,>54,>57,>52
+       byte >4A,>55,>00,>14,>57,>52,>4A,>55
+       byte >AE,>54,>00,>0C,>4A,>55,>00,>4C
+       byte >57,>0E,>4A,>55,>00,>0C,>57,>0E
+       byte >4A,>55,>AE,>14,>00,>0C,>4A,>55
+       byte >AE,>14,>57,>4E,>4A,>55,>00,>0C
+       byte >00,>50,>4A,>55,>00,>4C,>00,>50
+       byte >4A,>55,>AE,>54,>57,>4E,>4A,>55
+       byte >FF,>FF,>FF,>FF,>FE,>18,>FF,>FF
+       byte >FF,>FF,>F8,>19,>4A,>59,>57,>4A
+       byte >4A,>55,>4A,>59,>57,>0A,>4A,>55
+       byte >D6,>59,>FF,>FF,>4A,>55,>4A,>19
+       byte >57,>0A,>4A,>55,>D6,>19,>FF,>FF
+       byte >4A,>55,>4A,>19,>57,>4A,>4A,>55
+
+* Cobra MkIII: edge array (2 bytes/edge)
+ship_cobra_mkiii_edges:                                    ; >ab49
+       byte >00,>01,>00,>04,>01,>03,>03,>08
+       byte >04,>07,>06,>07,>06,>09,>05,>09
+       byte >05,>08,>02,>05,>02,>06,>03,>05
+       byte >04,>06,>01,>02,>00,>02,>08,>0A
+       byte >0A,>0B,>07,>0B,>01,>0A,>00,>0B
+       byte >01,>05,>00,>06,>14,>15,>0C,>0D
+       byte >12,>13,>0E,>0F,>10,>11,>0F,>10
+       byte >0E,>11,>0D,>12,>0C,>13,>02,>09
+       byte >16,>18,>17,>18,>16,>17,>19,>1A
+       byte >1A,>1B,>19,>1B
+
+* Cobra MkIII: faces (15 faces)
+*
+* See #R$A8DD for the format.
+ship_cobra_mkiii_faces:                                    ; >ab95
+       byte >22,>FF,>FF,>55,>1F,>55,>1B,>04
+       byte >00,>0D,>0E,>16,>1E,>F0,>58,>7D
+       byte >1F,>42,>18,>03,>09,>0D,>14,>1E
+       byte >F0,>18,>7D,>1F,>42,>18,>03,>0A
+       byte >0E,>15,>1D,>7E,>58,>83,>1F,>7E
+       byte >18,>03,>02,>0B,>14,>1D,>7E,>18
+       byte >83,>1F,>7E,>18,>03,>01,>0C,>15
+       byte >1A,>7A,>53,>F0,>1F,>FF,>FF,>03
+       byte >07,>09,>1F,>1A,>7A,>13,>F0,>1F
+       byte >FF,>FF,>03,>06,>0A,>1F,>3B,>0F
+       byte >5C,>1F,>1F,>FF,>FF,>03,>03,>08
+       byte >0B,>3B,>0F,>1C,>1F,>1F,>FF,>FF
+       byte >03,>04,>05,>0C,>28,>FF,>FF,>FF
+       byte >FF,>FA,>5F,>15,>05,>06,>07,>08
+       byte >0F,>10,>11,>17,>18,>19,>1A,>1B
+       byte >1C,>1D,>1E,>20,>21,>22,>23,>24
+       byte >25,>15,>DB,>54,>CD,>5F,>84,>16
+       byte >02,>02,>12,>0F,>FF,>FF,>DD,>5F
+       byte >94,>16,>05,>00,>10,>12,>13,>16
+       byte >15,>DB,>14,>CD,>5F,>84,>16,>02
+       byte >01,>13,>15,>DB,>54,>CD,>5F,>84
+       byte >16,>02,>03,>0F,>15,>DB,>14,>CD
+       byte >5F,>84,>16,>02,>04,>11
+
+* Asp MkII: ship-blueprint header
+*
+* See #R$A817 for the format. 19 vertices, 30 edges. The name (#R$AC65)
+* is "Asp MkI" followed by "I" with bit 7 set.
+ship_asp_mkii_header:                                      ; >ac4b
+       data ship_asp_mkii_vertices
+       data ship_asp_mkii_edges
+       data ship_asp_mkii_faces
+       data ship_asp_mkii_name
+       byte >0E,>1E,>13,>39,>C8,>28,>12,>01
+       byte >46,>10,>26,>01,>31,>96,>78,>00
+       byte >6E,>00
+
+* Asp MkII name text
+*
+* The message "Asp MkII".
+ship_asp_mkii_name:                                        ; >ac65
+       text 'ASP MKI',>c9
+
+* Asp MkII: vertex array (6 bytes/vertex)
+ship_asp_mkii_vertices:                                    ; >ac6d
+       byte >FF,>FF,>AE,>50,>FF,>FF,>FF,>FF
+       byte >AE,>4C,>F8,>55,>B4,>15,>FF,>FF
+       byte >F8,>55,>6F,>18,>57,>46,>FF,>FF
+       byte >B4,>15,>3B,>4F,>3B,>13,>B4,>55
+       byte >FF,>FF,>F8,>55,>6F,>58,>57,>46
+       byte >FF,>FF,>B4,>55,>3B,>4F,>3B,>13
+       byte >CD,>12,>3B,>4B,>C2,>18,>CD,>52
+       byte >3B,>4B,>C2,>18,>B4,>15,>3B,>0F
+       byte >3B,>13,>B4,>55,>3B,>0F,>3B,>13
+       byte >FF,>FF,>AE,>0C,>F8,>55,>5A,>50
+       byte >FF,>FF,>F8,>55,>5A,>10,>FF,>FF
+       byte >F8,>55,>FF,>FF,>00,>48,>F8,>55
+       byte >FF,>FF,>00,>08,>F8,>55,>FF,>FF
+       byte >3B,>4B,>C2,>18,>FF,>FF,>3B,>4B
+       byte >80,>19
+
+* Asp MkII: edge array (2 bytes/edge)
+*
+* 30 edges, each the numbers of the two vertices at its ends. The last two
+* ($FE,$0A and $FB,$0B) are invisible edges: bit 7 of their first bytes is
+* set, so #R$491A never draws them (and doesn't read their second bytes).
+* They are listed in faces 5, 6, 12 and 13 (#R$AD1B), closing them.
+ship_asp_mkii_edges:                                       ; >acdf
+       byte >00,>01,>00,>04,>00,>07,>01,>02
+       byte >02,>03,>03,>08,>08,>09,>06,>09
+       byte >05,>06,>01,>05,>03,>04,>04,>08
+       byte >06,>07,>07,>09,>02,>0C,>05,>0C
+       byte >0A,>0C,>0B,>0C,>0A,>0B,>06,>0B
+       byte >09,>0B,>03,>0A,>08,>0A,>0D,>0F
+       byte >0F,>0E,>0E,>10,>10,>0D,>12,>11
+       byte >FE,>0A,>FB,>0B
+
+* Asp MkII: faces (14 faces)
+*
+* See #R$A8DD for the format.
+ship_asp_mkii_faces:                                       ; >ad1b
+       byte >12,>FF,>FF,>E6,>5F,>8F,>15,>06
+       byte >01,>02,>06,>0B,>0D,>1B,>12,>63
+       byte >17,>BD,>5F,>BA,>55,>05,>00,>01
+       byte >03,>04,>0A,>12,>63,>57,>BD,>5F
+       byte >BA,>55,>05,>00,>02,>08,>09,>0C
+       byte >0C,>FF,>FF,>F5,>1F,>9E,>51,>03
+       byte >10,>11,>12,>18,>FF,>FF,>6F,>1F
+       byte >E3,>1A,>05,>06,>12,>14,>16,>1B
+       byte >19,>99,>5A,>68,>1F,>50,>55,>03
+       byte >08,>13,>1D,>19,>99,>1A,>68,>1F
+       byte >50,>55,>03,>04,>15,>1C,>30,>7E
+       byte >1D,>AD,>5D,>06,>1A,>03,>05,>0A
+       byte >0B,>30,>7E,>5D,>AD,>5D,>06,>1A
+       byte >03,>07,>0C,>0D,>34,>8F,>1E,>B3
+       byte >1A,>B5,>1B,>03,>05,>15,>16,>34
+       byte >8F,>5E,>B3,>1A,>B5,>1B,>03,>07
+       byte >13,>14,>2D,>FF,>FF,>FF,>FF,>FA
+       byte >5F,>08,>03,>09,>0E,>0F,>17,>18
+       byte >19,>1A,>11,>1F,>16,>C8,>1F,>1F
+       byte >56,>03,>0E,>10,>1C,>11,>1F,>56
+       byte >C8,>1F,>1F,>56,>03,>0F,>11,>1D
+
+* Adder: ship-blueprint header
+*
+* See #R$A817 for the format. 18 vertices, 29 edges.
+ship_adder_header:                                         ; >adc3
+       data ship_adder_vertices
+       data ship_adder_edges
+       data ship_adder_faces
+       data ship_adder_name
+       byte >0D,>1D,>12,>24,>70,>18,>00,>01
+       byte >32,>10,>26,>01,>61,>64,>78,>00
+       byte >64,>00
+
+* Adder name text
+*
+* The message "Adder".
+ship_adder_name:                                           ; >addd
+       text 'ADDE',>f2
+
+* Adder: vertex array (6 bytes/vertex)
+ship_adder_vertices:                                       ; >ade2
+       byte >AE,>50,>FF,>FF,>4A,>15,>AE,>10
+       byte >FF,>FF,>4A,>15,>A1,>13,>FF,>FF
+       byte >57,>52,>A1,>13,>FF,>FF,>4A,>55
+       byte >AE,>10,>3B,>4B,>4A,>55,>AE,>50
+       byte >3B,>4B,>4A,>55,>A1,>53,>FF,>FF
+       byte >4A,>55,>A1,>53,>FF,>FF,>57,>52
+       byte >AE,>50,>3B,>0B,>4A,>55,>AE,>10
+       byte >3B,>0B,>4A,>55,>AE,>50,>3B,>0B
+       byte >CD,>0E,>AE,>10,>3B,>0B,>CD,>0E
+       byte >AE,>50,>3B,>4B,>CD,>0E,>AE,>10
+       byte >3B,>4B,>CD,>0E,>D6,>4D,>57,>06
+       byte >6F,>13,>D6,>0D,>57,>06,>6F,>13
+       byte >D6,>0D,>00,>08,>57,>12,>D6,>4D
+       byte >00,>08,>57,>12
+
+* Adder: edge array (2 bytes/edge)
+ship_adder_edges:                                          ; >ae4e
+       byte >00,>01,>01,>02,>02,>03,>03,>04
+       byte >04,>05,>05,>06,>06,>07,>07,>00
+       byte >03,>09,>09,>08,>08,>06,>00,>0A
+       byte >07,>0A,>01,>0B,>02,>0B,>00,>0C
+       byte >07,>0C,>01,>0D,>02,>0D,>0A,>0B
+       byte >0C,>0D,>08,>0A,>09,>0B,>05,>0C
+       byte >04,>0D,>0E,>0F,>0F,>10,>10,>11
+       byte >11,>0E
+
+* Adder: faces (13 faces)
+*
+* See #R$A8DD for the format.
+ship_adder_faces:                                          ; >ae88
+       byte >0A,>FF,>FF,>BB,>1F,>C8,>18,>08
+       byte >00,>0B,>0D,>13,>19,>1A,>1B,>1C
+       byte >0A,>FF,>FF,>BB,>5F,>C8,>18,>04
+       byte >00,>0F,>11,>14,>14,>A0,>1E,>F7
+       byte >1C,>F7,>14,>03,>01,>0D,>0E,>14
+       byte >A0,>1E,>F7,>5C,>F7,>14,>03,>01
+       byte >11,>12,>0F,>40,>1C,>0D,>1F,>FF
+       byte >FF,>04,>02,>08,>0E,>16,>0F,>40
+       byte >1C,>0D,>5F,>FF,>FF,>04,>02,>03
+       byte >12,>18,>0F,>40,>5C,>0D,>1F,>FF
+       byte >FF,>04,>06,>0A,>0C,>15,>0F,>40
+       byte >5C,>0D,>5F,>FF,>FF,>04,>05,>06
+       byte >10,>17,>14,>A0,>5E,>F7,>1C,>F7
+       byte >14,>03,>07,>0B,>0C,>14,>A0,>5E
+       byte >F7,>5C,>F7,>14,>03,>07,>0F,>10
+       byte >07,>FF,>FF,>FA,>1F,>FF,>FF,>04
+       byte >09,>13,>15,>16,>07,>FF,>FF,>FA
+       byte >5F,>FF,>FF,>04,>04,>14,>17,>18
+       byte >28,>FF,>FF,>FF,>FF,>FA,>5F,>06
+       byte >03,>08,>04,>09,>05,>0A
+
+* Space Station: ship-blueprint header
+*
+* See #R$A817 for the format. 16 vertices, 28 edges.
+ship_space_station_header:                                 ; >af26
+       data ship_space_station_vertices
+       data ship_space_station_edges
+       data ship_space_station_faces
+       data ship_space_station_name
+       byte >0E,>1C,>10,>D2,>FF,>00,>00,>01
+       byte >E2,>00,>18,>80,>73,>00,>00,>00
+       byte >F4,>01
+
+* Space Station name text
+*
+* The message "Space Station".
+ship_space_station_name:                                   ; >af40
+       text 'SPACE STATIO',>ee
+
+* Space Station: vertex array (6 bytes/vertex)
+ship_space_station_vertices:                               ; >af4d
+       byte >4A,>1D,>FF,>FF,>4A,>1D,>FF,>FF
+       byte >4A,>1D,>4A,>1D,>4A,>5D,>FF,>FF
+       byte >4A,>1D,>FF,>FF,>4A,>5D,>4A,>1D
+       byte >4A,>1D,>4A,>5D,>FF,>FF,>4A,>1D
+       byte >4A,>1D,>FF,>FF,>4A,>5D,>4A,>1D
+       byte >FF,>FF,>4A,>5D,>4A,>5D,>FF,>FF
+       byte >4A,>1D,>FF,>FF,>4A,>5D,>FF,>FF
+       byte >4A,>1D,>4A,>5D,>4A,>5D,>FF,>FF
+       byte >4A,>5D,>FF,>FF,>4A,>5D,>4A,>5D
+       byte >4A,>0D,>A1,>53,>4A,>1D,>4A,>0D
+       byte >A1,>13,>4A,>1D,>4A,>4D,>A1,>13
+       byte >4A,>1D,>4A,>4D,>A1,>53,>4A,>1D
+
+* Space Station: edge array (2 bytes/edge)
+ship_space_station_edges:                                  ; >afad
+       byte >00,>03,>00,>01,>01,>02,>02,>03
+       byte >03,>04,>00,>04,>00,>05,>05,>01
+       byte >01,>06,>02,>06,>02,>07,>03,>07
+       byte >08,>0B,>08,>09,>09,>0A,>0A,>0B
+       byte >04,>0B,>04,>08,>05,>08,>05,>09
+       byte >06,>09,>06,>0A,>07,>0A,>07,>0B
+       byte >0C,>0D,>0D,>0E,>0E,>0F,>0F,>0C
+
+* Space Station: faces (14 faces)
+*
+* See #R$A8DD for the format.
+ship_space_station_faces:                                  ; >afe5
+       byte >A0,>FF,>FF,>FF,>FF,>FA,>1F,>08
+       byte >00,>01,>02,>03,>18,>19,>1A,>1B
+       byte >B9,>CF,>1C,>CF,>5C,>CF,>1C,>03
+       byte >00,>04,>05,>B9,>CF,>1C,>CF,>1C
+       byte >CF,>1C,>03,>01,>06,>07,>B9,>CF
+       byte >5C,>CF,>1C,>CF,>1C,>03,>02,>08
+       byte >09,>B9,>CF,>5C,>CF,>5C,>CF,>1C
+       byte >03,>03,>0A,>0B,>A0,>FF,>FF,>FA
+       byte >5F,>FF,>FF,>04,>04,>0B,>10,>17
+       byte >A0,>FA,>1F,>FF,>FF,>FF,>FF,>04
+       byte >05,>06,>11,>12,>A0,>FA,>5F,>FF
+       byte >FF,>FF,>FF,>04,>09,>0A,>15,>16
+       byte >A0,>FF,>FF,>FA,>1F,>FF,>FF,>04
+       byte >07,>08,>13,>14,>B9,>CF,>5C,>CF
+       byte >5C,>CF,>5C,>03,>0F,>16,>17,>B9
+       byte >CF,>1C,>CF,>5C,>CF,>5C,>03,>0C
+       byte >10,>11,>B9,>CF,>1C,>CF,>1C,>CF
+       byte >5C,>03,>0D,>12,>13,>B9,>CF,>5C
+       byte >CF,>1C,>CF,>5C,>03,>0E,>14,>15
+       byte >A0,>FF,>FF,>FF,>FF,>FA,>5F,>04
+       byte >0C,>0D,>0E,>0F
+
+* Cargo Canister: ship-blueprint header
+*
+* See #R$A817 for the format. 10 vertices, 15 edges.
+ship_cargo_canister_header:                                ; >b089
+       data ship_cargo_canister_vertices
+       data ship_cargo_canister_edges
+       data ship_cargo_canister_faces
+       data ship_cargo_canister_name
+       byte >07,>0F,>0A,>1C,>11,>0F,>00,>01
+       byte >32,>00,>18,>00,>00,>00,>00,>00
+       byte >00,>00
+
+* Cargo Canister name text
+*
+* The message "Cargo Canister".
+ship_cargo_canister_name:                                  ; >b0a3
+       text 'CARGO CANISTE',>f2
+
+* Cargo Canister: vertex array (6 bytes/vertex)
+ship_cargo_canister_vertices:                              ; >b0b1
+       byte >57,>12,>00,>10,>FF,>FF,>57,>12
+       byte >4A,>09,>A1,>0F,>57,>12,>CD,>4E
+       byte >AE,>0C,>57,>12,>CD,>4E,>AE,>4C
+       byte >57,>12,>4A,>09,>A1,>4F,>57,>52
+       byte >00,>10,>FF,>FF,>57,>52,>4A,>09
+       byte >A1,>0F,>57,>52,>CD,>4E,>AE,>0C
+       byte >57,>52,>CD,>4E,>AE,>4C,>57,>52
+       byte >4A,>09,>A1,>4F
+
+* Cargo Canister: edge array (2 bytes/edge)
+ship_cargo_canister_edges:                                 ; >b0ed
+       byte >00,>01,>01,>02,>02,>03,>03,>04
+       byte >00,>04,>00,>05,>01,>06,>02,>07
+       byte >03,>08,>04,>09,>05,>06,>06,>07
+       byte >07,>08,>08,>09,>09,>05
+
+* Cargo Canister: faces (7 faces)
+*
+* See #R$A8DD for the format.
+ship_cargo_canister_faces:                                 ; >b10b
+       byte >18,>FA,>1F,>FF,>FF,>FF,>FF,>05
+       byte >00,>01,>02,>03,>04,>0D,>FF,>FF
+       byte >8D,>1E,>43,>1D,>04,>00,>05,>06
+       byte >0A,>0D,>FF,>FF,>55,>59,>AC,>1F
+       byte >04,>01,>06,>07,>0B,>0D,>FF,>FF
+       byte >FA,>5F,>FF,>FF,>04,>02,>07,>08
+       byte >0C,>0D,>FF,>FF,>55,>59,>AC,>5F
+       byte >04,>03,>08,>09,>0D,>0D,>FF,>FF
+       byte >8D,>1E,>43,>5D,>04,>04,>05,>09
+       byte >0E,>18,>FA,>5F,>FF,>FF,>FF,>FF
+       byte >05,>0A,>0B,>0C,>0D,>0E
+
+* Gecko: ship-blueprint header
+*
+* See #R$A817 for the format. 13 vertices, 17 edges.
+ship_gecko_header:                                         ; >b161
+       data ship_gecko_vertices
+       data ship_gecko_edges
+       data ship_gecko_faces
+       data ship_gecko_name
+       byte >09,>11,>0D,>27,>BE,>1E,>00,>01
+       byte >42,>1C,>26,>82,>42,>96,>96,>00
+       byte >5A,>00
+
+* Gecko name text
+*
+* The message "Gecko".
+ship_gecko_name:                                           ; >b17b
+       text 'GECK',>ef
+
+* Gecko: vertex array (6 bytes/vertex)
+ship_gecko_vertices:                                       ; >b180
+       byte >4A,>4D,>00,>48,>38,>16,>4A,>0D
+       byte >00,>48,>38,>16,>00,>50,>00,>0C
+       byte >18,>52,>00,>10,>00,>0C,>18,>52
+       byte >2D,>58,>FF,>FF,>57,>46,>2D,>18
+       byte >FF,>FF,>57,>46,>4A,>51,>3B,>4F
+       byte >18,>52,>4A,>11,>3B,>4F,>18,>52
+       byte >00,>4C,>57,>4A,>2D,>14,>00,>0C
+       byte >57,>4A,>2D,>14,>00,>4C,>CD,>4E
+       byte >00,>50,>00,>0C,>CD,>4E,>00,>50
+       byte >FF,>FF,>00,>48,>38,>16
+
+* Gecko: edge array (2 bytes/edge)
+ship_gecko_edges:                                          ; >b1ce
+       byte >00,>01,>01,>05,>05,>03,>03,>02
+       byte >02,>04,>04,>00,>05,>07,>07,>06
+       byte >06,>04,>00,>02,>01,>03,>00,>06
+       byte >01,>07,>02,>06,>03,>07,>08,>0A
+       byte >09,>0B
+
+* Gecko: faces (9 faces)
+*
+* See #R$A8DD for the format.
+ship_gecko_faces:                                          ; >b1f0
+       byte >04,>FF,>FF,>CD,>1F,>CD,>17,>04
+       byte >00,>03,>09,>0A,>05,>FF,>FF,>DD
+       byte >1F,>94,>16,>03,>01,>02,>0A,>0D
+       byte >4D,>17,>C3,>5F,>F6,>14,>03,>01
+       byte >06,>0C,>0B,>FF,>FF,>E2,>5F,>0C
+       byte >16,>06,>00,>07,>0B,>0C,>0F,>10
+       byte >0D,>4D,>57,>C3,>5F,>F6,>14,>03
+       byte >05,>08,>0B,>05,>FF,>FF,>DD,>1F
+       byte >94,>16,>03,>04,>05,>09,>1C,>86
+       byte >5A,>B0,>10,>7D,>5F,>03,>04,>08
+       byte >0D,>17,>FF,>FF,>FF,>FF,>FA,>5F
+       byte >04,>03,>07,>0D,>0E,>1C,>86,>1A
+       byte >B0,>10,>7D,>5F,>03,>02,>06,>0E
+
+* Missile: ship-blueprint header
+*
+* See #R$A817 for the format. 17 vertices, 24 edges.
+ship_missile_header:                                       ; >b258
+       data ship_missile_vertices
+       data ship_missile_edges
+       data ship_missile_faces
+       data ship_missile_name
+       byte >09,>18,>11,>26,>01,>38,>00,>01
+       byte >44,>28,>18,>00,>00,>00,>00,>00
+       byte >00,>00
+
+* Missile name text
+*
+* The message "Missile".
+ship_missile_name:                                         ; >b272
+       text 'MISSIL',>e5
+
+* Missile: vertex array (6 bytes/vertex)
+ship_missile_vertices:                                     ; >b279
+       byte >FF,>FF,>FF,>FF,>5A,>18,>00,>0C
+       byte >00,>4C,>AE,>14,>00,>0C,>00,>0C
+       byte >AE,>14,>00,>4C,>00,>0C,>AE,>14
+       byte >00,>4C,>00,>4C,>AE,>14,>00,>0C
+       byte >00,>0C,>D6,>55,>00,>0C,>00,>4C
+       byte >D6,>55,>00,>4C,>00,>4C,>D6,>55
+       byte >00,>4C,>00,>0C,>D6,>55,>57,>0E
+       byte >57,>0E,>D6,>55,>57,>0E,>57,>4E
+       byte >D6,>55,>57,>4E,>57,>4E,>D6,>55
+       byte >57,>4E,>57,>0E,>D6,>55,>00,>4C
+       byte >00,>0C,>57,>4E,>00,>4C,>00,>4C
+       byte >57,>4E,>00,>0C,>00,>0C,>57,>4E
+       byte >00,>0C,>00,>4C,>57,>4E
+
+* Missile: edge array (2 bytes/edge)
+ship_missile_edges:                                        ; >b2df
+       byte >00,>01,>00,>02,>00,>03,>00,>04
+       byte >01,>02,>01,>04,>03,>04,>02,>03
+       byte >02,>05,>01,>06,>04,>07,>03,>08
+       byte >07,>08,>05,>08,>05,>06,>06,>07
+       byte >06,>0A,>05,>09,>08,>0C,>07,>0B
+       byte >09,>0F,>0A,>10,>0C,>0D,>0B,>0E
+
+* Missile: faces (9 faces)
+*
+* See #R$A8DD for the format.
+ship_missile_faces:                                        ; >b30f
+       byte >10,>CD,>5F,>FF,>FF,>CD,>17,>03
+       byte >02,>03,>06,>10,>FF,>FF,>CD,>5F
+       byte >CD,>17,>03,>00,>03,>05,>10,>CD
+       byte >1F,>FF,>FF,>CD,>17,>03,>00,>01
+       byte >04,>10,>FF,>FF,>CD,>1F,>CD,>17
+       byte >03,>01,>02,>07,>08,>FF,>FF,>FA
+       byte >5F,>FF,>FF,>08,>05,>09,>0A,>0F
+       byte >10,>13,>15,>17,>08,>FF,>FF,>FA
+       byte >1F,>FF,>FF,>08,>07,>08,>0B,>0D
+       byte >11,>12,>14,>16,>2C,>FF,>FF,>FF
+       byte >FF,>FA,>5F,>08,>0C,>0D,>0E,>0F
+       byte >10,>11,>12,>13,>08,>FA,>1F,>FF
+       byte >FF,>FF,>FF,>08,>04,>08,>09,>0E
+       byte >14,>15,>11,>10,>08,>FA,>5F,>FF
+       byte >FF,>FF,>FF,>08,>06,>0A,>0B,>0C
+       byte >16,>17,>12,>13
+
+* Platlet: ship-blueprint header
+*
+* See #R$A817 for the format. 4 vertices, 4 edges.
+ship_platlet_header:                                       ; >b38b
+       data ship_platlet_vertices
+       data ship_platlet_edges
+       data ship_platlet_faces
+       data ship_platlet_name
+       byte >01,>04,>04,>27,>00,>14,>00,>00
+       byte >2F,>00,>18,>00,>00,>00,>00,>00
+       byte >00,>00
+
+* Platlet name text
+*
+* The message "Platlet".
+ship_platlet_name:                                         ; >b3a5
+       text 'PLATLE',>f4
+
+* Platlet: vertex array (6 bytes/vertex)
+ship_platlet_vertices:                                     ; >b3ac
+       byte >A1,>4F,>D6,>51,>AE,>4C,>A1,>4F
+       byte >FE,>14,>AE,>4C,>FE,>10,>00,>14
+       byte >D6,>0D,>4A,>0D,>18,>56,>57,>0A
+
+* Platlet: edge array (2 bytes/edge)
+ship_platlet_edges:                                        ; >b3c4
+       byte >00,>01,>01,>02,>02,>03,>03,>00
+
+* Platlet: faces
+*
+* No normals (#R$F804), so just one edge list: the number of edges (4),
+* then the edges 0-3.
+ship_platlet_faces:                                        ; >b3cc
+       byte >04,>00,>01,>02,>03
+
+* Orbit Shuttle: ship-blueprint header
+*
+* See #R$A817 for the format. 19 vertices, 30 edges.
+ship_orbit_shuttle_header:                                 ; >b3d1
+       data ship_orbit_shuttle_vertices
+       data ship_orbit_shuttle_edges
+       data ship_orbit_shuttle_faces
+       data ship_orbit_shuttle_name
+       byte >0D,>1E,>13,>1F,>70,>08,>00,>01
+       byte >27,>10,>09,>01,>81,>32,>00,>00
+       byte >03,>00
+
+* Orbit Shuttle name text
+*
+* The message "Orbit Shuttle".
+ship_orbit_shuttle_name:                                   ; >b3eb
+       text 'ORBIT SHUTTL',>e5
+
+* Orbit Shuttle: vertex array (6 bytes/vertex)
+ship_orbit_shuttle_vertices:                               ; >b3f8
+       byte >FF,>FF,>5A,>50,>18,>12,>5A,>50
+       byte >FF,>FF,>18,>12,>FF,>FF,>AE,>10
+       byte >18,>12,>AE,>10,>FF,>FF,>18,>12
+       byte >4A,>51,>4A,>51,>05,>53,>4A,>51
+       byte >4A,>11,>05,>53,>4A,>11,>4A,>11
+       byte >05,>53,>4A,>11,>4A,>51,>05,>53
+       byte >4A,>09,>FF,>FF,>05,>53,>FF,>FF
+       byte >00,>44,>05,>53,>4A,>49,>FF,>FF
+       byte >05,>53,>FF,>FF,>57,>06,>05,>53
+       byte >FF,>FF,>AE,>4C,>84,>14,>57,>06
+       byte >00,>40,>D1,>13,>00,>08,>D6,>0D
+       byte >93,>12,>D6,>0D,>00,>08,>93,>12
+       byte >57,>46,>00,>40,>D1,>13,>57,>46
+       byte >D6,>0D,>93,>12,>4A,>4D,>00,>08
+       byte >93,>12
+
+* Orbit Shuttle: edge array (2 bytes/edge)
+ship_orbit_shuttle_edges:                                  ; >b46a
+       byte >00,>01,>01,>02,>02,>03,>00,>03
+       byte >00,>07,>00,>04,>01,>04,>01,>05
+       byte >02,>05,>02,>06,>03,>06,>03,>07
+       byte >04,>05,>05,>06,>06,>07,>04,>07
+       byte >00,>0C,>01,>0C,>02,>0C,>03,>0C
+       byte >08,>09,>09,>0A,>0A,>0B,>08,>0B
+       byte >0D,>0E,>0E,>0F,>0D,>0F,>10,>11
+       byte >11,>12,>10,>12
+
+* Orbit Shuttle: faces (13 faces)
+*
+* See #R$A8DD for the format.
+ship_orbit_shuttle_faces:                                  ; >b4a6
+       byte >14,>5C,>5D,>5C,>5D,>3C,>1B,>03
+       byte >00,>10,>11,>12,>FF,>FF,>F8,>5F
+       byte >4A,>0F,>03,>04,>05,>0F,>12,>A3
+       byte >5D,>A3,>5D,>A3,>19,>03,>00,>05
+       byte >06,>12,>F8,>5F,>FF,>FF,>4A,>0F
+       byte >03,>06,>07,>0C,>13,>E3,>5D,>6C
+       byte >1D,>6C,>19,>03,>01,>07,>08,>13
+       byte >FF,>FF,>F8,>1F,>FA,>0E,>03,>08
+       byte >09,>0D,>13,>AF,>1D,>AF,>1D,>39
+       byte >19,>03,>02,>09,>0A,>13,>F8,>1F
+       byte >FF,>FF,>FA,>0E,>03,>0A,>0B,>0E
+       byte >13,>6C,>1D,>E3,>5D,>6C,>19,>03
+       byte >03,>04,>0B,>1B,>FF,>FF,>FF,>FF
+       byte >FA,>5F,>08,>0C,>0D,>0E,>0F,>14
+       byte >15,>16,>17,>1A,>6E,>5A,>6E,>1A
+       byte >FB,>1E,>06,>01,>11,>12,>1B,>1C
+       byte >1D,>1A,>6E,>1A,>6E,>1A,>FB,>1E
+       byte >06,>02,>12,>13,>18,>19,>1A,>15
+       byte >2D,>1D,>9B,>5D,>0E,>1B,>03,>03
+       byte >10,>13
+
+* Krait: ship-blueprint header
+*
+* See #R$A817 for the format. 17 vertices, 21 edges.
+ship_krait_header:                                         ; >b540
+       data ship_krait_vertices
+       data ship_krait_edges
+       data ship_krait_faces
+       data ship_krait_name
+       byte >06,>15,>11,>3D,>B4,>1E,>00,>01
+       byte >50,>20,>26,>00,>C1,>64,>64,>00
+       byte >5A,>00
+
+* Krait name text
+*
+* The message "Krait".
+ship_krait_name:                                           ; >b55a
+       text 'KRAI',>f4
+
+* Krait: vertex array (6 bytes/vertex)
+ship_krait_vertices:                                       ; >b55f
+       byte >FF,>FF,>FF,>FF,>57,>1A,>FF,>FF
+       byte >AE,>10,>57,>56,>FF,>FF,>AE,>50
+       byte >57,>56,>F8,>19,>FF,>FF,>57,>46
+       byte >F8,>59,>FF,>FF,>57,>46,>F8,>19
+       byte >FF,>FF,>C6,>19,>F8,>59,>FF,>FF
+       byte >C6,>19,>FF,>FF,>4A,>09,>E9,>16
+       byte >FF,>FF,>3B,>0B,>FE,>14,>AE,>50
+       byte >3B,>0B,>FE,>10,>AE,>10,>3B,>0B
+       byte >FE,>10,>AE,>10,>D6,>0D,>24,>55
+       byte >AE,>10,>D6,>4D,>24,>55,>AE,>14
+       byte >FF,>FF,>A1,>53,>AE,>50,>D6,>0D
+       byte >24,>55,>AE,>50,>D6,>4D,>24,>55
+       byte >AE,>54,>FF,>FF,>A1,>53
+
+* Krait: edge array (2 bytes/edge)
+ship_krait_edges:                                          ; >b5c5
+       byte >00,>01,>00,>02,>00,>03,>00,>04
+       byte >01,>04,>04,>02,>02,>03,>03,>01
+       byte >03,>05,>04,>06,>01,>02,>07,>0A
+       byte >08,>0A,>07,>09,>08,>09,>0B,>0D
+       byte >0D,>0C,>0C,>0B,>0E,>0F,>0F,>10
+       byte >10,>0E
+
+* Krait: faces (6 faces)
+*
+* See #R$A8DD for the format.
+ship_krait_faces:                                          ; >b5ef
+       byte >0C,>8A,>15,>E1,>1F,>8A,>11,>06
+       byte >00,>02,>07,>08,>0B,>0C,>0C,>8A
+       byte >15,>E1,>5F,>8A,>11,>04,>01,>02
+       byte >06,>08,>0C,>8A,>55,>E1,>5F,>8A
+       byte >11,>04,>01,>03,>05,>09,>0C,>8A
+       byte >55,>E1,>1F,>8A,>11,>06,>00,>03
+       byte >04,>09,>0D,>0E,>2A,>55,>1B,>FF
+       byte >FF,>55,>5F,>06,>06,>07,>0A,>0F
+       byte >10,>11,>2A,>55,>5B,>FF,>FF,>55
+       byte >5F,>06,>04,>05,>0A,>12,>13,>14
+
+* Escape Capsule: ship-blueprint header
+*
+* See #R$A817 for the format. 11 vertices, 16 edges.
+ship_escape_capsule_header:                                ; >b63f
+       data ship_escape_capsule_vertices
+       data ship_escape_capsule_edges
+       data ship_escape_capsule_faces
+       data ship_escape_capsule_name
+       byte >08,>10,>0B,>1E,>28,>17,>00,>01
+       byte >26,>18,>0A,>00,>00,>32,>00,>00
+       byte >5A,>00
+
+* Escape Capsule name text
+*
+* The message "Escape Capsule".
+ship_escape_capsule_name:                                  ; >b659
+       text 'ESCAPE CAPSUL',>e5
+
+* Escape Capsule: vertex array (6 bytes/vertex)
+ship_escape_capsule_vertices:                              ; >b667
+       byte >4A,>0D,>4A,>4D,>84,>14,>4A,>4D
+       byte >4A,>4D,>84,>14,>4A,>09,>57,>0A
+       byte >A1,>0F,>4A,>49,>57,>0A,>A1,>0F
+       byte >A1,>0F,>4A,>4D,>93,>12,>A1,>4F
+       byte >4A,>4D,>93,>12,>CD,>12,>4A,>4D
+       byte >93,>52,>CD,>52,>4A,>4D,>93,>52
+       byte >00,>0C,>3B,>0F,>93,>52,>00,>4C
+       byte >3B,>0F,>93,>52,>FF,>FF,>4A,>4D
+       byte >84,>14
+
+* Escape Capsule: edge array (2 bytes/edge)
+ship_escape_capsule_edges:                                 ; >b6a9
+       byte >00,>01,>01,>05,>05,>07,>07,>06
+       byte >06,>04,>04,>00,>00,>02,>01,>03
+       byte >04,>02,>05,>03,>02,>08,>08,>06
+       byte >03,>09,>09,>07,>02,>03,>08,>09
+
+* Escape Capsule: faces (8 faces)
+*
+* See #R$A8DD for the format.
+ship_escape_capsule_faces:                                 ; >b6c9
+       byte >0E,>FF,>FF,>80,>1E,>57,>1D,>04
+       byte >00,>06,>07,>0E,>09,>FF,>FF,>D7
+       byte >1F,>29,>17,>04,>0A,>0C,>0E,>0F
+       byte >0D,>FF,>1D,>51,>1D,>51,>19,>03
+       byte >05,>06,>08,>0D,>FF,>5D,>51,>1D
+       byte >51,>19,>03,>01,>07,>09,>0A,>94
+       byte >1E,>EB,>1C,>94,>16,>04,>04,>08
+       byte >0A,>0B,>0A,>94,>5E,>EB,>1C,>94
+       byte >16,>04,>02,>09,>0C,>0D,>19,>FF
+       byte >FF,>FF,>FF,>FA,>5F,>04,>03,>0B
+       byte >0D,>0F,>0A,>FF,>FF,>FA,>5F,>FF
+       byte >FF,>06,>00,>01,>02,>03,>04,>05
+
+* Anaconda: ship-blueprint header
+*
+* See #R$A817 for the format. 15 vertices, 25 edges.
+ship_anaconda_header:                                      ; >b729
+       data ship_anaconda_vertices
+       data ship_anaconda_edges
+       data ship_anaconda_faces
+       data ship_anaconda_name
+       byte >0C,>19,>0F,>4F,>70,>0E,>0C,>01
+       byte >5A,>0C,>02,>83,>83,>64,>00,>00
+       byte >5A,>00
+
+* Anaconda name text
+*
+* The message "Anaconda".
+ship_anaconda_name:                                        ; >b743
+       text 'ANACOND',>e1
+
+* Anaconda: vertex array (6 bytes/vertex)
+ship_anaconda_vertices:                                    ; >b74b
+       byte >FF,>FF,>3B,>0B,>6F,>57,>B4,>55
+       byte >CD,>4E,>D6,>54,>CD,>52,>38,>56
+       byte >57,>46,>CD,>12,>38,>56,>57,>46
+       byte >B4,>15,>CD,>4E,>D6,>54,>FF,>FF
+       byte >57,>16,>75,>56,>6F,>58,>A1,>0F
+       byte >A1,>4F,>B4,>55,>24,>55,>4A,>15
+       byte >B4,>15,>24,>55,>4A,>15,>6F,>18
+       byte >A1,>0F,>A1,>4F,>B4,>55,>E9,>16
+       byte >18,>52,>6F,>58,>00,>40,>00,>14
+       byte >FF,>FF,>FF,>FF,>F4,>1F,>6F,>18
+       byte >00,>40,>00,>14,>B4,>15,>E9,>16
+       byte >18,>52
+
+* Anaconda: edge array (2 bytes/edge)
+ship_anaconda_edges:                                       ; >b7a5
+       byte >00,>01,>01,>02,>02,>03,>03,>04
+       byte >00,>04,>00,>05,>01,>06,>02,>07
+       byte >03,>08,>04,>09,>05,>0A,>06,>0A
+       byte >06,>0B,>07,>0B,>07,>0C,>08,>0C
+       byte >08,>0D,>09,>0D,>09,>0E,>05,>0E
+       byte >0A,>0E,>0A,>0C,>0B,>0C,>0C,>0D
+       byte >0C,>0E
+
+* Anaconda: faces (12 faces)
+*
+* See #R$A8DD for the format.
+ship_anaconda_faces:                                       ; >b7d7
+       byte >23,>FF,>FF,>18,>5E,>DB,>5D,>05
+       byte >00,>01,>02,>03,>04,>33,>EA,>5B
+       byte >05,>16,>0B,>5F,>05,>00,>05,>06
+       byte >0A,>0B,>31,>88,>5E,>F8,>5C,>D3
+       byte >56,>05,>01,>06,>07,>0C,>0D,>2E
+       byte >FF,>FF,>E3,>5F,>EC,>15,>05,>02
+       byte >07,>08,>0E,>0F,>31,>88,>1E,>F8
+       byte >5C,>D3,>56,>05,>03,>08,>09,>10
+       byte >11,>33,>EA,>1B,>05,>16,>0B,>5F
+       byte >05,>04,>05,>09,>12,>13,>38,>FF
+       byte >FF,>DD,>1F,>94,>56,>03,>0A,>13
+       byte >14,>3B,>62,>5E,>19,>1D,>A6,>17
+       byte >04,>0B,>0C,>15,>16,>42,>DC,>5E
+       byte >05,>5C,>31,>18,>03,>0D,>0E,>16
+       byte >42,>DC,>1E,>05,>5C,>31,>18,>03
+       byte >0F,>10,>17,>3B,>62,>1E,>19,>1D
+       byte >A6,>17,>04,>11,>12,>17,>18,>30
+       byte >FF,>FF,>E0,>1F,>56,>16,>03,>14
+       byte >15,>18
+
+* Asteroid: ship-blueprint header
+*
+* See #R$A817 for the format. 9 vertices, 21 edges.
+ship_asteroid_header:                                      ; >b869
+       data ship_asteroid_vertices
+       data ship_asteroid_edges
+       data ship_asteroid_faces
+       data ship_asteroid_name
+       byte >0E,>15,>09,>4F,>3C,>1E,>00,>01
+       byte >51,>00,>0C,>00,>00,>00,>05,>00
+       byte >00,>00
+
+* Asteroid name text
+*
+* The message "Asteroid".
+ship_asteroid_name:                                        ; >b883
+       text 'ASTEROI',>e4
+
+* Asteroid: vertex array (6 bytes/vertex)
+ship_asteroid_vertices:                                    ; >b88b
+       byte >FF,>FF,>4A,>19,>FF,>FF,>4A,>59
+       byte >4A,>4D,>FF,>FF,>FF,>FF,>4A,>59
+       byte >FF,>FF,>84,>18,>4A,>55,>FF,>FF
+       byte >A1,>17,>93,>16,>FF,>FF,>93,>16
+       byte >FF,>FF,>A1,>17,>4A,>55,>FF,>FF
+       byte >84,>18,>FF,>FF,>A1,>13,>EA,>58
+       byte >FF,>FF,>93,>56,>A1,>57
+
+* Asteroid: edge array (2 bytes/edge)
+ship_asteroid_edges:                                       ; >b8c1
+       byte >00,>01,>00,>04,>03,>04,>02,>03
+       byte >01,>02,>01,>06,>02,>06,>02,>05
+       byte >05,>06,>00,>05,>03,>05,>00,>06
+       byte >04,>05,>01,>08,>01,>07,>00,>07
+       byte >04,>07,>03,>07,>03,>08,>02,>08
+       byte >07,>08
+
+* Asteroid: faces (14 faces)
+*
+* See #R$A8DD for the format.
+ship_asteroid_faces:                                       ; >b8eb
+       byte >33,>55,>11,>55,>1D,>79,>1E,>03
+       byte >08,>09,>0B,>33,>55,>11,>55,>5D
+       byte >79,>1E,>03,>06,>07,>08,>33,>FF
+       byte >5D,>51,>1D,>51,>19,>03,>00,>05
+       byte >0B,>36,>E8,>5C,>BE,>5D,>3F,>1B
+       byte >03,>04,>05,>06,>38,>A0,>1A,>EE
+       byte >5D,>F7,>1C,>03,>03,>07,>0A,>3F
+       byte >C0,>1F,>42,>13,>07,>18,>03,>02
+       byte >0A,>0C,>37,>D7,>19,>D7,>1D,>5D
+       byte >1D,>03,>01,>09,>0C,>31,>B6,>5D
+       byte >29,>1D,>D2,>5A,>03,>00,>0E,>0F
+       byte >35,>6B,>5D,>4D,>54,>5C,>5E,>03
+       byte >0D,>0E,>14,>33,>96,>1D,>77,>54
+       byte >3A,>5E,>03,>11,>12,>14,>39,>2F
+       byte >5D,>F4,>5D,>F4,>59,>03,>04,>0D
+       byte >13,>40,>6E,>1B,>B0,>5E,>93,>5A
+       byte >03,>03,>12,>13,>33,>79,>1E,>55
+       byte >11,>55,>5D,>03,>02,>10,>11,>3D
+       byte >93,>1A,>74,>1E,>0D,>5C,>03,>01
+       byte >0F,>10
+
+* Boa Class Cruiser: ship-blueprint header
+*
+* See #R$A817 for the format. 13 vertices, 24 edges.
+ship_boa_class_cruiser_header:                             ; >b985
+       data ship_boa_class_cruiser_vertices
+       data ship_boa_class_cruiser_edges
+       data ship_boa_class_cruiser_faces
+       data ship_boa_class_cruiser_name
+       byte >0D,>18,>0D,>50,>7C,>18,>00,>01
+       byte >5F,>10,>26,>01,>93,>32,>96,>00
+       byte >3C,>00
+
+* Boa Class Cruiser name text
+*
+* The message "Boa Class Cruiser".
+ship_boa_class_cruiser_name:                               ; >b99f
+       text 'BOA CLASS CRUISE',>f2
+
+* Boa Class Cruiser: vertex array (6 bytes/vertex)
+ship_boa_class_cruiser_vertices:                           ; >b9b0
+       byte >FF,>FF,>FF,>FF,>28,>1A,>FF,>FF
+       byte >4A,>15,>C6,>59,>FE,>14,>93,>52
+       byte >84,>5A,>FE,>54,>93,>52,>84,>5A
+       byte >FE,>54,>4A,>15,>88,>57,>FE,>14
+       byte >4A,>15,>88,>57,>D1,>17,>FF,>FF
+       byte >44,>58,>57,>12,>17,>58,>37,>59
+       byte >57,>52,>17,>58,>37,>59,>D1,>57
+       byte >FF,>FF,>44,>58,>FF,>FF,>3B,>0B
+       byte >F7,>5A,>CD,>0E,>AE,>4C,>F7,>5A
+       byte >CD,>4E,>AE,>4C,>F7,>5A
+
+* Boa Class Cruiser: edge array (2 bytes/edge)
+ship_boa_class_cruiser_edges:                              ; >b9fe
+       byte >00,>05,>00,>07,>00,>09,>00,>04
+       byte >00,>06,>00,>08,>04,>05,>05,>06
+       byte >06,>07,>07,>08,>08,>09,>04,>09
+       byte >01,>04,>01,>05,>03,>09,>03,>08
+       byte >02,>06,>02,>07,>01,>0A,>02,>0B
+       byte >03,>0C,>0A,>0B,>0B,>0C,>0C,>0A
+
+* Boa Class Cruiser: faces (13 faces)
+*
+* See #R$A8DD for the format.
+ship_boa_class_cruiser_faces:                              ; >ba2e
+       byte >50,>61,>1C,>31,>1B,>1B,>5E,>06
+       byte >07,>0D,>10,>12,>13,>15,>64,>FF
+       byte >FF,>63,>5B,>52,>5F,>06,>09,>0F
+       byte >11,>13,>14,>16,>50,>61,>5C,>31
+       byte >1B,>1B,>5E,>06,>0B,>0C,>0E,>12
+       byte >14,>17,>28,>FF,>FF,>FA,>1F,>FF
+       byte >FF,>03,>06,>0C,>0D,>48,>05,>1F
+       byte >4C,>5B,>DE,>58,>03,>08,>10,>11
+       byte >48,>05,>5F,>4C,>5B,>DE,>58,>03
+       byte >0A,>0E,>0F,>18,>FF,>FF,>CA,>1F
+       byte >08,>18,>03,>00,>03,>06,>1D,>A9
+       byte >5E,>32,>5C,>3F,>19,>03,>02,>05
+       byte >0A,>1D,>A9,>1E,>32,>5C,>3F,>19
+       byte >03,>01,>04,>08,>1E,>F2,>5E,>2C
+       byte >1B,>A8,>19,>03,>02,>03,>0B,>21
+       byte >FF,>FF,>93,>5F,>19,>1A,>03,>01
+       byte >05,>09,>1E,>F2,>1E,>2C,>1B,>A8
+       byte >19,>03,>00,>04,>07,>6B,>FF,>FF
+       byte >FF,>FF,>FA,>5F,>03,>15,>16,>17
+
+* Cobra MK1: ship-blueprint header
+*
+* See #R$A817 for the format. 11 vertices, 18 edges.
+ship_cobra_mk1_header:                                     ; >bac6
+       data ship_cobra_mk1_vertices
+       data ship_cobra_mk1_edges
+       data ship_cobra_mk1_faces
+       data ship_cobra_mk1_name
+       byte >0A,>12,>0B,>36,>48,>1A,>0A,>01
+       byte >43,>20,>02,>83,>00,>32,>00,>00
+       byte >3C,>00
+
+* Cobra MK1 name text
+*
+* The message "Cobra MK1".
+ship_cobra_mk1_name:                                       ; >bae0
+       text 'COBRA MK',>b1
+
+* Cobra MK1: vertex array (6 bytes/vertex)
+ship_cobra_mk1_vertices:                                   ; >bae9
+       byte >AE,>50,>00,>40,>93,>16,>AE,>10
+       byte >00,>40,>93,>16,>2D,>58,>FF,>FF
+       byte >3B,>0B,>2D,>18,>FF,>FF,>3B,>0B
+       byte >00,>54,>57,>0E,>FE,>54,>00,>14
+       byte >57,>0E,>FE,>54,>05,>57,>57,>4E
+       byte >FE,>54,>05,>17,>57,>4E,>FE,>54
+       byte >FF,>FF,>57,>0E,>57,>4A,>FF,>FF
+       byte >00,>40,>93,>16,>FF,>FF,>00,>40
+       byte >A1,>17
+
+* Cobra MK1: edge array (2 bytes/edge)
+ship_cobra_mk1_edges:                                      ; >bb2b
+       byte >01,>00,>00,>02,>02,>06,>06,>07
+       byte >07,>03,>03,>01,>02,>04,>04,>05
+       byte >05,>03,>00,>08,>08,>01,>04,>08
+       byte >08,>05,>04,>06,>05,>07,>00,>06
+       byte >01,>07,>0A,>09
+
+* Cobra MK1: faces (10 faces)
+*
+* See #R$A8DD for the format.
+ship_cobra_mk1_faces:                                      ; >bb4f
+       byte >0A,>FF,>FF,>DD,>1F,>94,>16,>04
+       byte >00,>09,>0A,>11,>07,>FF,>FF,>EB
+       byte >5F,>B1,>14,>05,>00,>03,>0F,>10
+       byte >11,>0A,>8D,>52,>D6,>1F,>8D,>16
+       byte >04,>01,>06,>09,>0B,>0F,>D6,>56
+       byte >B9,>5F,>D6,>16,>03,>01,>02,>0F
+       byte >0A,>8D,>12,>D6,>1F,>8D,>16,>04
+       byte >05,>08,>0A,>0C,>0F,>D6,>16,>B9
+       byte >5F,>D6,>16,>03,>04,>05,>10,>0C
+       byte >FF,>FF,>FA,>1F,>FF,>FF,>03,>07
+       byte >0B,>0C,>26,>FF,>FF,>FF,>FF,>FA
+       byte >5F,>04,>03,>07,>0D,>0E,>2B,>E4
+       byte >5D,>49,>1D,>E4,>59,>03,>02,>06
+       byte >0D,>2B,>E4,>1D,>49,>1D,>E4,>59
+       byte >03,>04,>08,>0E
+
+* Fer-De-Lance: ship-blueprint header
+*
+* See #R$A817 for the format. 19 vertices, 27 edges.
+ship_fer_de_lance_header:                                  ; >bbc3
+       data ship_fer_de_lance_vertices
+       data ship_fer_de_lance_edges
+       data ship_fer_de_lance_faces
+       data ship_fer_de_lance_name
+       byte >0A,>1B,>13,>31,>28,>1E,>00,>01
+       byte >37,>14,>56,>01,>00,>32,>46,>00
+       byte >64,>00
+
+* Fer-De-Lance name text
+*
+* The message "Fer-De-Lance".
+ship_fer_de_lance_name:                                    ; >bbdd
+       text 'FER-DE-LANC',>e5
+
+* Fer-De-Lance: vertex array (6 bytes/vertex)
+ship_fer_de_lance_vertices:                                ; >bbe9
+       byte >FF,>FF,>3B,>4F,>05,>1B,>4A,>55
+       byte >3B,>4F,>00,>48,>57,>4E,>3B,>4F
+       byte >CD,>56,>57,>0E,>3B,>4F,>CD,>56
+       byte >4A,>15,>3B,>4F,>00,>48,>4A,>55
+       byte >3B,>0F,>00,>48,>57,>4E,>00,>04
+       byte >CD,>56,>57,>0E,>00,>04,>CD,>56
+       byte >4A,>15,>3B,>0F,>00,>48,>FF,>FF
+       byte >AE,>10,>4A,>51,>57,>46,>D6,>4D
+       byte >66,>1A,>CD,>52,>00,>0C,>AE,>10
+       byte >00,>50,>3B,>0F,>00,>48,>57,>06
+       byte >D6,>4D,>66,>1A,>CD,>12,>00,>0C
+       byte >AE,>10,>00,>10,>3B,>0F,>00,>48
+       byte >FF,>FF,>3B,>4F,>4A,>51,>3B,>4F
+       byte >3B,>4F,>D6,>15,>3B,>0F,>3B,>4F
+       byte >D6,>15
+
+* Fer-De-Lance: edge array (2 bytes/edge)
+ship_fer_de_lance_edges:                                   ; >bc5b
+       byte >00,>01,>01,>02,>02,>03,>03,>04
+       byte >00,>04,>00,>05,>05,>06,>06,>07
+       byte >07,>08,>00,>08,>05,>09,>06,>09
+       byte >07,>09,>08,>09,>01,>05,>02,>06
+       byte >03,>07,>04,>08,>0A,>0B,>0B,>0C
+       byte >0A,>0C,>0D,>0E,>0E,>0F,>0D,>0F
+       byte >10,>11,>10,>12,>11,>12
+
+* Fer-De-Lance: faces (10 faces)
+*
+* See #R$A8DD for the format.
+ship_fer_de_lance_faces:                                   ; >bc91
+       byte >0C,>FF,>FF,>CD,>1F,>CD,>17,>0A
+       byte >05,>09,>0A,>0D,>12,>13,>14,>15
+       byte >16,>17,>24,>A4,>5F,>FF,>FF,>A1
+       byte >19,>03,>00,>05,>0E,>25,>2F,>5F
+       byte >FF,>FF,>DD,>5B,>04,>01,>06,>0E
+       byte >0F,>34,>FF,>FF,>FF,>FF,>FA,>5F
+       byte >04,>02,>07,>0F,>10,>25,>2F,>1F
+       byte >FF,>FF,>DD,>5B,>04,>03,>08,>10
+       byte >11,>24,>A4,>1F,>FF,>FF,>A1,>19
+       byte >03,>04,>09,>11,>18,>12,>58,>4C
+       byte >1F,>69,>5A,>03,>06,>0A,>0B,>19
+       byte >FF,>FF,>55,>1F,>55,>5B,>03,>07
+       byte >0B,>0C,>18,>12,>18,>4C,>1F,>69
+       byte >5A,>03,>08,>0C,>0D,>0E,>FF,>FF
+       byte >FA,>5F,>FF,>FF,>08,>00,>01,>02
+       byte >03,>04,>18,>19,>1A
+
+* Mamba: ship-blueprint header
+*
+* See #R$A817 for the format. 25 vertices, 28 edges.
+ship_mamba_header:                                         ; >bd0e
+       data ship_mamba_vertices
+       data ship_mamba_edges
+       data ship_mamba_faces
+       data ship_mamba_name
+       byte >05,>1C,>19,>27,>28,>20,>00,>01
+       byte >48,>24,>26,>01,>A1,>64,>96,>00
+       byte >3C,>00
+
+* Mamba name text
+*
+* The message "Mamba".
+ship_mamba_name:                                           ; >bd28
+       text 'MAMB',>e1
+
+* Mamba: vertex array (6 bytes/vertex)
+ship_mamba_vertices:                                       ; >bd2d
+       byte >FF,>FF,>FF,>FF,>84,>18,>84,>58
+       byte >AE,>4C,>84,>54,>84,>54,>AE,>0C
+       byte >84,>54,>84,>14,>AE,>0C,>84,>54
+       byte >84,>18,>AE,>4C,>84,>54,>00,>48
+       byte >00,>08,>AE,>10,>00,>08,>00,>08
+       byte >AE,>10,>AE,>0C,>57,>06,>D1,>13
+       byte >AE,>4C,>57,>06,>D1,>13,>D6,>51
+       byte >00,>48,>AE,>10,>D6,>11,>00,>48
+       byte >AE,>10,>CD,>52,>00,>4C,>D6,>51
+       byte >AE,>50,>00,>4C,>D6,>51,>AE,>10
+       byte >00,>4C,>D6,>51,>CD,>12,>00,>4C
+       byte >D6,>51,>AE,>4C,>00,>08,>84,>54
+       byte >AE,>0C,>00,>08,>84,>54,>AE,>0C
+       byte >00,>48,>84,>54,>AE,>4C,>00,>48
+       byte >84,>54,>84,>54,>00,>08,>84,>54
+       byte >84,>14,>00,>08,>84,>54,>4A,>15
+       byte >00,>48,>84,>54,>4A,>55,>00,>48
+       byte >84,>54,>92,>55,>FF,>FF,>84,>54
+       byte >92,>15,>FF,>FF,>84,>54
+
+* Mamba: edge array (2 bytes/edge)
+ship_mamba_edges:                                          ; >bdc3
+       byte >00,>01,>00,>04,>01,>04,>01,>02
+       byte >02,>03,>03,>04,>05,>06,>06,>07
+       byte >07,>08,>05,>08,>09,>0B,>09,>0C
+       byte >0A,>0D,>0A,>0E,>0D,>0E,>0B,>0C
+       byte >0F,>10,>11,>12,>0F,>12,>10,>11
+       byte >14,>15,>14,>18,>15,>18,>13,>16
+       byte >13,>17,>16,>17,>00,>02,>00,>03
+
+* Mamba: faces (5 faces)
+*
+* See #R$A8DD for the format.
+ship_mamba_faces:                                          ; >bdfb
+       byte >06,>FF,>FF,>E6,>5F,>8F,>15,>09
+       byte >00,>01,>02,>0A,>0B,>0C,>0D,>0E
+       byte >0F,>06,>FF,>FF,>E6,>1F,>8F,>15
+       byte >07,>04,>06,>07,>08,>09,>1A,>1B
+       byte >10,>3B,>5B,>3B,>1F,>57,>16,>03
+       byte >00,>03,>1A,>10,>3B,>1B,>3B,>1F
+       byte >57,>16,>03,>01,>05,>1B,>23,>FF
+       byte >FF,>FF,>FF,>FA,>5F,>0E,>02,>03
+       byte >04,>05,>10,>11,>12,>13,>14,>15
+       byte >16,>17,>18,>19
+
+* Moray Star Boat: ship-blueprint header
+*
+* See #R$A817 for the format. 14 vertices, 19 edges.
+ship_moray_star_boat_header:                               ; >be47
+       data ship_moray_star_boat_vertices
+       data ship_moray_star_boat_edges
+       data ship_moray_star_boat_faces
+       data ship_moray_star_boat_name
+       byte >09,>13,>0E,>31,>60,>19,>0B,>01
+       byte >43,>10,>26,>02,>81,>64,>46,>00
+       byte >32,>00
+
+* Moray Star Boat name text
+*
+* The message "Moray Star Boat".
+ship_moray_star_boat_name:                                 ; >be61
+       text 'MORAY STAR BOA',>f4
+
+* Moray Star Boat: vertex array (6 bytes/vertex)
+ship_moray_star_boat_vertices:                             ; >be70
+       byte >A1,>0F,>FF,>FF,>17,>18,>A1,>4F
+       byte >FF,>FF,>17,>18,>FF,>FF,>AE,>10
+       byte >4A,>55,>A1,>57,>FF,>FF,>FF,>FF
+       byte >A1,>17,>FF,>FF,>FF,>FF,>A1,>13
+       byte >05,>53,>4A,>4D,>A1,>53,>05,>53
+       byte >4A,>4D,>AE,>4C,>00,>48,>93,>52
+       byte >AE,>0C,>00,>48,>93,>52,>FF,>FF
+       byte >AE,>50,>00,>50,>CD,>0E,>57,>06
+       byte >75,>16,>57,>0A,>FF,>FF,>17,>18
+       byte >CD,>4E,>57,>06,>75,>16,>57,>4A
+       byte >FF,>FF,>17,>18
+
+* Moray Star Boat: edge array (2 bytes/edge)
+ship_moray_star_boat_edges:                                ; >bec4
+       byte >00,>01,>01,>03,>03,>06,>05,>06
+       byte >04,>05,>00,>04,>01,>06,>00,>05
+       byte >00,>02,>01,>02,>02,>03,>02,>04
+       byte >02,>05,>02,>06,>07,>08,>07,>09
+       byte >08,>09,>0A,>0B,>0C,>0D
+
+* Moray Star Boat: faces (9 faces)
+*
+* See #R$A8DD for the format.
+ship_moray_star_boat_faces:                                ; >beea
+       byte >0B,>FF,>FF,>E2,>1F,>0C,>16,>05
+       byte >00,>08,>09,>11,>12,>0C,>7B,>55
+       byte >D2,>1F,>7B,>15,>03,>01,>09,>0A
+       byte >0C,>7B,>15,>D2,>1F,>7B,>15,>03
+       byte >05,>08,>0B,>1D,>AD,>5B,>AD,>57
+       byte >06,>5F,>03,>02,>0A,>0D,>17,>FF
+       byte >FF,>AE,>5C,>DF,>5E,>06,>03,>0C
+       byte >0D,>0E,>0F,>10,>1D,>AD,>1B,>AD
+       byte >57,>06,>5F,>03,>04,>0B,>0C,>20
+       byte >9A,>5C,>43,>5E,>43,>1A,>03,>01
+       byte >02,>06,>16,>FF,>FF,>AC,>5F,>55
+       byte >19,>04,>00,>03,>06,>07,>20,>9A
+       byte >1C,>43,>5E,>43,>1A,>03,>04,>05
+       byte >07
+
+* Python: ship-blueprint header
+*
+* See #R$A817 for the format. 11 vertices, 26 edges.
+ship_python_header:                                        ; >bf53
+       data ship_python_vertices
+       data ship_python_edges
+       data ship_python_faces
+       data ship_python_name
+       byte >0D,>1A,>0B,>50,>50,>14,>00,>01
+       byte >64,>0C,>01,>01,>B3,>32,>00,>00
+       byte >28,>00
+
+* Python name text
+*
+* The message "Python".
+ship_python_name:                                          ; >bf6d
+       text 'PYTHO',>ee
+
+* Python: vertex array (6 bytes/vertex)
+ship_python_vertices:                                      ; >bf73
+       byte >FF,>FF,>FF,>FF,>3B,>1F,>FF,>FF
+       byte >57,>16,>57,>16,>57,>1A,>FF,>FF
+       byte >00,>50,>57,>5A,>FF,>FF,>00,>50
+       byte >FF,>FF,>57,>16,>00,>54,>FF,>FF
+       byte >57,>12,>3B,>5B,>57,>56,>FF,>FF
+       byte >3B,>5B,>57,>16,>FF,>FF,>3B,>5B
+       byte >FF,>FF,>57,>56,>57,>16,>FF,>FF
+       byte >57,>56,>00,>54,>FF,>FF,>57,>52
+       byte >3B,>5B
+
+* Python: edge array (2 bytes/edge)
+ship_python_edges:                                         ; >bfb5
+       byte >00,>08,>00,>03,>00,>02,>00,>01
+       byte >02,>04,>01,>02,>02,>08,>01,>03
+       byte >03,>08,>02,>09,>03,>04,>03,>09
+       byte >03,>05,>03,>0A,>02,>05,>02,>0A
+       byte >02,>07,>03,>06,>05,>06,>05,>07
+       byte >07,>0A,>06,>0A,>04,>05,>09,>0A
+       byte >01,>04,>08,>09
+
+* Python: faces (13 faces)
+*
+* See #R$A8DD for the format.
+ship_python_faces:                                         ; >bfe9
+       byte >31,>7B,>5C,>BF,>1E,>4C,>17,>03
+       byte >01,>03,>07,>31,>7B,>1C,>BF,>1E
+       byte >4C,>17,>03,>02,>03,>05,>31,>7B
+       byte >5C,>BF,>5E,>4C,>17,>03,>00,>01
+       byte >08,>31,>7B,>1C,>BF,>5E,>4C,>17
+       byte >03,>00,>02,>06,>2A,>55,>5B,>55
+       byte >1F,>FF,>FF,>03,>07,>0A,>18,>2A
+       byte >55,>1B,>55,>1F,>FF,>FF,>03,>04
+       byte >05,>18,>2A,>55,>5B,>55,>5F,>FF
+       byte >FF,>03,>08,>0B,>19,>2A,>55,>1B
+       byte >55,>5F,>FF,>FF,>03,>06,>09,>19
+       byte >30,>B3,>5B,>09,>1F,>71,>57,>05
+       byte >0A,>0C,>11,>12,>16,>30,>B3,>1B
+       byte >09,>1F,>71,>57,>05,>04,>0E,>10
+       byte >13,>16,>30,>B3,>1B,>09,>5F,>71
+       byte >57,>05,>09,>0F,>10,>14,>17,>30
+       byte >B3,>5B,>09,>5F,>71,>57,>05,>0B
+       byte >0D,>11,>15,>17,>70,>FF,>FF,>FF
+       byte >FF,>FA,>5F,>04,>12,>13,>14,>15
+
+* Sidewinder: ship-blueprint header
+*
+* See #R$A817 for the format. 11 vertices, 15 edges.
+ship_sidewinder_header:                                    ; >c081
+       data ship_sidewinder_vertices
+       data ship_sidewinder_edges
+       data ship_sidewinder_faces
+       data ship_sidewinder_name
+       byte >07,>0F,>0B,>2A,>28,>1B,>00,>01
+       byte >46,>24,>26,>01,>B1,>64,>32,>00
+       byte >50,>00
+
+* Sidewinder name text
+*
+* The message "Sidewinder".
+ship_sidewinder_name:                                      ; >c09b
+       text 'SIDEWINDE',>f2
+
+* Sidewinder: vertex array (6 bytes/vertex)
+ship_sidewinder_vertices:                                  ; >c0a5
+       byte >00,>54,>FF,>FF,>AE,>14,>00,>14
+       byte >FF,>FF,>AE,>14,>00,>18,>FF,>FF
+       byte >3B,>53,>00,>58,>FF,>FF,>3B,>53
+       byte >FF,>FF,>00,>10,>3B,>53,>FF,>FF
+       byte >00,>50,>3B,>53,>57,>4E,>57,>0A
+       byte >3B,>53,>57,>0E,>57,>0A,>3B,>53
+       byte >57,>0E,>57,>4A,>3B,>53,>57,>4E
+       byte >57,>4A,>3B,>53,>FF,>FF,>FF,>FF
+       byte >AE,>14
+
+* Sidewinder: edge array (2 bytes/edge)
+ship_sidewinder_edges:                                     ; >c0e7
+       byte >00,>01,>01,>02,>01,>04,>00,>04
+       byte >00,>03,>03,>04,>02,>04,>03,>05
+       byte >02,>05,>01,>05,>00,>05,>06,>07
+       byte >07,>08,>06,>09,>08,>09
+
+* Sidewinder: faces (7 faces)
+*
+* See #R$A8DD for the format.
+ship_sidewinder_faces:                                     ; >c105
+       byte >08,>FF,>FF,>CD,>1F,>CD,>17,>03
+       byte >00,>02,>03,>0C,>C9,>57,>C9,>1F
+       byte >72,>11,>03,>03,>04,>05,>0C,>C9
+       byte >17,>C9,>1F,>72,>11,>03,>01,>02
+       byte >06,>1C,>FF,>FF,>FF,>FF,>FA,>5F
+       byte >08,>05,>06,>07,>08,>0B,>0C,>0D
+       byte >0E,>0C,>C9,>57,>C9,>5F,>72,>11
+       byte >03,>04,>07,>0A,>08,>FF,>FF,>CD
+       byte >5F,>CD,>17,>03,>00,>09,>0A,>0C
+       byte >C9,>17,>C9,>5F,>72,>11,>03,>01
+       byte >08,>09
+
+* Thargoid: ship-blueprint header
+*
+* See #R$A817 for the format. 20 vertices, 26 edges.
+ship_thargoid_header:                                      ; >c157
+       data ship_thargoid_vertices
+       data ship_thargoid_edges
+       data ship_thargoid_faces
+       data ship_thargoid_name
+       byte >0A,>1A,>14,>64,>FF,>14,>0F,>01
+       byte >6E,>20,>3E,>81,>00,>96,>96,>00
+       byte >96,>00
+
+* Thargoid name text
+*
+* The message "Thargoid".
+ship_thargoid_name:                                        ; >c171
+       text 'THARGOI',>e4
+
+* Thargoid: vertex array (6 bytes/vertex)
+ship_thargoid_vertices:                                    ; >c179
+       byte >00,>14,>57,>56,>57,>16,>00,>14
+       byte >5A,>58,>FF,>FF,>00,>14,>57,>56
+       byte >57,>56,>00,>14,>FF,>FF,>5A,>58
+       byte >00,>14,>57,>16,>57,>56,>00,>14
+       byte >5A,>18,>FF,>FF,>00,>14,>57,>16
+       byte >57,>16,>00,>14,>FF,>FF,>5A,>18
+       byte >57,>52,>6F,>5B,>6F,>1B,>57,>52
+       byte >6E,>5D,>FF,>FF,>57,>52,>6F,>5B
+       byte >6F,>5B,>57,>52,>FF,>FF,>6E,>5D
+       byte >57,>52,>6F,>1B,>6F,>5B,>57,>52
+       byte >6E,>1D,>FF,>FF,>57,>52,>6F,>1B
+       byte >6F,>1B,>57,>52,>FF,>FF,>6E,>1D
+       byte >57,>52,>00,>18,>4A,>19,>57,>52
+       byte >00,>18,>4A,>59,>57,>52,>00,>58
+       byte >4A,>59,>57,>52,>00,>58,>4A,>19
+
+* Thargoid: edge array (2 bytes/edge)
+ship_thargoid_edges:                                       ; >c1f1
+       byte >00,>07,>00,>01,>01,>02,>02,>03
+       byte >03,>04,>04,>05,>05,>06,>06,>07
+       byte >00,>08,>01,>09,>02,>0A,>03,>0B
+       byte >04,>0C,>05,>0D,>06,>0E,>07,>0F
+       byte >08,>0F,>08,>09,>09,>0A,>0A,>0B
+       byte >0B,>0C,>0C,>0D,>0D,>0E,>0E,>0F
+       byte >10,>11,>12,>13
+
+* Thargoid: faces (10 faces)
+*
+* See #R$A8DD for the format.
+ship_thargoid_faces:                                       ; >c225
+       byte >3C,>01,>1F,>F1,>5B,>A7,>16,>04
+       byte >01,>08,>09,>11,>3C,>01,>1F,>F1
+       byte >5B,>A7,>56,>04,>02,>09,>0A,>12
+       byte >3C,>01,>1F,>A7,>56,>F1,>5B,>04
+       byte >03,>0A,>0B,>13,>3C,>01,>1F,>A7
+       byte >16,>F1,>5B,>04,>04,>0B,>0C,>14
+       byte >20,>FA,>1F,>FF,>FF,>FF,>FF,>08
+       byte >00,>01,>02,>03,>04,>05,>06,>07
+       byte >3C,>01,>1F,>F1,>1B,>A7,>56,>04
+       byte >05,>0C,>0D,>15,>3C,>01,>1F,>F1
+       byte >1B,>A7,>16,>04,>06,>0D,>0E,>16
+       byte >3C,>01,>1F,>A7,>16,>F1,>1B,>04
+       byte >07,>0E,>0F,>17,>3C,>01,>1F,>A7
+       byte >56,>F1,>1B,>04,>00,>08,>0F,>10
+       byte >18,>FA,>5F,>FF,>FF,>FF,>FF,>0A
+       byte >10,>11,>12,>13,>14,>15,>16,>17
+       byte >18,>19
+
+* Transporter: ship-blueprint header
+*
+* See #R$A817 for the format. 38 vertices, 46 edges.
+ship_transporter_header:                                   ; >c2a7
+       data ship_transporter_vertices
+       data ship_transporter_edges
+       data ship_transporter_faces
+       data ship_transporter_name
+       byte >0E,>2E,>26,>19,>50,>1E,>0C,>01
+       byte >27,>10,>09,>00,>00,>32,>00,>00
+       byte >0A,>00
+
+* Transporter name text
+*
+* The message "Transporter".
+ship_transporter_name:                                     ; >c2c1
+       text 'TRANSPORTE',>f2
+
+* Transporter: vertex array (6 bytes/vertex)
+ship_transporter_vertices:                                 ; >c2cc
+       byte >FF,>FF,>4A,>0D,>CD,>52,>93,>52
+       byte >00,>08,>CD,>52,>3B,>53,>57,>46
+       byte >CD,>52,>93,>52,>00,>4C,>CD,>52
+       byte >CD,>12,>00,>4C,>CD,>52,>6F,>13
+       byte >57,>46,>CD,>52,>CD,>12,>00,>08
+       byte >CD,>52,>FF,>FF,>57,>0A,>57,>0E
+       byte >A1,>53,>00,>40,>57,>0E,>2D,>54
+       byte >00,>4C,>57,>0E,>2D,>14,>00,>4C
+       byte >57,>0E,>A1,>13,>00,>40,>57,>0E
+       byte >D6,>4D,>00,>44,>A1,>13,>CD,>4E
+       byte >00,>4C,>A1,>13,>3B,>0F,>00,>4C
+       byte >A1,>13,>D6,>0D,>00,>44,>A1,>13
+       byte >4A,>49,>57,>0A,>00,>04,>AE,>50
+       byte >57,>06,>00,>04,>4A,>49,>3B,>0B
+       byte >3B,>4B,>AE,>50,>00,>08,>3B,>4B
+       byte >D6,>4D,>57,>0A,>3B,>4F,>D6,>4D
+       byte >4A,>09,>3B,>4B,>4A,>09,>3B,>0B
+       byte >3B,>4F,>AE,>10,>00,>08,>3B,>4F
+       byte >D6,>0D,>4A,>09,>3B,>4B,>4A,>09
+       byte >57,>0A,>57,>46,>AE,>10,>57,>06
+       byte >57,>46,>D6,>0D,>00,>08,>00,>0C
+       byte >D6,>0D,>4A,>09,>57,>46,>00,>50
+       byte >00,>4C,>CD,>4E,>00,>50,>00,>4C
+       byte >00,>10,>5A,>10,>00,>4C,>CD,>4E
+       byte >5A,>10,>00,>4C,>00,>10,>CD,>4E
+       byte >57,>46,>CD,>52,>CD,>0E,>57,>46
+       byte >CD,>52,>AE,>0C,>57,>06,>CD,>52
+       byte >00,>4C,>57,>06,>CD,>52,>FF,>FF
+       byte >00,>44,>A1,>13
+
+* Transporter: edge array (2 bytes/edge)
+ship_transporter_edges:                                    ; >c3b0
+       byte >00,>01,>01,>02,>02,>03,>03,>04
+       byte >04,>05,>05,>06,>00,>06,>00,>07
+       byte >01,>08,>02,>09,>03,>09,>04,>0A
+       byte >05,>0A,>06,>0B,>07,>08,>08,>09
+       byte >0A,>0B,>07,>0B,>07,>0F,>07,>0C
+       byte >08,>0C,>09,>0D,>0A,>0E,>0B,>0F
+       byte >0C,>0D,>0D,>0E,>0E,>0F,>0C,>0F
+       byte >10,>11,>12,>13,>13,>14,>12,>14
+       byte >14,>15,>16,>17,>17,>18,>18,>16
+       byte >19,>1A,>1A,>1B,>19,>1B,>1B,>1C
+       byte >1D,>1E,>1F,>20,>21,>22,>22,>23
+       byte >23,>24,>24,>21
+
+* Transporter: faces (14 faces)
+*
+* See #R$A8DD for the format.
+ship_transporter_faces:                                    ; >c40c
+       byte >1A,>FF,>FF,>FF,>FF,>FA,>5F,>0B
+       byte >00,>01,>02,>03,>04,>05,>06,>2A
+       byte >2B,>2C,>2D,>1A,>80,>5F,>72,>1A
+       byte >29,>51,>04,>01,>08,>09,>0F,>1E
+       byte >02,>5F,>0F,>5C,>B8,>55,>03,>02
+       byte >09,>0A,>08,>FF,>FF,>FA,>5F,>FF
+       byte >FF,>08,>03,>0A,>0B,>15,>16,>19
+       byte >28,>29,>1E,>12,>1F,>E5,>5B,>8E
+       byte >55,>03,>04,>0B,>0C,>1A,>83,>1F
+       byte >76,>1A,>2C,>4D,>04,>05,>0C,>0D
+       byte >10,>07,>78,>18,>B2,>1F,>78,>14
+       byte >0B,>06,>07,>0D,>11,>21,>22,>23
+       byte >24,>25,>26,>27,>07,>78,>58,>B2
+       byte >1F,>78,>14,>09,>00,>07,>08,>0E
+       byte >1C,>1D,>1E,>1F,>20,>09,>72,>57
+       byte >72,>1F,>C9,>19,>03,>0E,>13,>14
+       byte >1C,>6A,>5D,>BC,>18,>05,>1E,>04
+       byte >0F,>14,>15,>18,>1C,>6A,>1D,>BC
+       byte >18,>05,>1E,>04,>10,>16,>17,>1A
+       byte >09,>72,>17,>72,>1F,>C9,>19,>03
+       byte >11,>12,>17,>0A,>FF,>FF,>75,>1F
+       byte >C7,>1A,>03,>12,>13,>1B,>1E,>FF
+       byte >FF,>FF,>FF,>FA,>1F,>04,>18,>19
+       byte >1A,>1B
+
+* Viper: ship-blueprint header
+*
+* See #R$A817 for the format. 15 vertices, 20 edges.
+ship_viper_header:                                         ; >c4c6
+       data ship_viper_vertices
+       data ship_viper_edges
+       data ship_viper_faces
+       data ship_viper_name
+       byte >07,>14,>0F,>26,>78,>1E,>00,>01
+       byte >3C,>1C,>52,>00,>00,>64,>00,>00
+       byte >32,>00
+
+* Viper name text
+*
+* The message "Viper".
+ship_viper_name:                                           ; >c4e0
+       text 'VIPE',>f2
+
+* Viper: vertex array (6 bytes/vertex)
+ship_viper_vertices:                                       ; >c4e5
+       byte >FF,>FF,>FF,>FF,>AE,>18,>FF,>FF
+       byte >00,>10,>57,>12,>FF,>FF,>00,>50
+       byte >57,>12,>57,>16,>FF,>FF,>57,>52
+       byte >57,>56,>FF,>FF,>57,>52,>57,>12
+       byte >00,>50,>57,>52,>57,>52,>00,>50
+       byte >57,>52,>57,>12,>00,>10,>57,>52
+       byte >57,>52,>00,>10,>57,>52,>00,>54
+       byte >FF,>FF,>57,>52,>00,>14,>FF,>FF
+       byte >57,>52,>00,>0C,>00,>0C,>57,>52
+       byte >00,>4C,>00,>0C,>57,>52,>00,>4C
+       byte >00,>4C,>57,>52,>00,>0C,>00,>4C
+       byte >57,>52
+
+* Viper: edge array (2 bytes/edge)
+ship_viper_edges:                                          ; >c53f
+       byte >00,>03,>00,>01,>00,>02,>00,>04
+       byte >01,>07,>01,>08,>02,>05,>02,>06
+       byte >07,>08,>05,>06,>04,>08,>04,>06
+       byte >03,>07,>03,>05,>09,>0C,>09,>0D
+       byte >0A,>0B,>0A,>0E,>0B,>0E,>0C,>0D
+
+* Viper: faces (7 faces)
+*
+* See #R$A8DD for the format.
+ship_viper_faces:                                          ; >c567
+       byte >10,>FF,>FF,>FA,>1F,>FF,>FF,>03
+       byte >04,>05,>08,>13,>5D,>5C,>B4,>1E
+       byte >5D,>18,>04,>01,>03,>05,>0A,>13
+       byte >5D,>1C,>B4,>1E,>5D,>18,>04,>00
+       byte >01,>04,>0C,>13,>5D,>5C,>B4,>5E
+       byte >5D,>18,>04,>02,>03,>07,>0B,>13
+       byte >5D,>1C,>B4,>5E,>5D,>18,>04,>00
+       byte >02,>06,>0D,>10,>FF,>FF,>FA,>5F
+       byte >FF,>FF,>03,>06,>07,>09,>18,>FF
+       byte >FF,>FF,>FF,>FA,>5F,>0C,>08,>09
+       byte >0A,>0B,>0C,>0D,>0E,>0F,>10,>11
+       byte >12,>13
+
+* Thargon: ship-blueprint header
+*
+* See #R$A817 for the format. 10 vertices, 15 edges.
+ship_thargon_header:                                       ; >c5c1
+       data ship_thargon_vertices
+       data ship_thargon_edges
+       data ship_thargon_faces
+       data ship_thargon_name
+       byte >07,>0F,>0A,>23,>1E,>14,>06,>01
+       byte >23,>18,>3E,>00,>00,>32,>0A,>00
+       byte >14,>00
+
+* Thargon name text
+*
+* The message "Thargon".
+ship_thargon_name:                                         ; >c5db
+       text 'THARGO',>ee
+
+* Thargon: vertex array (6 bytes/vertex)
+ship_thargon_vertices:                                     ; >c5e2
+       byte >AE,>4C,>57,>0A,>FF,>FF,>FF,>FF
+       byte >57,>0A,>D6,>0D,>AE,>0C,>57,>0A
+       byte >FF,>FF,>00,>08,>57,>0A,>3B,>4B
+       byte >00,>48,>57,>0A,>3B,>4B,>4A,>51
+       byte >57,>4A,>FF,>FF,>FF,>FF,>57,>4A
+       byte >CD,>12,>4A,>11,>57,>4A,>FF,>FF
+       byte >57,>0A,>57,>4A,>4A,>51,>57,>4A
+       byte >57,>4A,>4A,>51
+
+* Thargon: edge array (2 bytes/edge)
+ship_thargon_edges:                                        ; >c61e
+       byte >00,>01,>01,>02,>02,>03,>03,>04
+       byte >04,>00,>05,>06,>06,>07,>07,>08
+       byte >08,>09,>09,>05,>00,>05,>01,>06
+       byte >02,>07,>03,>08,>04,>09
+
+* Thargon: faces (7 faces)
+*
+* See #R$A8DD for the format.
+ship_thargon_faces:                                        ; >c63c
+       byte >09,>C9,>5D,>BB,>1C,>72,>1B,>04
+       byte >00,>0B,>05,>0A,>09,>C9,>1D,>BB
+       byte >1C,>72,>1B,>04,>0B,>06,>01,>0C
+       byte >09,>66,>1D,>66,>1D,>0F,>5B,>04
+       byte >02,>0C,>07,>0D,>09,>FF,>FF,>63
+       byte >1E,>80,>5D,>04,>0E,>03,>0D,>08
+       byte >09,>66,>5D,>66,>1D,>0F,>5B,>04
+       byte >04,>0E,>09,>0A,>06,>FF,>FF,>FA
+       byte >1F,>FF,>FF,>05,>00,>01,>02,>03
+       byte >04,>06,>FF,>FF,>FA,>5F,>FF,>FF
+       byte >05,>05,>06,>07,>08,>09
+
+* Wolf MKII: ship-blueprint header
+*
+* See #R$A817 for the format. 30 vertices, 43 edges.
+ship_wolf_mkii_header:                                     ; >c692
+       data ship_wolf_mkii_vertices
+       data ship_wolf_mkii_edges
+       data ship_wolf_mkii_faces
+       data ship_wolf_mkii_name
+       byte >12,>2B,>1E,>45,>FF,>28,>1D,>01
+       byte >78,>24,>26,>83,>91,>96,>73,>00
+       byte >96,>00
+
+* Wolf MKII name text
+*
+* The message "Wolf MKII".
+ship_wolf_mkii_name:                                       ; >c6ac
+       text 'WOLF MKI',>c9
+
+* Wolf MKII: vertex array (6 bytes/vertex)
+ship_wolf_mkii_vertices:                                   ; >c6b5
+       byte >FF,>FF,>A1,>13,>A1,>13,>A1,>13
+       byte >A1,>53,>A1,>13,>A1,>13,>A1,>53
+       byte >A1,>53,>A1,>53,>A1,>13,>A1,>13
+       byte >A1,>53,>FF,>FF,>A1,>1B,>A1,>13
+       byte >FF,>FF,>A1,>1B,>A1,>13,>A1,>13
+       byte >A1,>13,>4A,>59,>FF,>FF,>A1,>13
+       byte >4A,>19,>FF,>FF,>A1,>13,>4A,>19
+       byte >FF,>FF,>4A,>51,>A1,>13,>A1,>13
+       byte >4A,>51,>A1,>53,>A1,>13,>4A,>51
+       byte >4A,>59,>FF,>FF,>4A,>51,>A1,>53
+       byte >FF,>FF,>93,>56,>A1,>13,>FF,>FF
+       byte >93,>56,>A1,>53,>A1,>53,>A1,>53
+       byte >A1,>53,>A1,>53,>A1,>13,>A1,>53
+       byte >FF,>FF,>EA,>1C,>A1,>13,>FF,>FF
+       byte >EA,>1C,>84,>58,>4A,>09,>4A,>4D
+       byte >4A,>55,>93,>12,>4A,>4D,>4A,>55
+       byte >93,>12,>4A,>11,>4A,>51,>A1,>13
+       byte >4A,>11,>4A,>51,>A1,>13,>4A,>4D
+       byte >4A,>11,>A1,>13,>4A,>4D,>4A,>11
+       byte >A1,>13,>4A,>11,>4A,>15,>93,>12
+       byte >4A,>11,>4A,>15,>93,>12,>4A,>4D
+       byte >84,>18,>4A,>09,>4A,>4D,>FF,>FF
+       byte >FF,>FF,>A1,>1B
+
+* Wolf MKII: edge array (2 bytes/edge)
+ship_wolf_mkii_edges:                                      ; >c769
+       byte >00,>04,>00,>05,>0E,>02,>03,>04
+       byte >04,>05,>05,>06,>06,>03,>03,>07
+       byte >07,>04,>08,>05,>06,>08,>09,>08
+       byte >0A,>06,>0B,>03,>0C,>07,>0C,>0B
+       byte >0B,>0A,>0A,>09,>09,>0E,>0E,>0A
+       byte >0D,>0B,>0D,>0C,>0D,>0E,>0C,>0F
+       byte >0F,>02,>02,>09,>0F,>10,>02,>01
+       byte >07,>10,>10,>01,>01,>08,>05,>01
+       byte >04,>10,>0D,>0F,>04,>11,>05,>12
+       byte >13,>14,>14,>15,>16,>17,>17,>18
+       byte >18,>19,>1A,>1B,>1B,>1C
+
+* Wolf MKII: faces (18 faces)
+*
+* See #R$A8DD for the format.
+ship_wolf_mkii_faces:                                      ; >c7bf
+       byte >26,>FF,>FF,>AC,>1F,>55,>19,>08
+       byte >03,>04,>05,>06,>00,>01,>23,>22
+       byte >30,>07,>5C,>D4,>1E,>7D,>18,>04
+       byte >08,>03,>07,>22,>30,>07,>1C,>D4
+       byte >1E,>7D,>18,>04,>05,>09,>0A,>23
+       byte >29,>24,>5C,>17,>1F,>FF,>FF,>06
+       byte >0E,>07,>0D,>0F,>24,>25,>1E,>FF
+       byte >FF,>FA,>1F,>FF,>FF,>07,>0D,>06
+       byte >0C,>10,>26,>27,>28,>29,>24,>1C
+       byte >17,>1F,>FF,>FF,>06,>0C,>0A,>0B
+       byte >11,>29,>2A,>2C,>70,>1A,>85,>1D
+       byte >85,>5D,>03,>13,>11,>12,>23,>FF
+       byte >FF,>FA,>1D,>FA,>5D,>04,>14,>10
+       byte >13,>16,>2C,>70,>5A,>85,>1D,>85
+       byte >5D,>03,>15,>0F,>14,>33,>63,>5B
+       byte >DE,>5B,>48,>5E,>03,>17,>21,>15
+       byte >29,>24,>5C,>17,>5F,>FF,>FF,>04
+       byte >1A,>17,>1C,>0E,>30,>07,>5C,>D4
+       byte >5E,>7D,>18,>04,>20,>1C,>08,>22
+       byte >2A,>FF,>FF,>85,>5C,>F1,>5E,>04
+       byte >21,>18,>02,>16,>1E,>FF,>FF,>FA
+       byte >5F,>FF,>FF,>04,>1A,>1D,>1B,>18
+       byte >26,>FF,>FF,>AC,>5F,>55,>19,>06
+       byte >20,>1D,>1F,>04,>22,>23,>30,>07
+       byte >1C,>D4,>5E,>7D,>18,>04,>1F,>1E
+       byte >09,>23,>29,>24,>1C,>17,>5F,>FF
+       byte >FF,>04,>1B,>19,>1E,>0B,>33,>63
+       byte >1B,>DE,>5B,>48,>5E,>03,>19,>02
+       byte >12
+
+* Title letter E: ship-blueprint header
+*
+* The letter "E" shown on the title screen (ship type 8, see #R$1F0C). See
+* #R$A817 for the blueprint format. 12 vertices and 12 edges, going once
+* round the letter's outline. The letters have no name: the name pointer
+* points to the vertex array, which reads as "WJJ" (see #R$A7D7). It
+* has one face, made of all its edges (#R$C91A).
+ship_letter_e_header:                                      ; >c8a0
+       data ship_letter_e_vertices
+       data ship_letter_e_edges
+       data ship_letter_e_faces
+       data ship_letter_e_vertices
+       byte >01,>0C,>0C,>00,>00,>00,>FF,>00
+       byte >0C,>00,>00,>00,>00,>00,>00,>00
+       byte >00,>00
+
+* Title letter E: vertex array (6 bytes/vertex)
+ship_letter_e_vertices:                                    ; >c8ba
+       byte >57,>4A,>4A,>0D,>FF,>FF,>57,>0A
+       byte >4A,>0D,>FF,>FF,>57,>0A,>57,>0A
+       byte >FF,>FF,>00,>44,>57,>0A,>FF,>FF
+       byte >00,>44,>00,>04,>FF,>FF,>57,>0A
+       byte >00,>04,>FF,>FF,>57,>0A,>00,>44
+       byte >FF,>FF,>00,>44,>00,>44,>FF,>FF
+       byte >00,>44,>57,>4A,>FF,>FF,>57,>0A
+       byte >57,>4A,>FF,>FF,>57,>0A,>4A,>4D
+       byte >FF,>FF,>57,>4A,>4A,>4D,>FF,>FF
+
+* Title letter E: edge array (2 bytes/edge)
+ship_letter_e_edges:                                       ; >c902
+       byte >00,>01,>01,>02,>02,>03,>03,>04
+       byte >04,>05,>05,>06,>06,>07,>07,>08
+       byte >08,>09,>09,>0A,>0A,>0B,>0B,>00
+
+* Title letter E: faces (1 face)
+*
+* The letter's one face. The title letters have no normals (#R$F804), so a
+* face is just a count and the numbers of its edges (see #R$A8DD); this one
+* lists all 12 of the letter's edges, so #R$491A draws the whole outline.
+* The other letters' faces (#R$C971, #R$C9F2, #R$CA59) are the same, each
+* listing all of the letter's edges.
+ship_letter_e_faces:                                       ; >c91a
+       byte >0C,>00,>01,>02,>03,>04,>05,>06
+       byte >07,>08,>09,>0A,>0B
+
+* Title letter L: ship-blueprint header
+*
+* The letter "L" shown on the title screen (ship type 9, see #R$1F0C). See
+* #R$A817 for the blueprint format. 6 vertices and 6 edges, going once
+* round the letter's outline. The letters have no name: the name pointer
+* points to the vertex array, which reads as "WJJ" (see #R$A7D7). It
+* has one face, made of all its edges (#R$C971).
+ship_letter_l_header:                                      ; >c927
+       data ship_letter_l_vertices
+       data ship_letter_l_edges
+       data ship_letter_l_faces
+       data ship_letter_l_vertices
+       byte >01,>06,>06,>00,>00,>00,>FF,>00
+       byte >0C,>00,>00,>00,>00,>00,>00,>00
+       byte >00,>00
+
+* Title letter L: vertex array (6 bytes/vertex)
+ship_letter_l_vertices:                                    ; >c941
+       byte >57,>4A,>4A,>0D,>FF,>FF,>00,>44
+       byte >4A,>0D,>FF,>FF,>00,>44,>57,>4A
+       byte >FF,>FF,>57,>0A,>57,>4A,>FF,>FF
+       byte >57,>0A,>4A,>4D,>FF,>FF,>57,>4A
+       byte >4A,>4D,>FF,>FF
+
+* Title letter L: edge array (2 bytes/edge)
+ship_letter_l_edges:                                       ; >c965
+       byte >00,>01,>01,>02,>02,>03,>03,>04
+       byte >04,>05,>05,>00
+
+* Title letter L: faces (1 face)
+*
+* The letter's one face: all 6 of its edges (see #R$C91A).
+ship_letter_l_faces:                                       ; >c971
+       byte >06,>00,>01,>02,>03,>04,>05
+
+* Title letter I: ship-blueprint header
+*
+* The letter "I" shown on the title screen (ship type 10, see #R$1F0C). See
+* #R$A817 for the blueprint format. 12 vertices and 12 edges, going once
+* round the letter's outline. The letters have no name: the name pointer
+* points to the vertex array, which reads as "WJJ" (see #R$A7D7). It
+* has one face, made of all its edges (#R$C9F2).
+ship_letter_i_header:                                      ; >c978
+       data ship_letter_i_vertices
+       data ship_letter_i_edges
+       data ship_letter_i_faces
+       data ship_letter_i_vertices
+       byte >01,>0C,>0C,>00,>00,>00,>FF,>00
+       byte >0C,>00,>00,>00,>00,>00,>00,>00
+       byte >00,>00
+
+* Title letter I: vertex array (6 bytes/vertex)
+ship_letter_i_vertices:                                    ; >c992
+       byte >57,>4A,>4A,>0D,>FF,>FF,>57,>0A
+       byte >4A,>0D,>FF,>FF,>57,>0A,>57,>0A
+       byte >FF,>FF,>00,>04,>57,>0A,>FF,>FF
+       byte >00,>04,>57,>4A,>FF,>FF,>57,>0A
+       byte >57,>4A,>FF,>FF,>57,>0A,>4A,>4D
+       byte >FF,>FF,>57,>4A,>4A,>4D,>FF,>FF
+       byte >57,>4A,>57,>4A,>FF,>FF,>00,>44
+       byte >57,>4A,>FF,>FF,>00,>44,>57,>0A
+       byte >FF,>FF,>57,>4A,>57,>0A,>FF,>FF
+
+* Title letter I: edge array (2 bytes/edge)
+ship_letter_i_edges:                                       ; >c9da
+       byte >00,>01,>01,>02,>02,>03,>03,>04
+       byte >04,>05,>05,>06,>06,>07,>07,>08
+       byte >08,>09,>09,>0A,>0A,>0B,>0B,>00
+
+* Title letter I: faces (1 face)
+*
+* The letter's one face: all 12 of its edges (see #R$C91A).
+ship_letter_i_faces:                                       ; >c9f2
+       byte >0C,>00,>01,>02,>03,>04,>05,>06
+       byte >07,>08,>09,>0A,>0B
+
+* Title letter T: ship-blueprint header
+*
+* The letter "T" shown on the title screen (ship type 11, see #R$1F0C). See
+* #R$A817 for the blueprint format. 8 vertices and 8 edges, going once
+* round the letter's outline. The letters have no name: the name pointer
+* points to the vertex array, which reads as "WJJ" (see #R$A7D7). It
+* has one face, made of all its edges (#R$CA59).
+ship_letter_t_header:                                      ; >c9ff
+       data ship_letter_t_vertices
+       data ship_letter_t_edges
+       data ship_letter_t_faces
+       data ship_letter_t_vertices
+       byte >01,>08,>08,>00,>00,>00,>FF,>00
+       byte >0C,>00,>00,>00,>00,>00,>00,>00
+       byte >00,>00
+
+* Title letter T: vertex array (6 bytes/vertex)
+ship_letter_t_vertices:                                    ; >ca19
+       byte >57,>4A,>4A,>0D,>FF,>FF,>57,>0A
+       byte >4A,>0D,>FF,>FF,>57,>0A,>57,>0A
+       byte >FF,>FF,>00,>04,>57,>0A,>FF,>FF
+       byte >00,>04,>4A,>4D,>FF,>FF,>00,>44
+       byte >4A,>4D,>FF,>FF,>00,>44,>57,>0A
+       byte >FF,>FF,>57,>4A,>57,>0A,>FF,>FF
+
+* Title letter T: edge array (2 bytes/edge)
+ship_letter_t_edges:                                       ; >ca49
+       byte >00,>01,>01,>02,>02,>03,>03,>04
+       byte >04,>05,>05,>06,>06,>07,>07,>00
+
+* Title letter T: faces (1 face)
+*
+* The letter's one face: all 8 of its edges (see #R$C91A).
+ship_letter_t_faces:                                       ; >ca59
+       byte >08,>00,>01,>02,>03,>04,>05,>06
+       byte >07
+

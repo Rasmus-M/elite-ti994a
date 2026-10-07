@@ -1433,9 +1433,9 @@ print_char:                                                ; >34a8
        .push hl                                            ; PUSH HL           ; 
        movb a,@l                                           ; LD L,A            ; HL = A (the character code)
        sb   h,h                                            ; LD H,$00          ; 
-       a    hl,hl                                          ; ADD HL,HL         ; HL *= 8 (this char's offset into the font table)
-       a    hl,hl                                          ; ADD HL,HL         ; 
-       a    hl,hl                                          ; ADD HL,HL         ; 
+       sla  hl,3                                           ; ADD HL,HL         ; HL *= 8 (this char's offset into the font table)
+       ;                                                   ; ADD HL,HL         ; 
+       ;                                                   ; ADD HL,HL         ; 
        li   bc,font->0100                                  ; LD BC,$099F       ; the font pattern table (codes $20-$7F)
        a    bc,hl                                          ; ADD HL,BC         ; HL -> this character's 8-byte glyph
        li   de,scratch_buffer                              ; LD DE,$E600       ; DE -> the staging buffer
@@ -2097,9 +2097,9 @@ _3a13:                                                     ; >3a13
        .push hl                                            ; PUSH HL           ; save the message pointer
        movb a,@l                                           ; LD L,A            ; 
        sb   h,h                                            ; LD H,$00          ; 
-       a    hl,hl                                          ; ADD HL,HL         ; 
-       a    hl,hl                                          ; ADD HL,HL         ; 
-       a    hl,hl                                          ; ADD HL,HL         ; HL = the character * 8
+       sla  hl,3                                           ; ADD HL,HL         ; 
+       ;                                                   ; ADD HL,HL         ; 
+       ;                                                   ; ADD HL,HL         ; HL = the character * 8
        li   bc,>1a80                                       ; LD BC,$1A80       ; 
        a    bc,hl                                          ; ADD HL,BC         ; HL = the character's pattern
 ;      limi 0                                              ; DI                ; 
@@ -5269,8 +5269,8 @@ stardust_move_outwards:                                    ; >6520
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = |X|
 stardust_front_x:                                          ; >6533
-       srl  a,1                                            ; SRL A             ; 
-       srl  a,1                                            ; SRL A             ; A = |X| / 4
+       srl  a,2                                            ; SRL A             ; 
+       ;                                                   ; SRL A             ; A = |X| / 4
        movb a,@c                                           ; LD C,A            ; 
        movb a,r1                                           ; LD B,$02          ; 
        srl  r1,8                                           ;                   ; 
@@ -5294,8 +5294,8 @@ _653c:                                                     ; >653c
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = |Y|
 stardust_front_y:                                          ; >6558
-       srl  a,1                                            ; SRL A             ; 
-       srl  a,1                                            ; SRL A             ; A = |Y| / 4
+       srl  a,2                                            ; SRL A             ; 
+       ;                                                   ; SRL A             ; A = |Y| / 4
        movb a,@c                                           ; LD C,A            ; 
        movb a,r1                                           ; LD B,$02          ; 
        srl  r1,8                                           ;                   ; 
@@ -6293,9 +6293,9 @@ draw_bar_gauge_jmp:
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; return if the dashboard isn't shown (#R$6C9E)
        movb a,@e                                           ; LD E,A            ; E = the length
        sb   d,d                                            ; LD D,$00          ; D = 0, the number of cells drawn
-       srl  a,1                                            ; RRA               ; 
-       srl  a,1                                            ; RRA               ; 
-       srl  a,1                                            ; RRA               ; 
+       srl  a,3                                            ; RRA               ; 
+       ;                                                   ; RRA               ; 
+       ;                                                   ; RRA               ; 
        andi a,>1f00                                        ; AND $1F           ; A = the number of full cells
        jeq  _6c52                                          ; JR Z,$6C52        ; none
        movb a,@c                                           ; LD C,A            ; C = the number of full cells
@@ -6347,9 +6347,9 @@ draw_dial_gauge:                                           ; >6c71
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; return if the dashboard isn't shown (#R$6C9E)
        movb one,d                                          ; LD D,$01          ; D = 1 (counting the cell with the pixel)
        movb a,@e                                           ; LD E,A            ; E = the position
-       srl  a,1                                            ; RRA               ; 
-       srl  a,1                                            ; RRA               ; 
-       srl  a,1                                            ; RRA               ; 
+       srl  a,3                                            ; RRA               ; 
+       ;                                                   ; RRA               ; 
+       ;                                                   ; RRA               ; 
        andi a,>1f00                                        ; AND $1F           ; A = the number of empty cells before the pixel
        jeq  _6c85                                          ; JR Z,$6C85        ; none
        movb a,@c                                           ; LD C,A            ; 

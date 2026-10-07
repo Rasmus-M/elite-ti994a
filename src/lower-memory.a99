@@ -21,6 +21,7 @@
 * $D604 and $D605; and for a commander file read from tape (#R$A492,
 * #R$A4CA): the name at $D606 (11 bytes) and the file at $D611 (128 bytes).
 * The startup code (#R$6F9F) clears it, with everything up to $EFA9.
+       even
 space_view_buffer:                                         ; >d600
        byte >00,>00,>00,>00                                          ;
 tape_slot_page0:                                           ; >d604

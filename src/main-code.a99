@@ -1752,56 +1752,38 @@ copy_to_vram:                                              ; >3830
 * first (#R$39F1). Then copies the space view's bitmap buffer (#R$D600) to
 * the pattern table: character rows 1-16, columns 5-26 (176x128 pixels).
 * Each character's 8 bytes are the same byte of 8 consecutive 32-byte rows
-* of the buffer. Sets #R$EF9E while it's writing to VRAM.
+* of the buffer. Sets #R$EF9E while it's writing to VRAM. Reads the buffer
+* through HL with indexed offsets, so it can be located anywhere.
 copy_space_view:                                           ; >3846
        .proc
        bl   @count_message_timer                           ; CALL $39F1        ; count the message timer down
-       li   de,>4120                                       ; LD DE,$4120       ; D = $41: VRAM $0128 for writing; E = 32
-       movb @bytes+>d6,h                                   ; LD H,$D6          ; H = the buffer's first page
-       movb @bytes+>98,@c                                  ; LD C,$98          ; C = the VDP data port
+       li   hl,space_view_buffer                           ; LD H,$D6          ; HL -> the buffer
+       li   de,>4128                                       ; LD DE,$4120       ; DE = VRAM $0128 for writing (row 1, column 5)
+       li   r2,vdpwd                                       ; LD C,$98          ; R2 -> the VDP data port
        movb @bytes+>10,a                                   ; LD A,$10          ; 16 character rows
        movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; writing to VRAM
 _3855:                                                     ; >3855
-       .ex_af_af_                                          ; EX AF,AF'         ; 
        limi 0                                              ; DI                ; 
-       movb @bytes+>28,a                                   ; LD A,$28          ; VRAM address low byte: column 5
-       movb a,@vdpwa                                       ; OUT ($99),A       ; 
-       movb d,a                                            ; LD A,D            ; high byte: the character row
-       movb a,@vdpwa                                       ; OUT ($99),A       ; 
-       ; EI                                                ; EI                ; TODO: check code. 
-       sb   a,a                                            ; XOR A             ; start at byte 0 of the page
-       movb @bytes+>c6,b                                   ; LD B,$C6          ; 22 characters (8 OUTIs and a DJNZ each)
+       swpb de                                             ; LD A,$28          ; 
+       movb de,@vdpwa                                      ; OUT ($99),A       ; VRAM address low byte: column 5
+       swpb de                                             ; LD A,D            ; 
+       movb de,@vdpwa                                      ; OUT ($99),A       ; high byte: the character row
+       ; EI                                                ; EI                ; TODO: check code.
+       movb @bytes+>16,b                                   ; LD B,$C6          ; 22 characters
 _3862:                                                     ; >3862
-       movb a,@l                                           ; LD L,A            ; row 0 of the character
-       ; OUTI                                              ; OUTI              ; TODO: check code. 
-       ab   @e,a                                           ; ADD A,E           ; 
-       movb a,@l                                           ; LD L,A            ; row 1
-       ; OUTI                                              ; OUTI              ; TODO: check code. 
-       ab   @e,a                                           ; ADD A,E           ; 
-       movb a,@l                                           ; LD L,A            ; row 2
-       ; OUTI                                              ; OUTI              ; TODO: check code. 
-       ab   @e,a                                           ; ADD A,E           ; 
-       movb a,@l                                           ; LD L,A            ; row 3
-       ; OUTI                                              ; OUTI              ; TODO: check code. 
-       ab   @e,a                                           ; ADD A,E           ; 
-       movb a,@l                                           ; LD L,A            ; row 4
-       ; OUTI                                              ; OUTI              ; TODO: check code. 
-       ab   @e,a                                           ; ADD A,E           ; 
-       movb a,@l                                           ; LD L,A            ; row 5
-       ; OUTI                                              ; OUTI              ; TODO: check code. 
-       ab   @e,a                                           ; ADD A,E           ; 
-       movb a,@l                                           ; LD L,A            ; row 6
-       ; OUTI                                              ; OUTI              ; TODO: check code. 
-       ab   @e,a                                           ; ADD A,E           ; 
-       movb a,@l                                           ; LD L,A            ; row 7
-       ; OUTI                                              ; OUTI              ; TODO: check code. 
-       ab   @e,a                                           ; ADD A,E           ; (back to row 0)
-       ab   one,a                                          ; INC A             ; next byte along
+       movb *hl,*r2                                        ; OUTI              ; row 0 of the character
+       movb @>20(hl),*r2                                   ; OUTI              ; row 1
+       movb @>40(hl),*r2                                   ; OUTI              ; row 2
+       movb @>60(hl),*r2                                   ; OUTI              ; row 3
+       movb @>80(hl),*r2                                   ; OUTI              ; row 4
+       movb @>a0(hl),*r2                                   ; OUTI              ; row 5
+       movb @>c0(hl),*r2                                   ; OUTI              ; row 6
+       movb @>e0(hl),*r2                                   ; OUTI              ; row 7
+       inc  hl                                             ; INC A             ; next byte along
        sb   one,b                                          ; DJNZ $3862        ; next character
-       jne  _3862                                          ;                   
-       ab   one,h                                          ; INC H             ; next page of the buffer
-       ab   one,d                                          ; INC D             ; next character row
-       .ex_af_af_                                          ; EX AF,AF'         ; 
+       jne  _3862                                          ;                   ; 
+       ai   hl,>100-22                                     ; INC H             ; next 8 rows of the buffer
+       ai   de,>100                                        ; INC D             ; next character row
        sb   one,a                                          ; DEC A             ; 
        jne  _3855                                          ; JR NZ,$3855       ; 
        movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; done writing to VRAM
@@ -1814,124 +1796,27 @@ _3862:                                                     ; >3862
 * #R$894D.
 * .
 * Clears the space view's bitmap buffer (#R$D600) - the first 22 bytes
-* (176 pixels) of each of its 128 rows - from the bottom up, 8 rows a
-* pass, by pointing SP into the buffer and pushing zeros.
+* (176 pixels) of each of its 128 rows. The original pushes zeros with SP
+* pointed into the buffer; here each row is cleared with 11 CLRs.
 clear_space_view:                                          ; >388f
-       .proc
-       mov  sp,@clear_view_saved_sp                        ; LD ($E732),SP     ; save SP
-       li   hl,tape_record_data+>0fe5                      ; LD HL,$E5F6       ; the end of the bottom row's 22 bytes, plus 1
-       li   de,>0000                                       ; LD DE,$0000       ; 
-       li   bc,>ffe0                                       ; LD BC,$FFE0       ; 32 bytes back: the row above
-       movb @bytes+>10,a                                   ; LD A,$10          ; 16 passes of 8 rows
+       li   hl,space_view_buffer                           ; LD HL,$E5F6       ; HL -> the first row (top down instead of bottom up)
+       li   r0,128                                         ; LD A,$10          ; 128 rows (16 passes of 8 rows on the MSX)
 _389e:                                                     ; >389e
-       mov  hl,sp                                          ; LD SP,HL          ; SP -> the end of the row
-       .push de                                            ; PUSH DE           ; clear 22 bytes
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       a    bc,hl                                          ; ADD HL,BC         ; the row above
-       mov  hl,sp                                          ; LD SP,HL          ; SP -> the end of the row
-       .push de                                            ; PUSH DE           ; clear 22 bytes
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       a    bc,hl                                          ; ADD HL,BC         ; the row above
-       mov  hl,sp                                          ; LD SP,HL          ; SP -> the end of the row
-       .push de                                            ; PUSH DE           ; clear 22 bytes
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       a    bc,hl                                          ; ADD HL,BC         ; the row above
-       mov  hl,sp                                          ; LD SP,HL          ; SP -> the end of the row
-       .push de                                            ; PUSH DE           ; clear 22 bytes
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       a    bc,hl                                          ; ADD HL,BC         ; the row above
-       mov  hl,sp                                          ; LD SP,HL          ; SP -> the end of the row
-       .push de                                            ; PUSH DE           ; clear 22 bytes
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       a    bc,hl                                          ; ADD HL,BC         ; the row above
-       mov  hl,sp                                          ; LD SP,HL          ; SP -> the end of the row
-       .push de                                            ; PUSH DE           ; clear 22 bytes
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       a    bc,hl                                          ; ADD HL,BC         ; the row above
-       mov  hl,sp                                          ; LD SP,HL          ; SP -> the end of the row
-       .push de                                            ; PUSH DE           ; clear 22 bytes
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       a    bc,hl                                          ; ADD HL,BC         ; the row above
-       mov  hl,sp                                          ; LD SP,HL          ; SP -> the end of the row
-       .push de                                            ; PUSH DE           ; clear 22 bytes
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push de                                            ; PUSH DE           ; 
-       a    bc,hl                                          ; ADD HL,BC         ; the row above
-       sb   one,a                                          ; DEC A             ; one fewer pass
-       jne  _389e                                          ; JR NZ,$389E       ; next 8 rows
-       mov  @clear_view_saved_sp,sp                        ; LD SP,($E732)     ; restore SP
-       .endproc                                            ; RET               ; 
+       clr  *hl+                                           ; PUSH DE           ; clear 22 bytes
+       clr  *hl+                                           ; PUSH DE           ; 
+       clr  *hl+                                           ; PUSH DE           ; 
+       clr  *hl+                                           ; PUSH DE           ; 
+       clr  *hl+                                           ; PUSH DE           ; 
+       clr  *hl+                                           ; PUSH DE           ; 
+       clr  *hl+                                           ; PUSH DE           ; 
+       clr  *hl+                                           ; PUSH DE           ; 
+       clr  *hl+                                           ; PUSH DE           ; 
+       clr  *hl+                                           ; PUSH DE           ; 
+       clr  *hl+                                           ; PUSH DE           ; 
+       ai   hl,10                                          ; ADD HL,BC         ; skip the other 10 bytes to the next row
+       dec  r0                                             ; DEC A             ; one fewer row
+       jne  _389e                                          ; JR NZ,$389E       ; next row
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Decompress a full-screen picture (pattern + colour data) to VRAM

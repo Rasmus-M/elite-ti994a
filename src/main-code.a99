@@ -159,7 +159,7 @@ title_screen_next_frame:                                   ; >1cf4
        movb @bytes+>d6,a                                   ; LD A,$D6          ;
        movb a,@message_row                                 ; LD ($E92C),A      ; the ship's name at the top of the view
        mov  @bp_name,hl                                    ; LD HL,($F7FB)     ;
-       .call @show_view_message                            ; CALL $39C8        ; print the ship's name
+       bl   @show_view_message                             ; CALL $39C8        ; print the ship's name
 _1d02:                                                     ; >1d02
        bl   @count_message_timer                           ; CALL $39F1        ;
        movb @bytes+>e4,a                                   ; LD A,$E4          ;
@@ -170,7 +170,7 @@ _1d02:                                                     ; >1d02
        jne  _1d17                                          ; JR NZ,$1D17       ;
        li   hl,msg_hit_key_mission                         ; LD HL,$1EF9       ; mission briefing: "Hit key for mission"
 _1d17:                                                     ; >1d17
-       .call @show_view_message                            ; CALL $39C8        ; print it
+       bl   @show_view_message                             ; CALL $39C8        ; print it
        bl   @draw_object                                   ; CALL $422E        ; draw the ship
        bl   @copy_space_view                               ; CALL $3846        ; copy the space view to the screen
        movb @title_ship_flying_off,a                       ; LD A,($E88C)      ;
@@ -355,7 +355,7 @@ spawn_fresh_ship:                                          ; >1e32
        movb a,@object_status_byte                          ; LD ($F7CD),A      ;
        bl   @add_object                                    ; CALL $3037        ; add it to the object table
        mov  hl,@title_letter_slot                          ; LD ($E88E),HL     ; remember which slot it's in
-       .call @title_screen_letter_frames                   ; CALL $1E5A        ; run 24 frames
+       bl   @title_screen_letter_frames                    ; CALL $1E5A        ; run 24 frames
        jnc  title_screen_next_letter                       ; JR NC,$1E48       ; TODO: check code. no key pressed
        .pop hl                                             ; POP HL            ;
        .pop hl                                             ; POP HL            ;
@@ -383,7 +383,7 @@ _1e4e:                                                     ; >1e4e
        jne  _1e4e                                          ; JR NZ,$1E4E       ; a short pause
        sb   a,a                                            ; XOR A             ;
        movb a,@title_letter_being_added                    ; LD ($E892),A      ; no letter being added any more
-       b    @title_screen_letter_frames                    ; JP $1E5A          ; 24 more frames
+       b    @title_screen_letter_frames_jmp                ; JP $1E5A          ; 24 more frames
 
 ********************************************************************************
 * Title screen: run 24 frames of the "ELITE" letters
@@ -409,6 +409,8 @@ _1e4e:                                                     ; >1e4e
 *
 * O:F Carry set if a key was pressed
 title_screen_letter_frames:                                ; >1e5a
+       .proc
+title_screen_letter_frames_jmp:
        movb @bytes+>18,b                                   ; LD B,$18          ; 24 frames
 title_screen_letter_slot:                                  ; >1e5c
        .push bc                                            ; PUSH BC           ;
@@ -458,7 +460,7 @@ _1ea4:                                                     ; >1ea4
        jmp  _1e67                                          ; JR $1E67          ;
 title_screen_letter_frame_end:                             ; >1eb3
        li   hl,msg_copyright_1987_firebird                 ; LD HL,$1EEB       ;
-       .call @show_view_message                            ; CALL $39C8        ; print "(c)1987 Firebird"
+       bl   @show_view_message                             ; CALL $39C8        ; print "(c)1987 Firebird"
        bl   @copy_space_view                               ; CALL $3846        ; copy the space view to the screen
 _1ebc:                                                     ; >1ebc
        movb @vblank_subtick_counter,a                      ; LD A,($F748)      ;
@@ -471,7 +473,7 @@ _1ebc:                                                     ; >1ebc
        movb a,@pending_debounced_keypress_byte_status      ; LD ($E8F5),A      ; forget the key
        .pop hl                                             ; POP HL            ;
        ; SCF                                               ; SCF               ; TODO: check code.
-       .ret                                                ; RET               ; return with carry set
+       .endproc                                            ; RET               ; return with carry set
 title_screen_letter_next_frame:                            ; >1ed0
        .pop bc                                             ; POP BC            ; recover the slot counter
        sb   one,b                                          ; DEC B             ;
@@ -479,7 +481,7 @@ title_screen_letter_next_frame:                            ; >1ed0
        b    @title_screen_letter_slot                      ;
 !
        socb a,a                                            ; OR A              ; none left - carry clear (no key pressed)
-       .ret                                                ; RET               ;
+       .endproc                                            ; RET               ;
 
 ********************************************************************************
 * The message "Load New Commander ?"
@@ -1604,10 +1606,12 @@ set_cursor_position:                                       ; >3548
 * #R$34A8 (RST $00); the original byte's top bit being set ends the
 * string after this character.
 rst_08_target_print_tokenised_string:                      ; >357a
+       .proc
+rst_08_target_print_tokenised_string_jmp:
        movb *hl,a                                          ; LD A,(HL)         ; 
        socb a,a                                            ; OR A              ; 
        jne  !                                              ; RET Z             ; 0 - the end
-       .ret                                                ;                   
+       .endproc                                            ;                   
 !
        andi a,>7f00                                        ; AND $7F           ; 
        jeq  !                                              ; CALL NZ,$34A8     ; print the character (#R$34A8)
@@ -1616,10 +1620,10 @@ rst_08_target_print_tokenised_string:                      ; >357a
        movb *hl,r0                                         ; BIT 7,(HL)        ; bit 7 set?
        andi r0,>8000                                       ;                   
        jeq  !                                              ; RET NZ            ; yes - that was the last character
-       .ret                                                ;                   
+       .endproc                                            ;                   
 !
        inc  hl                                             ; INC HL            ; 
-       jmp  rst_08_target_print_tokenised_string           ; JR $357A          ; 
+       jmp  rst_08_target_print_tokenised_string_jmp       ; JR $357A          ; 
 
 ********************************************************************************
 * Fill BC bytes of VRAM with a fixed byte
@@ -1639,7 +1643,7 @@ fill_vram_bytes:                                           ; >35a4
        movb b,a                                            ; LD A,B            ; 
        socb @c,a                                           ; OR C              ; 
        jne  fill_vram_bytes                                ; JR NZ,$35A4       ; 
-       .ret                                                ; RET               ; 
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Fill a rectangular block of a screen-2 table with one byte
@@ -1736,7 +1740,7 @@ copy_to_vram:                                              ; >3830
        movb a,@vdpwd                                       ; OUT ($98),A       ; 
        sb   one,b                                          ; DJNZ $3830        ; 
        jne  copy_to_vram                                   ;                   
-       .ret                                                ; RET               ; 
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Copy the space view to the screen
@@ -1949,14 +1953,14 @@ decompress_picture:                                        ; >390e
        movb @bytes+>40,a                                   ; LD A,$40          ; VRAM address = $0000 (pattern-generator table)
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        ; EI                                                ; EI                ; TODO: check code. 
-       .call @decompress_rle_to_vram                       ; CALL $3928        ; Unpack the pixel/pattern half of the picture
+       bl   @decompress_rle_to_vram                        ; CALL $3928        ; Unpack the pixel/pattern half of the picture
        sb   a,a                                            ; LD A,$00          ; 
        limi 0                                              ; DI                ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>60,a                                   ; LD A,$60          ; VRAM address = $2000 (colour table)
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        ; EI                                                ; EI                ; TODO: check code. 
-       b    @decompress_rle_to_vram                        ; JP $3928          ; Unpack the colour half, continuing the same stream
+       b    @decompress_rle_to_vram_jmp                    ; JP $3928          ; Unpack the colour half, continuing the same stream
 
 ********************************************************************************
 * Decompress a run-length-encoded byte stream straight to VRAM
@@ -1978,6 +1982,8 @@ decompress_picture:                                        ; >390e
 * 
 * I:HL Pointer to the compressed byte stream
 * O:HL Points just past the terminating zero-count run
+decompress_rle_to_vram_jmp:
+       .pop r11
 decompress_rle_to_vram:                                    ; >3928
        movb *hl,@e                                         ; LD E,(HL)         ; E = this stream's escape/marker byte
        inc  hl                                             ; INC HL            ; 
@@ -1993,7 +1999,7 @@ _392a:                                                     ; >392a
        movb b,a                                            ; LD A,B            ; 
        socb a,a                                            ; OR A              ; 
        jne  !                                              ; RET Z             ; Count of 0 marks the end of the stream
-       .ret                                                ;                   
+       rt                                                  ;                   
 !
        movb @c,a                                           ; LD A,C            ; 
 _3937:                                                     ; >3937
@@ -2018,6 +2024,8 @@ _3940:                                                     ; >3940
 * 
 * I:HL VRAM address of the first sprite's attribute-table entry (its Y byte)
 * I:B Number of sprites to hide
+hide_sprites_jmp:
+       .pop r11
 hide_sprites:                                              ; >3942
        li   de,>0004                                       ; LD DE,$0004       ; Sprite-attribute entries are 4 bytes apart
 _3945:                                                     ; >3945
@@ -2031,7 +2039,7 @@ _3945:                                                     ; >3945
        a    de,hl                                          ; ADD HL,DE         ; Next sprite entry
        sb   one,b                                          ; DJNZ $3945        ; 
        jne  _3945                                          ;                   
-       .ret                                                ; RET               ; 
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Clear the message line
@@ -2047,6 +2055,8 @@ _3945:                                                     ; >3945
 * prompt. Sets #R$EF9E while it writes to the VRAM. Preserves AF, BC and
 * HL.
 clear_message_line:                                        ; >3955
+       .proc
+clear_message_line_jmp:
        .push af                                            ; PUSH AF           ; 
        .push bc                                            ; PUSH BC           ; 
        .push hl                                            ; PUSH HL           ; save registers
@@ -2060,7 +2070,7 @@ clear_message_line:                                        ; >3955
        ; EI                                                ; EI                ; TODO: check code. 
        li   bc,>00d0                                       ; LD BC,$00D0       ; 208 bytes (26 characters)
        sb   @e,@e                                          ; LD E,$00          ; of 0
-       .call @fill_vram_bytes                              ; CALL $35A4        ; clear them (#R$35A4)
+       bl   @fill_vram_bytes                               ; CALL $35A4        ; clear them (#R$35A4)
        sb   a,a                                            ; XOR A             ; 
        movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; VRAM not busy
        movb @b255,a                                        ; LD A,$FF          ; 
@@ -2073,7 +2083,7 @@ clear_message_line:                                        ; >3955
        ; EI                                                ; EI                ; TODO: check code. 
        li   bc,>00d0                                       ; LD BC,$00D0       ; 208 bytes
        movb @bytes+>15,@e                                  ; LD E,$15          ; of $15
-       .call @fill_vram_bytes                              ; CALL $35A4        ; colour them
+       bl   @fill_vram_bytes                               ; CALL $35A4        ; colour them
        sb   a,a                                            ; XOR A             ; 
        movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; VRAM not busy
        li   hl,>351f                                       ; LD HL,$351F       ; HL = $351F, the bottom pixel row of row 21, column 3
@@ -2086,7 +2096,7 @@ clear_message_line:                                        ; >3955
        .pop hl                                             ; POP HL            ; 
        .pop bc                                             ; POP BC            ; 
        .pop af                                             ; POP AF            ; restore registers
-       .ret                                                ; RET               ; 
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Set a sprite's attributes
@@ -2136,7 +2146,7 @@ write_run_length_encoded_byte_stream:                      ; >39b9
        movb *hl,a                                          ; LD A,(HL)         ; A = the count
        socb a,a                                            ; OR A              ; 
        jne  !                                              ; RET Z             ; 0 - the end
-       .ret                                                ;                   
+       rt                                                  ;                   
 !
        movb a,b                                            ; LD B,A            ; 
        inc  hl                                             ; INC HL            ; 
@@ -2163,6 +2173,8 @@ _39c0:                                                     ; >39c0
 * (#R$39F1, #R$3A03).
 * 
 * I:HL The message
+show_view_message_jmp:
+       .pop r11
 show_view_message:                                         ; >39c8
        mov  hl,@view_message_address                       ; LD ($E735),HL     ; the message
        sb   @c,@c                                          ; LD C,$00          ; 
@@ -2185,7 +2197,7 @@ _39da:                                                     ; >39da
        movb a,@view_message_column                         ; LD ($E737),A      ; the column
        movb @bytes+>8a,a                                   ; LD A,$8A          ; 
        movb a,@message_timer                               ; LD ($E919),A      ; start the timer
-       .ret                                                ; RET               ; 
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Count the message timer down
@@ -2874,6 +2886,8 @@ row_column_to_buffer_address:                              ; >3cec
 * I:B Row (passed straight to #R$3CEC, unclamped there too)
 * I:C Column
 plot_single_pixel:                                         ; >3cfd
+       .proc
+plot_single_pixel_jmp:
        bl   @row_column_to_buffer_address                  ; CALL $3CEC        ; HL = buffer address for (B,C)
        movb @c,a                                           ; LD A,C            ; A = column
        andi a,>0700                                        ; AND $07           ; keep the low 3 bits (bit position within the byte)
@@ -2884,7 +2898,7 @@ plot_pixel_mask:                                           ; >3d06
        movb *hl,a                                          ; LD A,(HL)         ; A = the current buffer byte
        socb @c,a                                           ; OR C              ; OR in the pixel bitmask
        movb a,*hl                                          ; LD (HL),A         ; write the plotted pixel
-       .ret                                                ; RET               ; 
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Draw a circle
@@ -2907,6 +2921,8 @@ plot_pixel_mask:                                           ; >3d06
 * I:IX Centre x
 * I:IY Centre y
 draw_circle:                                               ; >3d0e
+       .proc
+draw_circle_jmp:
        movb h,a                                            ; LD A,H            ; A = the magnitude's high byte
        socb a,a                                            ; OR A              ; already fits in a byte (high byte 0)?
        jeq  _3d1d                                          ; JR Z,$3D1D        ; yes - shift count stays 0, skip the normalizing loop
@@ -2976,7 +2992,7 @@ _3d51:                                                     ; >3d51
        a    de,hl                                          ; ADD HL,DE         ; advance the table pointer by the stride, on top of the 2 bytes already consumed reading this step's record
        sb   one,b                                          ; DJNZ $3D32        ; loop for the next step
        jne  _3d32                                          ;                   
-       .ret                                                ; RET               ; 
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Scale #R$3D0E's magnitude by one #R$1311 trig byte
@@ -3112,7 +3128,7 @@ clip_test_and_plot_single_point:                           ; >3dd7
        movb *hl,a                                          ; LD A,(HL)         ; A = table[column]
        ab   @bytes+>57,a                                   ; ADD A,$57         ; 
        movb a,@c                                           ; LD C,A            ; C = screen-space column
-       b    @plot_single_pixel                             ; JP $3CFD          ; plot the pixel at (B,C)
+       b    @plot_single_pixel_jmp                         ; JP $3CFD          ; plot the pixel at (B,C)
 
 ********************************************************************************
 * Draw a filled disc
@@ -4221,7 +4237,7 @@ _4738:                                                     ; >4738
        socb a,a                                            ; OR A              ; test it
        jeq  _4777                                          ; JR Z,$4777        ; 'I' not pressed
        mov  @bp_name,hl                                    ; LD HL,($F7FB)     ; HL -> the ship's name
-       .call @show_view_message                            ; CALL $39C8        ; show it
+       bl   @show_view_message                             ; CALL $39C8        ; show it
        sb   a,a                                            ; XOR A             ; A = 0
        movb a,@identify_target                             ; LD ($EF9D),A      ; 
        movb one,a                                          ; LD A,$01          ; A = 1
@@ -4248,7 +4264,7 @@ _4777:                                                     ; >4777
        movb one,a                                          ; LD A,$01          ; A = 1
 ;       .call @play_sound_effect                            ; CALL $7468        ; play sound effect 1
        li   hl,msg_missile_locked                          ; LD HL,$4B9A       ; "Missile Locked"
-       b    @show_view_message                             ; JP $39C8          ; show it
+       b    @show_view_message_jmp                         ; JP $39C8          ; show it
 
 ********************************************************************************
 * Draw an explosion: the next dot's offset
@@ -4934,7 +4950,7 @@ draw_small:                                                ; >4a86
 !
        li   de,>0002                                       ; LD DE,$0002       ; yes: DE = 2
        movb @bytes+>0a,b                                   ; LD B,$0A          ; B = 10
-       b    @draw_circle                                   ; JP $3D0E          ; dispatch to #R$3D0E instead
+       b    @draw_circle_jmp                               ; JP $3D0E          ; dispatch to #R$3D0E instead
 
 ********************************************************************************
 * Draw a ship: is it on screen?
@@ -5194,7 +5210,7 @@ show_message:                                              ; >5ffb
        .proc
        .rst >08                                            ; RST $08           ; 
        bl   @busy_wait_delay                               ; CALL $3808        ; 
-       b    @clear_message_line                            ; JP $3955          ; clear the message line
+       b    @clear_message_line_jmp                        ; JP $3955          ; clear the message line
 
 ********************************************************************************
 * Enter flight mode: set up the cockpit screen
@@ -5219,19 +5235,19 @@ enter_flight_mode:                                         ; >63f1
        li   hl,>1b00                                       ; LD HL,$1B00       ; hide all 32 sprites
        movb @bytes+>20,b                                   ; LD B,$20          ; 
        limi 0                                              ; DI                ; 
-       .call @hide_sprites                                 ; CALL $3942        ; 
+       bl   @hide_sprites                                  ; CALL $3942        ; 
        movb @bytes+>80,a                                   ; LD A,$80          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>78,a                                   ; LD A,$78          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $3880 (sprite patterns)
        li   hl,flight_sprite_patterns                      ; LD HL,$6EC7       ; 
-       .call @write_run_length_encoded_byte_stream         ; CALL $39B9        ; upload the missile patterns
+       bl   @write_run_length_encoded_byte_stream          ; CALL $39B9        ; upload the missile patterns
        movb @bytes+>c0,a                                   ; LD A,$C0          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>78,a                                   ; LD A,$78          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $38C0
        li   hl,compass_dot_pattern                         ; LD HL,$6ED4       ; 
-       .call @write_run_length_encoded_byte_stream         ; CALL $39B9        ; upload the compass dot pattern
+       bl   @write_run_length_encoded_byte_stream          ; CALL $39B9        ; upload the compass dot pattern
        ; EI                                                ; EI                ; TODO: check code. 
        bl   @blank_screen_decompress_picture_recolour      ; CALL $7139        ; unpack the cockpit screen picture
        bl   @redraw_all_dashboard_gauges                   ; CALL $6433        ; draw all the gauges
@@ -6005,7 +6021,7 @@ _6931:                                                     ; >6931
        ab   @bytes+>3f,a                                   ; ADD A,$3F         ; B = screen row (view centre is row 63)
        movb a,b                                            ; LD B,A            ; 
        .push ix                                            ; PUSH IX           ; 
-       .call @plot_single_pixel                            ; CALL $3CFD        ; plot the particle
+       bl   @plot_single_pixel                             ; CALL $3CFD        ; plot the particle
        .pop ix                                             ; POP IX            ; 
 _6940:                                                     ; >6940
        movb @>08(ix),a                                     ; LD A,(IX+$08)     ; Z flag = particle doesn't need respawning
@@ -6055,7 +6071,7 @@ _6a69:                                                     ; >6a69
        bl   @divide_hl_a                                   ; CALL $2079        ; HL = the speed * 24 / 30 (#R$2079)
        movb @l,a                                           ; LD A,L            ; A = the bar's length (0-24)
        li   hl,>11b3                                       ; LD HL,$11B3       ; the speed gauge
-       b    @draw_bar_gauge                                ; JP $6C37          ; draw it (#R$6C37)
+       b    @draw_bar_gauge_jmp                            ; JP $6C37          ; draw it (#R$6C37)
 
 ********************************************************************************
 * Draw the energy banks
@@ -6085,7 +6101,7 @@ _6a9e:                                                     ; >6a9e
        .push bc                                            ; PUSH BC           ; 
        .push hl                                            ; PUSH HL           ; 
        movb @c,a                                           ; LD A,C            ; 
-       .call @draw_bar_gauge                               ; CALL $6C37        ; draw the bar (#R$6C37)
+       bl   @draw_bar_gauge                                ; CALL $6C37        ; draw the bar (#R$6C37)
        .pop hl                                             ; POP HL            ; 
        .pop bc                                             ; POP BC            ; 
        .pop af                                             ; POP AF            ; 
@@ -6112,7 +6128,7 @@ draw_fuel_gauge:                                           ; >6aad
        bl   @divide_hl_a                                   ; CALL $2079        ; HL = fuel * 24 / 70 (#R$2079)
        movb @l,a                                           ; LD A,L            ; 
        li   hl,>1339                                       ; LD HL,$1339       ; the fuel gauge
-       b    @draw_bar_gauge                                ; JP $6C37          ; draw it (#R$6C37)
+       b    @draw_bar_gauge_jmp                            ; JP $6C37          ; draw it (#R$6C37)
 
 ********************************************************************************
 * Draw the altitude gauge [dashboard]
@@ -6126,7 +6142,7 @@ draw_altitude:                                             ; >6ac4
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; return if the dashboard isn't shown (#R$6C9E)
        movb @altitude_gauge,a                              ; LD A,($F812)      ; A = the altitude
        li   hl,>1639                                       ; LD HL,$1639       ; the altitude gauge
-       b    @draw_bar_gauge                                ; JP $6C37          ; draw it (#R$6C37)
+       b    @draw_bar_gauge_jmp                            ; JP $6C37          ; draw it (#R$6C37)
 
 ********************************************************************************
 * Draw the cabin temperature gauge [dashboard]
@@ -6140,7 +6156,7 @@ draw_cabin_temperature:                                    ; >6ad0
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; return if the dashboard isn't shown (#R$6C9E)
        movb @cabin_temperature,a                           ; LD A,($F811)      ; A = the cabin temperature
        li   hl,>1439                                       ; LD HL,$1439       ; the cabin temperature gauge
-       b    @draw_bar_gauge                                ; JP $6C37          ; draw it (#R$6C37)
+       b    @draw_bar_gauge_jmp                            ; JP $6C37          ; draw it (#R$6C37)
 
 ********************************************************************************
 * Draw the "S" (space station in range) indicator
@@ -6163,13 +6179,13 @@ draw_station_indicator:                                    ; >6adc
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $16A0: the pattern of row 22, column 20
        li   hl,station_indicator_glyph                     ; LD HL,$6EFF       ; HL -> the "S" glyph (#R$6EFF)
        movb @bytes+>08,b                                   ; LD B,$08          ; its first 8 rows
-       .call @copy_to_vram                                 ; CALL $3830        ; write them (#R$3830)
+       bl   @copy_to_vram                                  ; CALL $3830        ; write them (#R$3830)
        movb @bytes+>a0,a                                   ; LD A,$A0          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>57,a                                   ; LD A,$57          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $17A0: row 23, column 20
        movb @bytes+>04,b                                   ; LD B,$04          ; its last 4 rows
-       .call @copy_to_vram                                 ; CALL $3830        ; write them
+       bl   @copy_to_vram                                  ; CALL $3830        ; write them
        jmp  _6b10                                          ; JR $6B10          ; 
 continuation_blank_status_lamp_tile:                       ; >6b05
        li   hl,>16a0                                       ; LD HL,$16A0       ; HL = $16A0 again
@@ -6202,13 +6218,13 @@ draw_ecm_indicator:                                        ; >6b12
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $1650: the pattern of row 22, column 10
        li   hl,ecm_indicator_glyph                         ; LD HL,$6F0B       ; HL -> the "E" glyph (#R$6F0B)
        movb @bytes+>08,b                                   ; LD B,$08          ; its first 8 rows
-       .call @copy_to_vram                                 ; CALL $3830        ; write them (#R$3830)
+       bl   @copy_to_vram                                  ; CALL $3830        ; write them (#R$3830)
        movb @bytes+>50,a                                   ; LD A,$50          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>57,a                                   ; LD A,$57          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $1750: row 23, column 10
        movb @bytes+>04,b                                   ; LD B,$04          ; its last 4 rows
-       .call @copy_to_vram                                 ; CALL $3830        ; write them
+       bl   @copy_to_vram                                  ; CALL $3830        ; write them
        jmp  _6b46                                          ; JR $6B46          ; 
 continuation_blank_status_lamp_tile_6b3b:                  ; >6b3b
        li   hl,>1650                                       ; LD HL,$1650       ; HL = $1650 again
@@ -6229,7 +6245,7 @@ draw_gauge_dashboard_6b48:                                 ; >6b48
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; 
        movb @fore_shield,a                                 ; LD A,($F80F)      ; 
        li   hl,>113b                                       ; LD HL,$113B       ; 
-       b    @draw_bar_gauge                                ; JP $6C37          ; 
+       b    @draw_bar_gauge_jmp                            ; JP $6C37          ; 
 
 ********************************************************************************
 * Draw the aft shield gauge [dashboard]
@@ -6240,7 +6256,7 @@ draw_gauge_dashboard_6b54:                                 ; >6b54
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; 
        movb @aft_shield,a                                  ; LD A,($F810)      ; 
        li   hl,>123a                                       ; LD HL,$123A       ; 
-       b    @draw_bar_gauge                                ; JP $6C37          ; 
+       b    @draw_bar_gauge_jmp                            ; JP $6C37          ; 
 
 ********************************************************************************
 * Draw the laser temperature gauge [dashboard]
@@ -6255,7 +6271,7 @@ draw_laser_temperature:                                    ; >6b60
        movb @laser_temp_gauge,a                            ; LD A,($F813)      ; 
        srl  a,1                                            ; SRL A             ; A = the laser temperature / 2
        li   hl,>1539                                       ; LD HL,$1539       ; the laser temperature gauge
-       b    @draw_bar_gauge                                ; JP $6C37          ; draw it (#R$6C37)
+       b    @draw_bar_gauge_jmp                            ; JP $6C37          ; draw it (#R$6C37)
 
 ********************************************************************************
 * Draw the missile indicator
@@ -6373,6 +6389,8 @@ draw_pitch_dial:                                           ; >6bca
 * I:A The bar's length in pixels (0-24)
 * I:HL The VRAM address of the gauge's first cell
 draw_bar_gauge:                                            ; >6c37
+       .proc
+draw_bar_gauge_jmp:
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; return if the dashboard isn't shown (#R$6C9E)
        movb a,@e                                           ; LD E,A            ; E = the length
        sb   d,d                                            ; LD D,$00          ; D = 0, the number of cells drawn
@@ -6410,7 +6428,7 @@ _6c66:                                                     ; >6c66
        sb   a,a                                            ; XOR A             ; empty
        bl   @draw_gauge_tiles                              ; CALL $6CA8        ; draw them
 _6c70:                                                     ; >6c70
-       .ret                                                ; RET               ; 
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Draw a dial gauge [dashboard]
@@ -6540,7 +6558,7 @@ _6cde:                                                     ; >6cde
        li   ix,>0000                                       ; LD IX,$0000       ; 
        li   iy,>0000                                       ; LD IY,$0000       ; 
        mov  hl,@tunnel_ring_radius                         ; LD ($E921),HL     ; 
-       .call @draw_circle                                  ; CALL $3D0E        ; draw a ring
+       bl   @draw_circle                                   ; CALL $3D0E        ; draw a ring
        .pop hl                                             ; POP HL            ; 
        .pop bc                                             ; POP BC            ; 
        movb *hl,a                                          ; LD A,(HL)         ; 
@@ -6657,7 +6675,7 @@ _6d6e:                                                     ; >6d6e
 !
        li   hl,>1b00                                       ; LD HL,$1B00       ; none: hide the crosshair sprites
        movb @bytes+>04,b                                   ; LD B,$04          ; 
-       b    @hide_sprites                                  ; JP $3942          ; 
+       b    @hide_sprites_jmp                              ; JP $3942          ; 
 set_up_laser:                                              ; >6d82
        movb a,@e                                           ; LD E,A            ; E = the laser type
        ab   a,a                                            ; ADD A,A           ; A = type * 5
@@ -6684,7 +6702,7 @@ set_up_laser:                                              ; >6d82
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
        movb @bytes+>78,a                                   ; LD A,$78          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; ...high byte, write mode: $3800 (sprite pattern table)
-       .call @write_run_length_encoded_byte_stream         ; CALL $39B9        ; write the RLE-encoded pattern
+       bl   @write_run_length_encoded_byte_stream          ; CALL $39B9        ; write the RLE-encoded pattern
        sb   a,a                                            ; LD A,$00          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
        movb @bytes+>5b,a                                   ; LD A,$5B          ; 
@@ -6726,7 +6744,7 @@ refuse_if_docked:                                          ; >6dcf
        socb a,a                                            ; OR A              ; 
        jeq  _6de2                                          ; JR Z,$6DE2        ; in flight
 ;       .call @trigger_sfx_6                                ; CALL $16FE        ; beep
-       .call @clear_message_line                           ; CALL $3955        ; clear the message line
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
        li   hl,msg_docked                                  ; LD HL,$6F17       ; "Docked!"
        bl   @show_message                                  ; CALL $5FFB        ; show it for a while
        .pop hl                                             ; POP HL            ; return to the key handler's caller

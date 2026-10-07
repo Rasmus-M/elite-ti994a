@@ -91,7 +91,7 @@
        bl   @print_char                            ; JP $34A8          ; print character A
        .endif
        .ifeq #1,>08
-       .call @rst_08_target_print_tokenised_string ; JP $357A          ; print a tokenised string at HL
+       bl   @rst_08_target_print_tokenised_string  ; JP $357A          ; print a tokenised string at HL
        .endif
        .ifeq #1,>10
        .call @rst_10_target_print_ath_tokenised    ; JP $3588          ; print the A'th tokenised string in a list at HL

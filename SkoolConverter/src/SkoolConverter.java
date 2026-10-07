@@ -336,6 +336,12 @@ public class SkoolConverter {
                         } else {
                             tms9900Line.setInstruction("jhe  " + getTMS9900Equivalent(opr2));
                         }
+                    } else if ((flag.equals("c") || flag.equals("nc")) && lastInstructionIsSubtraction(tms9900Lines)) {
+                        if (flag.equals("c")) {
+                            tms9900Line.setInstruction("jnc  " + getTMS9900Equivalent(opr2));
+                        } else {
+                            tms9900Line.setInstruction("joc  " + getTMS9900Equivalent(opr2));
+                        }
                     } else {
                         tms9900Line.setInstruction("j" + getTMS9900Equivalent(opr1) + "  " + getTMS9900Equivalent(opr2));
                         if (flag.equals("c") || flag.equals("nc")) {
@@ -517,6 +523,12 @@ public class SkoolConverter {
             } else {
                 tms9900Line.setInstruction("jl   !");
             }
+        } else if ((flag.equals("c") || flag.equals("nc")) && lastInstructionIsSubtraction(tms9900Lines)) {
+            if (flag.equals("c")) {
+                tms9900Line.setInstruction("joc  !");
+            } else {
+                tms9900Line.setInstruction("jnc  !");
+            }
         } else {
             switch (flag) {
                 case "z":
@@ -644,6 +656,22 @@ public class SkoolConverter {
             }
         }
         return "";
+    }
+
+    // The TMS9900 sets carry on a subtraction when there is no borrow, the Z80 when there is.
+    private boolean lastInstructionIsSubtraction(List<TMS9900Line> tms9900Lines) {
+        for (int i = tms9900Lines.size() - 1; i >= 0; i--) {
+            TMS9900Line tms9900Line = tms9900Lines.get(i);
+            if (tms9900Line.getType() == TMS9900Line.Type.Instruction) {
+                String z80Instruction = tms9900Line.getZ80Instruction();
+                if (z80Instruction == null) {
+                    return false;
+                }
+                String opcode = new Instruction(z80Instruction).getOpcode();
+                return opcode.equals("sub") || opcode.equals("sbc");
+            }
+        }
+        return false;
     }
 
     private boolean lastLineWasAGlobalLabel(List<TMS9900Line> tms9900Lines) {

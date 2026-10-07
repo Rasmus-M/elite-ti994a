@@ -2727,9 +2727,10 @@ _3c58:                                                     ; >3c58
        bl   @row_column_to_buffer_address                  ; CALL $3CEC        ; HL = buffer address for the second endpoint (B,C)
        movb @c,a                                           ; LD A,C            ; A = second endpoint's column
        andi a,>0700                                        ; AND $07           ; keep the low 3 bits (bit position within the byte)
-       movb a,@line_start_mask+>0001                       ; LD ($3C66),A      ; patch the mask lookup's address (#R$3C65+1)
+       mov  a,r1                                           ; LD ($3C66),A      ; index the table with A (instead of patching the operand)
+       srl  r1,8                                           ;                   ;
 line_start_mask:                                           ; >3c65
-       movb @pixel_bitmask_table+>0002,a                   ; LD A,($E702)      ; A = the pixel bitmask for that bit position
+       movb @pixel_bitmask_table(r1),a                     ; LD A,($E702)      ; A = the pixel bitmask for that bit position
        movb a,@c                                           ; LD C,A            ; C = starting pixel bitmask
        movb @e,a                                           ; LD A,E            ; A = dx
        cb   a,d                                            ; CP D              ; compare dx against dy
@@ -2891,9 +2892,10 @@ plot_single_pixel_jmp:
        bl   @row_column_to_buffer_address                  ; CALL $3CEC        ; HL = buffer address for (B,C)
        movb @c,a                                           ; LD A,C            ; A = column
        andi a,>0700                                        ; AND $07           ; keep the low 3 bits (bit position within the byte)
-       movb a,@plot_pixel_mask+>0001                       ; LD ($3D07),A      ; patch the mask lookup's address (#R$3D06+1)
+       mov  a,r1                                           ; LD ($3D07),A      ; index the table with A (instead of patching the operand)
+       srl  r1,8                                           ;                   ;
 plot_pixel_mask:                                           ; >3d06
-       movb @pixel_bitmask_table,a                         ; LD A,($E700)      ; A = the pixel bitmask for that bit position
+       movb @pixel_bitmask_table(r1),a                     ; LD A,($E700)      ; A = the pixel bitmask for that bit position
        movb a,@c                                           ; LD C,A            ; C = the pixel bitmask
        movb *hl,a                                          ; LD A,(HL)         ; A = the current buffer byte
        socb @c,a                                           ; OR C              ; OR in the pixel bitmask
@@ -3718,7 +3720,7 @@ rotate_vertex:                                             ; >4464
        .pop de                                             ; POP DE            ; DE = the first output component
 * This entry point is used by the routines at #R$422E and #R$43C2.
 convert_to_view:                                           ; >44ce
-       .call @view_front                                   ; CALL $44E5        ; convert to the current view
+       bl   @view_front                                    ; CALL $44E5        ; convert to the current view
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -3753,7 +3755,7 @@ add_object_position:                                       ; >44d2
 * The front view's version of the call at #R$44CE: x and z are
 * unchanged.
 view_front:                                                ; >44e5
-       .ret                                                ; RET               ; 
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Straighten out the orientation
@@ -4653,7 +4655,7 @@ draw_face_edges:                                           ; >491a
        inc  hl                                             ; INC HL            ; 
 _491c:                                                     ; >491c
        movb *hl,a                                          ; LD A,(HL)         ; A = the next edge
-       movb a,@draw_face_edge_flag+>0002                   ; LD ($4922),A      ; point (IX+d) at the edge's flag (#R$4920+2)
+       movb a,@draw_face_edge_flag+>0003                   ; LD ($4922),A      ; point (IX+d) at the edge's flag (#R$4920+2)
 draw_face_edge_flag:                                       ; >4920
        movb @>05(ix),a                                     ; LD A,(IX+$05)     ; A = the edge's flag
        socb a,a                                            ; OR A              ; 
@@ -4680,7 +4682,7 @@ draw_face_edge:                                            ; >4932
        bl   @draw_edge                                     ; CALL $496D        ; draw the edge
        .pop hl                                             ; POP HL            ; 
        movb *hl,a                                          ; LD A,(HL)         ; 
-       movb a,@draw_face_edge_drawn+>0002                  ; LD ($4944),A      ; point (IX+d) at the edge's flag (#R$4942+2)
+       movb a,@draw_face_edge_drawn+>0003                  ; LD ($4944),A      ; point (IX+d) at the edge's flag (#R$4942+2)
 draw_face_edge_drawn:                                      ; >4942
        movb one,@>05(ix)                                   ; LD (IX+$05),$01   ; the edge is drawn
        jmp  _4955                                          ; JR $4955          ; 
@@ -4689,9 +4691,9 @@ draw_face_edges_2:                                         ; >4948
        ab   one,*hl                                        ; INC (HL)          ; one more edge skipped
        .pop hl                                             ; POP HL            ; 
        movb *hl,a                                          ; LD A,(HL)         ; 
-       movb a,@draw_face_edge_skipped+>0002                ; LD ($4953),A      ; point (IX+d) at the edge's flag (#R$4951+2)
+       movb a,@draw_face_edge_skipped+>0005                ; LD ($4953),A      ; point (IX+d) at the edge's flag (#R$4951+2)
 draw_face_edge_skipped:                                    ; >4951
-       movb @b255,*ix                                      ; LD (IX+$00),$FF   ; the edge is skipped
+       movb @b255,@>00(ix)                                 ; LD (IX+$00),$FF   ; the edge is skipped
 _4955:                                                     ; >4955
        jmp  draw_face_next_edge                            ; JR $4969          ; next edge
 draw_face_edges_3:                                         ; >4957
@@ -4699,9 +4701,9 @@ draw_face_edges_3:                                         ; >4957
        b    @draw_face_next_edge                           ;                   
 !
        movb *hl,a                                          ; LD A,(HL)         ; skipped:
-       movb a,@draw_face_edge_drawn_2+>0002                ; LD ($4960),A      ; point (IX+d) at the edge's flag (#R$495E+2)
+       movb a,@draw_face_edge_drawn_2+>0003                ; LD ($4960),A      ; point (IX+d) at the edge's flag (#R$495E+2)
 draw_face_edge_drawn_2:                                    ; >495e
-       movb one,*ix                                        ; LD (IX+$00),$01   ; the edge is drawn
+       movb one,@>00(ix)                                   ; LD (IX+$00),$01   ; the edge is drawn
        movb @skipped_edges_count,a                         ; LD A,($E6EE)      ; one fewer edge skipped
        sb   one,a                                          ; DEC A             ; 
        movb a,@skipped_edges_count                         ; LD ($E6EE),A      ; 
@@ -4742,9 +4744,9 @@ draw_edge:                                                 ; >496d
        mov  hl,@line_end_1_z                               ; LD ($F76D),HL     ; 
        .exx                                                ; EXX               ; (scratch use of the shadow set)
        movb @e,a                                           ; LD A,E            ; 
-       movb a,@draw_edge_clear_flag_e+>0002                ; LD ($4988),A      ; point (IY+d) at vertex E's flag (#R$4986+2)
+       movb a,@draw_edge_clear_flag_e+>0005                ; LD ($4988),A      ; point (IY+d) at vertex E's flag (#R$4986+2)
 draw_edge_clear_flag_e:                                    ; >4986
-       sb   *iy,*iy                                        ; LD (IY+$00),$00   ; clear the per-vertex cache flag for E
+       movb @zero,@>00(iy)                                 ; LD (IY+$00),$00   ; clear the per-vertex cache flag for E
        .pop de                                             ; POP DE            ; DE = the original vertex-index pair
        movb d,a                                            ; LD A,D            ; A = the second vertex's index
        bl   @vertex_relative                               ; CALL $4A5C        ; project it directly (no caching)
@@ -4774,9 +4776,9 @@ draw_edge_2:                                               ; >49b6
        mov  hl,@line_end_1_z                               ; LD ($F76D),HL     ; 
        .exx                                                ; EXX               ; (scratch use of the shadow set)
        movb @e,a                                           ; LD A,E            ; 
-       movb a,@draw_edge_clear_flag_d+>0002                ; LD ($49D7),A      ; point (IY+d) at vertex D's flag (#R$49D5+2)
+       movb a,@draw_edge_clear_flag_d+>0005                ; LD ($49D7),A      ; point (IY+d) at vertex D's flag (#R$49D5+2)
 draw_edge_clear_flag_d:                                    ; >49d5
-       sb   *iy,*iy                                        ; LD (IY+$00),$00   ; clear the per-vertex cache flag for D
+       movb @zero,@>00(iy)                                 ; LD (IY+$00),$00   ; clear the per-vertex cache flag for D
        .pop de                                             ; POP DE            ; DE = the vertex-index pair again
        movb @e,a                                           ; LD A,E            ; A = the FIRST vertex's index (E, already known valid)
        bl   @vertex_relative                               ; CALL $4A5C        ; project it directly (no caching)
@@ -4816,13 +4818,13 @@ _49f9:                                                     ; >49f9
 project_vertex:                                            ; >49fd
        .proc
        movb @e,a                                           ; LD A,E            ; A = the vertex index
-       movb a,@project_vertex_flag+>0002                   ; LD ($4A03),A      ; patch the (IY+d) read to (IY+E) (#R$4A01+2)
+       movb a,@project_vertex_flag+>0003                   ; LD ($4A03),A      ; patch the (IY+d) read to (IY+E) (#R$4A01+2)
 project_vertex_flag:                                       ; >4a01
-       movb *iy,a                                          ; LD A,(IY+$00)     ; A = this vertex's cache flag
+       movb @>00(iy),a                                     ; LD A,(IY+$00)     ; A = this vertex's cache flag
        socb a,a                                            ; OR A              ; 
        jne  project_vertex_from_cache                      ; JR NZ,$4A4C       ; already cached - read it back
        movb @e,a                                           ; LD A,E            ; not cached: A = the vertex index again
-       movb a,@project_vertex_set_flag+>0002               ; LD ($4A0D),A      ; patch the (IY+d) write to (IY+E) (#R$4A0B+2)
+       movb a,@project_vertex_set_flag+>0005               ; LD ($4A0D),A      ; patch the (IY+d) write to (IY+E) (#R$4A0B+2)
 project_vertex_set_flag:                                   ; >4a0b
        movb @b255,@>05(iy)                                 ; LD (IY+$05),$FF   ; set a second, fixed-offset flag
        .exx                                                ; EXX               ; (scratch use of the shadow set)
@@ -5300,7 +5302,7 @@ redraw_all_dashboard_gauges:                               ; >6433
 * I:DE Source data for the VRAM copy
 * I:HL The view's stardust move handler
 switch_view:                                               ; >645b
-       mov  hl,@stardust_move_handler+>0001                ; LD ($6945),HL     ; patch the stardust move handler (#R$6944+1)
+       mov  hl,@stardust_move_handler+>0002                ; LD ($6945),HL     ; patch the stardust move handler (#R$6944+1)
        .push de                                            ; PUSH DE           ; save DE
        movb @space_view_showing,a                          ; LD A,($E903)      ; in flight?
        socb a,a                                            ; OR A              ; 
@@ -5362,7 +5364,7 @@ switch_to_front_view:                                      ; >64a1
        .proc
        bl   @refuse_if_docked                              ; CALL $6DCF        ; 
        li   hl,view_front                                  ; LD HL,$44E5       ; front view's negate-target inside #R$4464
-       mov  hl,@convert_to_view+>0001                      ; LD ($44CF),HL     ; patch the view conversion (#R$44CE+1)
+       mov  hl,@convert_to_view+>0002                      ; LD ($44CF),HL     ; patch the view conversion (#R$44CE+1)
        sb   b,b                                            ; LD B,$00          ; B = 0 (front view)
        li   hl,stardust_front_view                         ; LD HL,$64F1       ; HL = front view stardust handler (#R$64F1)
        li   de,view_name_front                             ; LD DE,$118F       ; DE = front view's VRAM data
@@ -5389,6 +5391,7 @@ switch_to_front_view:                                      ; >64a1
 * I:IX Pointer to the particle
 stardust_front_view:                                       ; >64f1
        jeq  stardust_move_outwards                         ; JR Z,$6520        ; not flagged for respawning - go move it
+       .proc
        bl   @random_byte                                   ; CALL $2176        ; A = random byte
        movb a,@l                                           ; LD L,A            ; 
        andi a,>3f00                                        ; AND $3F           ; C = |X| = 0-63
@@ -5410,7 +5413,7 @@ _6514:                                                     ; >6514
        sb   @>02(ix),@>02(ix)                              ; LD (IX+$02),$00   ; 
        movb a,@>03(ix)                                     ; LD (IX+$03),A     ; set Y
        bl   @stardust_set_velocity                         ; CALL $6805        ; set the velocity, pointing away from the centre
-       jmp  _656a                                          ; JR $656A          ; 
+       .endproc                                            ; JR $656A          ; 
 stardust_move_outwards:                                    ; >6520
        movb *ix,@l                                         ; LD L,(IX+$00)     ; 
        movb @>01(ix),h                                     ; LD H,(IX+$01)     ; HL = X
@@ -5459,7 +5462,7 @@ _6561:                                                     ; >6561
        movb @l,@>02(ix)                                    ; LD (IX+$02),L     ; 
        movb h,@>03(ix)                                     ; LD (IX+$03),H     ; store the new Y
 _656a:                                                     ; >656a
-       .ret                                                ; RET               ; 
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Stardust: rotate about the centre of the view
@@ -5478,6 +5481,7 @@ _656a:                                                     ; >656a
 * I:HL Cosine (sign-magnitude, from the roll or pitch coefficients)
 * I:DE Sine (sign-magnitude)
 stardust_rotate:                                           ; >66dc
+       .proc
        bl   @log_sign_tagged                               ; CALL $1FCF        ; convert cos to a log
        mov  hl,@stardust_log_cos                           ; LD ($E779),HL     ; and save it
        .ex_de_hl                                           ; EX DE,HL          ; 
@@ -5496,9 +5500,10 @@ stardust_rotate_particle:                                  ; >66ef
        neg a                                               ; NEG               ; A = |X|
 stardust_rotate_log_x:                                     ; >66fa
        ab   a,a                                            ; ADD A,A           ; 
-       movb a,@stardust_log_x_lookup+>0001                 ; LD ($66FF),A      ; point the LD at the table entry for |X| (#R$66FE+1)
+       mov  a,r1                                           ; LD ($66FF),A      ; index the table with A (instead of patching the operand)
+       srl  r1,8                                           ;                   ;
 stardust_log_x_lookup:                                     ; >66fe
-       mov  @log_table,hl                                  ; LD HL,($0800)     ; HL = log |X|
+       mov  @log_table(r1),hl                              ; LD HL,($0800)     ; HL = log |X|
        .pop af                                             ; POP AF            ; 
        jlt  !                                              ; JP P,$6707        ; 
        b    @stardust_rotate_save_log_x                    ;                   
@@ -5515,9 +5520,10 @@ stardust_rotate_save_log_x:                                ; >6707
        neg a                                               ; NEG               ; A = |Y|
 stardust_rotate_log_y:                                     ; >6714
        ab   a,a                                            ; ADD A,A           ; 
-       movb a,@stardust_log_y_lookup+>0001                 ; LD ($6719),A      ; point the LD at the table entry for |Y| (#R$6718+1)
+       mov  a,r1                                           ; LD ($6719),A      ; index the table with A (instead of patching the operand)
+       srl  r1,8                                           ;                   ;
 stardust_log_y_lookup:                                     ; >6718
-       mov  @log_table,hl                                  ; LD HL,($0800)     ; HL = log |Y|
+       mov  @log_table(r1),hl                              ; LD HL,($0800)     ; HL = log |Y|
        .pop af                                             ; POP AF            ; 
        jlt  !                                              ; JP P,$6721        ; 
        b    @stardust_rotate_save_log_y                    ;                   
@@ -5567,7 +5573,7 @@ stardust_rotate_abs_x:                                     ; >6766
        jeq  !                                              ; JP NZ,$66EF       ; loop for all 15 particles
        b    @stardust_rotate_particle                      ;                   
 !
-       .ret                                                ; RET               ; 
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Stardust: move up or down
@@ -5581,6 +5587,7 @@ stardust_rotate_abs_x:                                     ; >6766
 * 
 * I:HL Sine (sign-magnitude, from the roll or pitch coefficients)
 stardust_move_vertically:                                  ; >6775
+       .proc
        movb h,a                                            ; LD A,H            ; 
        ; RL L                                              ; RL L              ; TODO: check code. 
        sla  a,1                                            ; RLA               ; TODO: check code. A = magnitude bits 14-7, carry = sign
@@ -5615,7 +5622,7 @@ stardust_move_abs_x:                                       ; >679b
        .pop bc                                             ; POP BC            ; 
        sb   one,b                                          ; DJNZ $6784        ; loop for all 15 particles
        jne  _6784                                          ;                   
-       .ret                                                ; RET               ; 
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Jump to the entry for the current view in a table of handlers
@@ -5628,16 +5635,15 @@ stardust_move_abs_x:                                       ; >679b
 * I:HL Address of a table of 4 handler addresses (front, rear, left,
 * .    right)
 jump_to_view_handler:                                      ; >67a8
-       .proc
        movb @current_view,a                                ; LD A,($EB9A)      ; A = current view
        ab   a,a                                            ; ADD A,A           ; 
        movb a,@c                                           ; LD C,A            ; 
        sb   b,b                                            ; LD B,$00          ; 
        a    bc,hl                                          ; ADD HL,BC         ; HL -> this view's entry
-       movb *hl,a                                          ; LD A,(HL)         ; 
-       inc  hl                                             ; INC HL            ; 
-       movb *hl,h                                          ; LD H,(HL)         ; 
-       movb a,@l                                           ; LD L,A            ; 
+       mov  *hl,hl                                         ; LD A,(HL)         ; HL = the handler (TI data words are big-endian)
+;      inc  hl                                             ; INC HL            ; 
+;      movb *hl,h                                          ; LD H,(HL)         ; 
+;      movb a,@l                                           ; LD L,A            ; 
        b    *hl                                            ; JP (HL)           ; TODO. 
 
 ********************************************************************************
@@ -6027,7 +6033,7 @@ _6940:                                                     ; >6940
        movb @>08(ix),a                                     ; LD A,(IX+$08)     ; Z flag = particle doesn't need respawning
        socb a,a                                            ; OR A              ; 
 stardust_move_handler:                                     ; >6944
-       .call @stardust_front_view                          ; CALL $64F1        ; move or respawn it (operand patched per view by #R$645B)
+       bl   @stardust_front_view                           ; CALL $64F1        ; move or respawn it (operand patched per view by #R$645B)
        li   de,>000b                                       ; LD DE,$000B       ; 
        a    de,ix                                          ; ADD IX,DE         ; IX -> next particle
        .pop bc                                             ; POP BC            ; 
@@ -6415,9 +6421,9 @@ _6c52:                                                     ; >6c52
        jeq  _6c66                                          ; JR Z,$6C66        ; no pixels left over
        ab   one,d                                          ; INC D             ; one more cell drawn
        li   ix,gauge_bar_patterns                          ; LD IX,$6DE3       ; IX -> the partial cell patterns (#R$6DE3)
-       movb a,@bar_gauge_partial_pattern+>0002             ; LD ($6C60),A      ; patch the displacement (#R$6C5E+2)
+       movb a,@bar_gauge_partial_pattern+>0003             ; LD ($6C60),A      ; patch the displacement (#R$6C5E+2)
 bar_gauge_partial_pattern:                                 ; >6c5e
-       movb *ix,a                                          ; LD A,(IX+$00)     ; A = the pattern for that many pixels
+       movb @>00(ix),a                                     ; LD A,(IX+$00)     ; A = the pattern for that many pixels
        movb one,@c                                         ; LD C,$01          ; one cell
        bl   @draw_gauge_tiles                              ; CALL $6CA8        ; draw it
 _6c66:                                                     ; >6c66
@@ -6460,9 +6466,10 @@ draw_dial_gauge:                                           ; >6c71
 _6c85:                                                     ; >6c85
        movb @e,a                                           ; LD A,E            ; 
        andi a,>0700                                        ; AND $07           ; the pixel's position in its cell
-       movb a,@dial_gauge_pixel_mask+>0001                 ; LD ($6C8C),A      ; patch the mask lookup's address (#R$6C8B+1)
+       mov  a,r1                                           ; LD ($6C8C),A      ; index the table with A (instead of patching the operand)
+       srl  r1,8                                           ;                   ;
 dial_gauge_pixel_mask:                                     ; >6c8b
-       movb @pixel_bitmask_table+>0004,a                   ; LD A,($E704)      ; A = the pixel's mask (#R$E700)
+       movb @pixel_bitmask_table(r1),a                     ; LD A,($E704)      ; A = the pixel's mask (#R$E700)
        movb one,@c                                         ; LD C,$01          ; one cell
        bl   @draw_gauge_tiles                              ; CALL $6CA8        ; draw it
        movb @bytes+>03,a                                   ; LD A,$03          ; 

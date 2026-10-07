@@ -1752,18 +1752,7 @@ _3855:                                                     ; >3855
        movb de,@vdpwa                                      ; OUT ($99),A       ; high byte: the character row
        ; EI                                                ; EI                ;
        movb @bytes+>16,b                                   ; LD B,$C6          ; 22 characters
-_3862:                                                     ; >3862
-       movb *hl,*r2                                        ; OUTI              ; row 0 of the character
-       movb @>20(hl),*r2                                   ; OUTI              ; row 1
-       movb @>40(hl),*r2                                   ; OUTI              ; row 2
-       movb @>60(hl),*r2                                   ; OUTI              ; row 3
-       movb @>80(hl),*r2                                   ; OUTI              ; row 4
-       movb @>a0(hl),*r2                                   ; OUTI              ; row 5
-       movb @>c0(hl),*r2                                   ; OUTI              ; row 6
-       movb @>e0(hl),*r2                                   ; OUTI              ; row 7
-       inc  hl                                             ; INC A             ; next byte along
-       sb   one,b                                          ; DJNZ $3862        ; next character
-       jne  _3862                                          ;                   ; 
+       bl   @copy_space_view_row_pad                       ; OUTI              ; copy the row's 22 characters (8 OUTIs and a DJNZ each), from scratchpad
        ai   hl,>100-22                                     ; INC H             ; next 8 rows of the buffer
        ai   de,>100                                        ; INC D             ; next character row
        sb   one,a                                          ; DEC A             ; 

@@ -59,9 +59,9 @@ clear_pad_1:
 * Copy routines to pad
 *
 copy_to_pad:
-       li   r0,copy_bc_bytes_from_hl_to_vdp_unrolled
-       li   r1,copy_to_vdp_unrolled
-       li   r2,copy_bc_bytes_from_hl_to_vdp_unrolled_end-copy_bc_bytes_from_hl_to_vdp_unrolled
+       li   r0,copy_space_view_row
+       li   r1,copy_space_view_row_pad
+       li   r2,copy_space_view_row_end-copy_space_view_row
 copy_to_pad_1:
        mov  *r0+,*r1+
        dect r2
@@ -240,42 +240,28 @@ vsbw:
 
 *********************************************************************
 *
-* Copy B bytes from address in HL to VDP unrolled.
-* r0 is expected to contain VDPWD.
+* Copy one character row of the space view buffer to the VDP
+* (the inner loop of copy_space_view). Copied to scratchpad at
+* copy_space_view_row_pad, where it runs without wait states.
 *
-copy_bc_bytes_from_hl_to_vdp_unrolled:
-       mov  bc,r2
-       srl  r2,4
-       jeq  copy_bc_bytes_from_hl_to_vdp_unrolled_2
-copy_bc_bytes_from_hl_to_vdp_unrolled_1:
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       movb *hl+,*r0
-       dec  r2
-       jne  copy_bc_bytes_from_hl_to_vdp_unrolled_1
-copy_bc_bytes_from_hl_to_vdp_unrolled_2:
-       andi bc,>000f
-       jeq  copy_bc_bytes_from_hl_to_vdp_unrolled_4
-copy_bc_bytes_from_hl_to_vdp_unrolled_3:
-       movb *hl+,*r0
-       dec  bc
-       jne  copy_bc_bytes_from_hl_to_vdp_unrolled_3
-copy_bc_bytes_from_hl_to_vdp_unrolled_4:
+* HL: Buffer address of the row's first character, advanced past it
+* B: Number of characters (MSB)
+* R2: VDPWD
+*
+copy_space_view_row:
+       movb *hl,*r2
+       movb @>20(hl),*r2
+       movb @>40(hl),*r2
+       movb @>60(hl),*r2
+       movb @>80(hl),*r2
+       movb @>a0(hl),*r2
+       movb @>c0(hl),*r2
+       movb @>e0(hl),*r2
+       inc  hl
+       sb   one,b
+       jne  copy_space_view_row
        rt
-copy_bc_bytes_from_hl_to_vdp_unrolled_end:
+copy_space_view_row_end:
        equ  $
 
 *********************************************************************

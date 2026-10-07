@@ -57,10 +57,10 @@ b254:
        equ  b255+1
 pad_vars:
        equ  b254+1
-copy_to_vdp_unrolled:
+copy_space_view_row_pad:
        equ  pad_vars
 ldir_pad:
-       equ  copy_to_vdp_unrolled+>38
+       equ  copy_space_view_row_pad+>38
 pad_max:
        equ  ldir_pad+>50
 kscan_device:

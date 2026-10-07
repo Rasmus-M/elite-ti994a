@@ -5,6 +5,7 @@
 
        copy "ti-routines.a99"
        copy "ti-tables.a99"
+       copy "math-tables.a99"
 
 * Space view bitmap buffer
 *

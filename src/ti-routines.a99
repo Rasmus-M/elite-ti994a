@@ -74,6 +74,7 @@ copy_to_pad_2:
 * Set graphics mode
 *
 graphics_mode:
+       .proc
        clr  r0
        li   r1,vdp_registers
        li   r2,8
@@ -101,8 +102,7 @@ graphics_mode_1:
        li   r0,name_table
        bl   @vwad
        bl   @ti_init_name_table
-       lwpi wrksp
-       rt
+       .endproc
 *      VDP registers
 vdp_registers:
        byte >02                        ; Graphics II mode
@@ -129,111 +129,6 @@ ti_init_name_table_1:
        jne  ti_init_name_table_1
        rt
 *// ti_init_name_table
-
-;*********************************************************************************
-;*
-;* Select name table 1
-;*
-;ti_select_name_table_1:
-;       lwpi ti_wrksp
-;       li   r0,>020e
-;       bl   @vwtr
-;       lwpi wrksp
-;       rt
-;*// ti_select_name_table_1
-;
-;*********************************************************************************
-;*
-;* Select name table 2
-;*
-;ti_select_name_table_2:
-;       lwpi ti_wrksp
-;       li   r0,>020f
-;       bl   @vwtr
-;       lwpi wrksp
-;       rt
-;*// ti_select_name_table_2
-
-*********************************************************************************
-*
-* Display off
-*
-;ti_display_off:
-;       lwpi ti_wrksp
-;       li   r0,>01a2
-;       bl   @vwtr
-;       lwpi wrksp
-;       rt
-;*// ti_display_off
-
-*********************************************************************************
-*
-* Display off
-*
-;ti_display_on:
-;       lwpi ti_wrksp
-;       li   r0,>01e2
-;       bl   @vwtr
-;       lwpi wrksp
-;       rt
-;*// ti_display_on
-
-;*********************************************************************************
-;*
-;* Clear screen
-;*
-;ti_clear_screen:
-;       .proc
-;       bl   @ti_display_off
-;;       bl   @module_player
-;       li   r1,vdpwd
-;       li   r0,pattern_table
-;       bl   @vwad
-;       bl   @ti_clear_screen_part
-;       bl   @ti_clear_screen_part
-;       bl   @ti_clear_screen_part
-;       li   r0,color_table
-;       bl   @vwad
-;       bl   @ti_clear_screen_part
-;       bl   @ti_clear_screen_part
-;       bl   @ti_clear_screen_part
-;       bl   @ti_display_on
-;       .endproc
-;*// ti_clear_screen
-;
-;ti_clear_screen_part:
-;       .proc
-;       li   r2,>800
-;ti_clear_screen_part_1:
-;       clr  *r1
-;       dec  r2
-;       jne  ti_clear_screen_part_1
-;;       bl   @module_player
-;       .endproc
-
-;*********************************************************************************
-;*
-;* Set color of whole screen
-;*
-;* a: zx attribute
-;*
-;ti_set_screen_color:
-;       .proc
-;       movb @ti_colors(a),r1
-;       li   r0,color_table+(3*256)
-;       li   r2,5*256
-;       bl   @vsmw
-;;       bl   @module_player
-;       li   r0,color_table+(8*256)
-;       li   r2,5*256
-;       bl   @vsmw
-;;       bl   @module_player
-;       li   r0,color_table+(13*256)
-;       li   r2,5*256
-;       bl   @vsmw
-;;       bl   @module_player
-;       .endproc
-;*// ti_set_screen_color
 
 *********************************************************************
 *

@@ -125,3 +125,11 @@ name_table:                            ; Name table 1
        equ  >1800
 sprite_attr_table:                     ; Sprite attribute table
        equ  >1b00
+
+**
+* ROM bank selection
+*
+blueprints_1_bank_select:
+       equ  >6008
+blueprints_2_bank_select:
+       equ  >600a

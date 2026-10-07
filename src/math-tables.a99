@@ -1,0 +1,139 @@
+********************************************************************************
+* Log table
+*
+* 257 words: entry n is log2(n) * 1024, rounded ($0000 for n=1, $0400
+* for 2, $0800 for 4, ... $2000 for 256), with entry 0 = $FFFF. Looked
+* up by #R$1FCF (and #R$2191), whose index can in principle run past
+* entry 256 into the market prices at #R$0A02; the callers traced so
+* far keep it within range. See #R$0400 for the antilog table.
+log_table:                                                 ; >0800
+       data >ffff,>0001,>0400,>0657,>0800,>094A,>0a57,>0B3B          ; n = 0-7
+       data >0C00,>0CAE,>0D4A,>0DD6,>0E57,>0ECD,>0F3B,>0FA1          ; n = 8-15
+       data >1000,>105A,>10AE,>10FE,>114A,>1192,>11D6,>1218          ; n = 16-23
+       data >1257,>1293,>12CD,>1305,>133B,>136F,>13a1,>13D1          ; n = 24-31
+       data >1400,>142D,>145A,>1484,>14AE,>14D6,>14FE,>1524          ; n = 32-39
+       data >154A,>156E,>1592,>15B4,>15D6,>15F8,>1618,>1638          ; n = 40-47
+       data >1657,>1675,>1693,>16B1,>16CD,>16E9,>1705,>1720          ; n = 48-55
+       data >173B,>1755,>176F,>1788,>17A1,>17b9,>17D1,>17E9          ; n = 56-63
+       data >1800,>1817,>182D,>1844,>185A,>186F,>1884,>1899          ; n = 64-71
+       data >18AE,>18C2,>18D6,>18EA,>18FE,>1911,>1924,>1937          ; n = 72-79
+       data >194A,>195C,>196E,>1980,>1992,>19A3,>19B4,>19C6          ; n = 80-87
+       data >19D6,>19E7,>19F8,>1A08,>1A18,>1A28,>1A38,>1A48          ; n = 88-95
+       data >1A57,>1A66,>1A75,>1A84,>1A93,>1AA2,>1AB1,>1ABF          ; n = 96-103
+       data >1ACD,>1ADB,>1AE9,>1AF7,>1B05,>1b13,>1B20,>1B2D          ; n = 104-111
+       data >1B3B,>1B48,>1B55,>1B62,>1B6F,>1B7B,>1B88,>1B94          ; n = 112-119
+       data >1BA1,>1BAD,>1bb9,>1BC5,>1BD1,>1BDD,>1BE9,>1BF4          ; n = 120-127
+       data >1C00,>1C0B,>1C17,>1C22,>1C2D,>1C39,>1C44,>1C4F          ; n = 128-135
+       data >1C5A,>1C64,>1C6F,>1C7A,>1C84,>1C8F,>1C99,>1CA4          ; n = 136-143
+       data >1CAE,>1CB8,>1CC2,>1CCC,>1CD6,>1CE0,>1CEA,>1cf4          ; n = 144-151
+       data >1CFE,>1D08,>1D11,>1D1B,>1D24,>1D2E,>1D37,>1D40          ; n = 152-159
+       data >1D4A,>1D53,>1D5C,>1D65,>1D6E,>1D77,>1D80,>1D89          ; n = 160-167
+       data >1D92,>1D9B,>1DA3,>1DAC,>1DB4,>1DBD,>1DC6,>1DCE          ; n = 168-175
+       data >1DD6,>1DDF,>1DE7,>1DEF,>1DF8,>1E00,>1E08,>1E10          ; n = 176-183
+       data >1e18,>1E20,>1E28,>1E30,>1E38,>1E40,>1e48,>1E4F          ; n = 184-191
+       data >1E57,>1E5F,>1E66,>1E6E,>1E75,>1E7D,>1E84,>1E8C          ; n = 192-199
+       data >1E93,>1E9B,>1EA2,>1EA9,>1EB1,>1EB8,>1EBF,>1EC6          ; n = 200-207
+       data >1ECD,>1ED4,>1EDB,>1EE2,>1EE9,>1EF0,>1EF7,>1EFE          ; n = 208-215
+       data >1F05,>1f0c,>1F13,>1F19,>1F20,>1F27,>1F2D,>1F34          ; n = 216-223
+       data >1F3B,>1F41,>1F48,>1F4E,>1F55,>1F5B,>1F62,>1f68          ; n = 224-231
+       data >1F6F,>1F75,>1f7b,>1F82,>1F88,>1F8E,>1F94,>1F9A          ; n = 232-239
+       data >1FA1,>1FA7,>1FAD,>1FB3,>1FB9,>1FBF,>1FC5,>1FCB          ; n = 240-247
+       data >1FD1,>1FD7,>1FDD,>1FE3,>1FE9,>1FEF,>1FF4,>1FFA          ; n = 248-255
+       data >2000                                                    ; n = 256
+
+********************************************************************************
+* Fine-grained trig-coefficient table, 0-20 degrees in 0.5-degree steps
+*
+* 41 6-byte records (base $121B + index*6, index 0-40), read and copied
+* live by #R$21DA (which loads the base with "LD BC,$121B"). Each record is two 24-bit little-endian
+* fixed-point values - bytes 0-2 the #R$24D1 "cos" role, bytes 3-5 the
+* #R$24A7 "sin" role - in a $400000-scaled (UQ2.22-ish) format: record i
+* is (cos(i*0.5 deg)*$400000, sin(i*0.5 deg)*$400000), rounded to the
+* nearest integer.
+* .
+* The table ends at record 40, where a second, coarser table starts
+* (#R$1311). Every turn rate #R$21DA is given is within +-40, or 127 for
+* the 30-degree record at #R$2522: the player's roll and pitch are limited
+* to +-16 (#R$69E5/#R$69F8/#R$69FD/#R$6A10), a ship's turn rate (#R$F806)
+* is at most 40 and half that when it turns away (#R$281E), the steering
+* limits its rate to 40 (#R$2EB2), the title screen's ship turns by at most
+* 18 (#R$1C5C, at $1D7B and $1D83), the space station rolls at 4 (#R$254C)
+* and a ship spinning away at 10 (#R$27B3).
+trig_table_fine:                                           ; >121b
+       byte >00,>00,>40,>00,>00,>00
+       byte >61,>FF,>3F,>FA,>8E,>00
+       byte >82,>FD,>3F,>F1,>1D,>01
+       byte >63,>FA,>3F,>E2,>AC,>01
+       byte >06,>F6,>3F,>CB,>3B,>02
+       byte >68,>F0,>3F,>A9,>CA,>02
+       byte >8D,>E9,>3F,>79,>59,>03
+       byte >71,>E1,>3F,>38,>E8,>03
+       byte >17,>D8,>3F,>E4,>76,>04
+       byte >7F,>CD,>3F,>79,>05,>05
+       byte >A8,>C1,>3F,>F6,>93,>05
+       byte >93,>B4,>3F,>56,>22,>06
+       byte >40,>A6,>3F,>98,>B0,>06
+       byte >AF,>96,>3F,>B9,>3E,>07
+       byte >E1,>85,>3F,>B5,>CC,>07
+       byte >D6,>73,>3F,>8B,>5A,>08
+       byte >8E,>60,>3F,>36,>E8,>08
+       byte >09,>4C,>3F,>B6,>75,>09
+       byte >49,>36,>3F,>06,>03,>0A
+       byte >4E,>1F,>3F,>24,>90,>0A
+       byte >17,>07,>3F,>0D,>1D,>0B
+       byte >A6,>ED,>3E,>BF,>A9,>0B
+       byte >FB,>D2,>3E,>37,>36,>0C
+       byte >17,>B7,>3E,>72,>C2,>0C
+       byte >F9,>99,>3E,>6D,>4E,>0D
+       byte >A3,>7B,>3E,>26,>DA,>0D
+       byte >15,>5C,>3E,>99,>65,>0E
+       byte >4F,>3B,>3E,>C5,>F0,>0E
+       byte >54,>19,>3E,>A6,>7B,>0F
+       byte >22,>F6,>3D,>3A,>06,>10
+       byte >BB,>D1,>3D,>7E,>90,>10
+       byte >1F,>AC,>3D,>6F,>1A,>11
+       byte >50,>85,>3D,>0B,>A4,>11
+       byte >4E,>5D,>3D,>4F,>2D,>12
+       byte >19,>34,>3D,>38,>B6,>12
+       byte >B3,>09,>3D,>C4,>3E,>13
+       byte >1D,>DE,>3C,>EF,>C6,>13
+       byte >56,>B1,>3C,>B8,>4E,>14
+       byte >61,>83,>3C,>1C,>D6,>14
+       byte >3D,>54,>3C,>18,>5D,>15
+       byte >ED,>23,>3C,>A9,>E3,>15
+
+********************************************************************************
+* Coarse trig-coefficient table, 0-90 degrees in 5-degree steps
+*
+* 19 2-byte records (base $1311 + index*2, index 0-18): a plain unsigned
+* (cos,sin) byte pair scaled to $80 (half the precision of #R$121B's
+* table). Record i is (round(cos(i*5 deg)*$80), round(sin(i*5 deg)*$80));
+* the records are palindromic about i=9 ($1323: $5A,$5A, i.e. 45 degrees),
+* running from i=0's ($80,$00) at 0 degrees to i=18's ($00,$80) at 90
+* degrees. Read as (C,E)=(cos,sin) pairs to draw circles: the planet
+* (#R$3D0E), the sun (#R$3DF4) and the fuel-range circle on the local
+* chart (#R$5524).
+* .
+* The table ends cleanly at $1336; #R$1337's "JAMESON" string follows
+* immediately, with no gap.
+trig_table_coarse:                                         ; >1311
+       byte >80,>00
+       byte >7F,>0B
+       byte >7E,>16
+       byte >7B,>21
+       byte >78,>2B
+       byte >74,>36
+       byte >6E,>40
+       byte >68,>49
+       byte >62,>52
+       byte >5A,>5A
+       byte >52,>62
+       byte >49,>68
+       byte >3F,>6E
+       byte >36,>74
+       byte >2B,>78
+       byte >21,>7B
+       byte >16,>7E
+       byte >0B,>7F
+       byte >00,>80
+

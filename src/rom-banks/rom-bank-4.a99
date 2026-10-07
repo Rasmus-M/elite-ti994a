@@ -1,0 +1,6 @@
+       aorg >6000
+       bss  >40
+       copy "../ship-blueprints-1.a99"
+rom_bank_4_end:
+       equ  $
+       bss  >8000-$

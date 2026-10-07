@@ -1,6 +1,9 @@
        copy "macros.a99"
        copy "equates.a99"
 
+       copy "rom-banks/rom-bank-4.a99"
+       copy "rom-banks/rom-bank-5.a99"
+
        aorg >2000
        copy "lower-memory.a99"
 

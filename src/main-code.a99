@@ -318,10 +318,10 @@ title_screen_ship_arrived:                                 ; >1d5a
 _1d62:                                                     ; >1d62
        li   hl,title_wobble                                ; LD HL,$E884       ;
        li   ix,title_wobble_target_1                       ; LD IX,$E886       ;
-       .call @title_screen_swing                           ; CALL $1DDC        ; swing the first angle
+       bl   @title_screen_swing                            ; CALL $1DDC        ; swing the first angle
        li   hl,title_wobble_angle_2                        ; LD HL,$E885       ;
        li   ix,title_wobble_target_2                       ; LD IX,$E887       ;
-       .call @title_screen_swing                           ; CALL $1DDC        ; and the second
+       bl   @title_screen_swing                            ; CALL $1DDC        ; and the second
        movb @title_wobble,a                                ; LD A,($E884)      ;
        sra  a,1                                            ; SRA A             ;
        bl   @pitch_object                                  ; CALL $2365        ; turn the ship
@@ -397,26 +397,28 @@ title_screen_swing:                                        ; >1ddc
        ab   one,*hl                                        ; INC (HL)          ; swing up
        cb   a,*hl                                          ; CP (HL)           ; reached the target?
        jeq  !                                              ; RET NZ            ; no
-       .ret                                                ;
+       rt                                                  ;
 !
+       .proc
        bl   @random_byte                                   ; CALL $2176        ;
        andi a,>0f00                                        ; AND $0F           ;
        ab   @bytes+>14,a                                   ; ADD A,$14         ;
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ;
        movb a,*ix                                          ; LD (IX+$00),A     ; new target: -(20 to 35)
-       .ret                                                ; RET               ;
+       .endproc                                            ; RET               ;
 title_screen_swing_down:                                   ; >1df3
        sb   one,*hl                                        ; DEC (HL)          ; swing down
        cb   a,*hl                                          ; CP (HL)           ; reached the target?
        jeq  !                                              ; RET NZ            ; no
-       .ret                                                ;
+       rt                                                  ;
 !
+       .proc
        bl   @random_byte                                   ; CALL $2176        ;
        andi a,>0f00                                        ; AND $0F           ;
        ab   @bytes+>14,a                                   ; ADD A,$14         ;
        movb a,*ix                                          ; LD (IX+$00),A     ; new target: 20 to 35
-       .ret                                                ; RET               ;
+       .endproc                                            ; RET               ;
 
 ********************************************************************************
 * Title screen: the spinning "ELITE" letters
@@ -574,9 +576,9 @@ title_screen_letter_frame_end:                             ; >1eb3
        bl   @show_view_message                             ; CALL $39C8        ; print "(c)1987 Firebird"
        bl   @copy_space_view                               ; CALL $3846        ; copy the space view to the screen
 _1ebc:                                                     ; >1ebc
-       movb @vblank_subtick_counter,a                      ; LD A,($F748)      ;
-       cb   a,@bytes+>07                                   ; CP $07            ;
-       jl   _1ebc                                          ; JR C,$1EBC        ; wait for 7 VBlanks
+;      movb @vblank_subtick_counter,a                      ; LD A,($F748)      ;
+;      cb   a,@bytes+>07                                   ; CP $07            ;
+;      jl   _1ebc                                          ; JR C,$1EBC        ; wait for 7 VBlanks (VBlank timing isn't implemented yet)
        movb @pending_debounced_keypress_byte_status,a      ; LD A,($E8F5)      ;
        socb a,a                                            ; OR A              ;
        jeq  title_screen_letter_next_frame                 ; JR Z,$1ED0        ; no key
@@ -3291,7 +3293,7 @@ draw_object:                                               ; >422e
 draw_ship:                                                 ; >4255
        mov  @object_position_x,de                          ; LD DE,($F7CE)     ; DE = the object's world position, first half
        mov  @object_position_z_lo,hl                       ; LD HL,($F7D2)     ; HL = ...second half
-       .call @convert_to_view                              ; CALL $44CE        ; project the object's position
+       bl   @convert_to_view                               ; CALL $44CE        ; project the object's position
        mov  de,@view_x                                     ; LD ($E6D8),DE     ; store the projected first half
        mov  hl,@view_z                                     ; LD ($E6DC),HL     ; store the projected second half
        movb h,a                                            ; LD A,H            ; A = the projected second half's high byte
@@ -3531,10 +3533,11 @@ rotate_vertex:                                             ; >4464
        a    de,hl                                          ; ADD HL,DE         ; z'
        .pop bc                                             ; POP BC            ; BC = the second output component
        .pop de                                             ; POP DE            ; DE = the first output component
+       bl   @convert_to_view                               ;                   ; convert to the current view
+       .endproc                                            ; RET               ; 
 * This entry point is used by the routines at #R$422E and #R$43C2.
 convert_to_view:                                           ; >44ce
-       bl   @view_front                                    ; CALL $44E5        ; convert to the current view
-       .endproc                                            ; RET               ; 
+       b    @view_front                                    ; CALL $44E5        ; convert to the current view (operand patched by #R$64A1)
 
 ********************************************************************************
 * Add the object's position

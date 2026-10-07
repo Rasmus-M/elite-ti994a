@@ -34212,7 +34212,7 @@ constrictor_trail_count:                                   ; >efa3
 * #R$538B) keep their lists of systems at the address it holds. In this
 * snapshot its low byte is $00 rather than $44.
 reclaimed_range_end:                                       ; >efa4
-       data >7000
+       data startup_code_stardust_table+>00a6
 
 ********************************************************************************
 * Stardust table address / reclaimed-memory range start (word)

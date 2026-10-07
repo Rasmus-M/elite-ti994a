@@ -8010,7 +8010,7 @@ message_row:                                               ; >e92c
 * The turn number (#R$F7ED) given to the next object added to the object
 * table (#R$3037), which cycles it 1, 2, 3, 1...
 next_turn_number:                                          ; >e92f
-       byte >02
+       byte >01
 
 ********************************************************************************
 * PRNG state (3 bytes)

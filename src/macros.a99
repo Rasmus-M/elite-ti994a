@@ -23,6 +23,24 @@
        b    *r11
        .endm
 
+* Return from a .proc routine with carry set or clear. .endproc can't
+* return a carry, since its DECT changes it.
+       .defm retc
+       dect sp
+       mov  *sp,r11
+       seto r0
+       inc  r0
+       b    *r11
+       .endm
+
+       .defm retnc
+       dect sp
+       mov  *sp,r11
+       clr  r0
+       inc  r0
+       b    *r11
+       .endm
+
        .defm push
        mov  #1,*sp+
        .endm

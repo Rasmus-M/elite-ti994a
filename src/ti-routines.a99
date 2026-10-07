@@ -75,9 +75,9 @@ copy_to_pad_3:
        dect r2
        jne  copy_to_pad_3
 
-       li   r0,ti_ldir
-       li   r1,ldir_pad
-       li   r2,ti_ldir_end-ti_ldir
+       li   r0,line_loops
+       li   r1,line_loops_pad
+       li   r2,line_loops_end-line_loops
 copy_to_pad_2:
        mov  *r0+,*r1+
        dect r2
@@ -298,6 +298,67 @@ clear_space_view_rows:
        rt
 clear_space_view_rows_end:
        equ  $
+
+*********************************************************************
+*
+* The pixel loops of the line drawing (setup_bresenham_line), copied to
+* scratchpad at line_loops_pad. The rotate instructions and the plot
+* operations are patched there.
+*
+* HL: Buffer address   R0 (MSB): Error term   R1 (MSB): Pixel mask
+* R2: Column step (+1/-1)   B: Pixel count   D: dy   E: dx
+*
+line_loops:                             ; The shallow loop
+       srl  r1,1                       ; Rotate the pixel mask (patched)
+       movb r1,r1
+       jne  line_shallow_error_term    ; No byte boundary crossed
+       mov  @line_mask_wrap,r1         ; The mask wraps round...
+       a    r2,hl                      ; ...and the pointer steps a byte
+line_shallow_error_term:
+       sb   d,r0                       ; Error term -= dy
+       joc  line_shallow_plot          ; Still non-negative - no row step
+       ab   @e,r0                      ; Add dx back...
+       ai   hl,>20                     ; ...and step a row
+line_shallow_plot:
+       movb *hl,a
+line_shallow_plot_op:
+       socb r1,a                       ; OR in the pixel (patched to XOR)
+       movb a,*hl
+       sb   one,b
+       jne  line_loops
+       .ret
+line_steep_loop:
+       ai   hl,>20                     ; Step a row (every pixel)
+       sb   @e,r0                      ; Error term -= dx
+       joc  line_steep_plot            ; Still non-negative - no column step
+       ab   d,r0                       ; Add dy back
+line_steep_rotate:
+       srl  r1,1                       ; Rotate the pixel mask (patched)
+       movb r1,r1
+       jne  line_steep_plot            ; No byte boundary crossed
+       mov  @line_mask_wrap,r1         ; The mask wraps round...
+       a    r2,hl                      ; ...and the pointer steps a byte
+line_steep_plot:
+       movb *hl,a
+line_steep_plot_op:
+       socb r1,a                       ; OR in the pixel (patched to XOR)
+       movb a,*hl
+       sb   one,b
+       jne  line_steep_loop
+       .ret
+line_loops_end:
+       equ  $
+* The loops' entry points and patched instructions in scratchpad
+line_shallow_rotate_pad:
+       equ  line_loops_pad
+line_shallow_plot_op_pad:
+       equ  line_loops_pad+line_shallow_plot_op-line_loops
+line_steep_loop_pad:
+       equ  line_loops_pad+line_steep_loop-line_loops
+line_steep_rotate_pad:
+       equ  line_loops_pad+line_steep_rotate-line_loops
+line_steep_plot_op_pad:
+       equ  line_loops_pad+line_steep_plot_op-line_loops
 
 *********************************************************************
 *
@@ -693,7 +754,7 @@ ti_quit:
 
 *********************************************************************
 *
-* Faster replacement for LDIR
+* Faster replacement for LDIR (called by the .ldir macro)
 *
 ti_ldir:
        mov  hl,r0                      ; Check source

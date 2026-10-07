@@ -2627,14 +2627,14 @@ line_start_mask:                                           ; >3c65
        movb @pixel_bitmask_table(r1),r1                    ; LD A,($E702)      ; R1 = the pixel bitmask for that bit position...
        andi r1,>ff00                                       ; LD C,A            ; ...in its high byte (a zero high byte means a byte boundary was crossed)
        li   r0,>8000                                       ; LD A,$09          ; moving right: the mask wraps round to bit 7...
-       mov  @line_rotate_right,@shallow_line_rotate        ; LD ($3C94),A      ; ...rotating right
+       mov  @line_rotate_right,@line_shallow_rotate_pad    ; LD ($3C94),A      ; ...rotating right
        mov  r2,r2                                          ;                   ; 
        jgt  !                                              ; JR C,$3C7C        ; 
        li   r0,>0100                                       ; LD A,$01          ; moving left: it wraps round to bit 0...
-       mov  @line_rotate_left,@shallow_line_rotate         ; LD ($3C94),A      ; ...rotating left
+       mov  @line_rotate_left,@line_shallow_rotate_pad     ; LD ($3C94),A      ; ...rotating left
 !
        mov  r0,@line_mask_wrap                             ;                   ; 
-       mov  @shallow_line_rotate,@steep_line_rotate        ; LD ($3CDD),A      ; the same rotate for the steep loop
+       mov  @line_shallow_rotate_pad,@line_steep_rotate_pad ; LD ($3CDD),A      ; the same rotate for the steep loop
        movb @e,a                                           ; LD A,E            ; A = dx
        cb   a,d                                            ; CP D              ; compare dx against dy
        jl   steep_line_loop                                ; JR C,$3CAD        ; dx < dy - a steep line
@@ -2646,26 +2646,7 @@ shallow_line_loop:                                         ; >3c86
        movb a,b                                            ; LD B,A            ; B = dx, the loop counter
        movb a,r0                                           ; RRA               ; 
        srl  r0,1                                           ; LD H,A            ; R0 (high byte) = dx/2, the Bresenham error term
-shallow_line_rotate:                                       ; >3c93
-       srl  r1,1                                           ; RLC C             ; rotate the pixel bitmask by one bit (patched above)
-       movb r1,r1                                          ; JP NC,$3C99       ; 
-       jne  shallow_line_error_term                        ;                   ; no byte boundary crossed - keep this buffer byte
-       mov  @line_mask_wrap,r1                             ;                   ; 
-shallow_line_step_column:                                  ; >3c98
-       a    r2,hl                                          ; DEC L             ; crossed a byte boundary - step the buffer pointer
-shallow_line_error_term:                                   ; >3c99
-       sb   d,r0                                           ; SUB D             ; error term -= dy
-       joc  _3ca7                                          ; JP NC,$3CA5       ; still non-negative - no row step this pixel
-       ab   @e,r0                                          ; ADD A,E           ; underflowed - add dx back
-       ai   hl,>20                                         ; ADD HL,DE         ; step the buffer pointer by one row
-_3ca7:                                                     ; >3ca7
-       movb *hl,a                                          ; LD A,(HL)         ; A = the current buffer byte
-shallow_line_plot_op:                                      ; >3ca8
-       socb r1,a                                           ; OR C              ; OR in the pixel bitmask (patched to XOR by #R$6CB2)
-       movb a,*hl                                          ; LD (HL),A         ; write the plotted pixel back
-       sb   one,b                                          ; DJNZ $3C93        ; one column done - loop for the next
-       jne  shallow_line_rotate                            ;                   ; 
-       .ret                                                ; RET               ; 
+       b    @line_shallow_rotate_pad                       ;                   ; the pixel loop runs in scratchpad (line_loops)
 steep_line_loop:                                           ; >3cc6
        movb d,a                                            ; LD A,D            ; A = dy (also the loop count)
        socb a,a                                            ; OR A              ; 
@@ -2675,28 +2656,9 @@ steep_line_loop:                                           ; >3cc6
        movb a,b                                            ; LD B,A            ; B = dy, the loop counter
        movb a,r0                                           ; RRA               ; 
        srl  r0,1                                           ; LD H,A            ; R0 (high byte) = dy/2, the Bresenham error term
-_3cd3:                                                     ; >3cd3
-       ai   hl,>20                                         ; ADD HL,DE         ; step the buffer pointer by one row (every iteration)
-       sb   @e,r0                                          ; SUB E             ; error term -= dx
-       joc  steep_line_plot                                ; JR NC,$3CE4       ; still non-negative - no column step this pixel
-       ab   d,r0                                           ; ADD A,D           ; underflowed - add dy back
-steep_line_rotate:                                         ; >3cdc
-       srl  r1,1                                           ; RRC C             ; rotate the pixel bitmask by one bit (patched above)
-       movb r1,r1                                          ; JP NC,$3CE2       ; 
-       jne  steep_line_plot                                ;                   ; no byte boundary crossed - keep this buffer byte
-       mov  @line_mask_wrap,r1                             ;                   ; 
-steep_line_step_column:                                    ; >3ce1
-       a    r2,hl                                          ; INC L             ; crossed a byte boundary - step the buffer pointer
-steep_line_plot:                                           ; >3ce2
-       movb *hl,a                                          ; LD A,(HL)         ; A = the current buffer byte
-steep_line_plot_op:                                        ; >3ce7
-       socb r1,a                                           ; OR C              ; OR in the pixel bitmask (patched to XOR by #R$6CB2)
-       movb a,*hl                                          ; LD (HL),A         ; write the plotted pixel back
-       sb   one,b                                          ; DJNZ $3CD3        ; one row done - loop for the next
-       jne  _3cd3                                          ;                   ; 
-       .ret                                                ; RET               ; 
-* The rotate instructions copied into #R$3C93 and #R$3CDC, and the plot
-* operations #R$6CB2 copies into $3CA8 and $3CE7. Never executed here.
+       b    @line_steep_loop_pad                           ;                   ; the pixel loop runs in scratchpad (line_loops)
+* The rotate instructions copied into the line loops in scratchpad, and the
+* plot operations #R$6CB2 copies there. Never executed here.
 line_rotate_right:
        srl  r1,1                                           ;                   ; the pixel moves right
 line_rotate_left:
@@ -6467,8 +6429,8 @@ draw_gauge_tiles:                                          ; >6ca8
 tunnel_rings:                                              ; >6cb2
        .proc
        bl   @clear_space_view                              ; CALL $388F        ; clear the space view
-       mov  @line_plot_xor,@shallow_line_plot_op           ; LD A,$A9          ; draw lines with XOR
-       mov  @line_plot_xor,@steep_line_plot_op             ; LD ($3CA8),A      ; 
+       mov  @line_plot_xor,@line_shallow_plot_op_pad       ; LD A,$A9          ; draw lines with XOR
+       mov  @line_plot_xor,@line_steep_plot_op_pad         ; LD ($3CA8),A      ; 
        ;                                                   ; LD ($3CE7),A      ; 
        movb @bytes+>07,a                                   ; LD A,$07          ; 
 ;       .call @play_sound_effect                            ; CALL $7468        ; play sound effect 7
@@ -6527,8 +6489,8 @@ tunnel_rings_show:                                         ; >6d0d
        jne  _6cc4                                          ;                   
        movb @b255,a                                        ; LD A,$FF          ; 
        movb a,@tunnel_rings_finished                       ; LD ($E923),A      ; 
-       mov  @line_plot_or,@shallow_line_plot_op            ; LD A,$B1          ; draw lines with OR again
-       mov  @line_plot_or,@steep_line_plot_op              ; LD ($3CA8),A      ; 
+       mov  @line_plot_or,@line_shallow_plot_op_pad        ; LD A,$B1          ; draw lines with OR again
+       mov  @line_plot_or,@line_steep_plot_op_pad          ; LD ($3CA8),A      ; 
        ;                                                   ; LD ($3CE7),A      ; 
        .endproc                                            ; RET               ; 
 

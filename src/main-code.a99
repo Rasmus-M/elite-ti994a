@@ -286,7 +286,7 @@ _1d17:                                                     ; >1d17
        mov  @screen_radius,hl                              ; LD HL,($EB9E)     ; else HL = #R$EB9E (cached_range_value)
        li   de,>0005                                       ; LD DE,$0005       ;
        s    de,hl                                          ; SBC HL,DE         ;
-       jnc  !                                              ; JP C,$1C9E        ; TODO: check code. flown out of sight - next ship
+       joc  !                                              ; JP C,$1C9E        ; flown out of sight - next ship
        b    @title_screen_next_ship                        ;
 !
        mov  @object_position_z_lo,hl                       ; LD HL,($F7D2)     ; else nudge $F7D2 towards +200...
@@ -310,7 +310,7 @@ title_screen_frame:                                        ; >1d3d
 !
        socb a,a                                            ; OR A              ;
        s    de,hl                                          ; SBC HL,DE         ;
-       jnc  _1d62                                          ; JR NC,$1D62       ; TODO: check code. not there yet
+       joc  _1d62                                          ; JR NC,$1D62       ; not there yet
 title_screen_ship_arrived:                                 ; >1d5a
        mov  de,@object_position_z_lo                       ; LD ($F7D2),DE     ; there: stop at that distance
        li   hl,title_ship_arrived                          ; LD HL,$E88A       ;
@@ -914,7 +914,7 @@ _2082:                                                     ; >2082
        sla  a,1                                            ; RLA               ; TODO: check code. 
        a    hl,hl                                          ; ADC HL,HL         ; ...and the next dividend bit into the remainder
        s    de,hl                                          ; SBC HL,DE         ; subtract the divisor
-       jnc  _208d                                          ; JR NC,$208D       ; TODO: check code. it fits
+       joc  _208d                                          ; JR NC,$208D       ; it fits
        a    de,hl                                          ; ADD HL,DE         ; it doesn't: add it back
 _208d:                                                     ; >208d
        sb   one,b                                          ; DJNZ $2082        ; 
@@ -2335,7 +2335,7 @@ outcode:                                                   ; >3a72
        movb a,b                                            ; LD B,A            ; B = that difference
        movb d,a                                            ; LD A,D            ; A = X's high byte
        sb   @bytes+>7f,a                                   ; SBC A,$7F         ; A -= $7F and the borrow above - i.e. DE -= $7F8C
-       joc  !                                              ; JP NC,$3A82       ; TODO: check code. DE >= $7F8C - check the exact-boundary/far-side case
+       jnc  !                                              ; JP NC,$3A82       ; DE >= $7F8C - check the exact-boundary/far-side case
        b    @outcodes_x_near_boundary_case_else            ;                   
 !
        socb @bit0,@c                                       ; SET 0,C           ; DE < $7F8C - X is beyond the near boundary
@@ -2353,7 +2353,7 @@ outcodes_x_far_boundary_test_line:                         ; >3a8a
        movb a,b                                            ; LD B,A            ; B = that difference
        movb d,a                                            ; LD A,D            ; A = X's high byte
        sb   @bytes+>80,a                                   ; SBC A,$80         ; A -= $80 and the borrow above - i.e. DE -= $8075
-       jnc  !                                              ; JP C,$3A9D        ; TODO: check code. DE < $8075 - X is within both bounds, go to the Y test with no more X bits set
+       joc  !                                              ; JP C,$3A9D        ; DE < $8075 - X is within both bounds, go to the Y test with no more X bits set
        b    @outcode_y                                     ;                   
 !
        socb b,a                                            ; OR B              ; DE >= $8075: A OR B - zero only if DE == $8075 exactly
@@ -2368,7 +2368,7 @@ outcode_y:                                                 ; >3a9d
        movb a,b                                            ; LD B,A            ; B = that difference
        movb h,a                                            ; LD A,H            ; A = Y's high byte
        sb   @bytes+>7f,a                                   ; SBC A,$7F         ; A -= $7F and the borrow above - i.e. HL -= $7FC1
-       joc  !                                              ; JP NC,$3AAA       ; TODO: check code. HL >= $7FC1 - check the exact-boundary/far-side case
+       jnc  !                                              ; JP NC,$3AAA       ; HL >= $7FC1 - check the exact-boundary/far-side case
        b    @outcodes_y_near_boundary_case_else            ;                   
 !
        socb @bit2,@c                                       ; SET 2,C           ; HL < $7FC1 - Y is beyond the near boundary
@@ -2386,7 +2386,7 @@ outcodes_y_far_boundary_test_line:                         ; >3ab1
        movb a,b                                            ; LD B,A            ; B = that difference
        movb h,a                                            ; LD A,H            ; A = Y's high byte
        sb   @bytes+>80,a                                   ; SBC A,$80         ; A -= $80 and the borrow above - i.e. HL -= $8040
-       jnc  !                                              ; RET C             ; TODO: check code. HL < $8040 - Y is within both bounds, done, no more bits set
+       joc  !                                              ; RET C             ; HL < $8040 - Y is within both bounds, done, no more bits set
        rt                                                  ;                   
 !
        socb b,a                                            ; OR B              ; HL >= $8040: A OR B - zero only if HL == $8040 exactly
@@ -2770,7 +2770,7 @@ shallow_line_error_term:                                   ; >3c99
        .exx                                                ; EXX               ; back to the shadow set (H' = the error term)
        movb h,a                                            ; LD A,H            ; A = error term
        sb   d,a                                            ; SUB D             ; subtract dy
-       joc  !                                              ; JP NC,$3CA5       ; TODO: check code. still non-negative - no row step this pixel
+       jnc  !                                              ; JP NC,$3CA5       ; still non-negative - no row step this pixel
        b    @shallow_line_loop_no_row_step                 ;                   
 !
        ab   @e,a                                           ; ADD A,E           ; underflowed - add dx back
@@ -2821,7 +2821,7 @@ _3cd3:                                                     ; >3cd3
        .exx                                                ; EXX               ; switch to the shadow set (H' = the error term)
        movb h,a                                            ; LD A,H            ; A = error term
        sb   @e,a                                           ; SUB E             ; subtract dx
-       jnc  steep_line_loop_no_col_step                    ; JR NC,$3CE4       ; TODO: check code. still non-negative - no column step this pixel
+       joc  steep_line_loop_no_col_step                    ; JR NC,$3CE4       ; still non-negative - no column step this pixel
        ab   d,a                                            ; ADD A,D           ; underflowed - add dy back
        movb a,h                                            ; LD H,A            ; H' = corrected error term
        .exx                                                ; EXX               ; back to the main set
@@ -3247,7 +3247,7 @@ draw_disc_next_row:                                        ; >3e7e
        movb a,@c                                           ; LD C,A            ; 
        movb h,a                                            ; LD A,H            ; error term
        sb   d,a                                            ; SUB D             ; -= column delta
-       jnc  _3e87                                          ; JR NC,$3E87       ; TODO: check code. still non-negative - no row step this iteration
+       joc  _3e87                                          ; JR NC,$3E87       ; still non-negative - no row step this iteration
        sb   one,b                                          ; DEC B             ; underflowed - step the row
        ab   @e,a                                           ; ADD A,E           ; and correct the error term
 _3e87:                                                     ; >3e87
@@ -3384,7 +3384,7 @@ _3f28:                                                     ; >3f28
        sb   @bytes+>c1,a                                   ; SUB $C1           ; 
        movb h,a                                            ; LD A,H            ; 
        sb   @bytes+>7f,a                                   ; SBC A,$7F         ; 
-       joc  _3f49                                          ; JR C,$3F49        ; TODO: check code. below it - skip this edge's draw
+       jnc  _3f49                                          ; JR C,$3F49        ; below it - skip this edge's draw
        movb @l,a                                           ; LD A,L            ; 
        sb   @bytes+>41,a                                   ; SUB $41           ; 
        movb h,a                                            ; LD A,H            ; 
@@ -3399,7 +3399,7 @@ _3f49:                                                     ; >3f49
        sb   @bytes+>c1,a                                   ; SUB $C1           ; 
        movb h,a                                            ; LD A,H            ; 
        sb   @bytes+>7f,a                                   ; SBC A,$7F         ; 
-       joc  _3f64                                          ; JR C,$3F64        ; TODO: check code. below it - skip
+       jnc  _3f64                                          ; JR C,$3F64        ; below it - skip
        movb @l,a                                           ; LD A,L            ; 
        sb   @bytes+>41,a                                   ; SUB $41           ; 
        movb h,a                                            ; LD A,H            ; 
@@ -4033,7 +4033,7 @@ _465c:                                                     ; >465c
 _466d:                                                     ; >466d
        sb   @bytes+>40,a                                   ; SUB $40           ; subtract the trial value (DE with binary 01 appended)...
        s    de,hl                                          ; SBC HL,DE         ; ...from the remainder
-       jnc  _4677                                          ; JR NC,$4677       ; TODO: check code. it fits
+       joc  _4677                                          ; JR NC,$4677       ; it fits
        ab   @bytes+>40,a                                   ; ADD A,$40         ; it doesn't: add it back
        a    de,hl                                          ; ADC HL,DE         ; 
 _4677:                                                     ; >4677
@@ -4099,7 +4099,7 @@ _46b2:                                                     ; >46b2
        sla  a,1                                            ; RLA               ; TODO: check code. 
        a    hl,hl                                          ; ADC HL,HL         ; ...and shift the dividend left
        s    de,hl                                          ; SBC HL,DE         ; subtract the length
-       jnc  _46bd                                          ; JR NC,$46BD       ; TODO: check code. it fits
+       joc  _46bd                                          ; JR NC,$46BD       ; it fits
        a    de,hl                                          ; ADD HL,DE         ; it doesn't: add it back
 _46bd:                                                     ; >46bd
        sb   one,b                                          ; DJNZ $46B2        ; 
@@ -4219,7 +4219,7 @@ _4738:                                                     ; >4738
        .ex_de_hl                                           ; EX DE,HL          ; DE = that threshold, HL = #R$47F0's result
        socb a,a                                            ; OR A              ; clear carry
        s    de,hl                                          ; SBC HL,DE         ; HL -= DE
-       joc  !                                              ; RET NC            ; TODO: check code. outside the sights
+       jnc  !                                              ; RET NC            ; outside the sights
        .endproc                                            ;                   
 !
        mov  @object_position_y,hl                          ; LD HL,($F7D0)     ; HL = Y coordinate
@@ -4228,7 +4228,7 @@ _4738:                                                     ; >4738
        .ex_de_hl                                           ; EX DE,HL          ; DE = that threshold, HL = #R$47F0's result
        socb a,a                                            ; OR A              ; clear carry
        s    de,hl                                          ; SBC HL,DE         ; HL -= DE
-       joc  !                                              ; RET NC            ; TODO: check code. outside the sights
+       jnc  !                                              ; RET NC            ; outside the sights
        .endproc                                            ;                   
 !
        movb @object_status_byte,a                          ; LD A,($F7CD)      ; A = a flag byte at $F7CD
@@ -5003,28 +5003,28 @@ on_screen:                                                 ; >4a99
        li   de,>8076                                       ; LD DE,$8076       ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; compare against $8076
-       joc  !                                              ; RET NC            ; TODO: check code. still >= - out of range, return with A=0
+       jnc  !                                              ; RET NC            ; still >= - out of range, return with A=0
        rt                                                  ;                   
 !
        mov  @on_screen_right,hl                            ; LD HL,($E6E2)     ; HL = the first upper bound
        li   de,>7f8c                                       ; LD DE,$7F8C       ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; compare against $7F8C
-       jnc  !                                              ; RET C             ; TODO: check code. below it - out of range, return with A=0
+       joc  !                                              ; RET C             ; below it - out of range, return with A=0
        rt                                                  ;                   
 !
        mov  @on_screen_top,hl                              ; LD HL,($E6E4)     ; HL = the second upper bound
        li   de,>7fc1                                       ; LD DE,$7FC1       ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; compare against $7FC1
-       jnc  !                                              ; RET C             ; TODO: check code. below it - out of range, return with A=0
+       joc  !                                              ; RET C             ; below it - out of range, return with A=0
        rt                                                  ;                   
 !
        mov  @on_screen_bottom,hl                           ; LD HL,($E6E6)     ; HL = the second lower bound
        li   de,>8041                                       ; LD DE,$8041       ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; compare against $8041
-       joc  !                                              ; RET NC            ; TODO: check code. still >= - out of range, return with A=0
+       jnc  !                                              ; RET NC            ; still >= - out of range, return with A=0
        rt                                                  ;                   
 !
        sb   one,a                                          ; DEC A             ; all four checks passed - A = $FF (in range)
@@ -5125,7 +5125,7 @@ _4b51:                                                     ; >4b51
        sla  a,1                                            ; RLA               ; TODO: check code. rotate A left through carry...
        a    hl,hl                                          ; ADC HL,HL         ; ...and HL left, pulling that bit in
        s    de,hl                                          ; SBC HL,DE         ; HL -= DE (the difference computed earlier)
-       jnc  _4b59                                          ; JR NC,$4B59       ; TODO: check code. still non-negative - keep the subtraction
+       joc  _4b59                                          ; JR NC,$4B59       ; still non-negative - keep the subtraction
        a    de,hl                                          ; ADD HL,DE         ; else undo it (add DE back)
 _4b59:                                                     ; >4b59
        sb   one,b                                          ; DJNZ $4B51        ; loop 8 times (one division bit per iteration)

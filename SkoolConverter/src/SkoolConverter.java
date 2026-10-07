@@ -244,7 +244,7 @@ public class SkoolConverter {
                 if (opr1 != null && opr2 == null) {
                     tms9900Line.setInstruction(".call @" + getTMS9900Equivalent(opr1));
                 } else if (opr1 != null && opr1.getType() == Operand.Type.Flag) {
-                    setInverseJumpInstruction(tms9900Line, tms9900Lines, opr1);
+                    setInverseJumpInstruction(tms9900Line, tms9900Lines, additionalLines, opr1);
                     additionalLines.add(new TMS9900Line(TMS9900Line.Type.Instruction, null, ".call @" + getTMS9900Equivalent(opr2)));
                     TMS9900Line label = new TMS9900Line(TMS9900Line.Type.Label);
                     label.setLabel("!");
@@ -316,7 +316,7 @@ public class SkoolConverter {
                         tms9900Line.setComment("TODO. ");
                     }
                 } else if (opr1 != null && opr1.getType() == Operand.Type.Flag) {
-                    setInverseJumpInstruction(tms9900Line, tms9900Lines, opr1);
+                    setInverseJumpInstruction(tms9900Line, tms9900Lines, additionalLines, opr1);
                     additionalLines.add(new TMS9900Line(TMS9900Line.Type.Instruction, null, "b    @" + getTMS9900Equivalent(opr2)));
                     TMS9900Line label = new TMS9900Line(TMS9900Line.Type.Label);
                     label.setLabel("!");
@@ -404,7 +404,7 @@ public class SkoolConverter {
                 if (opr1 == null) {
                     tms9900Line.setInstruction(".ret");
                 } else if (opr1.getType() == Operand.Type.Flag) {
-                    setInverseJumpInstruction(tms9900Line, tms9900Lines, opr1);
+                    setInverseJumpInstruction(tms9900Line, tms9900Lines, additionalLines, opr1);
                     additionalLines.add(new TMS9900Line(TMS9900Line.Type.Instruction, null, ".ret"));
                     TMS9900Line label = new TMS9900Line(TMS9900Line.Type.Label);
                     label.setLabel("!");
@@ -509,7 +509,7 @@ public class SkoolConverter {
         tms9900Line.setComment("TODO: check code. " + (tms9900Line.getComment() != null ? tms9900Line.getComment() : ""));
     }
 
-    private void setInverseJumpInstruction(TMS9900Line tms9900Line, List<TMS9900Line> tms9900Lines, Operand opr1) {
+    private void setInverseJumpInstruction(TMS9900Line tms9900Line, List<TMS9900Line> tms9900Lines, List<TMS9900Line> additionalLines, Operand opr1) {
         String flag = opr1.getFlag();
         if ((flag.equals("c") || flag.equals("nc")) && getLastInstruction(tms9900Lines).startsWith("cb")) {
             if (flag.equals("c")) {
@@ -537,7 +537,9 @@ public class SkoolConverter {
                     tms9900Line.setInstruction("jlt  !");
                     break;
                 case "m":
-                    tms9900Line.setInstruction("jhe  !");
+                    // Not negative: there is no single TMS9900 jump for A> or EQ
+                    tms9900Line.setInstruction("jgt  !");
+                    additionalLines.add(new TMS9900Line(TMS9900Line.Type.Instruction, null, "jeq  !"));
                     break;
             }
         }

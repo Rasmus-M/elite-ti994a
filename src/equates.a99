@@ -136,3 +136,5 @@ blueprints_1_bank_select:
        equ  >6008
 blueprints_2_bank_select:
        equ  >600a
+cockpit_picture_bank_select:
+       equ  >600a

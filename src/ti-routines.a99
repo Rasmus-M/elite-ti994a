@@ -67,6 +67,14 @@ copy_to_pad_1:
        dect r2
        jne  copy_to_pad_1
 
+       li   r0,clear_space_view_rows
+       li   r1,clear_space_view_rows_pad
+       li   r2,clear_space_view_rows_end-clear_space_view_rows
+copy_to_pad_3:
+       mov  *r0+,*r1+
+       dect r2
+       jne  copy_to_pad_3
+
        li   r0,ti_ldir
        li   r1,ldir_pad
        li   r2,ti_ldir_end-ti_ldir
@@ -262,6 +270,33 @@ copy_space_view_row:
        jne  copy_space_view_row
        rt
 copy_space_view_row_end:
+       equ  $
+
+*********************************************************************
+*
+* Clear the space view buffer's rows (the loop of clear_space_view).
+* Copied to scratchpad at clear_space_view_rows_pad.
+*
+* HL: Buffer address of the first row
+* R0: Number of rows
+*
+clear_space_view_rows:
+       clr  *hl+
+       clr  *hl+
+       clr  *hl+
+       clr  *hl+
+       clr  *hl+
+       clr  *hl+
+       clr  *hl+
+       clr  *hl+
+       clr  *hl+
+       clr  *hl+
+       clr  *hl+
+       ai   hl,10                      ; Skip the other 10 bytes of the row
+       dec  r0
+       jne  clear_space_view_rows
+       rt
+clear_space_view_rows_end:
        equ  $
 
 *********************************************************************

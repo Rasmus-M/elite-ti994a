@@ -1772,22 +1772,7 @@ _3855:                                                     ; >3855
 clear_space_view:                                          ; >388f
        li   hl,space_view_buffer                           ; LD HL,$E5F6       ; HL -> the first row (top down instead of bottom up)
        li   r0,128                                         ; LD A,$10          ; 128 rows (16 passes of 8 rows on the MSX)
-_389e:                                                     ; >389e
-       clr  *hl+                                           ; PUSH DE           ; clear 22 bytes
-       clr  *hl+                                           ; PUSH DE           ; 
-       clr  *hl+                                           ; PUSH DE           ; 
-       clr  *hl+                                           ; PUSH DE           ; 
-       clr  *hl+                                           ; PUSH DE           ; 
-       clr  *hl+                                           ; PUSH DE           ; 
-       clr  *hl+                                           ; PUSH DE           ; 
-       clr  *hl+                                           ; PUSH DE           ; 
-       clr  *hl+                                           ; PUSH DE           ; 
-       clr  *hl+                                           ; PUSH DE           ; 
-       clr  *hl+                                           ; PUSH DE           ; 
-       ai   hl,10                                          ; ADD HL,BC         ; skip the other 10 bytes to the next row
-       dec  r0                                             ; DEC A             ; one fewer row
-       jne  _389e                                          ; JR NZ,$389E       ; next row
-       rt                                                  ; RET               ; 
+       b    @clear_space_view_rows_pad                     ; PUSH DE           ; clear each row's 22 bytes, from scratchpad (it returns to the caller)
 
 ********************************************************************************
 * Decompress a full-screen picture (pattern + colour data) to VRAM

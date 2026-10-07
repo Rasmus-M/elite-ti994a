@@ -59,8 +59,10 @@ pad_vars:
        equ  b254+1
 copy_space_view_row_pad:
        equ  pad_vars
+clear_space_view_rows_pad:
+       equ  copy_space_view_row_pad+>26   ; the size of copy_space_view_row
 ldir_pad:
-       equ  copy_space_view_row_pad+>38
+       equ  clear_space_view_rows_pad+>20 ; the size of clear_space_view_rows
 pad_max:
        equ  ldir_pad+>50
 kscan_device:

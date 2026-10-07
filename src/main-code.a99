@@ -1,4 +1,111 @@
 ********************************************************************************
+* Font: 8x8 character bitmaps for codes $20-$7F
+* 
+* 96 glyphs of 8 bytes each (one byte per pixel row, top row first, bit
+* 7 leftmost), running from $0A9F to $0D9E, directly before the
+* commodity name table at #R$0D9F. Most are standard ASCII shapes, but
+* codes $5E-$60 hold an up arrow, a pound sign and a copyright sign, and
+* codes $7E-$7F a checkerboard and a solid block. No code loads the
+* table's address directly.
+font:                                                      ; >0a9f
+       byte >00,>00,>00,>00,>00,>00,>00,>00                          ; space
+       byte >20,>20,>20,>20,>20,>00,>20,>00                          ; "!"
+       byte >50,>50,>50,>00,>00,>00,>00,>00                          ; """
+       byte >50,>50,>F8,>50,>F8,>50,>50,>00                          ; "#"
+       byte >20,>78,>A0,>70,>28,>F0,>20,>00                          ; "$"
+       byte >C0,>C8,>10,>20,>40,>98,>18,>00                          ; "%"
+       byte >40,>A0,>A0,>40,>A8,>90,>68,>00                          ; "&"
+       byte >20,>20,>20,>00,>00,>00,>00,>00                          ; "'"
+       byte >20,>40,>80,>80,>80,>40,>20,>00                          ; "("
+       byte >20,>10,>08,>08,>08,>10,>20,>00                          ; ")"
+       byte >20,>A8,>70,>20,>70,>A8,>20,>00                          ; "*"
+       byte >00,>20,>20,>F8,>20,>20,>00,>00                          ; "+"
+       byte >00,>00,>00,>00,>00,>20,>20,>40                          ; ","
+       byte >00,>00,>00,>F8,>00,>00,>00,>00                          ; "-"
+       byte >00,>00,>00,>00,>00,>10,>00,>00                          ; "."
+       byte >00,>08,>10,>20,>40,>80,>00,>00                          ; "/"
+       byte >70,>88,>98,>A8,>C8,>88,>70,>00                          ; "0"
+       byte >20,>60,>20,>20,>20,>20,>70,>00                          ; "1"
+       byte >70,>88,>08,>10,>20,>40,>F8,>00                          ; "2"
+       byte >F8,>08,>10,>30,>08,>88,>70,>00                          ; "3"
+       byte >10,>30,>50,>90,>F8,>10,>10,>00                          ; "4"
+       byte >F8,>80,>F0,>08,>08,>88,>70,>00                          ; "5"
+       byte >30,>40,>80,>F0,>88,>88,>70,>00                          ; "6"
+       byte >F8,>08,>10,>20,>40,>40,>40,>00                          ; "7"
+       byte >70,>88,>88,>70,>88,>88,>70,>00                          ; "8"
+       byte >70,>88,>88,>78,>08,>10,>60,>00                          ; "9"
+       byte >00,>00,>20,>00,>00,>20,>00,>00                          ; ":"
+       byte >00,>00,>20,>00,>00,>20,>20,>40                          ; ";"
+       byte >10,>20,>40,>80,>40,>20,>10,>00                          ; "<"
+       byte >00,>00,>F8,>00,>F8,>00,>00,>00                          ; "="
+       byte >40,>20,>10,>08,>10,>20,>40,>00                          ; ">"
+       byte >70,>88,>10,>20,>20,>00,>20,>00                          ; "?"
+       byte >70,>88,>A8,>B8,>B0,>80,>78,>00                          ; "@"
+       byte >20,>50,>88,>88,>F8,>88,>88,>00                          ; "A"
+       byte >F0,>88,>88,>F0,>88,>88,>F0,>00                          ; "B"
+       byte >70,>88,>80,>80,>80,>88,>70,>00                          ; "C"
+       byte >F0,>88,>88,>88,>88,>88,>F0,>00                          ; "D"
+       byte >F8,>80,>80,>F0,>80,>80,>F8,>00                          ; "E"
+       byte >F8,>80,>80,>F0,>80,>80,>80,>00                          ; "F"
+       byte >78,>80,>80,>80,>98,>88,>78,>00                          ; "G"
+       byte >88,>88,>88,>F8,>88,>88,>88,>00                          ; "H"
+       byte >70,>20,>20,>20,>20,>20,>70,>00                          ; "I"
+       byte >08,>08,>08,>08,>08,>88,>70,>00                          ; "J"
+       byte >88,>90,>A0,>C0,>A0,>90,>88,>00                          ; "K"
+       byte >80,>80,>80,>80,>80,>80,>F8,>00                          ; "L"
+       byte >88,>D8,>A8,>A8,>88,>88,>88,>00                          ; "M"
+       byte >88,>88,>C8,>A8,>98,>88,>88,>00                          ; "N"
+       byte >70,>88,>88,>88,>88,>88,>70,>00                          ; "O"
+       byte >F0,>88,>88,>F0,>80,>80,>80,>00                          ; "P"
+       byte >70,>88,>88,>88,>A8,>90,>68,>00                          ; "Q"
+       byte >F0,>88,>88,>F0,>A0,>90,>88,>00                          ; "R"
+       byte >70,>88,>80,>70,>08,>88,>70,>00                          ; "S"
+       byte >F8,>20,>20,>20,>20,>20,>20,>00                          ; "T"
+       byte >88,>88,>88,>88,>88,>88,>70,>00                          ; "U"
+       byte >88,>88,>88,>88,>88,>50,>20,>00                          ; "V"
+       byte >88,>88,>88,>A8,>A8,>D8,>88,>00                          ; "W"
+       byte >88,>88,>50,>20,>50,>88,>88,>00                          ; "X"
+       byte >88,>88,>50,>20,>20,>20,>20,>00                          ; "Y"
+       byte >F8,>08,>10,>20,>40,>80,>F8,>00                          ; "Z"
+       byte >78,>40,>40,>40,>40,>40,>78,>00                          ; "["
+       byte >00,>80,>40,>20,>10,>08,>00,>00                          ; "\"
+       byte >F0,>10,>10,>10,>10,>10,>F0,>00                          ; "]"
+       byte >20,>50,>A8,>20,>20,>20,>20,>00                          ; up arrow (in place of "^")
+       byte >38,>40,>40,>40,>F0,>40,>F8,>00                          ; pound sign (in place of "_")
+       byte >30,>48,>B4,>A4,>A4,>B4,>48,>30                          ; copyright sign (in place of "`")
+       byte >00,>00,>70,>08,>78,>88,>78,>00                          ; "a"
+       byte >80,>80,>F0,>88,>88,>88,>F0,>00                          ; "b"
+       byte >00,>00,>78,>80,>80,>80,>78,>00                          ; "c"
+       byte >08,>08,>78,>88,>88,>88,>78,>00                          ; "d"
+       byte >00,>00,>70,>88,>F8,>80,>78,>00                          ; "e"
+       byte >30,>48,>40,>F0,>40,>40,>40,>00                          ; "f"
+       byte >00,>00,>70,>88,>88,>78,>08,>70                          ; "g"
+       byte >80,>80,>F0,>88,>88,>88,>88,>00                          ; "h"
+       byte >20,>00,>60,>20,>20,>20,>70,>00                          ; "i"
+       byte >10,>00,>30,>10,>10,>10,>90,>60                          ; "j"
+       byte >80,>80,>88,>90,>E0,>90,>88,>00                          ; "k"
+       byte >60,>20,>20,>20,>20,>20,>70,>00                          ; "l"
+       byte >00,>00,>D8,>A8,>A8,>A8,>88,>00                          ; "m"
+       byte >00,>00,>F0,>88,>88,>88,>88,>00                          ; "n"
+       byte >00,>00,>70,>88,>88,>88,>70,>00                          ; "o"
+       byte >00,>00,>F0,>88,>88,>F0,>80,>80                          ; "p"
+       byte >00,>00,>78,>88,>88,>78,>08,>08                          ; "q"
+       byte >00,>00,>B8,>C0,>80,>80,>80,>00                          ; "r"
+       byte >00,>00,>78,>80,>70,>08,>F0,>00                          ; "s"
+       byte >40,>40,>F0,>40,>40,>48,>30,>00                          ; "t"
+       byte >00,>00,>88,>88,>88,>98,>68,>00                          ; "u"
+       byte >00,>00,>88,>88,>88,>50,>20,>00                          ; "v"
+       byte >00,>00,>88,>88,>A8,>A8,>D8,>00                          ; "w"
+       byte >00,>00,>88,>50,>20,>50,>88,>00                          ; "x"
+       byte >00,>00,>88,>88,>88,>78,>08,>70                          ; "y"
+       byte >00,>00,>F8,>10,>20,>40,>F8,>00                          ; "z"
+       byte >38,>60,>60,>C0,>60,>60,>38,>00                          ; "{"
+       byte >20,>20,>20,>20,>20,>20,>20,>20                          ; "|"
+       byte >E0,>30,>30,>18,>30,>30,>E0,>00                          ; "}"
+       byte >A8,>54,>A8,>54,>A8,>54,>A8,>54                          ; checkerboard (in place of "~")
+       byte >FC,>FC,>FC,>FC,>FC,>FC,>FC,>00                          ; solid block
+
+********************************************************************************
 * "FRONT VIEW" bitmap
 * 
 * The view name shown when switching to the front view (#R$64A1): 7
@@ -196,7 +303,9 @@ title_screen_frame:                                        ; >1d3d
        a    de,hl                                          ; ADC HL,DE         ;
        mov  hl,@object_position_z_lo                       ; LD ($F7D2),HL     ;
        mov  @title_ship_distance,de                        ; LD DE,($E888)     ; DE = distance to stop at
-       jhe  !                                              ; JP M,$1D5A        ;
+       mov  hl,hl                                          ;                   ; test the sign of the new distance (the MOVs above changed the status)
+       jgt  !                                              ; JP M,$1D5A        ;
+       jeq  !                                              ;                   ; 
        b    @title_screen_ship_arrived                     ;
 !
        socb a,a                                            ; OR A              ;
@@ -281,7 +390,8 @@ title_screen_key:                                          ; >1db5
 title_screen_swing:                                        ; >1ddc
        movb *ix,a                                          ; LD A,(IX+$00)     ;
        socb a,a                                            ; OR A              ; the target negative?
-       jhe  !                                              ; JP M,$1DF3        ; yes
+       jgt  !                                              ; JP M,$1DF3        ; yes
+       jeq  !                                              ;                   ; 
        b    @title_screen_swing_down                       ;
 !
        ab   one,*hl                                        ; INC (HL)          ; swing up
@@ -1461,7 +1571,7 @@ print_char:                                                ; >34a8
        a    hl,hl                                          ; ADD HL,HL         ; HL *= 8 (this char's offset into the font table)
        a    hl,hl                                          ; ADD HL,HL         ; 
        a    hl,hl                                          ; ADD HL,HL         ; 
-       li   bc,log_table+>019f                             ; LD BC,$099F       ; the font pattern table
+       li   bc,font->0100                                  ; LD BC,$099F       ; the font pattern table (codes $20-$7F)
        a    bc,hl                                          ; ADD HL,BC         ; HL -> this character's 8-byte glyph
        li   de,scratch_buffer                              ; LD DE,$E600       ; DE -> the staging buffer
        li   bc,>0008                                       ; LD BC,$0008       ; 8 bytes
@@ -1480,13 +1590,15 @@ print_char:                                                ; >34a8
        movb @bytes+>08,@c                                  ; LD C,$08          ; 8 rows
 _34d7:                                                     ; >34d7
        .push bc                                            ; PUSH BC           ; 
-       movb *de,a                                          ; LD A,(DE)         ; A = this row's spillover byte (0 to start)
+       movb *hl,r0                                         ; LD A,(DE)         ; R0 = glyph byte : this row's spillover byte (0 to start)
+       movb *de,@r0lb                                      ;                   ; 
 _34d9:                                                     ; >34d9
-       ; SRL (HL)                                          ; SRL (HL)          ; TODO: check code. shift the glyph byte right one bit...
-       srl  a,1                                            ; RRA               ; TODO: check code. ...carrying the bit shifted out into A's top bit
+       srl  r0,1                                           ; SRL (HL)          ; shift the glyph byte right one bit...
+       ;                                                   ; RRA               ; ...carrying the bit shifted out into the spillover byte
        sb   one,b                                          ; DJNZ $34D9        ; repeat for the full shift amount
        jne  _34d9                                          ;                   
-       movb a,*de                                          ; LD (DE),A         ; store what spilled over into the next byte
+       movb r0,*hl                                         ;                   ; store the shifted glyph byte
+       movb @r0lb,*de                                      ; LD (DE),A         ; store what spilled over into the next byte
        inc  hl                                             ; INC HL            ; both halves -> next row
        inc  de                                             ; INC DE            ; 
        .pop bc                                             ; POP BC            ; 
@@ -1508,7 +1620,8 @@ _34f1:                                                     ; >34f1
        .push hl                                            ; PUSH HL           ; (timing delay - let the VDP latch the address)
        .pop hl                                             ; POP HL            ; 
        movb @vdprd,a                                       ; IN A,($98)        ; A = the current pattern byte at that address
-       ; XOR (HL)                                          ; XOR (HL)          ; TODO: check code. combine with this row's buffer byte
+       movb *hl,r0                                         ; XOR (HL)          ; combine with this row's buffer byte
+       xor  r0,a                                           ;                   ; 
        inc  hl                                             ; INC HL            ; buffer -> next row
        .ex_af_af_                                          ; EX AF,AF'         ; stash the combined byte
        movb @e,a                                           ; LD A,E            ; 
@@ -1683,7 +1796,7 @@ _35c6:                                                     ; >35c6
        movb a,@vdpwd                                       ; OUT ($98),A       ; Write the fill byte
        ab   one,@l                                         ; INC L             ; 
        movb @l,a                                           ; LD A,L            ; 
-       ; AND D                                             ; AND D             ; TODO: check code. 
+       andi a,>0700                                        ; AND D             ; D is always 7 here
        jne  _35db                                          ; JR NZ,$35DB       ; Still inside this character's 8 pixel-rows
        movb @l,a                                           ; LD A,L            ; 
        sb   one,a                                          ; DEC A             ; 
@@ -2108,24 +2221,25 @@ count_message_timer:                                       ; >39f1
        jne  !                                              ; RET Z             ; 0 - nothing to do
        rt                                                  ;                   
 !
-       jhe  !                                              ; JP M,$39FC        ; negative - a message is showing
+       jgt  !                                              ; JP M,$39FC        ; negative - a message is showing
+       jeq  !                                              ;                   ; 
        b    @count_message_timer_2                         ;                   
 !
        sb   one,*hl                                        ; DEC (HL)          ; counting down to when the next message can be shown
        rt                                                  ; RET               ; 
 count_message_timer_2:                                     ; >39fc
        sb   one,*hl                                        ; DEC (HL)          ; 
-       jhe  !                                              ; JP M,$3A03        ; still showing - draw it
+       jgt  !                                              ; JP M,$3A03        ; still showing - draw it
+       jeq  !                                              ;                   ; 
        b    @draw_view_message                             ;                   
 !
        movb @bytes+>19,*hl                                 ; LD (HL),$19       ; 25 frames before the next message
        rt                                                  ; RET               ; 
 draw_view_message:                                         ; >3a03
        mov  @view_message_address,hl                       ; LD HL,($E735)     ; the message
-       movb @view_message_column,a                         ; LD A,($E737)      ; 
-       movb a,@e                                           ; LD E,A            ; E = column
-       movb @message_row,a                                 ; LD A,($E92C)      ; 
-       movb a,d                                            ; LD D,A            ; D = row
+       movb @view_message_column,@e                        ; LD A,($E737)      ; E = column
+       movb @message_row,d                                 ; LD A,($E92C)      ; D = row, as an MSX buffer page ($D6-$E5)
+       ai   de,space_view_buffer->d600                     ;                   ; DE -> the buffer at that row and column
 _3a0e:                                                     ; >3a0e
        movb *hl,a                                          ; LD A,(HL)         ; A = the next character
        inc  hl                                             ; INC HL            ; 
@@ -2153,9 +2267,7 @@ _3a13:                                                     ; >3a13
 _3a2a:                                                     ; >3a2a
        movb @vdprd,a                                       ; IN A,($98)        ; copy a row
        movb a,*de                                          ; LD (DE),A         ; 
-       movb @e,a                                           ; LD A,E            ; 
-       ab   @bytes+>20,a                                   ; ADD A,$20         ; next pixel row
-       movb a,@e                                           ; LD E,A            ; 
+       ai   de,>20                                         ; ADD A,$20         ; next pixel row
        sb   one,b                                          ; DJNZ $3A2A        ; 
        jne  _3a2a                                          ;                   
        ; EI                                                ; EI                ; TODO: check code. 
@@ -2163,10 +2275,11 @@ _3a2a:                                                     ; >3a2a
        .pop de                                             ; POP DE            ; 
        .pop af                                             ; POP AF            ; 
        socb a,a                                            ; OR A              ; 
-       jhe  !                                              ; RET M             ; that was the last character
+       jgt  !                                              ; RET M             ; that was the last character
+       jeq  !                                              ;                   ; 
        rt                                                  ;                   
 !
-       ab   one,@e                                         ; INC E             ; next column
+       inc  de                                             ; INC E             ; next column
        jmp  _3a0e                                          ; JR $3A0E          ; 
 
 ********************************************************************************
@@ -3371,7 +3484,8 @@ draw_ship:                                                 ; >4255
        mov  hl,@view_z                                     ; LD ($E6DC),HL     ; store the projected second half
        movb h,a                                            ; LD A,H            ; A = the projected second half's high byte
        socb a,a                                            ; OR A              ; 
-       jhe  !                                              ; RET M             ; behind the player
+       jgt  !                                              ; RET M             ; behind the player
+       jeq  !                                              ;                   ; 
        .endproc                                            ;                   
 !
        socb @l,a                                           ; OR L              ; 
@@ -4082,7 +4196,8 @@ _4721:                                                     ; >4721
        ab   a,a                                            ; ADD A,A           ; 
        ab   a,a                                            ; ADD A,A           ; A = -exponent * 4
        ab   h,a                                            ; ADD A,H           ; A += HL's high byte
-       jhe  !                                              ; JP M,$4735        ; too small
+       jgt  !                                              ; JP M,$4735        ; too small
+       jeq  !                                              ;                   ; 
        b    @check_sights                                  ;                   
 !
        movb a,h                                            ; LD H,A            ; else: H = the combined high byte
@@ -4094,7 +4209,8 @@ _4738:                                                     ; >4738
        mov  hl,@screen_radius                              ; LD ($EB9E),HL     ; 
        movb @view_laser_type,a                             ; LD A,($F818)      ; A = a sign byte at $F818
        socb a,a                                            ; OR A              ; test its sign
-       jhe  !                                              ; RET M             ; no laser in this view
+       jgt  !                                              ; RET M             ; no laser in this view
+       jeq  !                                              ;                   ; 
        .endproc                                            ;                   
 !
        mov  @view_x,hl                                     ; LD HL,($E6D8)     ; HL = X coordinate
@@ -4298,7 +4414,8 @@ _4809:                                                     ; >4809
        s    de,hl                                          ; SBC HL,DE         ; HL -= DE
        .ex_af_af_                                          ; EX AF,AF'         ; restore the stashed exponent*4 value
        ab   h,a                                            ; ADD A,H           ; A += HL's high byte
-       jhe  !                                              ; JP M,$4839        ; negative - out of range
+       jgt  !                                              ; JP M,$4839        ; negative - out of range
+       jeq  !                                              ;                   ; 
        b    @project_coordinate_2                          ;                   
 !
        movb a,h                                            ; LD H,A            ; else: H = the combined high byte
@@ -4558,7 +4675,8 @@ draw_face_edge_flag:                                       ; >4920
 draw_face_edge:                                            ; >4932
        movb *hl,a                                          ; LD A,(HL)         ; A = the edge's first vertex
        socb a,a                                            ; OR A              ; 
-       jhe  !                                              ; JP M,$4948        ; bit 7 set - skip it
+       jgt  !                                              ; JP M,$4948        ; bit 7 set - skip it
+       jeq  !                                              ;                   ; 
        b    @draw_face_edges_2                             ;                   
 !
        movb a,@e                                           ; LD E,A            ; E = the first vertex
@@ -4738,7 +4856,8 @@ project_vertex_record:                                     ; >4a21
        bl   @add_object_position                           ; CALL $44D2        ; combine that result via #R$44D2
        movb h,a                                            ; LD A,H            ; test the combined result's sign
        socb a,a                                            ; OR A              ; 
-       jhe  !                                              ; RET M             ; negative - no valid projection, carry clear
+       jgt  !                                              ; RET M             ; negative - no valid projection, carry clear
+       jeq  !                                              ;                   ; 
        .endproc                                            ;                   
 !
        socb @l,a                                           ; OR L              ; exactly zero?
@@ -4814,7 +4933,8 @@ vertex_relative_record:                                    ; >4a6a
 !
        movb h,a                                            ; LD A,H            ; A = the combined result's high byte
        socb a,a                                            ; OR A              ; test its sign (also clears carry)
-       jhe  !                                              ; RET M             ; negative - return with carry clear
+       jgt  !                                              ; RET M             ; negative - return with carry clear
+       jeq  !                                              ;                   ; 
        .endproc                                            ;                   
 !
        ; SCF                                               ; SCF               ; TODO: check code. non-negative - set carry
@@ -5652,7 +5772,8 @@ stardust_set_velocity:                                     ; >6805
        movb @bytes+>02,h                                   ; LD H,$02          ; 
        movb *hl,a                                          ; LD A,(HL)         ; A = bit length of (C OR B)
        sb   @bytes+>04,a                                   ; SUB $04           ; 
-       jhe  !                                              ; JP M,$6818        ; both already fit in 3 bits
+       jgt  !                                              ; JP M,$6818        ; both already fit in 3 bits
+       jeq  !                                              ;                   ; 
        b    @stardust_set_velocity_lookup                  ;                   
 !
        ab   one,a                                          ; INC A             ; A = number of bits to shift out
@@ -5861,7 +5982,8 @@ _68f0:                                                     ; >68f0
        movb @>03(ix),d                                     ; LD D,(IX+$03)     ; D = Y pixel offset
        movb @e,a                                           ; LD A,E            ; 
        socb a,a                                            ; OR A              ; 
-       jhe  !                                              ; JP M,$6902        ; X negative - check the left edge instead
+       jgt  !                                              ; JP M,$6902        ; X negative - check the left edge instead
+       jeq  !                                              ;                   ; 
        b    @stardust_check_left_edge                      ;                   
 !
        cb   a,@bytes+>59                                   ; CP $59            ; X > 88?
@@ -5873,7 +5995,8 @@ stardust_check_left_edge:                                  ; >6902
 _6906:                                                     ; >6906
        movb d,a                                            ; LD A,D            ; A = Y pixel offset
        socb a,a                                            ; OR A              ; 
-       jhe  !                                              ; JP M,$6911        ; Y negative - check the top edge instead
+       jgt  !                                              ; JP M,$6911        ; Y negative - check the top edge instead
+       jeq  !                                              ;                   ; 
        b    @stardust_check_top_edge_and_plot              ;                   
 !
        cb   a,@bytes+>41                                   ; CP $41            ; Y > 64?
@@ -6570,9 +6693,9 @@ _6d6e:                                                     ; >6d6e
        b    @hide_sprites_jmp                              ; JP $3942          ; 
 set_up_laser:                                              ; >6d82
        movb a,@e                                           ; LD E,A            ; E = the laser type
-       ab   a,a                                            ; ADD A,A           ; A = type * 5
-       ab   a,a                                            ; ADD A,A           ; 
-       ab   @e,a                                           ; ADD A,E           ; 
+       ab   a,a                                            ; ADD A,A           ; A = type * 6 (5 bytes plus a pad byte, so the pointer is word-aligned)
+       ab   @e,a                                           ; ADD A,A           ; 
+       ab   a,a                                            ; ADD A,E           ; 
        movb a,@e                                           ; LD E,A            ; 
        sb   d,d                                            ; LD D,$00          ; 
        li   hl,laser_types                                 ; LD HL,$6EB3       ; the laser types
@@ -6585,10 +6708,8 @@ set_up_laser:                                              ; >6d82
        movb a,@laser_power                                 ; LD ($F81A),A      ; laser power
        movb *hl,@e                                         ; LD E,(HL)         ; E = the crosshair colour
        inc  hl                                             ; INC HL            ; 
-       movb *hl,a                                          ; LD A,(HL)         ; 
-       inc  hl                                             ; INC HL            ; 
-       movb *hl,h                                          ; LD H,(HL)         ; 
-       movb a,@l                                           ; LD L,A            ; HL = the RLE pattern stream pointer (record bytes 3-4)
+       inc  hl                                             ;                   ; skip the pad byte
+       mov  *hl,hl                                         ; LD L,A            ; HL = the RLE pattern stream pointer (record bytes 4-5)
        limi 0                                              ; DI                ; 
        sb   a,a                                            ; LD A,$00          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
@@ -6701,17 +6822,19 @@ crosshair_military:                                        ; >6e80
 ********************************************************************************
 * Laser types
 * 
-* Five bytes for each type of laser, read by #R$6D82: the cooldown between
-* shots (#R$F819), the power (#R$F81A), the colour of the crosshair
-* sprites, and the address of the crosshair pattern (#R$6DEB).
+* Five bytes for each type of laser (six on the TI: a pad byte keeps the
+* pointer word-aligned), read by #R$6D82: the cooldown between shots
+* (#R$F819), the power (#R$F81A), the colour of the crosshair sprites, and
+* the address of the crosshair pattern (#R$6DEB).
+       even
 laser_types:                                               ; >6eb3
-       byte >05,>05,>02                                              ; 0: pulse laser - cooldown 5, power 5, medium green
+       byte >05,>05,>02,>00                                          ; 0: pulse laser - cooldown 5, power 5, medium green
        data crosshair_patterns                                       ; the crosshair pattern
-       byte >04,>0A,>06                                              ; 1: mining laser - cooldown 4, power 10, dark red
+       byte >04,>0A,>06,>00                                          ; 1: mining laser - cooldown 4, power 10, dark red
        data crosshair_mining                                         ; the crosshair pattern
-       byte >02,>05,>07                                              ; 2: beam laser - cooldown 2, power 5, cyan
+       byte >02,>05,>07,>00                                          ; 2: beam laser - cooldown 2, power 5, cyan
        data crosshair_beam                                           ; the crosshair pattern
-       byte >00,>0A,>0D                                              ; 3: military laser - cooldown 0, power 10, magenta
+       byte >00,>0A,>0D,>00                                          ; 3: military laser - cooldown 0, power 10, magenta
        data crosshair_military                                       ; the crosshair pattern
 
 ********************************************************************************

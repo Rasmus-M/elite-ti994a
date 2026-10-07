@@ -118,7 +118,7 @@ r      requ 0
 pattern_table:                         ; Pattern table
        equ  >0000
 sprite_pattern_table:                  ; Sprite pattern table
-       equ  >1b00
+       equ  >3800
 color_table:                           ; Color table
        equ  >2000
 name_table:                            ; Name table 1

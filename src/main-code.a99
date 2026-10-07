@@ -193,12 +193,12 @@ get_blueprint_data:                                        ; >16e3
 * (#R$A30A), and N to the docked screen (#R$6276), starting with the
 * default commander.
 title_screen:                                              ; >1c5c
-       limi 0                                              ; DI                ; backdrop colour 1 (black)
+;      limi 0                                              ; DI                ; backdrop colour 1 (black)
        movb one,a                                          ; LD A,$01          ;
        movb a,@vdpwa                                       ; OUT ($99),A       ;
        movb @bytes+>87,a                                   ; LD A,$87          ;
        movb a,@vdpwa                                       ; OUT ($99),A       ;
-       ; EI                                                ; EI                ; TODO: check code.
+       ; EI                                                ; EI                ;
        sb   a,a                                            ; XOR A             ;
        movb a,@docked                                      ; LD ($E90A),A      ;
        sb   one,a                                          ; DEC A             ;
@@ -1431,7 +1431,7 @@ _34ee:                                                     ; >34ee
        .push de                                            ; PUSH DE           ; stash this tile's base VRAM address
        movb @bytes+>08,b                                   ; LD B,$08          ; 8 rows
 _34f1:                                                     ; >34f1
-       limi 0                                              ; DI                ; VDP address/data access must not be interrupted
+;      limi 0                                              ; DI                ; VDP address/data access must not be interrupted
        movb @e,a                                           ; LD A,E            ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
        movb d,a                                            ; LD A,D            ; 
@@ -1450,7 +1450,7 @@ _34f1:                                                     ; >34f1
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        .ex_af_af_                                          ; EX AF,AF'         ; recover the combined byte
        movb a,@vdpwd                                       ; OUT ($98),A       ; write it back (an XOR-plot, not an overwrite)
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        sb   one,b                                          ; DEC B             ; one row done
        jeq  continue_34a8_advance_cursor                   ; JR Z,$351C        ; all 8 rows plotted - go advance the cursor
        ab   one,@e                                         ; INC E             ; VRAM address -> next row of this pattern
@@ -1599,7 +1599,7 @@ fill_vram_bytes:                                           ; >35a4
 * I:B Height in pixel-rows (a multiple of 8)
 * I:C Width in characters
 fill_vram_rect:                                            ; >35b8
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb a,@e                                           ; LD E,A            ; Keep the fill byte in E; A is about to be reused for
        movb @bytes+>07,d                                   ; LD D,$07          ; address bytes. D = row-within-character wrap mask
 _35bc:                                                     ; >35bc
@@ -1695,12 +1695,12 @@ copy_space_view:                                           ; >3846
        movb @bytes+>10,a                                   ; LD A,$10          ; 16 character rows
        movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; writing to VRAM
 _3855:                                                     ; >3855
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        swpb de                                             ; LD A,$28          ; 
        movb de,@vdpwa                                      ; OUT ($99),A       ; VRAM address low byte: column 5
        swpb de                                             ; LD A,D            ; 
        movb de,@vdpwa                                      ; OUT ($99),A       ; high byte: the character row
-       ; EI                                                ; EI                ; TODO: check code.
+       ; EI                                                ; EI                ;
        movb @bytes+>16,b                                   ; LD B,$C6          ; 22 characters
 _3862:                                                     ; >3862
        movb *hl,*r2                                        ; OUTI              ; row 0 of the character
@@ -1765,18 +1765,18 @@ _389e:                                                     ; >389e
 decompress_picture:                                        ; >390e
        .proc
        sb   a,a                                            ; LD A,$00          ; 
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>40,a                                   ; LD A,$40          ; VRAM address = $0000 (pattern-generator table)
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        bl   @decompress_rle_to_vram                        ; CALL $3928        ; Unpack the pixel/pattern half of the picture
        sb   a,a                                            ; LD A,$00          ; 
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>60,a                                   ; LD A,$60          ; VRAM address = $2000 (colour table)
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        b    @decompress_rle_to_vram_jmp                    ; JP $3928          ; Unpack the colour half, continuing the same stream
 
 ********************************************************************************
@@ -1880,11 +1880,11 @@ clear_message_line_jmp:
        movb @b255,a                                        ; LD A,$FF          ; 
        movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; VRAM busy
        movb @bytes+>18,a                                   ; LD A,$18          ; 
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>56,a                                   ; LD A,$56          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $1618: the patterns of row 22, column 3
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        li   bc,>00d0                                       ; LD BC,$00D0       ; 208 bytes (26 characters)
        sb   @e,@e                                          ; LD E,$00          ; of 0
        bl   @fill_vram_bytes                               ; CALL $35A4        ; clear them (#R$35A4)
@@ -1893,11 +1893,11 @@ clear_message_line_jmp:
        movb @b255,a                                        ; LD A,$FF          ; 
        movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; VRAM busy
        movb @bytes+>18,a                                   ; LD A,$18          ; 
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>76,a                                   ; LD A,$76          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $3618: the colours of row 22, column 3
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        li   bc,>00d0                                       ; LD BC,$00D0       ; 208 bytes
        movb @bytes+>15,@e                                  ; LD E,$15          ; of $15
        bl   @fill_vram_bytes                               ; CALL $35A4        ; colour them
@@ -1907,7 +1907,7 @@ clear_message_line_jmp:
        li   bc,>011a                                       ; LD BC,$011A       ; 1 pixel row, 26 characters
        movb @bytes+>15,a                                   ; LD A,$15          ; colour $15
        bl   @fill_vram_rect                                ; CALL $35B8        ; colour it (#R$35B8)
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        li   bc,>0516                                       ; LD BC,$0516       ; column 5, row 22
        bl   @set_cursor_position                           ; CALL $3548        ; put the text cursor there (#R$3548)
        .pop hl                                             ; POP HL            ; 
@@ -2076,7 +2076,7 @@ _3a13:                                                     ; >3a13
        a    hl,hl                                          ; ADD HL,HL         ; HL = the character * 8
        li   bc,>1a80                                       ; LD BC,$1A80       ; 
        a    bc,hl                                          ; ADD HL,BC         ; HL = the character's pattern
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb @l,a                                           ; LD A,L            ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb h,a                                            ; LD A,H            ; 
@@ -2090,7 +2090,7 @@ _3a2a:                                                     ; >3a2a
        ai   de,>20                                         ; ADD A,$20         ; next pixel row
        sb   one,b                                          ; DJNZ $3A2A        ; 
        jne  _3a2a                                          ;                   
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        .pop hl                                             ; POP HL            ; 
        .pop de                                             ; POP DE            ; 
        .pop af                                             ; POP AF            ; 
@@ -2116,7 +2116,7 @@ colour_space_view:                                         ; >3a4d
        movb a,@e                                           ; LD E,A            ; 
        movb @bytes+>10,@c                                  ; LD C,$10          ; 16 rows
 _3a53:                                                     ; >3a53
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb @l,a                                           ; LD A,L            ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb h,a                                            ; LD A,H            ; 
@@ -2128,7 +2128,7 @@ _3a5e:                                                     ; >3a5e
        movb a,@vdpwd                                       ; OUT ($98),A       ; 
        sb   one,b                                          ; DJNZ $3A5E        ; 
        jne  _3a5e                                          ;                   
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        ab   one,h                                          ; INC H             ; next row
        sb   one,@c                                         ; DEC C             ; 
        jne  _3a53                                          ; JR NZ,$3A53       ; 
@@ -2855,7 +2855,7 @@ _3d85:                                                     ; >3d85
 * O:HL The next slot
 draw_circle_point:                                         ; >3d8c
        .proc
-       limi 0                                              ; DI                ; repurposing SP - no interrupts while it's not a real stack pointer
+;      limi 0                                              ; DI                ; repurposing SP - no interrupts while it's not a real stack pointer
        mov  sp,@circle_saved_sp                            ; LD ($E81D),SP     ; stash the real SP
        mov  hl,sp                                          ; LD SP,HL          ; SP = this call's slot cursor
        movb @circle_first_step,a                           ; LD A,($E80C)      ; still the first step (nothing in the slot to connect to yet)?
@@ -2870,7 +2870,7 @@ draw_circle_point:                                         ; >3d8c
        li   hl,>0000                                       ; LD HL,$0000       ; 
        a    sp,hl                                          ; ADD HL,SP         ; HL = the new cursor (old cursor - 4), for next step's call to this slot
        mov  @circle_saved_sp,sp                            ; LD SP,($E81D)     ; restore the real SP
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        .endproc                                            ; RET               ; 
 write_vertex_and_draw_edge:                                ; >3dac
        .pop hl                                             ; POP HL            ; HL = the slot's old Y (this call's vertex from last step)
@@ -2888,7 +2888,7 @@ write_vertex_and_draw_edge:                                ; >3dac
        li   hl,>fffc                                       ; LD HL,$FFFC       ; 
        a    sp,hl                                          ; ADD HL,SP         ; HL = the new cursor (old cursor - 4)
        mov  @circle_saved_sp,sp                            ; LD SP,($E81D)     ; restore the real SP
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        .push bc                                            ; PUSH BC           ; 
        .push de                                            ; PUSH DE           ; 
        .push hl                                            ; PUSH HL           ; save this call's live registers across the line-draw call
@@ -4883,7 +4883,7 @@ enter_flight_mode:                                         ; >63f1
        movb a,@space_view_showing                          ; LD ($E903),A      ; space view showing
        li   hl,>1b00                                       ; LD HL,$1B00       ; hide all 32 sprites
        movb @bytes+>20,b                                   ; LD B,$20          ; 
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        bl   @hide_sprites                                  ; CALL $3942        ; 
        movb @bytes+>80,a                                   ; LD A,$80          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
@@ -4897,7 +4897,7 @@ enter_flight_mode:                                         ; >63f1
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $38C0
        li   hl,compass_dot_pattern                         ; LD HL,$6ED4       ; 
        bl   @write_run_length_encoded_byte_stream          ; CALL $39B9        ; upload the compass dot pattern
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        bl   @blank_screen_decompress_picture_recolour      ; CALL $7139        ; unpack the cockpit screen picture
        bl   @redraw_all_dashboard_gauges                   ; CALL $6433        ; draw all the gauges
        sb   a,a                                            ; XOR A             ; 
@@ -4970,7 +4970,7 @@ _646f:                                                     ; >646f
        movb @bytes+>07,@c                                  ; LD C,$07          ; 7 characters
 _647c:                                                     ; >647c
        .push af                                            ; PUSH AF           ; 
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>40,a                                   ; LD A,$40          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $0061 + 8n: rows 1-5 of the character's pattern
@@ -4981,7 +4981,7 @@ _6486:                                                     ; >6486
        movb a,@vdpwd                                       ; OUT ($98),A       ; 
        sb   one,b                                          ; DJNZ $6486        ; 
        jne  _6486                                          ;                   
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        .pop af                                             ; POP AF            ; 
        ab   @bytes+>08,a                                   ; ADD A,$08         ; next character
        sb   one,@c                                         ; DEC C             ; 
@@ -5307,7 +5307,7 @@ jump_to_view_handler:                                      ; >67a8
 ;      inc  hl                                             ; INC HL            ; 
 ;      movb *hl,h                                          ; LD H,(HL)         ; 
 ;      movb a,@l                                           ; LD L,A            ; 
-       b    *hl                                            ; JP (HL)           ; TODO. 
+       b    *hl                                            ; JP (HL)           ;
 
 ********************************************************************************
 * Stardust: roll in the front view
@@ -5852,7 +5852,7 @@ draw_station_indicator:                                    ; >6adc
        movb @station_in_range,a                            ; LD A,($EB05)      ; 
        sb   one,a                                          ; DEC A             ; the space station in range?
        jne  continuation_blank_status_lamp_tile            ; JR NZ,$6B05       ; no - blank the indicator
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb @bytes+>a0,a                                   ; LD A,$A0          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>56,a                                   ; LD A,$56          ; 
@@ -5874,7 +5874,7 @@ continuation_blank_status_lamp_tile:                       ; >6b05
        sb   a,a                                            ; XOR A             ; of 0
        bl   @fill_vram_rect                                ; CALL $35B8        ; blank the indicator (#R$35B8)
 _6b10:                                                     ; >6b10
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -5891,7 +5891,7 @@ draw_ecm_indicator:                                        ; >6b12
        movb @ecm_countdown,a                               ; LD A,($E912)      ; 
        socb a,a                                            ; OR A              ; ECM on?
        jeq  continuation_blank_status_lamp_tile_6b3b       ; JR Z,$6B3B        ; no - blank the indicator
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb @bytes+>50,a                                   ; LD A,$50          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>56,a                                   ; LD A,$56          ; 
@@ -5913,7 +5913,7 @@ continuation_blank_status_lamp_tile_6b3b:                  ; >6b3b
        sb   a,a                                            ; XOR A             ; of 0
        bl   @fill_vram_rect                                ; CALL $35B8        ; blank the indicator (#R$35B8)
 _6b46:                                                     ; >6b46
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -5973,12 +5973,12 @@ draw_laser_temperature:                                    ; >6b60
 draw_missile_indicator:                                    ; >6b6e
        .proc
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; do nothing unless the dashboard is showing
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb @bytes+>10,a                                   ; LD A,$10          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>5b,a                                   ; LD A,$5B          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $1B10: sprite 4's attributes
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        li   bc,>b838                                       ; LD BC,$B838       ; y = $B8, x = $38
        mov  @missile_count,hl                              ; LD HL,($F776)     ; L = number of missiles
        movb one,h                                          ; LD H,$01          ; H = 1 for the first
@@ -6191,7 +6191,7 @@ draw_gauge_tiles:                                          ; >6ca8
        movb a,@e                                           ; LD E,A            ; 
        movb @bytes+>04,b                                   ; LD B,$04          ; 
        bl   @fill_vram_rect                                ; CALL $35B8        ; 
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        .pop de                                             ; POP DE            ; 
        .endproc                                            ; RET               ; 
 
@@ -6388,7 +6388,7 @@ set_up_laser:                                              ; >6d82
        inc  hl                                             ; INC HL            ; 
        inc  hl                                             ;                   ; skip the pad byte
        mov  *hl,hl                                         ; LD L,A            ; HL = the RLE pattern stream pointer (record bytes 4-5)
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        sb   a,a                                            ; LD A,$00          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
        movb @bytes+>78,a                                   ; LD A,$78          ; 
@@ -6417,7 +6417,7 @@ _6dbb:                                                     ; >6dbb
        movb a,@c                                           ; LD C,A            ; 
        sb   one,@l                                         ; DEC L             ; 
        jne  _6db8                                          ; JR NZ,$6DB8       ; next column
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -6669,7 +6669,7 @@ startup_code_stardust_table:                               ; >6f9f
 * display back on.
 blank_screen_decompress_picture_recolour:                  ; >7139
        .proc
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb @vdp_reg1_cache,a                              ; LD A,($F3E0)      ; A = VDP register 1 (#R$F3E0)
        .push af                                            ; PUSH AF           ; save it
        andi a,>bf00                                        ; AND $BF           ; 
@@ -6685,11 +6685,11 @@ blank_screen_decompress_picture_recolour:                  ; >7139
        bl   @colour_space_view                             ; CALL $3A4D        ; (#R$3A4D)
 _7157:                                                     ; >7157
        .pop af                                             ; POP AF            ; 
-       limi 0                                              ; DI                ; 
+;      limi 0                                              ; DI                ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>81,a                                   ; LD A,$81          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; turn the display back on
-       ; EI                                                ; EI                ; TODO: check code. 
+       ; EI                                                ; EI                ;
        .endproc                                            ; RET               ; 
 
 ********************************************************************************

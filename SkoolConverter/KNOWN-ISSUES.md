@@ -35,6 +35,8 @@ after `SUB`/`SBC` (now inverted).
 - **Carry tests after `CP` with an instruction in between** become `joc`/`jnc`, but `cb` doesn't set
   carry on the TI. Only a test directly after the `cb` becomes `jl`/`jhe`.
 - **Carry tests after `SUB`/`SBC` with an instruction in between** aren't inverted.
+- **16-bit `INC`/`DEC` (`INC HL`...)** don't affect the Z80 flags, but `inc hl` sets the TI status, so a
+  flag test after one tests the register instead (e.g. `LD A,(HL) / OR A / INC HL / JP P`).
 - **`EX AF,AF'`** doesn't save the TI status register.
 - **`BIT n,r` → `czc`** sets only EQ, so a following `JP P`/`JP M` tests stale status.
 - **`P` maps to `he`** in `getTMS9900Equivalent`; positive needs `jgt` or `jeq`. Harmless for now

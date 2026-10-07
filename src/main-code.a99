@@ -2048,9 +2048,9 @@ show_view_message:                                         ; >39c8
        sb   @c,@c                                          ; LD C,$00          ; 
 show_view_message_count:                                   ; >39cd
        ab   one,@c                                         ; INC C             ; count its characters
-       movb *hl,a                                          ; LD A,(HL)         ; 
-       socb a,a                                            ; OR A              ; 
-       inc  hl                                             ; INC HL            ; 
+       movb *hl+,a                                         ; LD A,(HL)         ; the next character (MOVB sets the status; INC HL would change it on the TI)
+       ;                                                   ; OR A              ; 
+       ;                                                   ; INC HL            ; 
        jlt  !                                              ; JP P,$39CD        ; 
        b    @show_view_message_count                       ;                   
 !

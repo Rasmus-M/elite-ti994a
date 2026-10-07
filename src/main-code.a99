@@ -682,7 +682,7 @@ multiply_a_e_16bit:                                        ; >1f60
        srl  r1,8                                           ; LD D,$00          ; 
        mpy  r0,r1                                          ; ADD HL,DE         ; R1:R2 = A * E (the shift-and-add loop on the Z80)
        mov  r2,hl                                          ;                   ; HL = the product
-       .ret                                                ; RET               ; 
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Multiply: 16-bit x 8-bit -> 24-bit, unsigned
@@ -2822,7 +2822,7 @@ _3d51:                                                     ; >3d51
 scale_by_trig_byte:                                        ; >3d76
        .proc
        movb @shared_normalize_mantissa,a                   ; LD A,($EB9C)      ; A = the cached mantissa
-       .call @multiply_a_e_16bit                           ; CALL $1F60        ; HL = mantissa * E (the trig byte)
+       bl   @multiply_a_e_16bit                            ; CALL $1F60        ; HL = mantissa * E (the trig byte)
        movb @depth_shift,a                                 ; LD A,($EB9B)      ; A = the cached shift count
        sb   @bytes+>07,a                                   ; SUB $07           ; 
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
@@ -2987,14 +2987,14 @@ _3e29:                                                     ; >3e29
        inc  hl                                             ; INC HL            ; HL now points past this step's record
        .push hl                                            ; PUSH HL           ; save the table pointer
        movb @shared_normalize_mantissa,a                   ; LD A,($EB9C)      ; A = the cached mantissa
-       .call @multiply_a_e_16bit                           ; CALL $1F60        ; HL = mantissa * sin byte
+       bl   @multiply_a_e_16bit                            ; CALL $1F60        ; HL = mantissa * sin byte
        mov  hl,r0                                          ; LD A,H            ; fold the 16-bit product into an 8-bit scaled value...
        sla  r0,1                                           ; RL L              ; 
        movb r0,a                                           ; RLA               ; A = (HL << 1) >> 8
        .ex_af_af_                                          ; EX AF,AF'         ; ...and stash it
        movb @shared_normalize_mantissa,a                   ; LD A,($EB9C)      ; A = the cached mantissa again
        movb @c,@e                                          ; LD E,C            ; E = this step's cos byte
-       .call @multiply_a_e_16bit                           ; CALL $1F60        ; HL = mantissa * cos byte
+       bl   @multiply_a_e_16bit                            ; CALL $1F60        ; HL = mantissa * cos byte
        mov  hl,r0                                          ; LD A,H            ; fold it the same way...
        sla  r0,1                                           ; RL L              ; 
        movb r0,a                                           ; RLA               ; A = (HL << 1) >> 8
@@ -5746,7 +5746,7 @@ _6a69:                                                     ; >6a69
        bl   @draw_gauge_tiles                              ; CALL $6CA8        ; colour it (#R$6CA8)
        movb @speed_gauge_value,a                           ; LD A,($F814)      ; 
        movb @bytes+>18,@e                                  ; LD E,$18          ; 
-       .call @multiply_a_e_16bit                           ; CALL $1F60        ; HL = the speed * 24
+       bl   @multiply_a_e_16bit                            ; CALL $1F60        ; HL = the speed * 24
        movb @bytes+>1e,a                                   ; LD A,$1E          ; 
        bl   @divide_hl_a                                   ; CALL $2079        ; HL = the speed * 24 / 30 (#R$2079)
        movb @l,a                                           ; LD A,L            ; A = the bar's length (0-24)
@@ -5803,7 +5803,7 @@ draw_fuel_gauge:                                           ; >6aad
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; return if the dashboard isn't shown (#R$6C9E)
        movb @fuel_level,a                                  ; LD A,($F775)      ; A = the fuel
        movb @bytes+>18,@e                                  ; LD E,$18          ; 
-       .call @multiply_a_e_16bit                           ; CALL $1F60        ; HL = fuel * 24 (#R$1F60)
+       bl   @multiply_a_e_16bit                            ; CALL $1F60        ; HL = fuel * 24 (#R$1F60)
        movb @bytes+>46,a                                   ; LD A,$46          ; 
        bl   @divide_hl_a                                   ; CALL $2079        ; HL = fuel * 24 / 70 (#R$2079)
        movb @l,a                                           ; LD A,L            ; 
@@ -6027,7 +6027,7 @@ draw_roll_dial:                                            ; >6bb3
        movb @roll_rate,a                                   ; LD A,($F815)      ; A = the roll rate
        ab   @bytes+>10,a                                   ; ADD A,$10         ; 
        movb @bytes+>16,@e                                  ; LD E,$16          ; 
-       .call @multiply_a_e_16bit                           ; CALL $1F60        ; HL = (rate + 16) * 22 (#R$1F60)
+       bl   @multiply_a_e_16bit                            ; CALL $1F60        ; HL = (rate + 16) * 22 (#R$1F60)
        movb @bytes+>20,a                                   ; LD A,$20          ; 
        bl   @divide_hl_a                                   ; CALL $2079        ; HL = (rate + 16) * 22 / 32 (#R$2079)
        movb @l,a                                           ; LD A,L            ; 
@@ -6047,7 +6047,7 @@ draw_pitch_dial:                                           ; >6bca
        movb @pitch_rate,a                                  ; LD A,($F816)      ; A = the pitch rate
        ab   @bytes+>10,a                                   ; ADD A,$10         ; 
        movb @bytes+>16,@e                                  ; LD E,$16          ; 
-       .call @multiply_a_e_16bit                           ; CALL $1F60        ; HL = (rate + 16) * 22 (#R$1F60)
+       bl   @multiply_a_e_16bit                            ; CALL $1F60        ; HL = (rate + 16) * 22 (#R$1F60)
        movb @bytes+>20,a                                   ; LD A,$20          ; 
        bl   @divide_hl_a                                   ; CALL $2079        ; HL = (rate + 16) * 22 / 32 (#R$2079)
        movb @l,a                                           ; LD A,L            ; 

@@ -88,7 +88,7 @@
 
        .defm rst
        .ifeq #1,>00
-       .call @print_char                           ; JP $34A8          ; print character A
+       bl   @print_char                            ; JP $34A8          ; print character A
        .endif
        .ifeq #1,>08
        .call @rst_08_target_print_tokenised_string ; JP $357A          ; print a tokenised string at HL

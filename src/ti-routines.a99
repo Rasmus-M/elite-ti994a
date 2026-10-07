@@ -13,6 +13,14 @@ ti_setup_environment:
        bl   @clear_pad
        bl   @copy_to_pad
        bl   @graphics_mode
+       li   r0,>1b80                   ; The view messages read the font from VRAM >1A80 + 8 * code
+       bl   @vwad
+       li   r1,font
+       li   r2,96*8                    ; Codes >20->7F
+ti_setup_environment_1:
+       movb *r1+,@vdpwd
+       dec  r2
+       jne  ti_setup_environment_1
        .endproc
 *// ti_setup_environment
 

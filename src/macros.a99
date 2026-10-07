@@ -41,6 +41,12 @@
        b    *r11
        .endm
 
+* Pad so the next label has the same address parity as its MSX address
+* (#1), so words at even MSX addresses are word-aligned on the TI.
+       .defm msxalign
+       bss  ($+#1)&1
+       .endm
+
        .defm push
        mov  #1,*sp+
        .endm

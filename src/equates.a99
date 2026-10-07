@@ -99,6 +99,7 @@ iy     requ 9
 iyh    requ 9
 iyl    equ wrksp+19
 sp     requ 10                         ; Stack pointer. Stack grows up.
+splb   equ wrksp+21                    ; low byte of SP
 af_    requ 12
 a_     requ 12
 bc_    requ 13

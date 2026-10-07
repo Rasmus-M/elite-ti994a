@@ -34,7 +34,8 @@ There are no tests; verification is running the cartridge in an emulator.
 2. Routines are then copied by hand from `temp-src/` into `src/` (currently `src/main-code.a99` holds just the
    title screen, `src/ship-blueprints.a99` the blueprint data — not yet `copy`'d into the build) and fixed up
    manually. `src/` is hand-edited; never overwrite it with regenerated converter output.
-   `temp-src/main-code.a99` contains ~700 `TODO`/commented-out lines the converter couldn't handle.
+   `temp-src/main-code.a99` contains ~700 `TODO`/commented-out lines the converter couldn't handle,
+   and more that it gets silently wrong - see `SkoolConverter/KNOWN-ISSUES.md` before copying code over.
 
 Each converted line keeps the original Z80 instruction and comment in trailing columns
 (`movb a,@docked   ; LD ($E90A),A   ; comment`), so keep that layout when editing converted code.

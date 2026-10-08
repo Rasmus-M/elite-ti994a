@@ -405,11 +405,12 @@ title_screen_next_letter:                                  ; >1e48
        jeq  !                                              ; JP NZ,$1E18       ; next letter
        b    @title_screen_add_letter                       ;
 !
+       sb   a,a                                            ;                   ; (TI: wait 24 frames, polling for VBlank, instead of
+       movb a,@vblank_subtick_counter                      ;                   ; counting BC down to 0 - about as long on the MSX,
 _1e4e:                                                     ; >1e4e
-       dec  bc                                             ; DEC BC            ;
-       movb b,a                                            ; LD A,B            ;
-       socb @c,a                                           ; OR C              ;
-       jne  _1e4e                                          ; JR NZ,$1E4E       ; a short pause
+       bl   @ti_poll_vblank                                ; DEC BC            ; where the music plays on in the interrupt)
+       cb   @vblank_subtick_counter,@bytes+>18             ; LD A,B / OR C     ; 
+       jl   _1e4e                                          ; JR NZ,$1E4E       ; a short pause
        sb   a,a                                            ; XOR A             ;
        movb a,@title_letter_being_added                    ; LD ($E892),A      ; no letter being added any more
        b    @title_screen_letter_frames_jmp                ; JP $1E5A          ; 24 more frames
@@ -1385,8 +1386,8 @@ _34f1:                                                     ; >34f1
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
        movb d,a                                            ; LD A,D            ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; ...high byte, read mode
-       .push hl                                            ; PUSH HL           ; (timing delay - let the VDP latch the address)
-       .pop hl                                             ; POP HL            ; 
+;      .push hl                                            ; PUSH HL           ; (timing delay - let the VDP latch the address, not needed on the TI)
+;      .pop hl                                             ; POP HL            ; 
        movb @vdprd,a                                       ; IN A,($98)        ; A = the current pattern byte at that address
        movb *hl,r0                                         ; XOR (HL)          ; combine with this row's buffer byte
        xor  r0,a                                           ;                   ; 
@@ -1594,18 +1595,17 @@ _35db:                                                     ; >35db
 * Busy-wait delay loop (~3*65536 iterations)
 * 
 * Used by the routine at #R$5FFB.
+* On the TI it waits 71 frames instead, so the music keeps playing.
 busy_wait_delay:                                           ; >3808
-       movb @bytes+>03,b                                   ; LD B,$03          ; 3 outer passes
+       .proc
+       movb @vblank_frame_counter,a                        ; LD B,$03          ; (TI: wait 71 frames, polling for VBlank, instead of
 _380a:                                                     ; >380a
-       li   hl,>0000                                       ; LD HL,$0000       ; 
-_380d:                                                     ; >380d
-       dec  hl                                             ; DEC HL            ; count HL down from 0 (i.e. 65536 iterations)...
-       movb h,a                                            ; LD A,H            ; 
-       socb @l,a                                           ; OR L              ; 
-       jne  _380d                                          ; JR NZ,$380D       ; 
-       sb   one,b                                          ; DJNZ $380A        ; ...3 times over
-       jne  _380a                                          ;                   
-       rt                                                  ; RET               ; 
+       bl   @ti_poll_vblank                                ; LD HL,$0000       ; counting 3 * 65536 - about as long on the MSX)
+       movb @vblank_frame_counter,b                        ; DEC HL            ; 
+       sb   a,b                                            ; LD A,H / OR L     ; B = the frames passed
+       cb   b,@bytes+>47                                   ; JR NZ,$380D       ; 
+       jl   _380a                                          ; DJNZ $380A        ; 
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Write B bytes from (HL) to the VDP data port
@@ -1753,7 +1753,7 @@ _392a:                                                     ; >392a
        movb @c,a                                           ; LD A,C            ; 
 _3937:                                                     ; >3937
        movb a,@vdpwd                                       ; OUT ($98),A       ; Write the repeated byte...
-       nop                                                 ; NOP               ; 
+;      nop                                                 ; NOP               ; 
        sb   one,b                                          ; DJNZ $3937        ; ...B times
        jne  _3937                                          ;                   
        jmp  _3940                                          ; JR $3940          ; 
@@ -1864,18 +1864,18 @@ clear_message_line_jmp:
 set_sprite:                                                ; >39a4
        movb b,a                                            ; LD A,B            ; y
        movb a,@vdpwd                                       ; OUT ($98),A       ; 
-       .push hl                                            ; PUSH HL           ; 
-       .pop hl                                             ; POP HL            ; (a short delay for the VDP)
+;      .push hl                                            ; PUSH HL           ; 
+;      .pop hl                                             ; POP HL            ; (a short delay for the VDP)
        movb @c,a                                           ; LD A,C            ; x
        movb a,@vdpwd                                       ; OUT ($98),A       ; 
-       .push hl                                            ; PUSH HL           ; 
-       .pop hl                                             ; POP HL            ; 
+;      .push hl                                            ; PUSH HL           ; 
+;      .pop hl                                             ; POP HL            ; 
        movb d,a                                            ; LD A,D            ; pattern
        movb a,@vdpwd                                       ; OUT ($98),A       ; 
        ab   @bytes+>04,a                                   ; ADD A,$04         ; 
        movb a,d                                            ; LD D,A            ; the next sprite's pattern
        movb @e,a                                           ; LD A,E            ; colour
-       nop                                                 ; NOP               ; 
+;      nop                                                 ; NOP               ; 
        movb a,@vdpwd                                       ; OUT ($98),A       ; 
        rt                                                  ; RET               ; 
 
@@ -1903,8 +1903,8 @@ write_run_length_encoded_byte_stream:                      ; >39b9
        inc  hl                                             ; INC HL            ; 
 _39c0:                                                     ; >39c0
        movb a,@vdpwd                                       ; OUT ($98),A       ; write it
-       .push hl                                            ; PUSH HL           ; 
-       .pop hl                                             ; POP HL            ; (a short delay for the VDP)
+;      .push hl                                            ; PUSH HL           ; 
+;      .pop hl                                             ; POP HL            ; (a short delay for the VDP)
        sb   one,b                                          ; DJNZ $39C0        ; count times
        jne  _39c0                                          ;                   
        jmp  write_run_length_encoded_byte_stream           ; JR $39B9          ; next pair
@@ -2015,8 +2015,8 @@ _3a13:                                                     ; >3a13
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb h,a                                            ; LD A,H            ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; point the VDP at the pattern
-       .push hl                                            ; PUSH HL           ; 
-       .pop hl                                             ; POP HL            ; (a short delay for the VDP)
+;      .push hl                                            ; PUSH HL           ; 
+;      .pop hl                                             ; POP HL            ; (a short delay for the VDP)
        movb @bytes+>08,b                                   ; LD B,$08          ; 8 pixel rows
 _3a2a:                                                     ; >3a2a
        movb @vdprd,a                                       ; IN A,($98)        ; copy a row

@@ -171,7 +171,11 @@ public class SkoolConverter {
             String[] messageParts = z80Line.getInstruction().substring(4).trim().split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
             for (int i = 0; i < messageParts.length; i++) {
                 String messagePart = messageParts[i];
-                if (messagePart.startsWith("\"")) {
+                java.util.regex.Matcher charPlus = java.util.regex.Pattern.compile("^\"(.)\"\\+(\\$[0-9A-Fa-f]+|\\d+)$").matcher(messagePart.trim());
+                if (charPlus.matches()) {
+                    // A character with a value added, like "t"+$80 (the last character, with bit 7 set)
+                    messagePart = ">" + Util.hexString((charPlus.group(1).charAt(0) + Util.parseInt(charPlus.group(2))) & 0xff, 2);
+                } else if (messagePart.startsWith("\"")) {
                     messagePart = "'" + messagePart.substring(1, messagePart.length() - 1).replace("\"", "").replace("'", "''") + "'";
                 } else {
                     messagePart = ">" + Util.hexString(Util.parseInt(messagePart), 2);

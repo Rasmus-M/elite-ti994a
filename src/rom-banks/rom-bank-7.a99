@@ -1,4 +1,4 @@
-* ROM bank 7: the math tables, and code: the status page and the commander menu
+* ROM bank 7: the math tables, and code: the status page, the commander menu and the inventory
 * Assembled for real by code-banks.a99, and DORG in elite.a99 for its labels
        .ifdef code_banks
        aorg >6000
@@ -503,6 +503,151 @@ commander_menu_options:                                    ; >a6a4
        data menu_catalog_tape                                     ; 3
        data menu_default_commander                                ; 4
        data status_page                                           ; 5 (TI: not used - see #R$A35C)
+
+* The inventory screen, with its own data
+
+********************************************************************************
+* Inventory screen headings
+* 
+* Printed by #R$5C8E. A list of (column, row, string) records ending with $FF
+* (see #R$3596).
+inventory_screen_headings:                                 ; >58d7
+       text >10,>01,'Inventor',>f9                                ; 
+       text >05,>03,'Fuel',>ba                                    ; 
+       text >05,>04,'Cash',>ba                                    ; 
+       text >05,>05,'Hold',>ba                                    ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Inventory screen frame
+* 
+* Drawn by #R$5C8E. A list of (RST $28) rectangles ending with $FF (see
+* #R$36F1).
+inventory_screen_frame:                                    ; >58f8
+       byte >10,>01,>09,>01,>91                                   ; 
+       byte >05,>03,>05,>03,>21                                   ; 
+       byte >0B,>03,>11,>03,>51                                   ; 
+       byte >05,>07,>0C,>0E,>D1                                   ; 
+       byte >12,>07,>05,>0E,>71                                   ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Print the name and quantity of some cargo
+* 
+* Used by the routines at #R$5C8E and #R$5CEE.
+* .
+* Prints the name of goods B (from $0D9F) at column 5 of row C, and then
+* the quantity in the largest unit - grams, kilograms or tonnes - that
+* keeps the number under 1000 (dividing by 1000 with #R$211C). At $5B81,
+* prints the number (#R$E73E) and the unit (#R$E73D, from $5ABF).
+* 
+* I:B Goods
+* I:C Row
+* I:HL:DE Quantity, in grams
+print_cargo_quantity:                                      ; >5b4d
+       .proc                                               ;                   ; 
+       movb b,a                                            ; LD A,B            ; A = the item index
+       .push af                                            ; PUSH AF           ; stash it (twice - see below)
+       .push bc                                            ; PUSH BC           ; 
+       .push de                                            ; PUSH DE           ; stash the value
+       .push hl                                            ; PUSH HL           ; 
+       .push af                                            ; PUSH AF           ; 
+       movb @bytes+>05,b                                   ; LD B,$05          ; column 5
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor (row from the caller's C)
+       .pop af                                             ; POP AF            ; recover the item index
+       li   hl,msg_food                                    ; LD HL,$0D9F       ; the item-name list
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print this item's name
+       movb @bytes+>12,a                                   ; LD A,$12          ; 
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; position the cursor for the value column
+       .pop hl                                             ; POP HL            ; recover the value
+       .pop de                                             ; POP DE            ; 
+       movb @bytes+>02,a                                   ; LD A,$02          ; up to 2 divisions (to kilograms, then tonnes)
+_5b66:                                                     ; >5b66
+       mov  hl,hl                                          ; SBC HL,BC ...     ; (TI: under 1000 if the high word is 0 and the low word < 1000)
+       jne  _5b66_divide                                   ;                   ; 
+       ci   de,1000                                        ;                   ; 
+       jl   continue_5b4d_print_scaled_value               ; JR C,$5B81        ; already under 1000 - done scaling
+_5b66_divide:                                              
+       .push af                                            ; PUSH AF           ; 
+       bl   @divide_by_1000                                ; CALL $211C        ; still >= 1000 - divide by 1000
+       .pop af                                             ; POP AF            ; 
+       sb   one,a                                          ; DEC A             ; one fewer division allowed
+       jmp  _5b66                                          ; JR $5B66          ; check again
+continue_5b4d_print_scaled_value:                          ; >5b81
+       movb a,@remaining_divisions_count                   ; LD ($E73D),A      ; cache the remaining-divisions count
+       movb de,@scaled_cargo_value+1                       ; LD ($E73E),DE     ; cache the scaled value
+       movb @e,@scaled_cargo_value                         ;                   ; 
+       .push af                                            ; PUSH AF           ; 
+       movb @e,@c                                          ; LD C,E            ; 
+       movb d,@l                                           ; LD L,D            ; 
+       sb   h,h                                            ; LD H,$00          ; 
+       movb @bytes+>83,a                                   ; LD A,$83          ; control byte: pad to width 3
+       bl   @rst_18_target_format_value_print              ; RST $18           ; format and print it
+       .pop af                                             ; POP AF            ; 
+       li   hl,mass_unit_suffix_t                          ; LD HL,$5ABF       ; the unit-string list
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print the matching unit suffix
+       .pop bc                                             ; POP BC            ; 
+       .pop af                                             ; POP AF            ; 
+       ab   one,@c                                         ; INC C             ; -> the next row
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Show the cargo-hold manifest screen
+* 
+* Used by the routines at #R$5BBD and #R$5CEE.
+* .
+* Bails if already showing it (#R$E902=5). Otherwise hides sprites,
+* draws a frame (RST $28/$20), prints the fuel level and its label
+* (#R$6042), the cash total (#R$6037) and a label, and the hold's free
+* space and its label (#R$6051), then walks 18 4-byte records from the
+* cargo-hold table at #R$EB19 (the same table #R$5C01 updates),
+* printing each non-empty one's name and quantity (#R$5B4D - B is the
+* item index for the name lookup, and C, fixed at 7 on entry, is the
+* print row #R$5B4D itself advances per call). Marks the mode.
+show_cargo_manifest_screen:                                ; >5c8e
+       .proc                                               ;                   ; 
+       cb   @current_screen,@bytes+>05                     ; LD A,($E902) / CP $05; already showing the manifest?
+       jne  _5c8e_show                                     ; RET Z             ; yes - nothing to do
+       .endproc                                            ;                   ; 
+_5c8e_show:                                                
+       bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide sprites
+       li   ix,inventory_screen_frame                      ; LD IX,$58F8       ; 
+       bl   @rst_28_target_draw_list_tile                  ; RST $28           ; draw a frame
+       li   hl,inventory_screen_headings                   ; LD HL,$58D7       ; 
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print the "Fuel:"/"Cash:"/"Hold:" field list
+       li   bc,>0b03                                       ; LD BC,$0B03       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       bl   @print_fuel                                    ; CALL $6042        ; print the fuel level and its label
+       li   bc,>0b04                                       ; LD BC,$0B04       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       bl   @format_print_current_cash_total               ; CALL $6037        ; print the cash total
+       li   hl,msg_credits_5851                            ; LD HL,$5851       ; a fixed label
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   bc,>0b05                                       ; LD BC,$0B05       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       bl   @print_free_space                              ; CALL $6051        ; print the hold's free space and its label
+       li   hl,msg_tonnes                                  ; LD HL,$583D       ; a fixed label
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   ix,cargo_hold                                  ; LD IX,$EB19       ; the cargo-hold table
+       li   bc,>0007                                       ; LD BC,$0007       ; B = item index (0), C = the print row (7)
+_5cca:                                                     ; >5cca
+       movb *ix,@e                                         ; LD E,(IX+$00)     ; HL:DE = this item's 4-byte record
+       movb @1(ix),d                                       ; LD D,(IX+$01)     ; 
+       movb @2(ix),@l                                      ; LD L,(IX+$02)     ; 
+       movb @3(ix),h                                       ; LD H,(IX+$03)     ; 
+       mov  de,de                                          ; LD A,E / OR D / OR L / OR H; 
+       jne  _5cca_print                                    ;                   ; 
+       mov  hl,hl                                          ;                   ; 
+       jeq  _5cca_next                                     ; CALL NZ,$5B4D     ; empty - skip it
+_5cca_print:                                               
+       bl   @print_cargo_quantity                          ;                   ; non-empty - print its name and quantity
+_5cca_next:                                                
+       ai   ix,4                                           ; LD DE,$0004 / ADD IX,DE; -> the next record
+       ab   one,b                                          ; INC B             ; -> the next item index
+       cb   b,@bytes+>12                                   ; LD A,B / CP $12   ; all 18 done?
+       jne  _5cca                                          ; JR NZ,$5CCA       ; no - do the next one
+       movb @bytes+>05,@current_screen                     ; LD A,$05 / LD ($E902),A; mark the mode
+       .endproc                                            ; RET               ; 
 
 rom_bank_7_end:
        equ  $

@@ -50,6 +50,47 @@ market_prices:                                             ; >0a02
        byte >35,>0F,>F8,>07,>00                                   ; Alien Items
 
 ********************************************************************************
+* The message "Food"
+msg_food:                                                  ; >0d9f
+       text 'Foo',>e4                                             ; the names of the goods, printed with RST $10
+msg_textiles:                                              ; >0da3
+       text 'Textile',>f3                                         ; 
+msg_radioactives:                                          ; >0dab
+       text 'Radioactive',>f3                                     ; 
+msg_slaves:                                                ; >0db7
+       text 'Slave',>f3                                           ; 
+msg_liquor_wines:                                          ; >0dbd
+       text 'Liquor/Wine',>f3                                     ; 
+msg_luxuries:                                              ; >0dc9
+       text 'Luxurie',>f3                                         ; 
+msg_narcotics:                                             ; >0dd1
+       text 'Narcotic',>f3                                        ; 
+msg_computers:                                             ; >0dda
+       text 'Computer',>f3                                        ; 
+msg_machinery:                                             ; >0de3
+       text 'Machiner',>f9                                        ; 
+msg_alloys:                                                ; >0dec
+       text 'Alloy',>f3                                           ; 
+msg_firearms:                                              ; >0df2
+       text 'Firearm',>f3                                         ; 
+msg_furs:                                                  ; >0dfa
+       text 'Fur',>f3                                             ; 
+msg_minerals:                                              ; >0dfe
+       text 'Mineral',>f3                                         ; 
+msg_gold:                                                  ; >0e06
+       text 'Gol',>e4                                             ; 
+msg_platinum:                                              ; >0e0a
+       text 'Platinu',>ed                                         ; 
+msg_gem_stones:                                            ; >0e12
+       text 'Gem-Stone',>f3                                       ; 
+msg_alien_items:                                           ; >0e1c
+       text 'Alien Item',>f3                                      ; 
+msg_refugees:                                              ; >0e27
+       text 'Refugee',>f3                                         ; 
+msg_thargoid_documents:                                    ; >0e2f
+       text 'Thargoid document',>f3                               ; 
+
+********************************************************************************
 * Letter pairs for names
 * 
 * The 32 two-letter pairs system names are made from (#R$4CB8), as in BBC
@@ -973,6 +1014,59 @@ divide_c_l_h_by_10:                                        ; >20c6
        movb r0,@c                                          ;                   ; C = the quotient's low byte
        swpb r1                                             ;                   ; 
        movb r1,a                                           ;                   ; A = the remainder (the digit)
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Divide HL:DE by 100000
+* 
+* Used by the routine at #R$6051.
+* .
+* Used by #R$6051 to show the free space in the hold, which is held in
+* grams, in tenths of a tonne. A restoring division by 100000 kept in the
+* shadow CHL: shifts the dividend left a bit at a time into CHL, and
+* subtracts 100000 from it if it can (at $210D), shifting the quotient
+* bits in at the bottom of the dividend.
+* 
+* I:HL:DE Dividend
+* O:HL:DE Quotient
+divide_by_100000:                                          ; >20e1
+       .proc                                               ;                   ; (TI: / 1000, then / 100, with DIV)
+       li   r2,1000                                        ;                   ; 
+       bl   @divide_hl_de_by_r2                            ;                   ; 
+       li   r2,100                                         ;                   ; 
+       bl   @divide_hl_de_by_r2                            ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Divide DE:HL by 1000
+* 
+* Used by the routine at #R$5B4D.
+* .
+* Used by #R$5B4D to show amounts of cargo, which are held in grams, in
+* kilograms or tonnes. A restoring division, like #R$20E1's, by 1000 kept
+* in the shadow BC. The entry at $2134 (a single trial subtraction) is
+* also the target of the unused jump-table entry at $00A0 (see
+* #R$003B).
+* 
+* I:DE:HL The 32-bit dividend
+* O:DE:HL The quotient
+divide_by_1000:                                            ; >211c
+       li   r2,1000                                        ;                   ; (TI: with DIV)
+* TI-specific: divide the 32-bit HL:DE by R2, with two DIVs
+*
+* I:HL:DE The dividend (HL the high word)
+* I:R2 The divisor
+* O:HL:DE The quotient
+* O:R1 The remainder
+divide_hl_de_by_r2:                                        
+       clr  r0                                             ;                   ; 
+       mov  hl,r1                                          ;                   ; 
+       div  r2,r0                                          ;                   ; R0 = HL / R2, R1 = the remainder
+       mov  r0,hl                                          ;                   ; HL = the quotient's high word
+       mov  r1,r0                                          ;                   ; 
+       mov  de,r1                                          ;                   ; 
+       div  r2,r0                                          ;                   ; R0 = (the remainder:DE) / R2, R1 = the remainder
+       mov  r0,de                                          ;                   ; DE = the quotient's low word
        rt                                                  ; RET               ; 
 
 ********************************************************************************
@@ -4038,6 +4132,7 @@ run_key_handler:                                           ; >409b
 key_table:                                                 ; >419b
 * TI: (key in the high byte, the handler's ROM bank, the handler) words,
 * only for the keys whose handlers are converted so far, ending with 0
+       data >3000,code_bank_7_select,show_cargo_manifest_screen   ; '0': inventory (#R$5C8E)
        data >3900,code_bank_7_select,status_page                  ; '9': commander status (#R$6276)
        data >5b00,code_bank_7_select,commander_menu               ; '[' (FCTN-R): load/save commander menu (#R$A30A)
        data 0                                                     ; end of the table
@@ -6057,6 +6152,11 @@ msg_commander:                                             ; >57d3
        text 'Commander',>a0                                       ; 
 
 ********************************************************************************
+* The message " tonnes."
+msg_tonnes:                                                ; >583d
+       text ' tonnes',>ae                                         ; 
+
+********************************************************************************
 * The message " Light Years"
 msg_light_years_5845:                                      ; >5845
        text ' Light Year',>f3                                     ; 
@@ -6065,6 +6165,25 @@ msg_light_years_5845:                                      ; >5845
 * The message " Credits"
 msg_credits_5851:                                          ; >5851
        text ' Credit',>f3                                         ; 
+
+********************************************************************************
+* Cargo hold capacities
+* 
+* In grams, 4 bytes each (#R$63BA).
+cargo_hold_capacities:                                     ; >5a97
+       byte >00,>2D,>31,>01                                       ; 20 tonnes
+hold_capacity_large:                                       ; >5a9b
+       byte >C0,>0E,>16,>02                                       ; 35 tonnes, with a large cargo bay
+
+********************************************************************************
+* Mass-unit suffix "t" (tonnes) - pointed to directly by `LD HL,$5ABF`
+* at $5B40/$5B91
+mass_unit_suffix_t:                                        ; >5abf
+       text >f4                                                   ; "t", the mass units printed with RST $10 by #R$5B4D
+msg_kg:                                                    ; >5ac0
+       text 'k',>e7                                               ; "kg"
+mass_unit_suffix_g:                                        ; >5ac2
+       text >e7                                                   ; "g"
 
 ********************************************************************************
 * Show a message for a while
@@ -6109,6 +6228,28 @@ print_fuel:                                                ; >6042
        bl   @rst_18_target_format_value_print              ; RST $18           ; format and print it
        li   hl,msg_light_years_5845                        ; LD HL,$5845       ; " Light Years"
        bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Print the free space in the hold
+* 
+* Used by the routines at #R$5C8E and #R$612D.
+* .
+* Works out the free space in the hold (#R$63BA), and prints it in tonnes
+* to one decimal place (grams / 100000, #R$20E1).
+print_free_space:                                          ; >6051
+       .proc                                               ;                   ; 
+       bl   @work_out_free_space                           ; CALL $63BA        ; work out the free space
+       movb @free_space+1,de                               ; LD DE,($EB61)     ; HL:DE = the free space in grams
+       movb @free_space,@e                                 ;                   ; 
+       movb @free_hold_space_2+1,hl                        ; LD HL,($EB63)     ; 
+       movb @free_hold_space_2,@l                          ;                   ; 
+       bl   @divide_by_100000                              ; CALL $20E1        ; / 100000: tenths of a tonne
+       movb @e,@c                                          ; LD C,E            ; 
+       movb d,@l                                           ; LD L,D            ; 
+       sb   h,h                                            ; LD H,$00          ; 
+       movb @bytes+>40,a                                   ; LD A,$40          ; with a decimal point
+       bl   @rst_18_target_format_value_print              ; RST $18           ; print it
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -6183,6 +6324,71 @@ clear_page:                                                ; >60ca
        movb @bytes+>f1,a                                   ; LD A,$F1          ; white on black
        bl   @fill_vram_rect                                ; JP $35B8          ; 
        .endproc                                            ;                   ; 
+
+********************************************************************************
+* Work out the free space in the hold
+* 
+* Used by the routines at #R$5C01, #R$6051, #R$8BA6 and #R$909F.
+* .
+* Starts with the hold's capacity (#R$5A97: 20 tonnes, or 35 with a large
+* cargo bay, #R$F777), and takes the size of each of the 18 goods in the
+* hold (#R$EB19) off it (#R$63E0).
+work_out_free_space:                                       ; >63ba
+       .proc                                               ;                   ; 
+       li   hl,cargo_hold_capacities                       ; LD HL,$5A97       ; 20 tonnes
+       movb @item_large_cargo_bay,a                        ; LD A,($F777) / OR A; large cargo bay?
+       jeq  _63c6                                          ; JR Z,$63C6        ; no
+       li   hl,hold_capacity_large                         ; LD HL,$5A9B       ; yes: 35 tonnes
+_63c6:                                                     ; >63c6
+       li   de,free_space                                  ; LD DE,$EB61       ; the free space
+       li   bc,>0004                                       ; LD BC,$0004       ; 4 bytes
+       .ldir                                               ; LDIR              ; 
+       li   hl,cargo_hold                                  ; LD HL,$EB19       ; the goods in the hold
+       movb @bytes+>12,a                                   ; LD A,$12          ; 18 of them
+_63d3:                                                     ; >63d3
+       .push af                                            ; EX AF,AF'         ; 
+       li   bc,>0001                                       ; LD BC,$0001       ; one of them
+       bl   @take_off_free_space                           ; CALL $63E0        ; take it off the free space
+       .ex_de_hl                                           ; EX DE,HL          ; next
+       .pop af                                             ; EX AF,AF'         ; 
+       sb   one,a                                          ; DEC A             ; 
+       jne  _63d3                                          ; JR NZ,$63D3       ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Take cargo off the free space in the hold
+* 
+* Used by the routines at #R$5C01, #R$63BA and #R$8BA6.
+* .
+* Subtracts BC units of the size at HL from the free space (#R$EB61).
+* 
+* I:BC Number of units
+* I:HL Pointer to the size of a unit
+take_off_free_space:                                       ; >63e0
+* TI: a native 32-bit subtraction instead of #R$21CF, leaving the registers
+* as on the MSX: HL unchanged, DE = HL + 4, BC = 0
+       movb @1(hl),r0                                      ; LD DE,$EB61 / CALL $21CF; R0 = the size's low word
+       movb *hl,@r0lb                                      ;                   ; 
+       movb @free_space+1,r1                               ;                   ; R1 = the free space's low word
+       movb @free_space,@r1lb                              ;                   ; 
+       s    r0,r1                                          ;                   ; (carry clear = a borrow)
+       movb @r1lb,@free_space                              ;                   ; (MOVB leaves the carry alone)
+       movb r1,@free_space+1                               ;                   ; 
+       movb @free_hold_space_2+1,r1                        ;                   ; R1 = the free space's high word
+       movb @free_hold_space_2,@r1lb                       ;                   ; 
+       joc  _63e0_no_borrow                                ;                   ; 
+       dec  r1                                             ;                   ; 
+_63e0_no_borrow:                                           
+       movb @3(hl),r0                                      ;                   ; R0 = the size's high word
+       movb @2(hl),@r0lb                                   ;                   ; 
+       s    r0,r1                                          ;                   ; 
+       movb @r1lb,@free_hold_space_2                       ;                   ; 
+       movb r1,@free_hold_space_2+1                        ;                   ; 
+       dec  bc                                             ; DEC BC / LD A,B / OR C; 
+       jne  take_off_free_space                            ; JR NZ,$63E0       ; more units - repeat
+       mov  hl,de                                          ; EX DE,HL / POP HL ; 
+       ai   de,4                                           ;                   ; DE -> past the size, as on the MSX
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Enter flight mode: set up the cockpit screen

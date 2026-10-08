@@ -19235,7 +19235,7 @@ msg_fugitive:                                              ; >5ab7
 * Mass-unit suffix "t" (tonnes) - pointed to directly by `LD HL,$5ABF`
 * at $5B40/$5B91
 mass_unit_suffix_t:                                        ; >5abf
-       text 't+>8'
+       text >f4
 
 ********************************************************************************
 * The message "kg"
@@ -19245,7 +19245,7 @@ msg_kg:                                                    ; >5ac0
 ********************************************************************************
 * Mass-unit suffix "g" (grams)
 mass_unit_suffix_g:                                        ; >5ac2
-       text 'g+>8'
+       text >e7
 
 ********************************************************************************
 * Equipment item numbers of the four lasers

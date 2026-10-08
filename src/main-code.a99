@@ -1,4 +1,32 @@
 ********************************************************************************
+* Market prices
+* 
+* The goods' prices and availability, as in BBC Elite (QQ23), 5 bytes
+* each: the base price; the economic factor (bit 7 its sign, bits 0-4
+* its size) and the units (bits 5-6: 0 tonnes, 1 kilograms, 2 grams);
+* the base quantity; a mask for the random variation (#R$EFAA); and how
+* illegal the goods are. #R$4BA8 works out each system's market from
+* them (#R$F789).
+market_prices:                                             ; >0a02
+       byte >13,>82,>06,>01,>00                                   ; Food
+       byte >14,>81,>0A,>03,>00                                   ; Textiles
+       byte >41,>83,>02,>07,>00                                   ; Radioactives
+       byte >28,>85,>E2,>1F,>04                                   ; Slaves
+       byte >53,>85,>FB,>0F,>00                                   ; Liquor/Wines
+       byte >C4,>08,>36,>03,>00                                   ; Luxuries
+       byte >EB,>1D,>08,>78,>04                                   ; Narcotics
+       byte >9A,>0E,>38,>03,>00                                   ; Computers
+       byte >75,>06,>28,>07,>00                                   ; Machinery
+       byte >4E,>01,>11,>1F,>00                                   ; Alloys
+       byte >9C,>0D,>1D,>07,>02                                   ; Firearms
+       byte >B0,>89,>DC,>3F,>00                                   ; Furs
+       byte >18,>A1,>60,>03,>00                                   ; Minerals
+       byte >61,>A1,>42,>07,>00                                   ; Gold
+       byte >AB,>A2,>37,>1F,>00                                   ; Platinum
+       byte >2D,>C1,>FA,>0F,>00                                   ; Gem-Stones
+       byte >35,>0F,>F8,>07,>00                                   ; Alien Items
+
+********************************************************************************
 * Letter pairs for names
 * 
 * The 32 two-letter pairs system names are made from (#R$4CB8), as in BBC
@@ -403,7 +431,7 @@ _1db2:                                                     ; >1db2
 title_screen_key:                                          ; >1db5
        .push af                                            ; PUSH AF           ;
        blwp @music_stop_vector                             ; CALL $7438        ; stop the music
-;       .call @unpack_commander                             ; CALL $A469        ; set up the commander record
+       bl   @unpack_commander                              ; CALL $A469        ; set up the commander record
        li   hl,options                                     ; LD HL,$E914       ;
        socb @bit0,*hl                                      ; SET 0,(HL)        ; sound effects on
        sb   a,a                                            ; XOR A             ;
@@ -5525,6 +5553,85 @@ msg_missile_locked:                                        ; >4b9a
        text 'Missile Locke',>e4
 
 ********************************************************************************
+* Arrive in a system: its data and market
+* 
+* Used by the routines at #R$894D and #R$A469.
+* .
+* Generates the data for the current system (#R$EB67, #R$4C9B) and copies
+* it to #R$F75A. Sets the price of fuel ($E724) to s0_lo AND 15. Then works
+* out the market (#R$F789) from the market prices (#R$0A02), as BBC Elite
+* does, with E = 7 - the economy (#R$F754) and a random byte (#R$EFAA) for
+* the variation: for each of the goods, the price is the base price +
+* (random AND mask) + E * factor, and the quantity the base quantity +
+* (random AND mask) - E * factor (0-63, or 0 if negative).
+arrive_in_system:                                          ; >4ba8
+       .proc                                               ;                   ; 
+       movb @current_system,a                              ; LD A,($EB67)      ; A = the current system
+       bl   @generate_system                               ; CALL $4C9B        ; generate the current system
+       li   hl,system_s0_lo                                ; LD HL,$F74B       ; 
+       li   de,current_system_seeds                        ; LD DE,$F75A       ; 
+       li   bc,>000f                                       ; LD BC,$000F       ; 15 bytes
+       .ldir                                               ; LDIR              ; copy its data to $F75A
+       movb @system_economy,a                              ; LD A,($F754)      ; A = economy
+       li   r0,>0700                                       ; XOR $07           ; E = 7 - economy (0 for Rich Industrial, 7 for Poor Agricultural)
+       xor  a,r0                                           ;                   ; 
+       movb r0,@e                                          ; LD E,A            ; 
+       movb @system_seeds,a                                ; LD A,($E904)      ; rotating_accumulator's low byte
+       andi a,>0f00                                        ; AND $0F           ; 
+       movb a,@fuel_price                                  ; LD ($E724),A      ; the price of fuel
+       li   ix,market_prices                               ; LD IX,$0A02       ; IX -> the market prices
+       li   iy,market                                      ; LD IY,$F789       ; IY -> the market
+       movb @bytes+>11,b                                   ; LD B,$11          ; 17 goods
+_4bd5:                                                     ; >4bd5
+       movb @3(ix),r0                                      ; LD A,(IX+$03)     ; 
+       movb @market_price_roll,r1                          ; AND C             ; (C = the random byte, #R$EFAA)
+       inv  r1                                             ;                   ; 
+       szcb r1,r0                                          ;                   ; 
+       srl  r0,8                                           ; LD L,A / LD H,B   ; R0 = random AND mask
+       movb @1(ix),r1                                      ; LD A,(IX+$01)     ; 
+       andi r1,>1f00                                       ; AND $1F           ; 
+       srl  r1,8                                           ; LD D,A            ; R1 = factor
+       movb @e,r2                                          ;                   ; 
+       srl  r2,8                                           ;                   ; 
+       mpy  r2,r1                                          ; CALL $1F51        ; (TI: MPY instead of #R$1F51)
+       andi r2,>00ff                                       ; LD C,A            ; R2 = E * factor (8 bits, as on the MSX)
+       mov  r0,hl                                          ; PUSH HL / ADD HL,BC; 
+       a    r2,hl                                          ; EX DE,HL          ; (here HL =) random AND mask + E * factor
+       mov  r0,de                                          ; POP HL / SBC HL,BC; 
+       s    r2,de                                          ;                   ; (and DE =) random AND mask - E * factor
+       movb @1(ix),r1                                      ; BIT 7,(IX+$01)    ; this record's sign bit?
+       jlt  _4bf4                                          ; JR NZ,$4BF4       ; a negative factor: the price goes down, the quantity up
+       .ex_de_hl                                           ;                   ; (TI: with HL and DE the other way round from the MSX)
+_4bf4:                                                     ; >4bf4
+       movb *ix,r1                                         ; LD C,(IX+$00)     ; 
+       srl  r1,8                                           ;                   ; 
+       a    r1,de                                          ; ADD HL,BC         ; add the base price
+       movb @e,*iy                                         ; LD (IY+$00),L     ; price
+       movb @2(ix),r1                                      ; LD C,(IX+$02)     ; 
+       srl  r1,8                                           ; EX DE,HL          ; 
+       a    hl,r1                                          ; ADD HL,BC         ; add the base quantity
+       swpb r1                                             ; LD A,L / OR A     ; 
+       movb r1,r1                                          ;                   ; 
+       jgt  arrive_in_system_2                             ; JP P,$4C08        ; 
+       jeq  arrive_in_system_2                             ;                   ; 
+       clr  r1                                             ; XOR A             ; negative - none
+       jmp  _4c0a                                          ; JR $4C0A          ; 
+arrive_in_system_2:                                        ; >4c08
+       andi r1,>3f00                                       ; AND $3F           ; 0-63
+_4c0a:                                                     ; >4c0a
+       movb r1,@1(iy)                                      ; LD (IY+$01),A     ; quantity
+       movb @1(ix),r1                                      ; LD A,(IX+$01)     ; 
+       srl  r1,5                                           ; RLCA x 3          ; 
+       andi r1,>0300                                       ; AND $03           ; 
+       movb r1,@2(iy)                                      ; LD (IY+$02),A     ; units
+       movb @4(ix),@3(iy)                                  ; LD A,(IX+$04) / LD (IY+$03),A; how illegal
+       ai   ix,5                                           ; ADD IX,BC         ; next of the goods
+       ai   iy,4                                           ; ADD IY,BC         ; 
+       sb   one,b                                          ; DJNZ $4BD5        ; 
+       jne  _4bd5                                          ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
 * Work out a system's data from its seeds
 * 
 * Used by the routines at #R$4C9B and #R$55A3.
@@ -7817,6 +7924,62 @@ screen_frame:                                              ; >7161
        byte >AB,>E8                                               ; to (232, 171)
        byte >FF                                                   ; 
        byte >FF                                                   ; end of the list
+
+********************************************************************************
+* Unpack the commander file
+* 
+* Used by the routines at #R$1C5C, #R$A377 and #R$A41B.
+* .
+* Copies the commander file buffer at $F6C0 back into the variables listed
+* at #R$A551, then sets up the current system ($A486).
+* .
+* At $A486, selects the current system (#R$E72B), sets up its data and
+* market (#R$4BA8), and updates the chart cursor (#R$527F).
+unpack_commander:                                          ; >a469
+       .proc                                               ;                   ; 
+       li   ix,commander_file_variables                    ; LD HL,$A551       ; the list of variables
+       li   hl,commander_menu_buffer                       ; LD DE,$F6C0       ; the commander file buffer
+_a46f:                                                     ; >a46f
+       mov  *ix+,de                                        ; LD C,(HL) / LD A,(HL) / OR A; DE -> the next variable
+       jeq  unpack_commander_2                             ; JR Z,$A486        ; all done
+       mov  *ix+,bc                                        ; LD A,(HL)         ; BC = its length
+       .ldir                                               ; LDIR              ; copy it from the buffer
+       jmp  _a46f                                          ; JR $A46F          ; 
+unpack_commander_2:                                        ; >a486
+       movb @current_system,@selected_system               ; LD A,($EB67) / LD ($E72B),A; the current system is selected
+       bl   @arrive_in_system                              ; CALL $4BA8        ; set up its data and market
+* TI: update_chart_cursor (#R$527F) isn't converted yet. It only changes
+* anything in witchspace or on a chart, not from the title screen.
+       .endproc                                            ; JP $527F          ; update the chart cursor
+
+********************************************************************************
+* Commander file variables
+* 
+* The variables saved in the commander file, as (address, length): #R$A44F
+* copies them into the commander file buffer at $F6C0 for saving, and
+* #R$A469 copies them back. The list ends with an address of 0.
+commander_file_variables:                                  ; >a551
+       data current_galaxy,1                                      ; galaxy number (#R$EB66) (TI: words, not a word and a byte)
+       data galaxy_seeds,6                                        ; galaxy seeds (#R$E711)
+       data current_system,1                                      ; current system (#R$EB67)
+       data options,1                                             ; options (#R$E914)
+       data player_cash,3                                         ; cash (#R$EB16)
+       data market_price_roll,1                                   ; market random byte (#R$EFAA)
+       data scratch_buffer,4                                      ; scratch buffer ($E600)
+       data fuel_level,20                                         ; fuel and equipment (#R$F775)
+       data cargo_hold,72                                         ; cargo hold (#R$EB19)
+       data legal_status,1                                        ; legal status (#R$EB65)
+       data score,3                                               ; score (#R$EB13)
+       data combat_rank,1                                         ; combat rank (#R$EB12)
+       data scratch_buffer,1                                      ; scratch buffer ($E600)
+       data constrictor_trail_count,1                             ; Constrictor's trail (#R$EFA3)
+       data kill_count,1                                          ; kills (#R$E930)
+       data next_mission,1                                        ; next mission (#R$E93C)
+       data mission_state,1                                       ; mission state (#R$E93D)
+       data mission_system,1                                      ; mission system (#R$EFA2)
+       data jumps_to_next_mission,1                               ; jumps to the next mission (#R$E93B)
+       data game_clock,4                                          ; game time (#R$F742)
+       data 0                                                     ; end of list
 
 ********************************************************************************
 * Ship blueprint table

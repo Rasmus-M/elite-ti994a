@@ -57,6 +57,10 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   stack) remain only for routines not converted yet. `.endproc`/`.pop` use `dect`, which changes the carry, so a
   routine that returns a result in carry must use `.retc`/`.retnc`; and the stack macros' `mov` changes the
   status, so re-test flags after a call or push/pop.
+- **Calls into ROM banks** use `.far_call <bank select address>,<routine>` (`far_call` in `ti-routines.a99`, in RAM):
+  it selects the routine's bank, calls it with `bl`, then selects the caller's bank (`current_bank`) again. It
+  changes R0 and R1 and passes back only the carry. No code is in the banks yet; `tools/callgraph.py` shows which
+  parts of the game could go there.
 - Byte constants: `one`, `@b255`, `@b254`, and `@bytes+>NN` (a 0–255 table in `ti-tables.a99`) since TMS9900
   byte ops need memory/register sources. `@bit0`..`@bit7` are bit masks used for `bit`/`set`/`res`.
 - Known semantic gaps to watch for: Z80 vs TMS9900 flag behaviour (carry after `cb`, the converter maps `jr c`

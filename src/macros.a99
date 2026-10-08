@@ -55,6 +55,13 @@
        seto *r0
        .endm
 
+* Call routine #2 in the ROM bank selected with #1 (its select address),
+* then select the caller's bank again (far_call). Changes R0 and R1.
+       .defm far_call
+       bl   @far_call
+       data #1,#2
+       .endm
+
        .defm push
        mov  #1,*sp+
        .endm

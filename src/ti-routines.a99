@@ -816,6 +816,44 @@ ti_ldir_end:
        equ  $
 *// ti_ldir
 
+*********************************************************************
+*
+* Call a routine in another ROM bank
+*
+* For code in RAM or a ROM bank calling a routine in a (possibly
+* different) ROM bank, with the .far_call macro:
+*
+*       bl   @far_call
+*       data <bank select address>,<routine>
+*
+* Selects the routine's bank, calls it with BL (it returns with RT or
+* .endproc), then selects the caller's bank (current_bank) again. It has
+* to be in RAM, since selecting a bank swaps out the code in >6000->7FFF.
+* Calls can nest: the caller's bank and return address are kept on the
+* stack. The routine's carry is passed back (for .retc/.retnc), the other
+* status bits aren't.
+*
+* Changes R0 and R1 (and R0-R2 as the routine does).
+*
+far_call:
+       mov  @current_bank,*sp+         ; Save the caller's bank
+       mov  *r11+,r0                   ; R0 = the routine's bank select address
+       mov  *r11+,r1                   ; R1 = the routine
+       mov  r11,*sp+                   ; Save the return address
+       mov  r0,@current_bank
+       seto *r0                        ; Select the routine's bank
+       bl   *r1                        ; Call it
+       stst r1                         ; Keep its carry
+       dect sp
+       mov  *sp,r11                    ; R11 = the return address
+       dect sp
+       mov  *sp,r0                     ; R0 = the caller's bank
+       mov  r0,@current_bank
+       seto *r0                        ; Select it again
+       sla  r1,4                       ; The routine's carry (status bit 3) back in C
+       b    *r11
+*// far_call
+
 ;*********************************************************************
 ;*
 ;* Wait for r0 frames

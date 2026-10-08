@@ -296,6 +296,23 @@ ti_poll_vblank_2:
        rt
 *// ti_poll_vblank
 
+*********************************************************************
+*
+* Wait for the next frame
+*
+* TI-specific replacement for HALT: polls for VBlank (ti_poll_vblank)
+* until the frame counter (#R$E90B) changes. Changes R0.
+*
+ti_wait_frame:
+       .proc
+       movb @vblank_frame_counter,r0
+ti_wait_frame_1:
+       bl   @ti_poll_vblank
+       cb   @vblank_frame_counter,r0
+       jeq  ti_wait_frame_1
+       .endproc
+*// ti_wait_frame
+
 current_bank:                          ; The ROM bank selected last (.select_bank)
        data font_bank_select
 vdp_status:

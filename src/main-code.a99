@@ -454,8 +454,8 @@ _title_screen_status_wait:
 !
        movb @b255,a                                        ; LD A,$FF          ;
        movb a,@load_new_commander                          ; LD ($E924),A      ;
-;       b    @commander_menu                                ; JP $A30A          ; Y - load a commander
-       b    @title_screen                                  ;                   ; (TI: neither screen is converted yet - start again)
+       .far_call code_bank_7_select,commander_menu         ; JP $A30A          ; Y - load a commander (TI: the menu in ROM bank 7)
+       jmp  _title_screen_status_wait                      ;                   ; (TI: its "5. Exit" shows the status page and returns)
 
 ********************************************************************************
 * Title screen: swing an angle back and forth
@@ -1930,6 +1930,77 @@ _35db:                                                     ; >35db
        rt                                                  ; RET               ; 
 
 ********************************************************************************
+* Wait for a keypress, blinking the text-input cursor meanwhile [text]
+* 
+* Used by the routines at #R$3631, #R$3815 and #R$A30A.
+* .
+* Resets the blink-phase flag #R$E72E to 0 (erased) and the blink
+* countdown #R$E72D to 1, then repeatedly calls #R$3619 (which steps
+* the blink and HALTs for one VBlank each call) until #R$E8F5 (the
+* polled action code, see #R$347A) becomes non-zero. Consumes that
+* action code, and - only if the cursor glyph is currently showing
+* (#R$E72E set) - erases it (another XOR-plot of $7F via RST $00,
+* then #R$3564 to step the text cursor back the column that plot
+* advanced it by). Always plays the click (#R$7468) before
+* returning the consumed action code in A.
+* 
+* O:A The polled action code that ended the wait
+wait_for_keypress_blinking_cursor:                         ; >35e7
+       .proc                                               ;                   ; 
+       .push bc                                            ; PUSH BC           ; save registers
+       .push hl                                            ; PUSH HL           ; 
+       sb   a,a                                            ; XOR A             ; 
+       movb a,@cursor_blink_phase_flag                     ; LD ($E72E),A      ; blink phase = erased
+       movb one,@cursor_blink_countdown                    ; INC A / LD ($E72D),A; blink countdown = 1 (steps immediately)
+_35f1:                                                     ; >35f1
+       bl   @step_cursor_blink                             ; CALL $3619        ; step the blink
+       bl   @ti_wait_frame                                 ; HALT              ; (TI: wait for the next frame, polling for VBlank)
+       movb @pending_debounced_keypress_byte_status,a      ; LD A,($E8F5) / OR A; A = the polled action code
+       jeq  _35f1                                          ; JR Z,$35F1        ; nothing pressed yet - keep blinking and waiting
+       .push af                                            ; PUSH AF           ; stash the action code
+       sb   @pending_debounced_keypress_byte_status,@pending_debounced_keypress_byte_status; XOR A / LD ($E8F5),A; consume it
+       movb @cursor_blink_phase_flag,a                     ; LD A,($E72E) / OR A; A = the blink-phase flag
+       jeq  _3610                                          ; JR Z,$3610        ; cursor not currently shown - nothing to erase
+       movb @bytes+>7f,a                                   ; LD A,$7F          ; the cursor glyph
+       bl   @print_char                                    ; RST $00           ; XOR-plot it (erasing it, since it was showing)
+       movb @cursor_column,a                               ; LD A,($E72C)      ; step the text cursor back the column that plot advanced
+       sb   one,a                                          ; DEC A             ; 
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; 
+_3610:                                                     ; >3610
+* TI: no click (sound effect 0, #R$7468), as the sound effects aren't converted yet
+       .pop af                                             ; POP AF            ; recover the action code
+       .pop hl                                             ; POP HL            ; 
+       .pop bc                                             ; POP BC            ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Step #R$35E7's cursor-blink countdown and toggle the cursor glyph
+* 
+* Used by the routine at #R$35E7.
+* .
+* Decrements the countdown at #R$E72D, returning if it hasn't reached
+* zero. Otherwise resets it to 30 ($1E), XOR-plots the cursor glyph
+* $7F via RST $00 (toggling it on screen), steps the text cursor back
+* the column that plot advanced it by (#R$3564), and complements the
+* blink-phase flag #R$E72E to track which state ("on" or "erased")
+* the glyph is now in.
+step_cursor_blink:                                         ; >3619
+       .proc                                               ;                   ; 
+       sb   one,@cursor_blink_countdown                    ; LD HL,$E72D / DEC (HL); 
+       jne  _3619_end                                      ; RET NZ            ; not yet due - done
+       movb @bytes+>1e,@cursor_blink_countdown             ; LD (HL),$1E       ; due - reset the countdown (30 ticks)
+       movb @bytes+>7f,a                                   ; LD A,$7F          ; the cursor glyph
+       bl   @print_char                                    ; RST $00           ; XOR-plot it (toggles it on screen)
+       movb @cursor_column,a                               ; LD A,($E72C)      ; step the text cursor back the column that plot advanced
+       sb   one,a                                          ; DEC A             ; 
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; 
+       movb @cursor_blink_phase_flag,r0                    ; LD HL,$E72E / LD A,(HL); toggle the blink-phase flag
+       inv  r0                                             ; CPL               ; 
+       movb r0,@cursor_blink_phase_flag                    ; LD (HL),A         ; 
+_3619_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
 * Format a number
 * 
 * Used by the routines at #R$1651, #R$1A8A, #R$2556 and #R$36E1.
@@ -2313,6 +2384,43 @@ _380a:                                                     ; >380a
        cb   b,@bytes+>47                                   ; JR NZ,$380D       ; 
        jl   _380a                                          ; DJNZ $380A        ; 
        .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Y/N confirmation prompt: print " ? ", wait for Esc/Y/N
+* 
+* Used by the routines at #R$5CEE, #R$909F, #R$9120 and #R$A41B.
+* .
+* Prints " ? " (#R$382C), then loops on #R$35E7 until the key pressed is
+* Esc, 'Y' or 'N'. Esc returns with carry as #R$35E7 leaves it; 'Y' or 'N'
+* (at $3829) is printed, and returns with carry set.
+* 
+* O:A The key pressed ($1B/'Y'/'N')
+* O:carry Set for 'Y'/'N', per #R$35E7 for Esc
+confirm_prompt_yn:                                         ; >3815
+       .proc                                               ;                   ; 
+       li   hl,msg_382c                                    ; LD HL,$382C       ; the " ? " message
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+_3819:                                                     ; >3819
+       bl   @wait_for_keypress_blinking_cursor             ; CALL $35E7        ; A = the next key (blocks until one is available)
+       cb   a,@bytes+>1b                                   ; CP $1B            ; Esc?
+       jeq  _3815_esc                                      ; RET Z             ; yes - return as-is
+       cb   a,@bytes+>59                                   ; CP $59            ; 'Y'?
+       jeq  continue_3815_echo_confirm                     ; JR Z,$3829        ; yes - confirm
+       cb   a,@bytes+>4e                                   ; CP $4E            ; 'N'?
+       jne  _3819                                          ; JR Z,$3829        ; neither - keep waiting
+continue_3815_echo_confirm:                                ; >3829
+       bl   @print_char                                    ; RST $00           ; echo the key just pressed (still in A)
+       .retc                                               ; SCF / RET         ; carry set = confirmed (Y or N, not Esc)
+_3815_esc:                                                 
+       .retnc                                              ;                   ; carry clear = Esc
+
+********************************************************************************
+* The message " ? "
+* 
+* Printed via RST $08 (#R$3815, at $3818). No character here has bit 7
+* set, so it ends at the $00.
+msg_382c:                                                  ; >382c
+       text ' ? ',>00                                             ; 
 
 ********************************************************************************
 * Write B bytes from (HL) to the VDP data port

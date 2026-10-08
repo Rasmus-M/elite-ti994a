@@ -1,4 +1,4 @@
-* ROM bank 7: the math tables, and code: the status page
+* ROM bank 7: the math tables, and code: the status page and the commander menu
 * Assembled for real by code-banks.a99, and DORG in elite.a99 for its labels
        .ifdef code_banks
        aorg >6000
@@ -254,6 +254,255 @@ print_commander_name:                                      ; >6377
        li   hl,commander_name                              ; LD HL,$EB06       ; the commander's name
        bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
        .endproc                                            ; RET               ; 
+
+* The commander menu (only the Default JAMESON option so far), with its own data
+
+********************************************************************************
+* "JAMESON" default-commander-name string
+* 
+* Elite's traditional default commander name, plain ASCII and
+* null-terminated.
+* .
+* Copied into the commander's name by #R$A433.
+jameson_default_commander_name_string:                     ; >1337
+       text 'JAMESON',>00                                         ; (TI: with the 3 bytes after it that #R$A433 copies, as zeros)
+       byte >00,>00,>00                                           ; 
+
+********************************************************************************
+* Default commander file
+* 
+* Used by the routine at #R$A433.
+* .
+* The commander file for the default commander, JAMESON: copied into the
+* commander file buffer by #R$A433, and then into the variables listed
+* at #R$A551 (#R$A469).
+default_commander_file:                                    ; >7172
+       byte >00                                                   ; galaxy number: 0
+       byte >4A,>5A,>48,>02,>53,>B7                               ; galaxy seeds
+       byte >07                                                   ; current system: 7 (Lave)
+       byte >03                                                   ; options: sound on, D
+       byte >E8,>03,>00                                           ; cash: 1000 (100.0 credits)
+       byte >00                                                   ; market random byte
+       byte >2D,>31,>01,>FF                                       ; scratch buffer
+       byte >46,>03,>00,>00,>81,>80,>00,>00,>00,>00               ; fuel 70, 3 missiles, the equipment
+       byte >00,>00,>80,>80,>00,>00,>00,>00,>00,>00               ; 
+       bss  72                                                    ; cargo: none
+       byte >00                                                   ; legal status: clean
+       byte >00,>00,>00                                           ; score
+       byte >00                                                   ; combat rank: Harmless
+       byte >00                                                   ; scratch buffer
+       byte >00                                                   ; Constrictor's trail
+       byte >00                                                   ; kills
+       byte >01                                                   ; next mission: 1
+       byte >00                                                   ; mission state: none
+       byte >00                                                   ; mission system
+       byte >40                                                   ; jumps to the next mission: 64
+       byte >00,>00,>00,>00                                       ; game time
+       byte >00,>00,>00                                           ; unused
+
+********************************************************************************
+* Show the commander menu
+* 
+* Used by the routines at #R$1C5C, #R$A377, #R$A3E0, #R$A41B and #R$A542.
+* .
+* Reached from the title screen (#R$1DB5) and after each menu option.
+* Refuses in flight (#R$6393). Packs the commander's data into the
+* commander file (#R$A44F), and works out the length of the name (#R$EB06,
+* into #R$EB11). Then $A31D shows the menu.
+* .
+* At $A31D, draws the menu: "1. Load new Commander", "2. Save Commander",
+* "3. Catalog tape", "4. Default JAMESON", and the commander's name. The
+* entry at $A33A goes straight to option 1 if "Load New Commander" was
+* chosen on the title screen (#R$E924), and otherwise asks "Select option
+* ?" ($A348).
+* .
+* At $A348, prints the menu prompt ($A5FD), then waits (#R$35E7) for a key
+* in the range '1'-'5', rejecting anything else, before falling to $A359.
+* .
+* At $A359, redraws the dashboard, then (at $A35C) converts the '1'-'5' key
+* to a 0-4 index and jumps to the option's routine from the table at $A6A4.
+commander_menu:                                            ; >a30a
+       .proc                                               ;                   ; 
+commander_menu_jmp:                                        
+       movb @docked,a                                      ; CALL $6393        ; refuse in flight (#R$6393)
+       jne  commander_menu_docked                          ;                   ; 
+       .endproc                                            ;                   ; (TI: back to the caller, without the beep, as no sound effects yet)
+commander_menu_docked:                                     
+       bl   @pack_commander                                ; CALL $A44F        ; pack the commander file
+       li   hl,commander_name                              ; LD HL,$EB06       ; the commander's name
+       sb   b,b                                            ; LD B,$00          ; 
+_a315:                                                     ; >a315
+       movb *hl+,a                                         ; LD A,(HL) / OR A / INC HL; 
+       jeq  commander_menu_2                               ; JR Z,$A31D        ; 
+       ab   one,b                                          ; INC B             ; count its letters
+       jmp  _a315                                          ; JR $A315          ; 
+commander_menu_2:                                          ; >a31d
+       movb b,@name_length                                 ; LD A,B / LD ($EB11),A; the length of the name
+       bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide the sprites
+       li   ix,commander_menu_frame                        ; LD IX,$A5ED       ; 
+       bl   @rst_28_target_draw_list_tile                  ; RST $28           ; draw a frame
+       li   hl,commander_menu_text                         ; LD HL,$A58F       ; the menu
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print it
+       bl   @print_commander_name                          ; CALL $6377        ; 
+       li   bc,>1706                                       ; LD BC,$1706       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; 
+       li   hl,commander_name                              ; LD HL,$EB06       ; 
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print the commander's name
+commander_menu_ask:                                        ; >a33a
+       movb @load_new_commander,a                          ; LD A,($E924) / OR A; from the title screen?
+       jeq  commander_menu_wait_for_choice                 ; JR Z,$A348        ; no - ask
+       sb   @load_new_commander,@load_new_commander        ; XOR A / LD ($E924),A; 
+       movb @bytes+>31,a                                   ; LD A,$31          ; yes - option '1'
+       jmp  _a35c                                          ; JR $A35C          ; 
+commander_menu_wait_for_choice:                            ; >a348
+       li   hl,msg_select_option                           ; LD HL,$A5FD       ; "Select option ? "
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print it
+_a34c:                                                     ; >a34c
+       bl   @wait_for_keypress_blinking_cursor             ; CALL $35E7        ; wait for a key
+       cb   a,@bytes+>31                                   ; CP $31            ; below '1'?
+       jl   _a34c                                          ; JR C,$A357        ; yes - reject
+       cb   a,@bytes+>36                                   ; CP $36            ; '6' or above?
+       jhe  _a34c                                          ; JR C,$A359        ; yes - reject
+continue_a348_dispatch_menu_choice:                        ; >a359
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+_a35c:                                                     ; >a35c
+       sb   @bytes+>31,a                                   ; SUB $31           ; convert '1'-'5' to a 0-4 index
+       clr  r1                                             ;                   ; 
+       movb a,r1                                           ;                   ; 
+       srl  r1,7                                           ; ADD HL,BC x 2     ; R1 = the index * 2
+       ci   r1,8                                           ;                   ; (TI: '5' shows the status page and returns, as its RET does on the MSX)
+       jne  _a35c_jump                                     ;                   ; 
+       bl   @status_page                                   ;                   ; 
+       .endproc                                            ;                   ; 
+_a35c_jump:                                                
+       mov  @commander_menu_options(r1),r1                 ; LD HL,$A6A4 / LD A,(HL) ...; the option's handler
+       b    *r1                                            ; JP (HL)           ; dispatch to it
+
+********************************************************************************
+* Commander menu option '4': default JAMESON
+* 
+* Reached via the menu's jump table ($A6A4, #R$A359). Asks "Are you
+* sure"; if 'Y', gives the player the default commander, JAMESON
+* (#R$A433, #R$A469). Back to the menu (#R$A30A).
+menu_default_commander:                                    ; >a41b
+       li   hl,msg_are_you_sure                            ; LD HL,$A611       ; "Are you sure"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       bl   @confirm_prompt_yn                             ; CALL $3815        ; wait for Y, N or ESC
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       cb   a,@bytes+>59                                   ; CP $59            ; 
+       jeq  _a42a                                          ; JP NZ,$A33A       ; not 'Y' - ask again
+       b    @commander_menu_ask                            ;                   ; 
+_a42a:                                                     ; >a42a
+       bl   @default_commander                             ; CALL $A433        ; the default commander file
+       bl   @unpack_commander                              ; CALL $A469        ; unpack it
+       b    @commander_menu_jmp                            ; JP $A30A          ; back to the menu
+
+********************************************************************************
+* TI: options 1-3 use the tape (#R$A377, #R$A3E0, #R$A3C7), which isn't
+* converted yet: they say so and go back to the menu, as after a tape error
+* (#R$A542).
+menu_tape_not_available:                                   
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       li   hl,msg_tape_not_available                      ;                   ; 
+       bl   @show_message                                  ; CALL $5FFB        ; show it for a while
+       b    @commander_menu_jmp                            ; JP $A30A          ; back to the menu
+menu_load_commander:                                       
+       equ  menu_tape_not_available                               ; 
+menu_save_commander:                                       
+       equ  menu_tape_not_available                               ; 
+menu_catalog_tape:                                         
+       equ  menu_tape_not_available                               ; 
+msg_tape_not_available:                                    
+       text 'Tape not available on the T',>c9                     ; 
+
+********************************************************************************
+* Load the default commander
+* 
+* Used by the routines at #R$6F9F and #R$A41B.
+* .
+* Copies the default commander file (#R$7172) into the commander file
+* buffer ($F6C0), and the name "JAMESON" (#R$1337) into the commander's
+* name (#R$EB06), 7 letters long (#R$EB11). Used at startup (#R$6F9F)
+* and for menu option '4' (#R$A41B).
+default_commander:                                         ; >a433
+       .proc                                               ;                   ; 
+       li   hl,default_commander_file                      ; LD HL,$7172       ; 
+       li   de,commander_menu_buffer                       ; LD DE,$F6C0       ; the commander file buffer
+       li   bc,>0080                                       ; LD BC,$0080       ; 
+       .ldir                                               ; LDIR              ; copy the default commander file
+       li   hl,jameson_default_commander_name_string       ; LD HL,$1337       ; "JAMESON"
+       li   de,commander_name                              ; LD DE,$EB06       ; the commander's name
+       li   bc,>000b                                       ; LD BC,$000B       ; 
+       .ldir                                               ; LDIR              ; 
+       movb @bytes+>07,@name_length                        ; LD A,$07 / LD ($EB11),A; 7 letters
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Pack the commander file
+* 
+* Used by the routine at #R$A30A.
+* .
+* Copies the commander's data - the variables listed at #R$A551 - into
+* the commander file buffer at $F6C0, for saving.
+pack_commander:                                            ; >a44f
+       .proc                                               ;                   ; 
+       li   ix,commander_file_variables                    ; LD HL,$A551       ; the list of variables
+       li   de,commander_menu_buffer                       ; LD DE,$F6C0       ; the commander file buffer
+_a455:                                                     ; >a455
+       mov  *ix+,hl                                        ; LD C,(HL) / LD A,(HL) / OR A; HL -> the next variable
+       jeq  _a455_end                                      ; RET Z             ; all done
+       mov  *ix+,bc                                        ; LD A,(HL)         ; BC = its length
+       .ldir                                               ; LDIR              ; copy it into the buffer
+       jmp  _a455                                          ; JR $A455          ; 
+_a455_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Commander menu
+* 
+* Printed by #R$A30A (RST $20): a list of (column, row, string) records ending
+* with $FF (see #R$3596).
+commander_menu_text:                                       ; >a58f
+       text >05,>04,'1. Load new Commander',>00                   ; 
+       text >05,>06,'2. Save Commander',>00                       ; 
+       text >05,>08,'3. Catalog tape',>00                         ; 
+       text >05,>0a,'4. Default JAMESON',>00                      ; 
+       text >05,>0c,'5. Exit',>00                                 ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Commander menu frame
+* 
+* Three (RST $28) rectangles that #R$A30A draws around the commander menu (see
+* #R$36F1).
+commander_menu_frame:                                      ; >a5ed
+       byte >05,>01,>20,>01,>91                                   ; 
+       byte >05,>04,>02,>09,>D1                                   ; 
+       byte >08,>04,>19,>09,>21                                   ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Commander menu: "Select option ?"
+* 
+* Printed by #R$A30A.
+msg_select_option:                                         ; >a5fd
+       text >05,>16,'Select option ? ',>00                        ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* The message "Are you sure"
+msg_are_you_sure:                                          ; >a611
+       text 'Are you sur',>e5                                     ; 
+
+********************************************************************************
+* Pointer table
+commander_menu_options:                                    ; >a6a4
+       even                                                       ; 
+       data menu_load_commander                                   ; 1 (TI: words)
+       data menu_save_commander                                   ; 2
+       data menu_catalog_tape                                     ; 3
+       data menu_default_commander                                ; 4
+       data status_page                                           ; 5 (TI: not used - see #R$A35C)
 
 rom_bank_7_end:
        equ  $

@@ -142,3 +142,5 @@ cockpit_picture_bank_select:
        equ  >600c
 font_bank_select:
        equ  >600c
+music_bank_select:
+       equ  >600c

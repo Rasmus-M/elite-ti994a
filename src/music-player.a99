@@ -1,0 +1,292 @@
+*********************************************************************
+*
+* Music player for the SN76489
+*
+* TI-specific. A native replacement for the music part of the MSX sound
+* code (#R$7603, #R$7645, #R$769B). It plays a tune in the format of
+* title-music.a99 (in ROM bank 6) on tone channels 1-3, one tick per
+* (50 Hz) MSX frame, and starts it again when every channel has finished.
+*
+* It has its own workspace and is called with BLWP, so it can be called
+* from anywhere (via ti_poll_vblank) without disturbing the main registers.
+* It selects the music's ROM bank while it runs, then the bank in
+* current_bank again.
+*
+* Player workspace registers:
+*   R0-R2  scratch
+*   R4     -> the channel's record
+*   R5     the channel's number in bits 13-14 (>0000, >2000, >4000), for the
+*          SN76489 command bytes
+*   R6     loop counter
+*   R7     -> the channel's position in the tune
+*
+* Channel records (music_channels, music_record_size bytes each):
+music_active:                          ; Nonzero while the channel is playing
+       equ  0
+music_list:                            ; -> the channel's entry in its pattern list
+       equ  2
+music_position:                        ; -> the next (note, duration) pair
+       equ  4
+music_countdown:                       ; Ticks left of the current note
+       equ  6
+music_rest:                            ; Nonzero if the note's last tick is silent
+       equ  8
+music_attenuation:                     ; The channel's attenuation (0-15) in the high byte
+       equ  10
+music_record_size:
+       equ  12
+
+music_start_vector:                    ; Start the tune at the caller's HL
+       data music_ws,music_start
+music_stop_vector:                     ; Stop the music
+       data music_ws,music_stop
+music_tick_vector:                     ; Play one tick
+       data music_ws,music_tick
+
+*********************************************************************
+*
+* Start a tune
+*
+* Called with BLWP @music_start_vector.
+*
+* I:HL Address of the tune header (in ROM bank 6)
+*
+music_start:
+       mov  @14(r13),r0                ; R0 = the caller's HL (R7)
+       mov  r0,@music_tune
+       li   r1,music_bank_select
+       seto *r1
+       bl   @music_init
+       mov  @current_bank,r1
+       seto *r1
+       rtwp
+*// music_start
+
+*********************************************************************
+*
+* Stop the music
+*
+* Called with BLWP @music_stop_vector.
+*
+music_stop:
+       clr  @music_on
+       bl   @music_silence_all
+       rtwp
+*// music_stop
+
+*********************************************************************
+*
+* Play one tick of the tune
+*
+* Called with BLWP @music_tick_vector, once per MSX frame (ti_poll_vblank).
+* Like #R$7645 and #R$769B: on each active channel, counts down the
+* current note, or plays the pending silent tick, or reads the next
+* (note, duration) pair, moving on to the next pattern at >91. When every
+* channel has reached the end of its pattern list, starts the tune again.
+*
+music_tick:
+       mov  @music_on,r0
+       jeq  music_tick_return
+       li   r1,music_bank_select
+       seto *r1
+       li   r4,music_channels
+       clr  r5
+music_tick_channel:
+       mov  *r4,r0                     ; active?
+       jeq  music_tick_next
+       mov  @music_countdown(r4),r0
+       jeq  music_tick_rest
+       dec  @music_countdown(r4)       ; the note goes on
+       jmp  music_tick_next
+music_tick_rest:
+       mov  @music_rest(r4),r0
+       jeq  music_tick_read
+       clr  @music_rest(r4)
+       bl   @music_silence             ; the note's silent last tick
+       jmp  music_tick_next
+music_tick_read:
+       mov  @music_position(r4),r7
+music_tick_read_1:
+       movb *r7+,r1                    ; R1 = the note
+       cb   r1,@music_loop_byte
+       jne  music_tick_note
+       mov  @music_list(r4),r1         ; end of the pattern
+       inct r1                         ; -> the next entry in the pattern list
+       mov  *r1,r7
+       jeq  music_tick_end             ; end of the list
+       mov  r1,@music_list(r4)
+       jmp  music_tick_read_1
+music_tick_end:
+       clr  *r4                        ; the channel has finished
+       dec  @music_playing
+       bl   @music_silence
+       jmp  music_tick_next
+music_tick_note:
+       clr  r2
+       movb *r7+,r2                    ; R2 = the duration
+       jlt  music_tick_note_rest
+       srl  r2,7                       ; the note lasts duration * 2 ticks
+       dec  r2
+       jmp  music_tick_note_1
+music_tick_note_rest:
+       seto @music_rest(r4)            ; bit 7 set: the last tick is silent
+       andi r2,>7f00
+       srl  r2,7
+       dect r2
+music_tick_note_1:
+       andi r2,>00ff                   ; a byte, as on the MSX
+       mov  r2,@music_countdown(r4)
+       mov  r7,@music_position(r4)
+       cb   r1,@music_silent_byte
+       jl   music_tick_tone
+       bl   @music_silence             ; a rest
+       jmp  music_tick_next
+music_tick_tone:
+       srl  r1,8
+       mov  @note_tone_periods(r1),r1  ; the period's two command bytes
+       socb r5,r1
+       socb @music_tone_command,r1
+       movb r1,@sound                  ; command, channel and the low 4 bits
+       swpb r1
+       movb r1,@sound                  ; the high 6 bits
+       mov  @music_attenuation(r4),r0
+       socb r5,r0
+       socb @music_volume_command,r0
+       movb r0,@sound                  ; the channel's volume
+music_tick_next:
+       ai   r4,music_record_size
+       ai   r5,>2000
+       ci   r5,>6000
+       jne  music_tick_channel
+       mov  @music_playing,r0
+       jne  music_tick_done
+       mov  @music_tune,r0             ; every channel has finished:
+       bl   @music_init                ; start the tune again
+music_tick_done:
+       mov  @current_bank,r1
+       seto *r1
+music_tick_return:
+       rtwp
+*// music_tick
+
+*********************************************************************
+*
+* Set up the channels for a tune
+*
+* Like #R$7603. The music's ROM bank must be selected.
+*
+* I:R0 Address of the tune header
+*
+music_init:
+       mov  r11,r2
+       bl   @music_silence_all
+       mov  r2,r11
+       mov  *r0+,r6                    ; R6 = the number of channels
+       mov  r6,@music_playing
+       li   r4,music_channels
+       clr  r5
+music_init_1:
+       mov  *r0+,r1                    ; R1 -> the channel's pattern list
+       mov  r1,@music_list(r4)
+       mov  *r1,@music_position(r4)    ; start at its first pattern
+       clr  @music_countdown(r4)
+       clr  @music_rest(r4)
+       mov  *r0+,r1
+       swpb r1
+       mov  r1,@music_attenuation(r4)
+       seto *r4                        ; the channel is playing
+       ai   r4,music_record_size
+       ai   r5,>2000
+       dec  r6
+       jne  music_init_1
+       seto @music_on
+       rt
+*// music_init
+
+*********************************************************************
+*
+* Silence a channel
+*
+* I:R5 The channel's number in bits 13-14
+*
+music_silence:
+       li   r1,>9f00                   ; attenuation 15
+       socb r5,r1
+       movb r1,@sound
+       rt
+*// music_silence
+
+*********************************************************************
+*
+* Silence all four channels
+*
+music_silence_all:
+       li   r1,>9f00
+       movb r1,@sound
+       li   r1,>bf00
+       movb r1,@sound
+       li   r1,>df00
+       movb r1,@sound
+       li   r1,>ff00
+       movb r1,@sound
+       rt
+*// music_silence_all
+
+music_loop_byte:                       ; The end of a pattern
+       byte >91
+music_silent_byte:                     ; Notes from here on are silent
+       byte >90
+music_tone_command:                    ; SN76489 tone command (channel bits added)
+       byte >80
+music_volume_command:                  ; SN76489 attenuation command (channel bits added)
+       byte >90
+       even
+music_on:                              ; Nonzero while a tune is playing
+       data 0
+music_tune:                            ; Address of the tune header, to start it again
+       data 0
+music_playing:                         ; Number of channels still playing
+       data 0
+music_channels:
+       bss  3*music_record_size
+music_ws:
+       bss  >20
+
+*********************************************************************
+*
+* Poll for a VDP interrupt
+*
+* TI-specific. Interrupts stay off, so this takes the place of the MSX
+* VBlank handler (#R$7202): call it often enough to see every frame. When
+* the VDP has flagged a new frame, it counts the frame (#R$E90B, #R$F748)
+* and plays a tick of the music. The MSX runs at 50 Hz, so every sixth
+* (60 Hz) frame is ignored to keep the same timing.
+*
+* Reading the VDP status resets the VDP's address latch, so this mustn't be
+* called between the two bytes of a VDP address.
+*
+* Changes no registers (the status only).
+*
+ti_poll_vblank:
+       movb @vdpsta,@vdp_status        ; bit 7 = a new frame (reading clears it)
+       jlt  ti_poll_vblank_1
+       rt
+ti_poll_vblank_1:
+       sb   one,@frame_skip_counter
+       jne  ti_poll_vblank_2
+       movb @bytes+>06,@frame_skip_counter
+       rt                              ; ignore every sixth frame
+ti_poll_vblank_2:
+       ab   one,@vblank_frame_counter
+       ab   one,@vblank_subtick_counter
+       blwp @music_tick_vector
+       rt
+*// ti_poll_vblank
+
+current_bank:                          ; The ROM bank selected last (.select_bank)
+       data font_bank_select
+vdp_status:
+       byte 0
+frame_skip_counter:
+       byte 6
+       even

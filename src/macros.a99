@@ -47,6 +47,14 @@
        bss  ($+#1)&1
        .endm
 
+* Select a ROM bank (#1 = its select address) and remember it in current_bank,
+* so ti_poll_vblank can select it again after the music player. Changes R0.
+       .defm select_bank
+       li   r0,#1
+       mov  r0,@current_bank
+       seto *r0
+       .endm
+
        .defm push
        mov  #1,*sp+
        .endm

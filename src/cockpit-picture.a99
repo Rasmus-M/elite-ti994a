@@ -12,7 +12,7 @@
 * ($CAD7-$CF7E), then the 6144-byte colour table ($CF7F-$D329). Each
 * stream ends with an escape byte followed by a zero repeat count.
 * .
-* On the TI it's in ROM bank 5 (cockpit_picture_bank_select).
+* On the TI it's in ROM bank 6 (cockpit_picture_bank_select).
 cockpit_picture:                                           ; >cad7
        byte >14,>14,>00,>20,>FE,>14,>01,>07
        byte >00,>55,>AA,>55,>AA,>55,>AA,>FF

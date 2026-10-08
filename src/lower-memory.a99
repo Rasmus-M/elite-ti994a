@@ -5,6 +5,7 @@
 
        copy "ti-routines.a99"
        copy "ti-tables.a99"
+       copy "music-player.a99"
 
 * Space view bitmap buffer
 *

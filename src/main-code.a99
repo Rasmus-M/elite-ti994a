@@ -23,10 +23,10 @@ view_name_front:                                           ; >118f
 select_blueprint_bank:
        cb   @ship_type,@bytes+blueprints_2_first_type
        jhe  !
-       seto @blueprints_1_bank_select
+       .select_bank blueprints_1_bank_select
        rt
 !
-       seto @blueprints_2_bank_select
+       .select_bank blueprints_2_bank_select
        rt
 
 ********************************************************************************
@@ -115,8 +115,8 @@ title_screen:                                              ; >1c5c
        jeq  title_screen_mission                           ; JR Z,$1C93        ; mission briefing - #R$1C93
        li   hl,options                                     ; LD HL,$E914       ;
        szcb @bit0,*hl                                      ; RES 0,(HL)        ; turn sound effects off (see #R$7468)
-;       li   hl,title_music                                 ; LD HL,$7AE4       ;
-;       .call @start_tune                                   ; CALL $7603        ; start the music
+       li   hl,title_music                                 ; LD HL,$7AE4       ;
+       blwp @music_start_vector                            ; CALL $7603        ; start the music
 _1c8b:                                                     ; >1c8b
        bl   @title_screen_letters                          ; CALL $1E01        ; show the spinning "ELITE" letters
        li   hl,title_ships                                 ; LD HL,$1F40       ; HL -> the list of title screen ships
@@ -271,7 +271,7 @@ _1db2:                                                     ; >1db2
        b    @title_screen_next_frame                       ; JP $1CF4          ; next frame
 title_screen_key:                                          ; >1db5
        .push af                                            ; PUSH AF           ;
-;       .call @stop_all_sound                               ; CALL $7438        ; stop the music
+       blwp @music_stop_vector                             ; CALL $7438        ; stop the music
 ;       .call @unpack_commander                             ; CALL $A469        ; set up the commander record
        li   hl,options                                     ; LD HL,$E914       ;
        socb @bit0,*hl                                      ; SET 0,(HL)        ; sound effects on
@@ -493,9 +493,10 @@ title_screen_letter_frame_end:                             ; >1eb3
        bl   @show_view_message                             ; CALL $39C8        ; print "(c)1987 Firebird"
        bl   @copy_space_view                               ; CALL $3846        ; copy the space view to the screen
 _1ebc:                                                     ; >1ebc
-;      movb @vblank_subtick_counter,a                      ; LD A,($F748)      ;
-;      cb   a,@bytes+>07                                   ; CP $07            ;
-;      jl   _1ebc                                          ; JR C,$1EBC        ; wait for 7 VBlanks (VBlank timing isn't implemented yet)
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
+       movb @vblank_subtick_counter,a                      ; LD A,($F748)      ;
+       cb   a,@bytes+>07                                   ; CP $07            ;
+       jl   _1ebc                                          ; JR C,$1EBC        ; wait for 7 VBlanks
        movb @pending_debounced_keypress_byte_status,a      ; LD A,($E8F5)      ;
        socb a,a                                            ; OR A              ;
        jeq  title_screen_letter_next_frame                 ; JR Z,$1ED0        ; no key
@@ -1175,10 +1176,10 @@ clear_all_ship_slots:                                      ; >28d4
 get_blueprint:                                             ; >2fe9
        cb   a,@bytes+blueprints_2_first_type
        jhe  !
-       seto @blueprints_1_bank_select                                          ; Select blueprints ROM bank 1
+       .select_bank blueprints_1_bank_select                                          ; Select blueprints ROM bank 1
        jmp  !!
 !
-       seto @blueprints_2_bank_select                                          ; Select blueprints ROM bank 2
+       .select_bank blueprints_2_bank_select                                          ; Select blueprints ROM bank 2
 !
        ab   a,a                                            ; ADD A,A           ;
        movb a,@c                                           ; LD C,A            ; 
@@ -1336,7 +1337,7 @@ print_char:                                                ; >34a8
        sla  hl,3                                           ; ADD HL,HL         ; HL *= 8 (this char's offset into the font table)
        ;                                                   ; ADD HL,HL         ; 
        ;                                                   ; ADD HL,HL         ; 
-       seto @font_bank_select                              ;                   ; the font is in ROM bank 5 on the TI
+       .select_bank font_bank_select                       ;                   ; the font is in ROM bank 6 on the TI
        li   bc,font->0100                                  ; LD BC,$099F       ; the font pattern table (codes $20-$7F)
        a    bc,hl                                          ; ADD HL,BC         ; HL -> this character's 8-byte glyph
        li   de,scratch_buffer                              ; LD DE,$E600       ; DE -> the staging buffer
@@ -1646,6 +1647,7 @@ copy_space_view:                                           ; >3846
        movb @bytes+>10,a                                   ; LD A,$10          ; 16 character rows
        movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; writing to VRAM
 _3855:                                                     ; >3855
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
 ;      limi 0                                              ; DI                ; 
        swpb de                                             ; LD A,$28          ; 
        movb de,@vdpwa                                      ; OUT ($99),A       ; VRAM address low byte: column 5
@@ -1671,9 +1673,14 @@ _3855:                                                     ; >3855
 * (176 pixels) of each of its 128 rows. The original pushes zeros with SP
 * pointed into the buffer; here each row is cleared with 11 CLRs.
 clear_space_view:                                          ; >388f
+       .proc
        li   hl,space_view_buffer                           ; LD HL,$E5F6       ; HL -> the first row (top down instead of bottom up)
-       li   r0,128                                         ; LD A,$10          ; 128 rows (16 passes of 8 rows on the MSX)
-       b    @clear_space_view_rows_pad                     ; PUSH DE           ; clear each row's 22 bytes, from scratchpad (it returns to the caller)
+       li   r0,64                                          ; LD A,$10          ; 64 rows at a time (16 passes of 8 rows on the MSX)
+       bl   @clear_space_view_rows_pad                     ; PUSH DE           ; clear each row's 22 bytes, from scratchpad
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
+       li   r0,64                                          ;                   ; the other 64 rows
+       bl   @clear_space_view_rows_pad                     ;                   ;
+       .endproc                                            ; RET               ;
 
 ********************************************************************************
 * Decompress a full-screen picture (pattern + colour data) to VRAM
@@ -2039,11 +2046,14 @@ _3a2a:                                                     ; >3a2a
 * 
 * I:A Colour
 colour_space_view:                                         ; >3a4d
+       .proc
        li   hl,>2128                                       ; LD HL,$2128       ; HL = $2128: the colour table at row 1, column 5
        movb a,@e                                           ; LD E,A            ; 
+       movb a,r1                                           ;                   ; R1 = the colour (A is needed for the address)
        movb @bytes+>10,@c                                  ; LD C,$10          ; 16 rows
+       li   r2,vdpwd                                       ;                   ; R2 -> the VDP data port
 _3a53:                                                     ; >3a53
-;      limi 0                                              ; DI                ; 
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
        movb @l,a                                           ; LD A,L            ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb h,a                                            ; LD A,H            ; 
@@ -2051,15 +2061,14 @@ _3a53:                                                     ; >3a53
        movb a,@vdpwa                                       ; OUT ($99),A       ; point the VDP at the row
        movb @bytes+>b0,b                                   ; LD B,$B0          ; 176 bytes (22 characters)
 _3a5e:                                                     ; >3a5e
-       movb @e,a                                           ; LD A,E            ; 
-       movb a,@vdpwd                                       ; OUT ($98),A       ; 
+       movb r1,*r2                                         ; LD A,E / OUT ($98),A; 
        sb   one,b                                          ; DJNZ $3A5E        ; 
-       jne  _3a5e                                          ;                   
-       ; EI                                                ; EI                ;
+       jne  _3a5e                                          ;                   ; 
        ab   one,h                                          ; INC H             ; next row
        sb   one,@c                                         ; DEC C             ; 
        jne  _3a53                                          ; JR NZ,$3A53       ; 
-       rt                                                  ; RET               ; 
+       movb @e,a                                           ;                   ; A = the colour, as on the MSX
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Work out a point's outcode
@@ -3279,6 +3288,7 @@ _42bc:                                                     ; >42bc
        movb @bp_face_count,a                               ; LD A,($F7FD)      ; B = number of faces
        movb a,b                                            ; LD B,A            ; B = the loop count
 _4303:                                                     ; >4303
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
        .push bc                                            ; PUSH BC           ; save the loop counter
        movb @bp_face_normals,a                             ; LD A,($F804)      ; A = faces have normals?
        socb a,a                                            ; OR A              ; 
@@ -4312,6 +4322,7 @@ draw_face_edge:                                            ; >4932
        inc  hl                                             ; INC HL            ; 
        movb *hl,d                                          ; LD D,(HL)         ; D = the second vertex
        bl   @draw_edge                                     ; CALL $496D        ; draw the edge
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
        .pop hl                                             ; POP HL            ; 
        movb *hl,a                                          ; LD A,(HL)         ; 
        movb a,@draw_face_edge_drawn+>0003                  ; LD ($4944),A      ; point (IX+d) at the edge's flag (#R$4942+2)
@@ -6696,7 +6707,7 @@ blank_screen_decompress_picture_recolour:                  ; >7139
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>81,a                                   ; LD A,$81          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; turn the display off
-       seto @cockpit_picture_bank_select                   ;                   ; the picture is in ROM bank 5 on the TI
+       .select_bank cockpit_picture_bank_select            ;                   ; the picture is in ROM bank 6 on the TI
        movb @cockpit_picture_addr+1,hl                     ; LD HL,($F740)     ; HL -> the cockpit picture (#R$F740)
        movb @cockpit_picture_addr,@l                       ;                   ;
        bl   @decompress_picture                            ; CALL $390E        ; decompress it (#R$390E)

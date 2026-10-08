@@ -8,7 +8,7 @@
 * codes $7E-$7F a checkerboard and a solid block. No code loads the
 * table's address directly.
 * .
-* On the TI it's in ROM bank 5 (font_bank_select).
+* On the TI it's in ROM bank 6 (font_bank_select).
 font:                                                      ; >0a9f
        byte >00,>00,>00,>00,>00,>00,>00,>00                          ; space
        byte >20,>20,>20,>20,>20,>00,>20,>00                          ; "!"

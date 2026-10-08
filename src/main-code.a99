@@ -3343,13 +3343,12 @@ _4303:                                                     ; >4303
        srl  r1,8                                           ;                   ; 
        movb @bit_length_table(r1),a                        ; LD A,(DE)         ; A = the scale's bit length (#R$0200)
        movb a,@face_scale_bits                             ; LD ($E7E9),A      ; 
-       li   de,rotated_vector                              ; LD DE,$E7EA       ; DE -> the $E7EA staging buffer
-       .ldi                                                ; LDI               ; copy 6 bytes from (HL) into the staging buffer...
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; copy the normal
+       movb *hl+,@rotated_vector+1                         ; LD DE,$E7EA       ; copy the 6-byte vector, swapping each little-endian word
+       movb *hl+,@rotated_vector                           ; LDI               ; to big-endian for word access
+       movb *hl+,@rotated_vector_y+1                       ; LDI               ; 
+       movb *hl+,@rotated_vector_y                         ; LDI               ; 
+       movb *hl+,@rotated_vector_z+1                       ; LDI               ; 
+       movb *hl+,@rotated_vector_z                         ; LDI x 2           ; (DE and BC are not used afterwards)
 _4325:                                                     ; >4325
        movb @bp_face_normals,a                             ; LD A,($F804)      ; A = the per-entry mode/flag byte again
        socb a,a                                            ; OR A              ; 
@@ -3456,61 +3455,52 @@ _4397:                                                     ; >4397
 * O:HL z
 rotate_vertex:                                             ; >4464
        .proc
-       movb @rotated_vector+1,hl                           ; LD HL,($E7EA)     ; x * side.x
-       movb @rotated_vector,@l                             ;                   ;
+       mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; x * side.x
        movb @side_vector_logs+1,bc                         ; LD BC,($E6CC)     ; BC = row 1's first coefficient
        movb @side_vector_logs,@c                           ;                   ;
        bl   @multiply_logs                                 ; CALL $2160        ; combine it via #R$2160
        .ex_de_hl                                           ; EX DE,HL          ; DE = that combine's result
-       movb @rotated_vector_y+1,hl                         ; LD HL,($E7EC)     ; y * roof.x
-       movb @rotated_vector_y,@l                           ;                   ;
+       mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; y * roof.x
        movb @roof_vector_logs+1,bc                         ; LD BC,($E6D2)     ; BC = row 1's second coefficient
        movb @roof_vector_logs,@c                           ;                   ;
        bl   @multiply_logs                                 ; CALL $2160        ; combine it
        a    de,hl                                          ; ADD HL,DE         ; HL = the running sum for row 1
        .ex_de_hl                                           ; EX DE,HL          ; DE = that sum
-       movb @rotated_vector_z+1,hl                         ; LD HL,($E7EE)     ; z * nose.x
-       movb @rotated_vector_z,@l                           ;                   ;
+       mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; z * nose.x
        movb @nose_vector_logs+1,bc                         ; LD BC,($EB68)     ; BC = row 1's third coefficient
        movb @nose_vector_logs,@c                           ;                   ;
        bl   @multiply_logs                                 ; CALL $2160        ; combine it
        a    de,hl                                          ; ADD HL,DE         ; x'
        .push hl                                            ; PUSH HL           ; save it
-       movb @rotated_vector+1,hl                           ; LD HL,($E7EA)     ; x * side.y
-       movb @rotated_vector,@l                             ;                   ;
+       mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; x * side.y
        movb @side_vector_log_y+1,bc                        ; LD BC,($E6CE)     ; 
        movb @side_vector_log_y,@c                          ;                   ;
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        .ex_de_hl                                           ; EX DE,HL          ; DE = that result
-       movb @rotated_vector_y+1,hl                         ; LD HL,($E7EC)     ; y * roof.y
-       movb @rotated_vector_y,@l                           ;                   ;
+       mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; y * roof.y
        movb @roof_vector_log_y+1,bc                        ; LD BC,($E6D4)     ; BC = row 2's second coefficient
        movb @roof_vector_log_y,@c                          ;                   ;
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        a    de,hl                                          ; ADD HL,DE         ; running sum for row 2
        .ex_de_hl                                           ; EX DE,HL          ; DE = that sum
-       movb @rotated_vector_z+1,hl                         ; LD HL,($E7EE)     ; z * nose.y
-       movb @rotated_vector_z,@l                           ;                   ;
+       mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; z * nose.y
        movb @nose_vector_log_y+1,bc                        ; LD BC,($EB6A)     ; BC = row 2's third coefficient
        movb @nose_vector_log_y,@c                          ;                   ;
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        a    de,hl                                          ; ADD HL,DE         ; y'
        .push hl                                            ; PUSH HL           ; save it
-       movb @rotated_vector+1,hl                           ; LD HL,($E7EA)     ; x * side.z
-       movb @rotated_vector,@l                             ;                   ;
+       mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; x * side.z
        movb @side_vector_log_z+1,bc                        ; LD BC,($E6D0)     ; BC = row 3's first coefficient
        movb @side_vector_log_z,@c                          ;                   ;
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        .ex_de_hl                                           ; EX DE,HL          ; DE = that result
-       movb @rotated_vector_y+1,hl                         ; LD HL,($E7EC)     ; y * roof.z
-       movb @rotated_vector_y,@l                           ;                   ;
+       mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; y * roof.z
        movb @roof_vector_log_z+1,bc                        ; LD BC,($E6D6)     ; BC = row 3's second coefficient
        movb @roof_vector_log_z,@c                          ;                   ;
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        a    de,hl                                          ; ADD HL,DE         ; running sum for row 3
        .ex_de_hl                                           ; EX DE,HL          ; DE = that sum
-       movb @rotated_vector_z+1,hl                         ; LD HL,($E7EE)     ; z * nose.z
-       movb @rotated_vector_z,@l                           ;                   ;
+       mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; z * nose.z
        movb @nose_vector_log_z+1,bc                        ; LD BC,($EB6C)     ; BC = row 3's third coefficient
        movb @nose_vector_log_z,@c                          ;                   ;
        bl   @multiply_logs                                 ; CALL $2160        ; combine
@@ -4250,21 +4240,16 @@ face_visible:                                              ; >4873
        .proc
        .push hl                                            ; PUSH HL           ; save the caller's HL
        bl   @rotate_vertex                                 ; CALL $4464        ; transform the vector via #R$4464 (BC/DE/HL = its three components)
-       movb de,@rotated_vector+1                           ; LD ($E7EA),DE     ; cache the first component
-       movb @e,@rotated_vector                             ;                   ;
-       movb bc,@rotated_vector_y+1                         ; LD ($E7EC),BC     ; cache the second component
-       movb @c,@rotated_vector_y                           ;                   ;
-       movb hl,@rotated_vector_z+1                         ; LD ($E7EE),HL     ; cache the third component
-       movb @l,@rotated_vector_z                           ;                   ;
+       mov  de,@rotated_vector                             ; LD ($E7EA),DE     ; cache the first component
+       mov  bc,@rotated_vector_y                           ; LD ($E7EC),BC     ; cache the second component
+       mov  hl,@rotated_vector_z                           ; LD ($E7EE),HL     ; cache the third component
        .ex_de_hl                                           ; EX DE,HL          ; HL = the first component
        bl   @scale_normal_component                        ; CALL $4847        ; scale it via #R$4847
        .push hl                                            ; PUSH HL           ; save the scaled result
-       movb @rotated_vector_y+1,hl                         ; LD HL,($E7EC)     ; HL = the second component
-       movb @rotated_vector_y,@l                           ;                   ;
+       mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; HL = the second component
        bl   @scale_normal_component                        ; CALL $4847        ; scale it too
        .push hl                                            ; PUSH HL           ; save that result
-       movb @rotated_vector_z+1,hl                         ; LD HL,($E7EE)     ; HL = the third component
-       movb @rotated_vector_z,@l                           ;                   ;
+       mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; HL = the third component
        bl   @scale_normal_component                        ; CALL $4847        ; scale it too
        .pop bc                                             ; POP BC            ; BC = the second scaled result
        .pop de                                             ; POP DE            ; DE = the first scaled result
@@ -4288,22 +4273,19 @@ _48b1:                                                     ; >48b1
 _48c1:                                                     ; >48c1
        movb hl,@face_visible_workspace_2+1                 ; LD ($E6EC),HL     ; cache the sign-magnitude HL
        movb @l,@face_visible_workspace_2                   ;                   ;
-       movb @rotated_vector+1,hl                           ; LD HL,($E7EA)     ; HL = the first (unscaled) component again
-       movb @rotated_vector,@l                             ;                   ;
+       mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; HL = the first (unscaled) component again
        bl   @multiply_small_by_word                        ; CALL $48EC        ; multiply it against DE (the sign-magnitude D from above) via #R$48EC
        .push af                                            ; PUSH AF           ; save the product's high byte (A)
        .push hl                                            ; PUSH HL           ; save the product's HL
        movb @face_visible_workspace_1+1,de                 ; LD DE,($E6EA)     ; DE = the cached sign-magnitude BC ($E6EA)
        movb @face_visible_workspace_1,@e                   ;                   ;
-       movb @rotated_vector_y+1,hl                         ; LD HL,($E7EC)     ; HL = the second (unscaled) component
-       movb @rotated_vector_y,@l                           ;                   ;
+       mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; HL = the second (unscaled) component
        bl   @multiply_small_by_word                        ; CALL $48EC        ; multiply it against DE via #R$48EC
        .push af                                            ; PUSH AF           ; save the product's high byte (A)
        .push hl                                            ; PUSH HL           ; save the product's HL
        movb @face_visible_workspace_2+1,de                 ; LD DE,($E6EC)     ; DE = the cached sign-magnitude HL ($E6EC)
        movb @face_visible_workspace_2,@e                   ;                   ;
-       movb @rotated_vector_z+1,hl                         ; LD HL,($E7EE)     ; HL = the third (unscaled) component
-       movb @rotated_vector_z,@l                           ;                   ;
+       mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; HL = the third (unscaled) component
        bl   @multiply_small_by_word                        ; CALL $48EC        ; multiply it against DE via #R$48EC
        .pop de                                             ; POP DE            ; DE = the second product's HL
        .pop bc                                             ; POP BC            ; BC = the second product's high byte
@@ -4596,13 +4578,12 @@ project_vertex_set_flag:                                   ; >4a0b
        ab   one,h                                          ; INC H             ; carry into the high byte
 project_vertex_record:                                     ; >4a21
        a    bc,hl                                          ; ADD HL,BC         ; HL = table base + index*4 + index*2 = + index*6 (6 bytes/record)
-       li   de,rotated_vector                              ; LD DE,$E7EA       ; DE -> the shared vector staging buffer
-       .ldi                                                ; LDI               ; copy the 6-byte record...
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; ...done
+       movb *hl+,@rotated_vector+1                         ; LD DE,$E7EA       ; copy the 6-byte vector, swapping each little-endian word
+       movb *hl+,@rotated_vector                           ; LDI               ; to big-endian for word access
+       movb *hl+,@rotated_vector_y+1                       ; LDI               ; 
+       movb *hl+,@rotated_vector_y                         ; LDI               ; 
+       movb *hl+,@rotated_vector_z+1                       ; LDI               ; 
+       movb *hl+,@rotated_vector_z                         ; LDI x 2           ; (DE and BC are not used afterwards)
        bl   @rotate_vertex                                 ; CALL $4464        ; combine via #R$4464
        bl   @add_object_position                           ; CALL $44D2        ; combine that result via #R$44D2
        movb h,a                                            ; LD A,H            ; test the combined result's sign
@@ -4672,13 +4653,12 @@ vertex_relative:                                           ; >4a5c
        ab   one,h                                          ; INC H             ; else carry into the high byte
 vertex_relative_record:                                    ; >4a6a
        a    bc,hl                                          ; ADD HL,BC         ; HL = table base + index*4 + index*2 = table base + index*6
-       li   de,rotated_vector                              ; LD DE,$E7EA       ; DE -> the $E7EA staging buffer
-       .ldi                                                ; LDI               ; copy 6 bytes from the record into the staging buffer...
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; 
-       .ldi                                                ; LDI               ; 
+       movb *hl+,@rotated_vector+1                         ; LD DE,$E7EA       ; copy the 6-byte vector, swapping each little-endian word
+       movb *hl+,@rotated_vector                           ; LDI               ; to big-endian for word access
+       movb *hl+,@rotated_vector_y+1                       ; LDI               ; 
+       movb *hl+,@rotated_vector_y                         ; LDI               ; 
+       movb *hl+,@rotated_vector_z+1                       ; LDI               ; 
+       movb *hl+,@rotated_vector_z                         ; LDI x 2           ; (DE and BC are not used afterwards)
        bl   @rotate_vertex                                 ; CALL $4464        ; combine the copied vector via #R$4464
        bl   @add_object_position                           ; CALL $44D2        ; combine that result with cached deltas via #R$44D2
        mov  hl,hl                                          ;                   ; (the RET changed the status)
@@ -7736,12 +7716,13 @@ face_scale_bits:                                           ; >e7e9
 * The x, y and z (words) of the vector #R$4464 rotates into the view: a face's
 * normal (copied by #R$422E), or a vertex (copied by #R$49FD and #R$4A5C).
 * #R$4873 keeps the rotated normal here.
+* Unlike the other variables, the words are big-endian, for word access.
 rotated_vector:                                            ; >e7ea
-       byte >00,>00                                                  ; 
+       data 0
 rotated_vector_y:                                          ; >e7ec
-       byte >00,>00                                                  ; 
+       data 0
 rotated_vector_z:                                          ; >e7ee
-       byte >00,>00                                                  ; 
+       data 0
 
 ********************************************************************************
 * Unused

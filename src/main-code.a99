@@ -277,10 +277,10 @@ _1d97:                                                     ; >1d97
        movb *hl,a                                          ; LD A,(HL)         ;
        socb a,a                                            ; OR A              ;
        jeq  _1db2                                          ; JR Z,$1DB2        ; no key pressed
-       movb @mission_state,a                               ; LD A,($E93D)      ;
-       cb   a,@bytes+>10                                   ; CP $10            ;
        movb *hl,a                                          ; LD A,(HL)         ;
        sb   *hl,*hl                                        ; LD (HL),$00       ;
+       cb   @mission_state,@bytes+>10                      ; LD A,($E93D)      ; (compared after the loads, which change
+       ;                                                   ; CP $10            ; the status on the TI)
        jne  !                                              ; RET Z             ; mission briefing: any key returns
        .ret                                                ;
 !
@@ -2874,9 +2874,11 @@ draw_disc:                                                 ; >3df4
        movb a,@circle_first_step                           ; LD ($E80C),A      ; also seed the "first step" flag with it
        movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
        cb   a,@bytes+>65                                   ; CP $65            ; is it mode $65?
-       movb @bytes+>02,a                                   ; LD A,$02          ; 
-       jeq  _3e0e                                          ; JR Z,$3E0E        ; yes - type 2
-       sb   one,a                                          ; DEC A             ; no - type 1
+       jne  !                                              ; JR Z,$3E0E        ; (tested before the load, which changes the status on the TI)
+       movb @bytes+>02,a                                   ; LD A,$02          ; yes - type 2
+       jmp  _3e0e                                          ;                   ; 
+!
+       movb one,a                                          ; DEC A             ; no - type 1
 _3e0e:                                                     ; >3e0e
        movb a,@scratch_buffer_4                            ; LD ($E604),A      ; cache the type
        li   bc,>8000                                       ; LD BC,$8000       ; 
@@ -6042,12 +6044,13 @@ _6b83:                                                     ; >6b83
        jmp  _6ba5                                          ; JR $6BA5          ; 
 draw_missile_indicator_2:                                  ; >6b8f
        movb @bytes+>10,d                                   ; LD D,$10          ; the missile pattern
+       cb   h,@l                                           ;                   ; (test again: the load changed the status)
        jne  draw_missile_indicator_3                       ; JR NZ,$6BA3       ; not the next to be fired
        movb @missile_state,a                               ; LD A,($E910)      ; A = missile state
        socb a,a                                            ; OR A              ; 
        jeq  draw_missile_indicator_3                       ; JR Z,$6BA3        ; not armed
-       cb   a,@bytes+>02                                   ; CP $02            ; 
        movb @bytes+>09,@e                                  ; LD E,$09          ; armed: light red
+       cb   a,@bytes+>02                                   ; CP $02            ; (compared after the load, which changes the status on the TI)
        jne  _6ba1                                          ; JR NZ,$6BA1       ; 
        movb @bytes+>06,@e                                  ; LD E,$06          ; locked on: dark red
 _6ba1:                                                     ; >6ba1

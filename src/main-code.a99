@@ -191,8 +191,7 @@ _1d17:                                                     ; >1d17
        movb @title_ship_flying_off,a                       ; LD A,($E88C)      ;
        socb a,a                                            ; OR A              ;
        jeq  title_screen_frame                             ; JR Z,$1D3D        ; not flying off
-       movb @screen_radius+1,hl                            ; LD HL,($EB9E)     ; else HL = #R$EB9E (cached_range_value)
-       movb @screen_radius,@l                              ;                   ;
+       mov  @screen_radius,hl                              ; LD HL,($EB9E)     ; else HL = #R$EB9E (cached_range_value)
        li   de,>0005                                       ; LD DE,$0005       ;
        s    de,hl                                          ; SBC HL,DE         ;
        joc  !                                              ; JP C,$1C9E        ; flown out of sight - next ship
@@ -2139,33 +2138,21 @@ outcodes_y_beyond_far_boundary_case:                       ; >3abf
 * the edge by bisecting towards it (#R$3BEC) before the line is drawn.
 clip_and_draw_line:                                        ; >3ac2
        .proc
-       movb @clip_point1_x+1,de                            ; LD DE,($EB92)     ; DE = point 1's X (biased/unbiased mix - see #R$3A72)
-       movb @clip_point1_x,@e                              ;                   ;
-       movb d,a                                            ; LD A,D            ; A = X's high byte
-       ab   @bytes+>80,a                                   ; ADD A,$80         ; A += $80 - bias it into the unsigned comparison range
-       movb a,d                                            ; LD D,A            ; D = the biased high byte
-       movb a,@clip_point1_x_hi                            ; LD ($EB93),A      ; also store it back to ($EB93) - point 1's X high byte is now biased in memory too
-       movb @clip_point1_y+1,hl                            ; LD HL,($EB94)     ; HL = point 1's Y
-       movb @clip_point1_y,@l                              ;                   ;
-       movb h,a                                            ; LD A,H            ; A = Y's high byte
-       ab   @bytes+>80,a                                   ; ADD A,$80         ; A += $80 - bias it likewise
-       movb a,h                                            ; LD H,A            ; H = the biased high byte
-       movb a,@clip_point1_y_hi                            ; LD ($EB95),A      ; store it back to ($EB95) - point 1's Y high byte is biased in memory too
+       mov  @clip_point1_x,de                              ; LD DE,($EB92)     ; DE = point 1's X (biased/unbiased mix - see #R$3A72)
+       ai   de,>8000                                       ; LD A,D / ADD A,$80; bias the high byte by $80 into the unsigned comparison range
+       mov  de,@clip_point1_x                              ; LD D,A / LD ($EB93),A; and store it back - the high byte is biased in memory too
+       mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's Y
+       ai   hl,>8000                                       ; LD A,H / ADD A,$80; bias the high byte by $80 into the unsigned comparison range
+       mov  hl,@clip_point1_y                              ; LD H,A / LD ($EB95),A; and store it back - the high byte is biased in memory too
        bl   @outcode                                       ; CALL $3A72        ; C = point 1's outcode (#R$3A72)
        movb @c,a                                           ; LD A,C            ; A = that outcode
        .ex_af_af_                                          ; EX AF,AF'         ; stash it in AF' - point 2's outcode calc below reuses A and C
-       movb @clip_point2_x+1,de                            ; LD DE,($EB96)     ; DE = point 2's X
-       movb @clip_point2_x,@e                              ;                   ;
-       movb d,a                                            ; LD A,D            ; A = X's high byte
-       ab   @bytes+>80,a                                   ; ADD A,$80         ; A += $80
-       movb a,d                                            ; LD D,A            ; D = the biased high byte
-       movb a,@clip_point2_x_hi                            ; LD ($EB97),A      ; store it back to ($EB97) - point 2's X high byte is biased in memory too
-       movb @clip_point2_y+1,hl                            ; LD HL,($EB98)     ; HL = point 2's Y
-       movb @clip_point2_y,@l                              ;                   ;
-       movb h,a                                            ; LD A,H            ; A = Y's high byte
-       ab   @bytes+>80,a                                   ; ADD A,$80         ; A += $80
-       movb a,h                                            ; LD H,A            ; H = the biased high byte
-       movb a,@clip_point2_y_hi                            ; LD ($EB99),A      ; store it back to ($EB99) - point 2's Y high byte is biased in memory too
+       mov  @clip_point2_x,de                              ; LD DE,($EB96)     ; DE = point 2's X
+       ai   de,>8000                                       ; LD A,D / ADD A,$80; bias the high byte by $80 into the unsigned comparison range
+       mov  de,@clip_point2_x                              ; LD D,A / LD ($EB97),A; and store it back - the high byte is biased in memory too
+       mov  @clip_point2_y,hl                              ; LD HL,($EB98)     ; HL = point 2's Y
+       ai   hl,>8000                                       ; LD A,H / ADD A,$80; bias the high byte by $80 into the unsigned comparison range
+       mov  hl,@clip_point2_y                              ; LD H,A / LD ($EB99),A; and store it back - the high byte is biased in memory too
        bl   @outcode                                       ; CALL $3A72        ; C = point 2's outcode (#R$3A72)
        .ex_af_af_                                          ; EX AF,AF'         ; restore point 1's outcode into A
        movb a,b                                            ; LD B,A            ; B = point 1's outcode
@@ -2191,31 +2178,23 @@ clip_and_draw_line:                                        ; >3ac2
        movb hl,@clip_reference_y+1                         ; LD ($E829),HL     ; and its Y to $E829
        movb @l,@clip_reference_y                           ;                   ;
        .exx                                                ; EXX               ; switch to the shadow registers
-       movb @clip_point1_x+1,hl                            ; LD HL,($EB92)     ; HL = point 1's (biased) X
-       movb @clip_point1_x,@l                              ;                   ;
-       movb hl,@clip_point2_x+1                            ; LD ($EB96),HL     ; copy it into point 2's slot ($EB96)
-       movb @l,@clip_point2_x                              ;                   ;
-       movb @clip_point1_y+1,hl                            ; LD HL,($EB94)     ; HL = point 1's (biased) Y
-       movb @clip_point1_y,@l                              ;                   ;
-       movb hl,@clip_point2_y+1                            ; LD ($EB98),HL     ; copy it into point 2's slot ($EB98)
-       movb @l,@clip_point2_y                              ;                   ;
+       mov  @clip_point1_x,hl                              ; LD HL,($EB92)     ; HL = point 1's (biased) X
+       mov  hl,@clip_point2_x                              ; LD ($EB96),HL     ; copy it into point 2's slot ($EB96)
+       mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's (biased) Y
+       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; copy it into point 2's slot ($EB98)
        .exx                                                ; EXX               ; back to the main registers
-       movb de,@clip_point1_x+1                            ; LD ($EB92),DE     ; overwrite point 1's slot ($EB92) with point 2's X - the outside point now lives in slot 1
-       movb @e,@clip_point1_x                              ;                   ;
-       movb hl,@clip_point1_y+1                            ; LD ($EB94),HL     ; and point 1's Y slot ($EB94) with point 2's Y
-       movb @l,@clip_point1_y                              ;                   ;
+       mov  de,@clip_point1_x                              ; LD ($EB92),DE     ; overwrite point 1's slot ($EB92) with point 2's X - the outside point now lives in slot 1
+       mov  hl,@clip_point1_y                              ; LD ($EB94),HL     ; and point 1's Y slot ($EB94) with point 2's Y
        b    @finish_clip_and_draw                          ; JP $3BDA          ; hand off to the boundary-clipping code
 clip_case_point2_only_outside:                             ; >3b26
        movb b,a                                            ; LD A,B            ; A = point 1's masked outcode
        andi a,>0f00                                        ; AND $0F           ; keep only the true outcode bits
        jne  bisect_clip_both_points_outside                ; JR NZ,$3B3B       ; point 1 also fails a boundary - bisect both sides
        movb b,a                                            ; LD A,B            ; (redundant reload)
-       movb @clip_point1_x+1,hl                            ; LD HL,($EB92)     ; HL = point 1's (inside) X
-       movb @clip_point1_x,@l                              ;                   ;
+       mov  @clip_point1_x,hl                              ; LD HL,($EB92)     ; HL = point 1's (inside) X
        movb hl,@clip_reference_x+1                         ; LD ($E827),HL     ; cache it as the reference X
        movb @l,@clip_reference_x                           ;                   ;
-       movb @clip_point1_y+1,hl                            ; LD HL,($EB94)     ; HL = point 1's (inside) Y
-       movb @clip_point1_y,@l                              ;                   ;
+       mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's (inside) Y
        movb hl,@clip_reference_y+1                         ; LD ($E829),HL     ; cache it as the reference Y
        movb @l,@clip_reference_y                           ;                   ;
        b    @finish_clip_and_draw                          ; JP $3BDA          ; go clip point 2 (still at ($EB96)/($EB98)) towards the reference
@@ -2226,11 +2205,9 @@ bisect_clip_both_points_outside:                           ; >3b3b
        movb a,@c                                           ; LD C,A            ; C = point 2's masked outcode
        .push de                                            ; PUSH DE           ; save point 2's original X (still live in DE, see I: above)
        .push hl                                            ; PUSH HL           ; save point 2's original Y (still live in HL)
-       movb @clip_point1_x+1,hl                            ; LD HL,($EB92)     ; HL = point 1's original X
-       movb @clip_point1_x,@l                              ;                   ;
+       mov  @clip_point1_x,hl                              ; LD HL,($EB92)     ; HL = point 1's original X
        .push hl                                            ; PUSH HL           ; save it too
-       movb @clip_point1_y+1,hl                            ; LD HL,($EB94)     ; HL = point 1's original Y
-       movb @clip_point1_y,@l                              ;                   ;
+       mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's original Y
        .push hl                                            ; PUSH HL           ; save it too
        .push bc                                            ; PUSH BC           ; stash the two masked outcodes...
        .exx                                                ; EXX               ; ...to move them into the shadow set
@@ -2239,10 +2216,8 @@ bisect_clip_both_points_outside:                           ; >3b3b
        movb @bytes+>10,a                                   ; LD A,$10          ; 16 iterations
        movb a,@clip_bisection_count                        ; LD ($E826),A      ; the bisection counter
 clip_bisect:                                               ; >3b53
-       movb @clip_point1_x+1,hl                            ; LD HL,($EB92)     ; HL = point 1's (current) X
-       movb @clip_point1_x,@l                              ;                   ;
-       movb @clip_point2_x+1,de                            ; LD DE,($EB96)     ; DE = point 2's (current) X
-       movb @clip_point2_x,@e                              ;                   ;
+       mov  @clip_point1_x,hl                              ; LD HL,($EB92)     ; HL = point 1's (current) X
+       mov  @clip_point2_x,de                              ; LD DE,($EB96)     ; DE = point 2's (current) X
        a    de,hl                                          ; ADD HL,DE         ; HL = X1+X2
        jnc  !                                              ; RR H              ; halve the sum... (the ADD's carry is bit 16 of the sum)
        srl  hl,1                                           ; RR L              ; 
@@ -2255,10 +2230,8 @@ clip_bisect:                                               ; >3b53
        inc  hl                                             ; INC HL            ; round the midpoint X up
 _3b62:                                                     ; >3b62
        .ex_de_hl                                           ; EX DE,HL          ; DE = midpoint X
-       movb @clip_point1_y+1,hl                            ; LD HL,($EB94)     ; HL = point 1's (current) Y
-       movb @clip_point1_y,@l                              ;                   ;
-       movb @clip_point2_y+1,bc                            ; LD BC,($EB98)     ; BC = point 2's (current) Y
-       movb @clip_point2_y,@c                              ;                   ;
+       mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's (current) Y
+       mov  @clip_point2_y,bc                              ; LD BC,($EB98)     ; BC = point 2's (current) Y
        a    bc,hl                                          ; ADD HL,BC         ; HL = Y1+Y2
        jnc  !                                              ; RR H              ; halve... (the ADD's carry is bit 16 of the sum)
        srl  hl,1                                           ; RR L              ; 
@@ -2281,29 +2254,23 @@ _3b72:                                                     ; >3b72
        movb @l,@clip_reference_y                           ;                   ;
        .exx                                                ; EXX               ; (unused since $3B4D - just scratch here)
        .pop hl                                             ; POP HL            ; HL = point 1's ORIGINAL Y (saved at $3B49)
-       movb hl,@clip_point2_y+1                            ; LD ($EB98),HL     ; park it in point 2's Y slot (see prose above)
-       movb @l,@clip_point2_y                              ;                   ;
+       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; park it in point 2's Y slot (see prose above)
        .pop hl                                             ; POP HL            ; HL = point 1's ORIGINAL X (saved at $3B45)
-       movb hl,@clip_point2_x+1                            ; LD ($EB96),HL     ; park it in point 2's X slot
-       movb @l,@clip_point2_x                              ;                   ;
+       mov  hl,@clip_point2_x                              ; LD ($EB96),HL     ; park it in point 2's X slot
        .push af                                            ; PUSH AF           ; save flags across the call below
        bl   @move_point_to_edge                            ; CALL $3BE0        ; bisect the parked point (point 1's original) towards the reference
        .pop af                                             ; POP AF            ; 
-       movb de,@clip_point1_x+1                            ; LD ($EB92),DE     ; point 1's slot becomes the refined boundary crossing
-       movb @e,@clip_point1_x                              ;                   ;
-       movb hl,@clip_point1_y+1                            ; LD ($EB94),HL     ; 
-       movb @l,@clip_point1_y                              ;                   ;
+       mov  de,@clip_point1_x                              ; LD ($EB92),DE     ; point 1's slot becomes the refined boundary crossing
+       mov  hl,@clip_point1_y                              ; LD ($EB94),HL     ; 
        .exx                                                ; EXX               ; back to the main set
        movb de,@clip_reference_x+1                         ; LD ($E827),DE     ; re-cache the refined point as the reference too
        movb @e,@clip_reference_x                           ;                   ;
        movb hl,@clip_reference_y+1                         ; LD ($E829),HL     ; 
        movb @l,@clip_reference_y                           ;                   ;
        .pop hl                                             ; POP HL            ; HL = point 2's ORIGINAL Y (saved at $3B41)
-       movb hl,@clip_point2_y+1                            ; LD ($EB98),HL     ; restore point 2's Y slot to its true original value
-       movb @l,@clip_point2_y                              ;                   ;
+       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; restore point 2's Y slot to its true original value
        .pop hl                                             ; POP HL            ; HL = point 2's ORIGINAL X (saved at $3B40)
-       movb hl,@clip_point2_x+1                            ; LD ($EB96),HL     ; restore point 2's X slot likewise
-       movb @l,@clip_point2_x                              ;                   ;
+       mov  hl,@clip_point2_x                              ; LD ($EB96),HL     ; restore point 2's X slot likewise
        jmp  finish_clip_and_draw                           ; JR $3BDA          ; finish clipping point 2's original position towards the refined reference
 bisect_test_which_endpoint_to_replace:                     ; >3ba9
        .exx                                                ; EXX               ; switch to the shadow set (holds the two original outcodes)
@@ -2330,18 +2297,14 @@ bisect_replace_point1_with_midpoint:                       ; >3bb8
        jeq  bisect_replace_point2_with_midpoint            ; JR Z,$3BC7        ; no shared bits - default to replacing point 2 instead
        movb @e,b                                           ; LD B,E            ; shadow B = the midpoint's outcode, replacing point 1's for future comparisons
        .exx                                                ; EXX               ; back to the main set
-       movb de,@clip_point1_x+1                            ; LD ($EB92),DE     ; point 1's slot becomes the midpoint X
-       movb @e,@clip_point1_x                              ;                   ;
-       movb hl,@clip_point1_y+1                            ; LD ($EB94),HL     ; and midpoint Y
-       movb @l,@clip_point1_y                              ;                   ;
+       mov  de,@clip_point1_x                              ; LD ($EB92),DE     ; point 1's slot becomes the midpoint X
+       mov  hl,@clip_point1_y                              ; LD ($EB94),HL     ; and midpoint Y
        jmp  _3bd0                                          ; JR $3BD0          ; join the shared loop tail
 bisect_replace_point2_with_midpoint:                       ; >3bc7
        movb @e,@c                                          ; LD C,E            ; shadow C = the midpoint's outcode, replacing point 2's for future comparisons
        .exx                                                ; EXX               ; back to the main set
-       movb de,@clip_point2_x+1                            ; LD ($EB96),DE     ; point 2's slot becomes the midpoint X
-       movb @e,@clip_point2_x                              ;                   ;
-       movb hl,@clip_point2_y+1                            ; LD ($EB98),HL     ; and midpoint Y
-       movb @l,@clip_point2_y                              ;                   ;
+       mov  de,@clip_point2_x                              ; LD ($EB96),DE     ; point 2's slot becomes the midpoint X
+       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; and midpoint Y
 _3bd0:                                                     ; >3bd0
        li   hl,clip_bisection_count                        ; LD HL,$E826       ; -> the iteration counter
        sb   one,*hl                                        ; DEC (HL)          ; one fewer iteration left
@@ -2379,8 +2342,7 @@ move_point_to_edge:                                        ; >3be0
        movb @clip_reference_y,@l                           ;                   ;
        .endproc                                            ; RET               ; 
 bisect_clip_single_outside_endpoint:                       ; >3bec
-       movb @clip_point2_x+1,hl                            ; LD HL,($EB96)     ; HL = the outside point's current X
-       movb @clip_point2_x,@l                              ;                   ;
+       mov  @clip_point2_x,hl                              ; LD HL,($EB96)     ; HL = the outside point's current X
        movb @clip_reference_x+1,de                         ; LD DE,($E827)     ; DE = the reference X
        movb @clip_reference_x,@e                           ;                   ;
        a    de,hl                                          ; ADD HL,DE         ; HL = sum
@@ -2397,8 +2359,7 @@ _3bfb:                                                     ; >3bfb
        .ex_de_hl                                           ; EX DE,HL          ; DE = midpoint X
        movb @clip_reference_y+1,hl                         ; LD HL,($E829)     ; HL = the reference Y
        movb @clip_reference_y,@l                           ;                   ;
-       movb @clip_point2_y+1,bc                            ; LD BC,($EB98)     ; BC = the outside point's current Y
-       movb @clip_point2_y,@c                              ;                   ;
+       mov  @clip_point2_y,bc                              ; LD BC,($EB98)     ; BC = the outside point's current Y
        a    bc,hl                                          ; ADD HL,BC         ; HL = sum
        jnc  !                                              ; RR H              ; halve... (the ADD's carry is bit 16 of the sum)
        srl  hl,1                                           ; RR L              ; 
@@ -2425,10 +2386,8 @@ _3c0b:                                                     ; >3c0b
        movb @l,@clip_reference_y                           ;                   ;
        jmp  _3c27                                          ; JR $3C27          ; loop again from the (now closer) reference
 bisect_move_outside_endpoint_to_midpoint:                  ; >3c20
-       movb de,@clip_point2_x+1                            ; LD ($EB96),DE     ; the outside point's X becomes the midpoint X
-       movb @e,@clip_point2_x                              ;                   ;
-       movb hl,@clip_point2_y+1                            ; LD ($EB98),HL     ; and midpoint Y
-       movb @l,@clip_point2_y                              ;                   ;
+       mov  de,@clip_point2_x                              ; LD ($EB96),DE     ; the outside point's X becomes the midpoint X
+       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; and midpoint Y
 _3c27:                                                     ; >3c27
        jmp  bisect_clip_single_outside_endpoint            ; JR $3BEC          ; bisect again
 
@@ -2464,14 +2423,14 @@ clip_endpoints_to_screen_space:                            ; >3c29
        movb @bytes+>40,a                                   ; LD A,$40          ; 
        sb   d,a                                            ; SUB D             ; A = $40 - raw row (mirror around row $40)
        movb a,d                                            ; LD D,A            ; D = screen-space row, first endpoint
-       movb @clip_point1_x,a                               ; LD A,($EB92)      ; A = the second endpoint's raw column value
+       movb @clip_point1_x+1,a                             ; LD A,($EB92)      ; A = the second endpoint's raw column value
        movb a,@l                                           ; LD L,A            ; 
        movb a,r1                                           ; LD A,(HL)         ; 
        srl  r1,8                                           ;                   ; 
        movb @scale_3_4_table(r1),a                         ;                   ; A = table[column]
        ab   @bytes+>57,a                                   ; ADD A,$57         ; 
        movb a,@c                                           ; LD C,A            ; C = screen-space column, second endpoint
-       movb @clip_point1_y,a                               ; LD A,($EB94)      ; A = the second endpoint's raw row value
+       movb @clip_point1_y+1,a                             ; LD A,($EB94)      ; A = the second endpoint's raw row value
        sb   @bytes+>40,a                                   ; SUB $40           ; 
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = $40 - raw row (same mirror, computed the other way round)
@@ -2787,22 +2746,18 @@ draw_circle_point:                                         ; >3d8c
        .endproc                                            ; RET               ; 
 write_vertex_and_draw_edge:                                ; >3dac
        .pop hl                                             ; POP HL            ; HL = the slot's old Y (this call's vertex from last step)
-       movb hl,@clip_point2_y+1                            ; LD ($EB98),HL     ; -> point 2's Y
-       movb @l,@clip_point2_y                              ;                   ;
+       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; -> point 2's Y
        .pop hl                                             ; POP HL            ; HL = the slot's old X (this call's vertex from last step)
-       movb hl,@clip_point2_x+1                            ; LD ($EB96),HL     ; -> point 2's X
-       movb @l,@clip_point2_x                              ;                   ;
+       mov  hl,@clip_point2_x                              ; LD ($EB96),HL     ; -> point 2's X
        movb @circle_centre_x+1,hl                          ; LD HL,($E81F)     ; HL = the cached centre X
        movb @circle_centre_x,@l                            ;                   ;
        a    de,hl                                          ; ADD HL,DE         ; + this step's cos-scaled offset
-       movb hl,@clip_point1_x+1                            ; LD ($EB92),HL     ; -> point 1's X
-       movb @l,@clip_point1_x                              ;                   ;
+       mov  hl,@clip_point1_x                              ; LD ($EB92),HL     ; -> point 1's X
        .push hl                                            ; PUSH HL           ; also overwrite the slot with it, for next step's call to this slot
        movb @circle_centre_y+1,hl                          ; LD HL,($E821)     ; HL = the cached centre Y
        movb @circle_centre_y,@l                            ;                   ;
        a    bc,hl                                          ; ADD HL,BC         ; + this step's sin-scaled offset
-       movb hl,@clip_point1_y+1                            ; LD ($EB94),HL     ; -> point 1's Y
-       movb @l,@clip_point1_y                              ;                   ;
+       mov  hl,@clip_point1_y                              ; LD ($EB94),HL     ; -> point 1's Y
        .push hl                                            ; PUSH HL           ; also overwrite the slot with it, for next step's call to this slot
        li   hl,>fffc                                       ; LD HL,$FFFC       ; 
        a    sp,hl                                          ; ADD HL,SP         ; HL = the new cursor (old cursor - 4)
@@ -3098,7 +3053,7 @@ _3f06:                                                     ; >3f06
        srl  r1,8                                           ;                   ; 
        movb @scale_3_4_table(r1),a                         ; LD A,(DE)         ; A = table[column]
        ab   @bytes+>57,a                                   ; ADD A,$57         ; 
-       movb a,@clip_point1_x                               ; LD ($EB92),A      ; cache the left bound's screen column
+       movb a,@clip_point1_x+1                             ; LD ($EB92),A      ; cache the left bound's screen column
        movb @circle_centre_x+1,hl                          ; LD HL,($E81F)     ; HL = the cached centre X again
        movb @circle_centre_x,@l                            ;                   ;
        movb @disc_row_half_width+1,bc                      ; LD BC,($E823)     ; BC = the offset pair
@@ -3119,7 +3074,7 @@ _3f28:                                                     ; >3f28
        srl  r1,8                                           ;                   ; 
        movb @scale_3_4_table(r1),a                         ; LD A,(DE)         ; A = table[column]
        ab   @bytes+>57,a                                   ; ADD A,$57         ; 
-       movb a,@clip_point2_x                               ; LD ($EB96),A      ; cache the right bound's screen column
+       movb a,@clip_point2_x+1                             ; LD ($EB96),A      ; cache the right bound's screen column
        movb @disc_row_offset+1,bc                          ; LD BC,($E824)     ; BC = this row's row offset
        movb @disc_row_offset,@c                            ;                   ;
        movb @circle_centre_y+1,hl                          ; LD HL,($E821)     ; HL = the cached centre Y
@@ -3231,10 +3186,8 @@ draw_ship:                                                 ; >4255
        movb @object_position_z_lo+1,hl                     ; LD HL,($F7D2)     ; HL = ...second half
        movb @object_position_z_lo,@l                       ;                   ;
        bl   @convert_to_view                               ; CALL $44CE        ; project the object's position
-       movb de,@view_x+1                                   ; LD ($E6D8),DE     ; store the projected first half
-       movb @e,@view_x                                     ;                   ;
-       movb hl,@view_z+1                                   ; LD ($E6DC),HL     ; store the projected second half
-       movb @l,@view_z                                     ;                   ;
+       mov  de,@view_x                                     ; LD ($E6D8),DE     ; store the projected first half
+       mov  hl,@view_z                                     ; LD ($E6DC),HL     ; store the projected second half
        movb h,a                                            ; LD A,H            ; A = the projected second half's high byte
        socb a,a                                            ; OR A              ; 
        jgt  !                                              ; RET M             ; behind the player
@@ -3246,8 +3199,7 @@ draw_ship:                                                 ; >4255
        .endproc                                            ;                   
 !
        a    hl,hl                                          ; ADD HL,HL         ; HL = the projected second half, doubled
-       movb hl,@view_z2+1                                  ; LD ($E6DA),HL     ; store it - a depth scale used below
-       movb @l,@view_z2                                    ;                   ;
+       mov  hl,@view_z2                                    ; LD ($E6DA),HL     ; store it - a depth scale used below
 * @label=*
 _426f:                                                     ; >426f
        movb @handler_type,a                                ; LD A,($F7EE)      ; A = handler type
@@ -3260,19 +3212,16 @@ _427c:                                                     ; >427c
        movb @handler_type,a                                ; LD A,($F7EE)      ; A = the object's type again
        cb   a,one                                          ; CP $01            ; is it type 1?
        jeq  _42bc                                          ; JR Z,$42BC        ; an explosion
-       movb @screen_radius+1,hl                            ; LD HL,($EB9E)     ; else HL = the cached value at $EB9E (see #R$4A99)
-       movb @screen_radius,@l                              ;                   ;
+       mov  @screen_radius,hl                              ; LD HL,($EB9E)     ; else HL = the cached value at $EB9E (see #R$4A99)
        movb h,a                                            ; LD A,H            ; 
        socb @l,a                                           ; OR L              ; 
        jne  !                                              ; RET Z             ; zero - bail out
        .endproc                                            ;                   
 !
-       movb @view_x+1,de                                   ; LD DE,($E6D8)     ; DE = the projected first half
-       movb @view_x,@e                                     ;                   ;
+       mov  @view_x,de                                     ; LD DE,($E6D8)     ; DE = the projected first half
        movb @object_position_y+1,bc                        ; LD BC,($F7D0)     ; BC = the vector's shared middle component
        movb @object_position_y,@c                          ;                   ;
-       movb @view_z2+1,hl                                  ; LD HL,($E6DA)     ; HL = the doubled depth value
-       movb @view_z2,@l                                    ;                   ;
+       mov  @view_z2,hl                                    ; LD HL,($E6DA)     ; HL = the doubled depth value
        bl   @project_point                                 ; CALL $47C4        ; scale (DE,BC) against it via #R$47C4
        movb b,ixh                                          ; LD IXH,B          ; IX = the scaled first pair
        movb @c,@ixl                                        ; LD IXL,C          ; 
@@ -3288,8 +3237,7 @@ _427c:                                                     ; >427c
        jeq  !                                              ; JP NZ,$4A86       ; can't be drawn in full - draw it small
        b    @draw_small                                    ;                   
 !
-       movb @screen_radius+1,hl                            ; LD HL,($EB9E)     ; clear: HL = the cached value at $EB9E
-       movb @screen_radius,@l                              ;                   ;
+       mov  @screen_radius,hl                              ; LD HL,($EB9E)     ; clear: HL = the cached value at $EB9E
        li   de,>fffc                                       ; LD DE,$FFFC       ; DE = -4
        a    de,hl                                          ; ADD HL,DE         ; HL -= 4 (carry reflects whether HL was >= 4)
        joc  !                                              ; JP NC,$4A86       ; too far away - draw it small
@@ -3323,7 +3271,7 @@ _42bc:                                                     ; >42bc
        sb   one,@c                                         ; DEC C             ; one fewer byte to fill
        .ldir                                               ; LDIR              ; clear the edge flags
 ;      movb @bytes+>e6,a                                   ; LD A,$E6          ; A = $E6
-;      movb a,@vertex_cache_slot_hi                        ; LD ($E6C9),A      ; the vertex cache is in page $E6 (the TI stores the full address in #R$49FD)
+;      movb a,@vertex_cache_slot                           ; LD ($E6C9),A      ; the vertex cache is in page $E6 (the TI stores the full address in #R$49FD)
        li   ix,edge_flags                                  ; LD IX,$E7B6       ; IX -> the $E7B6 buffer
        li   iy,vertex_flags                                ; LD IY,$E784       ; IY -> the $E784 buffer
        movb @bp_faces,hl                                   ; LD HL,($F7F9)     ; HL -> the faces
@@ -3508,16 +3456,14 @@ convert_to_view:                                           ; >44ce
 add_object_position:                                       ; >44d2
        .proc
        .push hl                                            ; PUSH HL           ; save the caller's HL (the "value on the stack")
-       movb @view_x+1,hl                                   ; LD HL,($E6D8)     ; HL = the projected first half (see #R$4255)
-       movb @view_x,@l                                     ;                   ;
+       mov  @view_x,hl                                     ; LD HL,($E6D8)     ; HL = the projected first half (see #R$4255)
        a    de,hl                                          ; ADD HL,DE         ; HL += DE
        .ex_de_hl                                           ; EX DE,HL          ; DE = the combined result
        movb @object_position_y+1,hl                        ; LD HL,($F7D0)     ; HL = the vector's shared middle component
        movb @object_position_y,@l                          ;                   ;
        a    bc,hl                                          ; ADD HL,BC         ; HL += BC
        .ex_sp_hl                                           ; EX (SP),HL        ; swap HL with the saved value on the stack
-       movb @view_z2+1,bc                                  ; LD BC,($E6DA)     ; BC = the depth scale (see #R$4255/#R$43C2)
-       movb @view_z2,@c                                    ;                   ;
+       mov  @view_z2,bc                                    ; LD BC,($E6DA)     ; BC = the depth scale (see #R$4255/#R$43C2)
        mov  bc,bc                                          ;                   ;
        jnc  !                                              ;                   ; (ADC: add the carry first)
        inc  hl                                             ;                   ; 
@@ -3876,8 +3822,7 @@ divide_by_length:                                          ; >46a1
 * "Missile Locked".
 ship_screen_size:                                          ; >46ca
        .proc
-       movb @view_z2+1,de                                  ; LD DE,($E6DA)     ; DE = depth
-       movb @view_z2,@e                                    ;                   ;
+       mov  @view_z2,de                                    ; LD DE,($E6DA)     ; DE = depth
        movb @object_status_byte,a                          ; LD A,($F7CD)      ; A = the object status byte
        andi a,>0800                                        ; AND $08           ; test bit 3 (the orientation-vector gate, as elsewhere)
        jeq  _46d9                                          ; JR Z,$46D9        ; not the planet or sun
@@ -3943,16 +3888,14 @@ _4721:                                                     ; >4721
 check_sights:                                              ; >4735
        li   hl,>0000                                       ; LD HL,$0000       ; HL = 0
 _4738:                                                     ; >4738
-       movb hl,@screen_radius+1                            ; LD ($EB9E),HL     ; 
-       movb @l,@screen_radius                              ;                   ;
+       mov  hl,@screen_radius                              ; LD ($EB9E),HL     ; 
        movb @view_laser_type,a                             ; LD A,($F818)      ; A = a sign byte at $F818
        socb a,a                                            ; OR A              ; test its sign
        jgt  !                                              ; RET M             ; no laser in this view
        jeq  !                                              ;                   ; 
        .endproc                                            ;                   
 !
-       movb @view_x+1,hl                                   ; LD HL,($E6D8)     ; HL = X coordinate
-       movb @view_x,@l                                     ;                   ;
+       mov  @view_x,hl                                     ; LD HL,($E6D8)     ; HL = X coordinate
        bl   @project_coordinate                            ; CALL $47F0        ; scale it by the distance
        movb @targetable_area+1,hl                          ; LD HL,($E6EF)     ; HL = a threshold at $E6EF
        movb @targetable_area,@l                            ;                   ;
@@ -4246,27 +4189,23 @@ _48a5:                                                     ; >48a5
        neg  bc                                             ; SUB C             ; set: negate BC...
        ori  bc,>8000                                       ; OR $80            ; ...and force the sign bit set
 _48b1:                                                     ; >48b1
-       movb bc,@face_visible_workspace_1+1                 ; LD ($E6EA),BC     ; cache the sign-magnitude BC
-       movb @c,@face_visible_workspace_1                   ;                   ;
+       mov  bc,@face_visible_workspace_1                   ; LD ($E6EA),BC     ; cache the sign-magnitude BC
        czc  @bit7,h                                        ; BIT 7,H           ; test H's sign bit
        jeq  _48c1                                          ; JR Z,$48C1        ; clear - skip the negate below
        neg  hl                                             ; SUB L             ; set: negate HL...
        ori  hl,>8000                                       ; OR $80            ; ...and force the sign bit set
 _48c1:                                                     ; >48c1
-       movb hl,@face_visible_workspace_2+1                 ; LD ($E6EC),HL     ; cache the sign-magnitude HL
-       movb @l,@face_visible_workspace_2                   ;                   ;
+       mov  hl,@face_visible_workspace_2                   ; LD ($E6EC),HL     ; cache the sign-magnitude HL
        mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; HL = the first (unscaled) component again
        bl   @multiply_small_by_word                        ; CALL $48EC        ; multiply it against DE (the sign-magnitude D from above) via #R$48EC
        .push af                                            ; PUSH AF           ; save the product's high byte (A)
        .push hl                                            ; PUSH HL           ; save the product's HL
-       movb @face_visible_workspace_1+1,de                 ; LD DE,($E6EA)     ; DE = the cached sign-magnitude BC ($E6EA)
-       movb @face_visible_workspace_1,@e                   ;                   ;
+       mov  @face_visible_workspace_1,de                   ; LD DE,($E6EA)     ; DE = the cached sign-magnitude BC ($E6EA)
        mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; HL = the second (unscaled) component
        bl   @multiply_small_by_word                        ; CALL $48EC        ; multiply it against DE via #R$48EC
        .push af                                            ; PUSH AF           ; save the product's high byte (A)
        .push hl                                            ; PUSH HL           ; save the product's HL
-       movb @face_visible_workspace_2+1,de                 ; LD DE,($E6EC)     ; DE = the cached sign-magnitude HL ($E6EC)
-       movb @face_visible_workspace_2,@e                   ;                   ;
+       mov  @face_visible_workspace_2,de                   ; LD DE,($E6EC)     ; DE = the cached sign-magnitude HL ($E6EC)
        mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; HL = the third (unscaled) component
        bl   @multiply_small_by_word                        ; CALL $48EC        ; multiply it against DE via #R$48EC
        .pop de                                             ; POP DE            ; DE = the second product's HL
@@ -4454,23 +4393,17 @@ draw_edge_clear_flag_e:                                    ; >4986
        movb hl,@line_end_2_z+1                             ; LD ($F773),HL     ; 
        movb @l,@line_end_2_z                               ;                   ;
        bl   @project_point                                 ; CALL $47C4        ; finishing step -> point 1
-       movb bc,@clip_point1_x+1                            ; LD ($EB92),BC     ; -> point 1's X
-       movb @c,@clip_point1_x                              ;                   ;
-       movb de,@clip_point1_y+1                            ; LD ($EB94),DE     ; -> point 1's Y
-       movb @e,@clip_point1_y                              ;                   ;
+       mov  bc,@clip_point1_x                              ; LD ($EB92),BC     ; -> point 1's X
+       mov  de,@clip_point1_y                              ; LD ($EB94),DE     ; -> point 1's Y
        bl   @clip_line_at_player                           ; CALL $4B22        ; a different finishing step -> point 2
-       movb bc,@clip_point2_x+1                            ; LD ($EB96),BC     ; -> point 2's X
-       movb @c,@clip_point2_x                              ;                   ;
-       movb hl,@clip_point2_y+1                            ; LD ($EB98),HL     ; -> point 2's Y
-       movb @l,@clip_point2_y                              ;                   ;
+       mov  bc,@clip_point2_x                              ; LD ($EB96),BC     ; -> point 2's X
+       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; -> point 2's Y
        bl   @clip_and_draw_line                            ; CALL $3AC2        ; clip and draw the substitute edge
 _49b4:                                                     ; >49b4
        jmp  _49f9                                          ; JR $49F9          ; join the shared return
 draw_edge_2:                                               ; >49b6
-       movb bc,@clip_point1_x+1                            ; LD ($EB92),BC     ; point 1 = vertex E's projection (BC,HL from #R$49FD)
-       movb @c,@clip_point1_x                              ;                   ;
-       movb hl,@clip_point1_y+1                            ; LD ($EB94),HL     ; 
-       movb @l,@clip_point1_y                              ;                   ;
+       mov  bc,@clip_point1_x                              ; LD ($EB92),BC     ; point 1 = vertex E's projection (BC,HL from #R$49FD)
+       mov  hl,@clip_point1_y                              ; LD ($EB94),HL     ; 
        .pop de                                             ; POP DE            ; DE = the original vertex-index pair
        .push de                                            ; PUSH DE           ; (peek, restore it)
        movb d,@e                                           ; LD E,D            ; E = the second vertex's index
@@ -4501,10 +4434,8 @@ draw_edge_clear_flag_d:                                    ; >49d5
 draw_edge_draw_clipped:                                    ; >49ee
        .pop de                                             ; POP DE            ; discard the saved vertex-index pair (draw is now unconditional)
 _49ef:                                                     ; >49ef
-       movb bc,@clip_point2_x+1                            ; LD ($EB96),BC     ; point 2's X
-       movb @c,@clip_point2_x                              ;                   ;
-       movb hl,@clip_point2_y+1                            ; LD ($EB98),HL     ; point 2's Y
-       movb @l,@clip_point2_y                              ;                   ;
+       mov  bc,@clip_point2_x                              ; LD ($EB96),BC     ; point 2's X
+       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; point 2's Y
        bl   @clip_and_draw_line                            ; CALL $3AC2        ; clip and draw
 _49f9:                                                     ; >49f9
        .pop ix                                             ; POP IX            ; restore the caller's IX
@@ -4550,8 +4481,7 @@ project_vertex_set_flag:                                   ; >4a0b
        movb a,r0                                           ; LD ($E6C8),A      ; the vertex's cache slot: $E600 + index * 4 on the MSX...
        srl  r0,8                                           ;                   ; 
        ai   r0,scratch_buffer                              ;                   ; ...the same offset from scratch_buffer on the TI
-       movb r0,@vertex_cache_slot+1                        ;                   ; 
-       movb @r0lb,@vertex_cache_slot                       ;                   ; 
+       mov  r0,@vertex_cache_slot                          ;                   ; 
        ab   @l,a                                           ; ADD A,L           ; A += table base low byte
        movb a,@l                                           ; LD L,A            ; L = table base low byte + index*4
        joc  !                                              ; JP NC,$4A21       ; no carry - skip the high-byte bump
@@ -4579,8 +4509,7 @@ project_vertex_record:                                     ; >4a21
        .retnc                                              ;                   
 !
        bl   @project_point                                 ; CALL $47C4        ; finish the projection
-       movb @vertex_cache_slot+1,hl                        ; LD HL,($E6C8)     ; HL -> this vertex's cache slot
-       movb @vertex_cache_slot,@l                          ;                   ;
+       mov  @vertex_cache_slot,hl                          ; LD HL,($E6C8)     ; HL -> this vertex's cache slot
        movb @c,*hl                                         ; LD (HL),C         ; cache (C,B,E,D) - the projected point
        inc  hl                                             ; INC L             ; 
        movb b,*hl                                          ; LD (HL),B         ; 
@@ -4664,8 +4593,7 @@ vertex_relative_record:                                    ; >4a6a
 * (#R$EB9E): the planet as an outline (#R$3D0E), anything else - the sun,
 * or a distant ship - as a filled disc (#R$3DF4).
 draw_small:                                                ; >4a86
-       movb @screen_radius+1,hl                            ; LD HL,($EB9E)     ; HL = the cached range value (see #R$4735/#R$4738)
-       movb @screen_radius,@l                              ;                   ;
+       mov  @screen_radius,hl                              ; LD HL,($EB9E)     ; HL = the cached range value (see #R$4735/#R$4738)
        movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
        cb   a,@bytes+>64                                   ; CP $64            ; is it mode $64?
        jeq  !                                              ; JP NZ,$3DF4       ; no - dispatch to #R$3DF4
@@ -4696,56 +4624,47 @@ on_screen:                                                 ; >4a99
        ab   b,a                                            ; ADD A,B           ; sign-flip B (of BC, the first scaled result)...
        movb a,b                                            ; LD B,A            ; 
        .push de                                            ; PUSH DE           ; save the sign-flipped D and original E
-       movb @screen_radius+1,de                            ; LD DE,($EB9E)     ; DE = the cached range value (see #R$4735/#R$4738)
-       movb @screen_radius,@e                              ;                   ;
+       mov  @screen_radius,de                              ; LD DE,($EB9E)     ; DE = the cached range value (see #R$4735/#R$4738)
        movb b,h                                            ; LD H,B            ; HL = the sign-flipped B, original C
        movb @c,@l                                          ; LD L,C            ; 
        s    de,hl                                          ; SBC HL,DE         ; HL = (flipped-B:C) - range
-       movb hl,@on_screen_left+1                           ; LD ($E6E0),HL     ; store the lower bound
-       movb @l,@on_screen_left                             ;                   ;
+       mov  hl,@on_screen_left                             ; LD ($E6E0),HL     ; store the lower bound
        movb b,h                                            ; LD H,B            ; HL = (flipped-B:C) again
        movb @c,@l                                          ; LD L,C            ; 
        a    de,hl                                          ; ADD HL,DE         ; HL = (flipped-B:C) + range
-       movb hl,@on_screen_right+1                          ; LD ($E6E2),HL     ; store the upper bound
-       movb @l,@on_screen_right                            ;                   ;
+       mov  hl,@on_screen_right                            ; LD ($E6E2),HL     ; store the upper bound
        .pop bc                                             ; POP BC            ; BC = the sign-flipped D, original E (saved above)
        movb b,h                                            ; LD H,B            ; HL = that pair
        movb @c,@l                                          ; LD L,C            ; 
        s    de,hl                                          ; SBC HL,DE         ; HL = (flipped-D:E) - range
-       movb hl,@on_screen_bottom+1                         ; LD ($E6E6),HL     ; store a second lower bound
-       movb @l,@on_screen_bottom                           ;                   ;
+       mov  hl,@on_screen_bottom                           ; LD ($E6E6),HL     ; store a second lower bound
        movb b,h                                            ; LD H,B            ; HL = (flipped-D:E) again
        movb @c,@l                                          ; LD L,C            ; 
        a    de,hl                                          ; ADD HL,DE         ; HL = (flipped-D:E) + range
-       movb hl,@on_screen_top+1                            ; LD ($E6E4),HL     ; store a second upper bound
-       movb @l,@on_screen_top                              ;                   ;
+       mov  hl,@on_screen_top                              ; LD ($E6E4),HL     ; store a second upper bound
        sb   a,a                                            ; XOR A             ; A = 0 (the "out of range" return value)
-       movb @on_screen_left+1,hl                           ; LD HL,($E6E0)     ; HL = the first lower bound
-       movb @on_screen_left,@l                             ;                   ;
+       mov  @on_screen_left,hl                             ; LD HL,($E6E0)     ; HL = the first lower bound
        li   de,>8076                                       ; LD DE,$8076       ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; compare against $8076
        jnc  !                                              ; RET NC            ; still >= - out of range, return with A=0
        rt                                                  ;                   
 !
-       movb @on_screen_right+1,hl                          ; LD HL,($E6E2)     ; HL = the first upper bound
-       movb @on_screen_right,@l                            ;                   ;
+       mov  @on_screen_right,hl                            ; LD HL,($E6E2)     ; HL = the first upper bound
        li   de,>7f8c                                       ; LD DE,$7F8C       ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; compare against $7F8C
        joc  !                                              ; RET C             ; below it - out of range, return with A=0
        rt                                                  ;                   
 !
-       movb @on_screen_top+1,hl                            ; LD HL,($E6E4)     ; HL = the second upper bound
-       movb @on_screen_top,@l                              ;                   ;
+       mov  @on_screen_top,hl                              ; LD HL,($E6E4)     ; HL = the second upper bound
        li   de,>7fc1                                       ; LD DE,$7FC1       ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; compare against $7FC1
        joc  !                                              ; RET C             ; below it - out of range, return with A=0
        rt                                                  ;                   
 !
-       movb @on_screen_bottom+1,hl                         ; LD HL,($E6E6)     ; HL = the second lower bound
-       movb @on_screen_bottom,@l                           ;                   ;
+       mov  @on_screen_bottom,hl                           ; LD HL,($E6E6)     ; HL = the second lower bound
        li   de,>8041                                       ; LD DE,$8041       ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; compare against $8041
@@ -6941,11 +6860,10 @@ vertex_cache:                                              ; >e61d
 * Vertex cache: address of the slot being written
 * 
 * The high byte is always $E6 (#R$422E); #R$49FD sets the low byte to 4 * the
-* vertex number.
+* vertex number. On the TI it's the full address of the slot in scratch_buffer,
+* as a big-endian word.
 vertex_cache_slot:                                         ; >e6c8
-       byte >00                                                      ; 
-vertex_cache_slot_hi:                                      ; >e6c9
-       byte >00                                                      ; 
+       data 0
 
 ********************************************************************************
 * Unused
@@ -6986,7 +6904,7 @@ roof_vector_log_z:                                         ; >e6d6
 * Set by #R$422E (at $4255) from the object's position, converted to the
 * current view (#R$44E5).
 view_x:                                                    ; >e6d8
-       byte >00,>00
+       data 0
 
 ********************************************************************************
 * Object's position in the view: z * 2
@@ -6994,14 +6912,14 @@ view_x:                                                    ; >e6d8
 * Twice #R$E6DC, set by #R$422E (at $4255) and #R$43C2: the depth that #R$44D2
 * adds to a vertex and #R$46CA projects with.
 view_z2:                                                   ; >e6da
-       byte >00,>00
+       data 0
 
 ********************************************************************************
 * Object's position in the view: z
 * 
 * Set by #R$422E (at $4255); negative if the object is behind the player.
 view_z:                                                    ; >e6dc
-       byte >00,>00
+       data 0
 
 ********************************************************************************
 * Explosion: random table pointer
@@ -7017,7 +6935,7 @@ explosion_random_pointer:                                  ; >e6de
 * The object's x on screen minus its radius, biased by $8000, worked out by
 * #R$4A99.
 on_screen_left:                                            ; >e6e0
-       byte >00,>00
+       data 0
 
 ********************************************************************************
 * On-screen check: right edge
@@ -7025,7 +6943,7 @@ on_screen_left:                                            ; >e6e0
 * The object's x on screen plus its radius, biased by $8000, worked out by
 * #R$4A99.
 on_screen_right:                                           ; >e6e2
-       byte >00,>00
+       data 0
 
 ********************************************************************************
 * On-screen check: top edge
@@ -7033,7 +6951,7 @@ on_screen_right:                                           ; >e6e2
 * The object's y on screen plus its radius, biased by $8000, worked out by
 * #R$4A99.
 on_screen_top:                                             ; >e6e4
-       byte >00,>00
+       data 0
 
 ********************************************************************************
 * On-screen check: bottom edge
@@ -7041,7 +6959,7 @@ on_screen_top:                                             ; >e6e4
 * The object's y on screen minus its radius, biased by $8000, worked out by
 * #R$4A99.
 on_screen_bottom:                                          ; >e6e6
-       byte >00,>00
+       data 0
 
 ********************************************************************************
 * Unused
@@ -7055,7 +6973,7 @@ unused_e6e8:                                               ; >e6e8
 * 
 * A sign-magnitude value #R$4873 keeps while it works out the dot product.
 face_visible_workspace_1:                                  ; >e6ea
-       byte >00,>00
+       data 0
 
 ********************************************************************************
 * Face visibility: more workspace
@@ -7063,7 +6981,7 @@ face_visible_workspace_1:                                  ; >e6ea
 * Another sign-magnitude value #R$4873 keeps while it works out the dot
 * product.
 face_visible_workspace_2:                                  ; >e6ec
-       byte >00,>00
+       data 0
 
 ********************************************************************************
 * Number of edges skipped
@@ -9659,19 +9577,16 @@ perentry_loop_pointer:                                     ; >eb90
 * reused as a general scale/quantize output slot by several callers of
 * #R$47C4/#R$4B22 outside the clipper itself (#R$442A, #R$4A99's
 * callers, #R$496D's cluster).
+* The four clip point words are big-endian, for word access.
 clip_point1_x:                                             ; >eb92
-       byte >00                                                      ; 
-clip_point1_x_hi:                                          ; >eb93
-       byte >00                                                      ; 
+       data 0
 
 ********************************************************************************
 * Clip point 1: row (Y)
 * 
 * Paired with #R$EB92 - see its description.
 clip_point1_y:                                             ; >eb94
-       byte >00                                                      ; 
-clip_point1_y_hi:                                          ; >eb95
-       byte >00                                                      ; 
+       data 0
 
 ********************************************************************************
 * Clip point 2: column (X)
@@ -9680,18 +9595,14 @@ clip_point1_y_hi:                                          ; >eb95
 * calls this same pair "the first endpoint"; see #R$EB92's description
 * for the numbering conflict.
 clip_point2_x:                                             ; >eb96
-       byte >00                                                      ; 
-clip_point2_x_hi:                                          ; >eb97
-       byte >00                                                      ; 
+       data 0
 
 ********************************************************************************
 * Clip point 2: row (Y)
 * 
 * Paired with #R$EB96 - see its description.
 clip_point2_y:                                             ; >eb98
-       byte >00                                                      ; 
-clip_point2_y_hi:                                          ; >eb99
-       byte >00                                                      ; 
+       data 0
 
 ********************************************************************************
 * Current view
@@ -9738,7 +9649,7 @@ unused_eb9d:                                               ; >eb9d
 * projected (#R$46CA, #R$4714); used to check whether it's on screen
 * (#R$4A99) and whether to draw it small (#R$4255, #R$4A86).
 screen_radius:                                             ; >eb9e
-       byte >00,>00
+       data 0
 
 ********************************************************************************
 * Ship/object table: 20 slots, 40-byte stride

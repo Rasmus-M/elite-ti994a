@@ -75,7 +75,10 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   headers use `data`. Also big-endian `data` words, for speed in
   `rotate_vertex`, are `rotated_vector`/`_y`/`_z` (the code that copies blueprint vertices and normals into it
   swaps the bytes of each word) and the orientation logs `side_vector_logs`, `roof_vector_logs` and
-  `nose_vector_logs` (also used by the MSX code at $869A, not converted yet). Constant tables read only by TI
+  `nose_vector_logs` (also used by the MSX code at $869A, not converted yet), and the per-edge and per-vertex
+  variables `clip_point1_x/_y`, `clip_point2_x/_y`, `view_x`, `view_z2`, `view_z`, `vertex_cache_slot`,
+  `face_visible_workspace_1/_2`, `screen_radius` and `on_screen_left/right/top/bottom`. A single-byte access to
+  one of these goes to the high byte at the label and the low byte at the label + 1. Constant tables read only by TI
   code (`log_table`, `antilog_table`) are big-endian `data`.
 - **No MSX page assumptions**: Z80 code that builds addresses from page numbers (`LD H,$E6`, `LD H,$02` for the
   $0200 table, `ADD A,$08` for $0800) or steps pointers with `INC L` relies on MSX page-aligned tables. On the TI,

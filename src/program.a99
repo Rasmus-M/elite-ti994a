@@ -1,0 +1,25 @@
+* The whole program, assembled twice: by elite.a99 for the RAM image, and by
+* code-banks.a99 for the ROM banks that hold code. Each build makes its own
+* part real (AORG) and the rest DORG, which defines the labels without
+* output, so code in RAM and in the banks can refer to each other.
+
+* The data banks are assembled on their own; here they only give their labels
+       copy "rom-banks/rom-bank-4.a99"
+       copy "rom-banks/rom-bank-5.a99"
+       copy "rom-banks/rom-bank-6.a99"
+
+       .ifdef code_banks
+       dorg >2000
+       .else
+       aorg >2000
+       .endif
+       copy "lower-memory.a99"
+
+       .ifdef code_banks
+       dorg >a000
+       .else
+       aorg >a000
+       .endif
+       copy "upper-memory.a99"
+
+       copy "rom-banks/rom-bank-7.a99"

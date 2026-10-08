@@ -20,10 +20,12 @@ data from extra 8K cartridge ROM banks into `>6000` while main code runs in 32K 
 
 1. `xas99.py -i -q -R -L elite.lst -E symbols.txt src/elite.a99 -o bin/elite` — assemble to EA5 program
    image(s) (`bin/elite`, `bin/elitf`, ... when larger than one file).
-2. `xas99.py src/rom-banks/rom-bank-N.a99 -B ...` — assemble the data banks 4-6 (`bin/bankN.bin`).
-3. `java -jar tools/ea5tocart.jar bin\elite "elite"` — pack the program (lower and upper RAM only) with a loader
-   into a 32K cartridge image (banks 0-3), then append banks 4-6 and an empty bank 7 (`elite8.bin`).
-4. Package `elite8.bin` + `layout.xml` into `elite.rpk` (MAME cartridge, PCB type `paged378`).
+2. `xas99.py src/math-tables-bin.a99 -b ...` and `xas99.py src/code-banks.a99 -B ...` — assemble the code bank 7
+   (`bin/bank7.bin`), which includes the math tables (`bin/math-tables.bin`) with `bcopy`.
+3. `xas99.py src/rom-banks/rom-bank-N.a99 -B ...` — assemble the data banks 4-6 (`bin/bankN.bin`).
+4. `java -jar tools/ea5tocart.jar bin\elite "elite"` — pack the program (lower and upper RAM only) with a loader
+   into a 32K cartridge image (banks 0-3), then append banks 4-7 (`elite8.bin`).
+5. Package `elite8.bin` + `layout.xml` into `elite.rpk` (MAME cartridge, PCB type `paged378`).
 
 There are no tests; verification is running the cartridge in an emulator.
 
@@ -93,6 +95,10 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   `copy_space_view_row_pad` (`>26`), `clear_space_view_rows_pad` (`>20`) and `line_loops_pad` (`>50`), ending at
   `pad_max` (`>83F8`, overlapping GPLWS - fine while interrupts and console routines are unused). The slot sizes
   are constants; update them if those routines change. Code there runs without wait states.
+- **Code in ROM banks**: `program.a99` holds the whole program and is assembled twice: by `elite.a99` with RAM
+  real (`aorg`) and the code banks `dorg`, and by `code-banks.a99` the other way round, so RAM and the banks can use
+  each other's labels. Bank 7 (`code_bank_7_select`) holds code; call into it with `.far_call`. Code in a bank may
+  read RAM, the math tables and its own bank only.
 - **ROM banks** (`src/rom-banks/`): every data bank starts with the math tables (`math-tables.a99`) at `>6040`,
   so they're readable whichever bank is selected. Bank 4 then holds the blueprints for ship types 1-22, bank 5
   types 23+ (`blueprints_2_first_type`), bank 6 the cockpit picture, the font and the title music. Select a bank with
@@ -117,7 +123,7 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
 
 ## Source layout
 
-`src/elite.a99` is the top-level file: macros + equates, then `aorg >2000` (low 8K RAM: `lower-memory.a99` —
+`src/elite.a99` is the top-level file: macros + equates, then `program.a99`: the data banks' labels, `aorg >2000` (low 8K RAM: `lower-memory.a99` —
 entry point, `ti-routines.a99` TI-specific hardware routines prefixed `ti_`, `ti-tables.a99`, buffers) and
-`aorg >a000` (high 24K RAM: `upper-memory.a99` → `main-code.a99`). VDP table addresses are in `equates.a99`
+`aorg >a000` (high 24K RAM: `upper-memory.a99` → `main-code.a99`) and the code bank (`rom-bank-7.a99`). VDP table addresses are in `equates.a99`
 (screen 2 layout matching the MSX).

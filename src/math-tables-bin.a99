@@ -1,0 +1,4 @@
+* The math tables on their own, as bin/math-tables.bin, for the code banks to
+* include with BCOPY (copying math-tables.a99 would define its labels again).
+       aorg >6040
+       copy "math-tables.a99"

@@ -144,3 +144,5 @@ font_bank_select:
        equ  >600c
 music_bank_select:
        equ  >600c
+code_bank_7_select:                    ; Code (rom-bank-7.a99)
+       equ  >600e

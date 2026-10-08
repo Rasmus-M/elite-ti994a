@@ -123,6 +123,7 @@ title_screen:                                              ; >1c5c
        movb @bytes+>87,a                                   ; LD A,$87          ;
        movb a,@vdpwa                                       ; OUT ($99),A       ;
        ; EI                                                ; EI                ;
+       .far_call code_bank_7_select,bank_7_test            ;                   ; (TI: temporary test of code in ROM bank 7: dark blue backdrop)
        sb   a,a                                            ; XOR A             ;
        movb a,@docked                                      ; LD ($E90A),A      ;
        sb   one,a                                          ; DEC A             ;

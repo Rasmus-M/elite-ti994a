@@ -1,0 +1,33 @@
+* ROM bank 7: the math tables and code
+* Assembled for real by code-banks.a99, and DORG in elite.a99 for its labels
+       .ifdef code_banks
+       aorg >6000
+       .else
+       dorg >6000
+       .endif
+       bss  >40
+       .ifdef code_banks
+       bcopy "../../bin/math-tables.bin" ; the math tables, as in the other banks
+       .else
+       bss  math_tables_end-math_tables
+       .endif
+
+*********************************************************************
+*
+* Test that code runs from a ROM bank (temporary)
+*
+* Called with .far_call from title_screen: sets the backdrop colour from
+* data in this bank, so the colour shows the bank was selected.
+*
+bank_7_test:
+       movb @bank_7_test_colour,@vdpwa
+       li   r0,>8700
+       movb r0,@vdpwa                  ; VDP register 7: the backdrop colour
+       rt
+bank_7_test_colour:
+       byte >04                        ; dark blue
+       even
+
+rom_bank_7_end:
+       equ  $
+       bss  >8000-$

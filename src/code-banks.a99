@@ -1,0 +1,9 @@
+* The ROM banks that hold code (see program.a99). The RAM image is DORG here.
+       copy "macros.a99"
+       copy "equates.a99"
+
+main_program:                          ; The data banks are copied only for their labels
+       equ  1
+code_banks:                            ; The code banks are assembled for real
+       equ  1
+       copy "program.a99"

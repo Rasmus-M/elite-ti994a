@@ -4,8 +4,11 @@
 *
 * TI-specific. A native replacement for the music part of the MSX sound
 * code (#R$7603, #R$7645, #R$769B). It plays a tune in the format of
-* title-music.a99 (in ROM bank 6) on tone channels 1-3, one tick per
-* (50 Hz) MSX frame, and starts it again when every channel has finished.
+* title-music.a99 (in ROM bank 6), one tick per (50 Hz) MSX frame, and
+* starts it again when every channel has finished. Channels 1 and 2 play
+* on tones 1 and 2. Channel 3, the bass, is too low for a tone, so it plays
+* on the noise channel in periodic mode, clocked by tone 3 (kept silent)
+* at 15 times the pitch (bass_tone_periods).
 *
 * It has its own workspace and is called with BLWP, so it can be called
 * from anywhere (via ti_poll_vblank) without disturbing the main registers.
@@ -33,8 +36,12 @@ music_rest:                            ; Nonzero if the note's last tick is sile
        equ  8
 music_attenuation:                     ; The channel's attenuation (0-15) in the high byte
        equ  10
-music_record_size:
+music_volume_command:                  ; SN76489 attenuation command for the channel (high byte)
        equ  12
+music_periods:                         ; -> the channel's tone period table
+       equ  14
+music_record_size:
+       equ  16
 
 music_start_vector:                    ; Start the tune at the caller's HL
        data music_ws,music_start
@@ -143,16 +150,16 @@ music_tick_note_1:
        jmp  music_tick_next
 music_tick_tone:
        srl  r1,8
-       mov  @note_tone_periods(r1),r1  ; the period's two command bytes
+       a    @music_periods(r4),r1
+       mov  *r1,r1                     ; the period's two command bytes
        socb r5,r1
        socb @music_tone_command,r1
        movb r1,@sound                  ; command, channel and the low 4 bits
        swpb r1
        movb r1,@sound                  ; the high 6 bits
        mov  @music_attenuation(r4),r0
-       socb r5,r0
-       socb @music_volume_command,r0
-       movb r0,@sound                  ; the channel's volume
+       socb @music_volume_command(r4),r0
+       movb r0,@sound                  ; the channel's volume (on the noise for channel 3)
 music_tick_next:
        ai   r4,music_record_size
        ai   r5,>2000
@@ -181,11 +188,15 @@ music_init:
        mov  r11,r2
        bl   @music_silence_all
        mov  r2,r11
+       li   r1,>e300                   ; periodic noise, clocked by tone 3
+       movb r1,@sound
        mov  *r0+,r6                    ; R6 = the number of channels
        mov  r6,@music_playing
        li   r4,music_channels
-       clr  r5
+       li   r2,music_channel_setup
 music_init_1:
+       mov  *r2+,@music_volume_command(r4)
+       mov  *r2+,@music_periods(r4)
        mov  *r0+,r1                    ; R1 -> the channel's pattern list
        mov  r1,@music_list(r4)
        mov  *r1,@music_position(r4)    ; start at its first pattern
@@ -196,7 +207,6 @@ music_init_1:
        mov  r1,@music_attenuation(r4)
        seto *r4                        ; the channel is playing
        ai   r4,music_record_size
-       ai   r5,>2000
        dec  r6
        jne  music_init_1
        seto @music_on
@@ -207,11 +217,11 @@ music_init_1:
 *
 * Silence a channel
 *
-* I:R5 The channel's number in bits 13-14
+* I:R4 -> the channel's record
 *
 music_silence:
-       li   r1,>9f00                   ; attenuation 15
-       socb r5,r1
+       li   r1,>0f00                   ; attenuation 15
+       socb @music_volume_command(r4),r1
        movb r1,@sound
        rt
 *// music_silence
@@ -238,9 +248,11 @@ music_silent_byte:                     ; Notes from here on are silent
        byte >90
 music_tone_command:                    ; SN76489 tone command (channel bits added)
        byte >80
-music_volume_command:                  ; SN76489 attenuation command (channel bits added)
-       byte >90
        even
+music_channel_setup:                   ; For each channel: its attenuation command and period table
+       data >9000,note_tone_periods    ; channel 1: tone 1
+       data >b000,note_tone_periods    ; channel 2: tone 2
+       data >f000,bass_tone_periods    ; channel 3: the noise, clocked by tone 3
 music_on:                              ; Nonzero while a tune is playing
        data 0
 music_tune:                            ; Address of the tune header, to start it again

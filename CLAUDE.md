@@ -98,7 +98,10 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   types 23+ (`blueprints_2_first_type`), bank 6 the cockpit picture, the font and the title music. Select a bank with
   `.select_bank ..._bank_select` (`equates.a99`; it changes R0) before reading its data - never a plain `seto`, as
   the music player selects the bank in `current_bank` again after each tick; `draw_object` and `get_blueprint_data` select
-  the blueprint bank themselves (`select_blueprint_bank`). The bank files are copied into `elite.a99` under `dorg`
+  the blueprint bank themselves (`select_blueprint_bank`). RAM routines that select a bank select the caller's bank
+  again before returning (`.save_bank`/`.restore_bank`), so code in a ROM bank can call them: `draw_object`,
+  `get_blueprint_data` (which also copies the name to `bp_name_buffer`, so `bp_name` points at RAM), `print_char`
+  and the cockpit picture routine. The exception is `get_blueprint`, whose callers read the blueprint through IY. The bank files are copied into `elite.a99` under `dorg`
   only for their labels (`main_program` is defined); banks 5 and 6 then reserve the tables' space with `bss`.
 - Interrupts stay disabled (`limi 0` once at startup); the converted `DI`/`EI` are commented out. Instead,
   `ti_poll_vblank` (`music-player.a99`) reads the VDP status and, on a new frame, does the MSX VBlank handler's

@@ -62,6 +62,20 @@
        data #1,#2
        .endm
 
+* Save the caller's ROM bank on the stack, and select it again, for routines in
+* RAM that select a bank but may be called from code in another bank.
+* .restore_bank changes R0 and the status (carry included).
+       .defm save_bank
+       mov  @current_bank,*sp+
+       .endm
+
+       .defm restore_bank
+       dect sp
+       mov  *sp,r0
+       mov  r0,@current_bank
+       seto *r0
+       .endm
+
        .defm push
        mov  #1,*sp+
        .endm

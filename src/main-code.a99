@@ -40,10 +40,12 @@ select_blueprint_bank:
 * and the sun), which have no blueprint.
 get_blueprint_data:                                        ; >16e3
        .proc
+       .save_bank                                          ;                   ; (TI: select the caller's bank again on return)
        movb @ship_type,a                                   ; LD A,($F7E7)      ; A = ship type
        bl   @select_blueprint_bank                         ;                   ; select its ROM bank
        cb   a,@bytes+>64                                   ; CP $64            ; 
        jl   !                                              ; RET NC            ; the planet or the sun - no blueprint
+       .restore_bank                                       ;                   ; 
        .endproc                                            ;                   
 !
        ab   a,a                                            ; ADD A,A           ; 
@@ -58,7 +60,26 @@ get_blueprint_data:                                        ; >16e3
        li   de,bp_vertices                                 ; LD DE,$F7F5       ; 
        li   bc,>001a                                       ; LD BC,$001A       ; 26 bytes
        .ldir                                               ; LDIR              ; copy the header to $F7F5
+       movb @bp_name,r1                                    ;                   ; (TI: copy the name to RAM, so the message routines
+       movb @bp_name+1,@r1lb                               ;                   ; can read it whichever bank is selected)
+       li   r2,bp_name_buffer                              ;                   ; 
+       movb r2,@bp_name                                    ;                   ; bp_name -> the copy
+       movb @r2lb,@bp_name+1                               ;                   ; 
+!
+       movb *r1+,r0                                        ;                   ; 
+       movb r0,*r2+                                        ;                   ; 
+       jlt  +!                                             ;                   ; up to the last character (bit 7 set),
+       ci   r2,bp_name_buffer+20                           ;                   ; or 20 bytes (the title letters have no name:
+       jl   -!                                             ;                   ; their name pointer points at their vertices)
+!
+       .restore_bank                                       ;                   ; 
        .endproc                                            ; RET               ; 
+
+* TI-specific. The object's name, copied from its blueprint (bp_name) by
+* get_blueprint_data, so it can be read with any ROM bank selected.
+bp_name_buffer:
+       bss  20
+       even
 
 ********************************************************************************
 * Title screen
@@ -1338,12 +1359,14 @@ print_char:                                                ; >34a8
        sla  hl,3                                           ; ADD HL,HL         ; HL *= 8 (this char's offset into the font table)
        ;                                                   ; ADD HL,HL         ; 
        ;                                                   ; ADD HL,HL         ; 
+       .save_bank                                          ;                   ; (TI: select the caller's bank again after the copy)
        .select_bank font_bank_select                       ;                   ; the font is in ROM bank 6 on the TI
        li   bc,font->0100                                  ; LD BC,$099F       ; the font pattern table (codes $20-$7F)
        a    bc,hl                                          ; ADD HL,BC         ; HL -> this character's 8-byte glyph
        li   de,scratch_buffer                              ; LD DE,$E600       ; DE -> the staging buffer
        li   bc,>0008                                       ; LD BC,$0008       ; 8 bytes
        .ldir                                               ; LDIR              ; copy the glyph in
+       .restore_bank                                       ;                   ; 
        .ex_de_hl                                           ; EX DE,HL          ; HL -> just past the copied glyph ($E608)
        sb   *hl,*hl                                        ; LD (HL),$00       ; zero it...
        li   de,scratch_buffer_5+>0004                      ; LD DE,$E609       ; ...and the following 7 bytes too
@@ -3170,6 +3193,12 @@ partial_byte_right_mask_table_8:                           ; >4014
 * At $4336, skips the face's list of edges (a count, then the edges). The
 * entry at $433B moves on to the next face.
 draw_object:                                               ; >422e
+       .proc
+       .save_bank                                          ;                   ; (TI: draw_object_body selects the blueprint's bank;
+       bl   @draw_object_body                              ;                   ; select the caller's bank again afterwards)
+       .restore_bank                                       ;                   ; 
+       .endproc                                            ;                   ; 
+draw_object_body:
        .proc
        bl   @select_blueprint_bank                         ;                   ; its blueprint's ROM bank (another bank may have been selected since #R$16E3)
        sb   a,a                                            ; XOR A             ; A = 0
@@ -6707,10 +6736,12 @@ blank_screen_decompress_picture_recolour:                  ; >7139
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
        movb @bytes+>81,a                                   ; LD A,$81          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; turn the display off
+       .save_bank                                          ;                   ; (TI: select the caller's bank again afterwards)
        .select_bank cockpit_picture_bank_select            ;                   ; the picture is in ROM bank 6 on the TI
        movb @cockpit_picture_addr+1,hl                     ; LD HL,($F740)     ; HL -> the cockpit picture (#R$F740)
        movb @cockpit_picture_addr,@l                       ;                   ;
        bl   @decompress_picture                            ; CALL $390E        ; decompress it (#R$390E)
+       .restore_bank                                       ;                   ; 
        movb @in_witchspace,a                               ; LD A,($EEC1)      ; in witchspace?
        socb a,a                                            ; OR A              ; 
        jeq  _7157                                          ; JR Z,$7157        ; no

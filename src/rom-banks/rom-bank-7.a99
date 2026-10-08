@@ -25,14 +25,14 @@ msg_fblr:                                                  ; >57dd
 * Printed by #R$6276. A list of (column, row, string) records ending with $FF
 * (see #R$3596).
 status_page_headings:                                      ; >59e0
-       text >05,>03,'PRESENT SYSTEM    ',>ba                      ; 
-       text >05,>04,'HYPERSPACE SYSTEM ',>ba                      ; 
-       text >05,>05,'CONDITION         ',>ba                      ; 
-       text >05,>06,'FUEL',>ba                                    ; 
-       text >05,>07,'CASH',>ba                                    ; 
-       text >05,>08,'LEGAL STATUS',>ba                            ; 
-       text >05,>09,'RATING',>ba                                  ; 
-       text >05,>0b,'EQUIPMENT',>ba                               ; 
+       text >05,>03,'Present System    ',>ba                      ; 
+       text >05,>04,'Hyperspace System ',>ba                      ; 
+       text >05,>05,'Condition         ',>ba                      ; 
+       text >05,>06,'Fuel',>ba                                    ; 
+       text >05,>07,'Cash',>ba                                    ; 
+       text >05,>08,'Legal Status',>ba                            ; 
+       text >05,>09,'Rating',>ba                                  ; 
+       text >05,>0b,'Equipment',>ba                               ; 
        byte >FF                                                   ; 
 
 ********************************************************************************
@@ -53,20 +53,20 @@ status_page_frame:                                         ; >5a52
 ********************************************************************************
 * The message "Green"
 msg_green_5a9f:                                            ; >5a9f
-       text 'GREE',>ee                                            ; the conditions, printed with RST $10
+       text 'Gree',>ee                                            ; the conditions, printed with RST $10
 msg_red_5aa4:                                              ; >5aa4
-       text 'RE',>e4                                              ; 
+       text 'Re',>e4                                              ; 
 msg_red_5aa7:                                              ; >5aa7
-       text 'RE',>e4                                              ; 
+       text 'Re',>e4                                              ; 
 
 ********************************************************************************
 * The message "Clean"
 msg_clean:                                                 ; >5aaa
-       text 'CLEA',>ee                                            ; the legal statuses, printed with RST $10
+       text 'Clea',>ee                                            ; the legal statuses, printed with RST $10
 msg_offender:                                              ; >5aaf
-       text 'OFFENDE',>f2                                         ; 
+       text 'Offende',>f2                                         ; 
 msg_fugitive:                                              ; >5ab7
-       text 'FUGITIV',>e5                                         ; 
+       text 'Fugitiv',>e5                                         ; 
 
 ********************************************************************************
 * Show the status page

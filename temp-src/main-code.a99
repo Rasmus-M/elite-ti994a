@@ -635,97 +635,97 @@ font:                                                      ; >0a9f
 ********************************************************************************
 * The message "Food"
 msg_food:                                                  ; >0d9f
-       text 'FOO',>e4
+       text 'Foo',>e4
 
 ********************************************************************************
 * The message "Textiles"
 msg_textiles:                                              ; >0da3
-       text 'TEXTILE',>f3
+       text 'Textile',>f3
 
 ********************************************************************************
 * The message "Radioactives"
 msg_radioactives:                                          ; >0dab
-       text 'RADIOACTIVE',>f3
+       text 'Radioactive',>f3
 
 ********************************************************************************
 * The message "Slaves"
 msg_slaves:                                                ; >0db7
-       text 'SLAVE',>f3
+       text 'Slave',>f3
 
 ********************************************************************************
 * The message "Liquor/Wines"
 msg_liquor_wines:                                          ; >0dbd
-       text 'LIQUOR/WINE',>f3
+       text 'Liquor/Wine',>f3
 
 ********************************************************************************
 * The message "Luxuries"
 msg_luxuries:                                              ; >0dc9
-       text 'LUXURIE',>f3
+       text 'Luxurie',>f3
 
 ********************************************************************************
 * The message "Narcotics"
 msg_narcotics:                                             ; >0dd1
-       text 'NARCOTIC',>f3
+       text 'Narcotic',>f3
 
 ********************************************************************************
 * The message "Computers"
 msg_computers:                                             ; >0dda
-       text 'COMPUTER',>f3
+       text 'Computer',>f3
 
 ********************************************************************************
 * The message "Machinery"
 msg_machinery:                                             ; >0de3
-       text 'MACHINER',>f9
+       text 'Machiner',>f9
 
 ********************************************************************************
 * The message "Alloys"
 msg_alloys:                                                ; >0dec
-       text 'ALLOY',>f3
+       text 'Alloy',>f3
 
 ********************************************************************************
 * The message "Firearms"
 msg_firearms:                                              ; >0df2
-       text 'FIREARM',>f3
+       text 'Firearm',>f3
 
 ********************************************************************************
 * The message "Furs"
 msg_furs:                                                  ; >0dfa
-       text 'FUR',>f3
+       text 'Fur',>f3
 
 ********************************************************************************
 * The message "Minerals"
 msg_minerals:                                              ; >0dfe
-       text 'MINERAL',>f3
+       text 'Mineral',>f3
 
 ********************************************************************************
 * The message "Gold"
 msg_gold:                                                  ; >0e06
-       text 'GOL',>e4
+       text 'Gol',>e4
 
 ********************************************************************************
 * The message "Platinum"
 msg_platinum:                                              ; >0e0a
-       text 'PLATINU',>ed
+       text 'Platinu',>ed
 
 ********************************************************************************
 * The message "Gem-Stones"
 msg_gem_stones:                                            ; >0e12
-       text 'GEM-STONE',>f3
+       text 'Gem-Stone',>f3
 
 ********************************************************************************
 * The message "Alien Items"
 msg_alien_items:                                           ; >0e1c
-       text 'ALIEN ITEM',>f3
+       text 'Alien Item',>f3
 
 ********************************************************************************
 * The message "Refugees"
 msg_refugees:                                              ; >0e27
-       text 'REFUGEE',>f3
+       text 'Refugee',>f3
 
 ********************************************************************************
 * The message "Thargoid documents"
 msg_thargoid_documents:                                    ; >0e2f
-       text 'THARGOID DOCUMENT',>f3
+       text 'Thargoid document',>f3
 
 ********************************************************************************
 * Letter pairs for names
@@ -735,59 +735,59 @@ msg_thargoid_documents:                                    ; >0e2f
 * "a".
 name_letter_pairs:                                         ; >0e41
        text '  '                                                     ; 0
-       text 'LE'                                                     ; 1
-       text 'XE'                                                     ; 2
-       text 'GE'                                                     ; 3
-       text 'ZA'                                                     ; 4
-       text 'CE'                                                     ; 5
-       text 'BI'                                                     ; 6
-       text 'SO'                                                     ; 7
-       text 'US'                                                     ; 8
-       text 'ES'                                                     ; 9
-       text 'AR'                                                     ; 10
-       text 'MA'                                                     ; 11
-       text 'IN'                                                     ; 12
-       text 'DI'                                                     ; 13
-       text 'RE'                                                     ; 14
-       text 'A '                                                     ; 15
-       text 'ER'                                                     ; 16
-       text 'AT'                                                     ; 17
-       text 'EN'                                                     ; 18
-       text 'BE'                                                     ; 19
-       text 'RA'                                                     ; 20
-       text 'LA'                                                     ; 21
-       text 'VE'                                                     ; 22
-       text 'TI'                                                     ; 23
-       text 'ED'                                                     ; 24
-       text 'OR'                                                     ; 25
-       text 'QU'                                                     ; 26
-       text 'AN'                                                     ; 27
-       text 'TE'                                                     ; 28
-       text 'IS'                                                     ; 29
-       text 'RI'                                                     ; 30
-       text 'ON'                                                     ; 31
+       text 'le'                                                     ; 1
+       text 'xe'                                                     ; 2
+       text 'ge'                                                     ; 3
+       text 'za'                                                     ; 4
+       text 'ce'                                                     ; 5
+       text 'bi'                                                     ; 6
+       text 'so'                                                     ; 7
+       text 'us'                                                     ; 8
+       text 'es'                                                     ; 9
+       text 'ar'                                                     ; 10
+       text 'ma'                                                     ; 11
+       text 'in'                                                     ; 12
+       text 'di'                                                     ; 13
+       text 're'                                                     ; 14
+       text 'a '                                                     ; 15
+       text 'er'                                                     ; 16
+       text 'at'                                                     ; 17
+       text 'en'                                                     ; 18
+       text 'be'                                                     ; 19
+       text 'ra'                                                     ; 20
+       text 'la'                                                     ; 21
+       text 've'                                                     ; 22
+       text 'ti'                                                     ; 23
+       text 'ed'                                                     ; 24
+       text 'or'                                                     ; 25
+       text 'qu'                                                     ; 26
+       text 'an'                                                     ; 27
+       text 'te'                                                     ; 28
+       text 'is'                                                     ; 29
+       text 'ri'                                                     ; 30
+       text 'on'                                                     ; 31
 
 ********************************************************************************
 * The message "Human Colonial)"
 * 
 * Shown for the inhabitants of some systems (#R$60E3).
 msg_human_colonial:                                        ; >0e81
-       text 'HUMAN COLONIAL)',>00
+       text 'Human Colonial)',>00
 
 ********************************************************************************
 * The message "Large "
 msg_large:                                                 ; >0e91
-       text 'LARGE',>a0
+       text 'Large',>a0
 
 ********************************************************************************
 * The message "Fierce "
 msg_fierce:                                                ; >0e97
-       text 'FIERCE',>a0
+       text 'Fierce',>a0
 
 ********************************************************************************
 * The message "Small "
 msg_small:                                                 ; >0e9e
-       text 'SMALL',>a0
+       text 'Small',>a0
 
 ********************************************************************************
 * Empty entries, #R$0E91's word-select table
@@ -804,32 +804,32 @@ size_word_table_empty_slots:                               ; >0ea4
 ********************************************************************************
 * The message "Green "
 msg_green:                                                 ; >0ea9
-       text 'GREEN',>a0
+       text 'Green',>a0
 
 ********************************************************************************
 * The message "Red "
 msg_red:                                                   ; >0eaf
-       text 'RED',>a0
+       text 'Red',>a0
 
 ********************************************************************************
 * The message "Yellow "
 msg_yellow:                                                ; >0eb3
-       text 'YELLOW',>a0
+       text 'Yellow',>a0
 
 ********************************************************************************
 * The message "Blue "
 msg_blue:                                                  ; >0eba
-       text 'BLUE',>a0
+       text 'Blue',>a0
 
 ********************************************************************************
 * The message "Black "
 msg_black:                                                 ; >0ebf
-       text 'BLACK',>a0
+       text 'Black',>a0
 
 ********************************************************************************
 * The message "Harmless "
 msg_harmless:                                              ; >0ec5
-       text 'HARMLESS',>a0
+       text 'Harmless',>a0
 
 ********************************************************************************
 * Empty entry, #R$0EA9's word-select table
@@ -846,32 +846,32 @@ colour_word_table_empty_slot:                              ; >0ece
 ********************************************************************************
 * The message "Slimy "
 msg_slimy:                                                 ; >0ecf
-       text 'SLIMY',>a0
+       text 'Slimy',>a0
 
 ********************************************************************************
 * The message "Bug-eyed "
 msg_bug_eyed:                                              ; >0ed5
-       text 'BUG-EYED',>a0
+       text 'Bug-eyed',>a0
 
 ********************************************************************************
 * The message "Horned "
 msg_horned:                                                ; >0ede
-       text 'HORNED',>a0
+       text 'Horned',>a0
 
 ********************************************************************************
 * The message "Bony "
 msg_bony:                                                  ; >0ee5
-       text 'BONY',>a0
+       text 'Bony',>a0
 
 ********************************************************************************
 * The message "Fat "
 msg_fat:                                                   ; >0eea
-       text 'FAT',>a0
+       text 'Fat',>a0
 
 ********************************************************************************
 * The message "Furry "
 msg_furry:                                                 ; >0eee
-       text 'FURRY',>a0
+       text 'Furry',>a0
 
 ********************************************************************************
 * Empty entries, #R$0ECF's word-select table
@@ -888,82 +888,82 @@ species_adj_word_table_empty_slots:                        ; >0ef4
 ********************************************************************************
 * The message "Rodent"
 msg_rodent:                                                ; >0ef6
-       text 'RODEN',>f4
+       text 'Roden',>f4
 
 ********************************************************************************
 * The message "Frog"
 msg_frog:                                                  ; >0efc
-       text 'FRO',>e7
+       text 'Fro',>e7
 
 ********************************************************************************
 * The message "Lizard"
 msg_lizard:                                                ; >0f00
-       text 'LIZAR',>e4
+       text 'Lizar',>e4
 
 ********************************************************************************
 * The message "Lobster"
 msg_lobster:                                               ; >0f06
-       text 'LOBSTE',>f2
+       text 'Lobste',>f2
 
 ********************************************************************************
 * The message "Bird"
 msg_bird:                                                  ; >0f0d
-       text 'BIR',>e4
+       text 'Bir',>e4
 
 ********************************************************************************
 * The message "Humanoid"
 msg_humanoid:                                              ; >0f11
-       text 'HUMANOI',>e4
+       text 'Humanoi',>e4
 
 ********************************************************************************
 * The message "Feline"
 msg_feline:                                                ; >0f19
-       text 'FELIN',>e5
+       text 'Felin',>e5
 
 ********************************************************************************
 * The message "Insect"
 msg_insect:                                                ; >0f1f
-       text 'INSEC',>f4
+       text 'Insec',>f4
 
 ********************************************************************************
 * The message "Harmless"
 msg_harmless_0f25:                                         ; >0f25
-       text 'HARMLES',>f3
+       text 'Harmles',>f3
 
 ********************************************************************************
 * The message "Mostly Harmless"
 msg_mostly_harmless:                                       ; >0f2d
-       text 'MOSTLY HARMLES',>f3
+       text 'Mostly Harmles',>f3
 
 ********************************************************************************
 * The message "Poor"
 msg_poor:                                                  ; >0f3c
-       text 'POO',>f2
+       text 'Poo',>f2
 
 ********************************************************************************
 * The message "Average"
 msg_average:                                               ; >0f40
-       text 'AVERAG',>e5
+       text 'Averag',>e5
 
 ********************************************************************************
 * The message "Above average"
 msg_above_average:                                         ; >0f47
-       text 'ABOVE AVERAG',>e5
+       text 'Above averag',>e5
 
 ********************************************************************************
 * The message "Competent"
 msg_competent:                                             ; >0f54
-       text 'COMPETEN',>f4
+       text 'Competen',>f4
 
 ********************************************************************************
 * The message "Dangerous"
 msg_dangerous:                                             ; >0f5d
-       text 'DANGEROU',>f3
+       text 'Dangerou',>f3
 
 ********************************************************************************
 * The message "Deadly"
 msg_deadly:                                                ; >0f66
-       text 'DEADL',>f9
+       text 'Deadl',>f9
 
 ********************************************************************************
 * The message "E-L-I-T-E"
@@ -973,22 +973,22 @@ msg_e_l_i_t_e:                                             ; >0f6c
 ********************************************************************************
 * The message "Poor "
 msg_poor_0f75:                                             ; >0f75
-       text 'POOR',>a0
+       text 'Poor',>a0
 
 ********************************************************************************
 * The message "Average"
 msg_average_0f7a:                                          ; >0f7a
-       text 'AVERAG',>e5
+       text 'Averag',>e5
 
 ********************************************************************************
 * The message "Mainly "
 msg_mainly:                                                ; >0f81
-       text 'MAINLY',>a0
+       text 'Mainly',>a0
 
 ********************************************************************************
 * The message "Rich "
 msg_rich:                                                  ; >0f88
-       text 'RICH',>a0
+       text 'Rich',>a0
 
 ********************************************************************************
 * The message " Agricultural"
@@ -997,7 +997,7 @@ msg_rich:                                                  ; >0f88
 * bit-7 convention as every other message here. It has no bit-7-set
 * character, so it ends at the $00.
 msg_agricultural:                                          ; >0f8d
-       text ' AGRICULTURAL',>00
+       text ' Agricultural',>00
 
 ********************************************************************************
 * The message " Industrial"
@@ -1006,117 +1006,117 @@ msg_agricultural:                                          ; >0f8d
 * $61CB/$61D7),
 * terminated by a trailing $00 rather than a bit-7-set character.
 msg_industrial:                                            ; >0f9b
-       text ' INDUSTRIAL',>00
+       text ' Industrial',>00
 
 ********************************************************************************
 * The message "Anarchy"
 msg_anarchy:                                               ; >0fa7
-       text 'ANARCH',>f9
+       text 'Anarch',>f9
 
 ********************************************************************************
 * The message "Feudal"
 msg_feudal:                                                ; >0fae
-       text 'FEUDA',>ec
+       text 'Feuda',>ec
 
 ********************************************************************************
 * The message "Multi-government"
 msg_multi_government:                                      ; >0fb4
-       text 'MULTI-GOVERNMEN',>f4
+       text 'Multi-governmen',>f4
 
 ********************************************************************************
 * The message "Dictatorship"
 msg_dictatorship:                                          ; >0fc4
-       text 'DICTATORSHI',>f0
+       text 'Dictatorshi',>f0
 
 ********************************************************************************
 * The message "Communist"
 msg_communist:                                             ; >0fd0
-       text 'COMMUNIS',>f4
+       text 'Communis',>f4
 
 ********************************************************************************
 * The message "Confederacy"
 msg_confederacy:                                           ; >0fd9
-       text 'CONFEDERAC',>f9
+       text 'Confederac',>f9
 
 ********************************************************************************
 * The message "Democracy"
 msg_democracy:                                             ; >0fe4
-       text 'DEMOCRAC',>f9
+       text 'Democrac',>f9
 
 ********************************************************************************
 * The message "Corporate state"
 msg_corporate_state:                                       ; >0fed
-       text 'CORPORATE STAT',>e5
+       text 'Corporate stat',>e5
 
 ********************************************************************************
 * The message "Fuel"
 msg_fuel:                                                  ; >0ffc
-       text 'FUE',>ec
+       text 'Fue',>ec
 
 ********************************************************************************
 * The message "Missiles"
 msg_missiles:                                              ; >1000
-       text 'MISSILE',>f3
+       text 'Missile',>f3
 
 ********************************************************************************
 * The message "Large Cargo Bay"
 msg_large_cargo_bay:                                       ; >1008
-       text 'LARGE CARGO BA',>f9
+       text 'Large Cargo Ba',>f9
 
 ********************************************************************************
 * The message "ECM system"
 msg_ecm_system:                                            ; >1017
-       text 'ECM SYSTE',>ed
+       text 'ECM syste',>ed
 
 ********************************************************************************
 * The message "Pulse Laser"
 msg_pulse_laser:                                           ; >1021
-       text 'PULSE LASE',>f2
+       text 'Pulse Lase',>f2
 
 ********************************************************************************
 * The message "Beam Laser"
 msg_beam_laser:                                            ; >102c
-       text 'BEAM LASE',>f2
+       text 'Beam Lase',>f2
 
 ********************************************************************************
 * The message "Fuel Scoop"
 msg_fuel_scoop:                                            ; >1036
-       text 'FUEL SCOO',>f0
+       text 'Fuel Scoo',>f0
 
 ********************************************************************************
 * The message "Escape Capsule"
 msg_escape_capsule:                                        ; >1040
-       text 'ESCAPE CAPSUL',>e5
+       text 'Escape Capsul',>e5
 
 ********************************************************************************
 * The message "Energy Bomb"
 msg_energy_bomb:                                           ; >104e
-       text 'ENERGY BOM',>e2
+       text 'Energy Bom',>e2
 
 ********************************************************************************
 * The message "Extra Energy Unit"
 msg_extra_energy_unit:                                     ; >1059
-       text 'EXTRA ENERGY UNI',>f4
+       text 'Extra Energy Uni',>f4
 
 ********************************************************************************
 * The message "Docking Computer"
 msg_docking_computer:                                      ; >106a
-       text 'DOCKING COMPUTE',>f2
+       text 'Docking Compute',>f2
 
 ********************************************************************************
 * The message "Galactic Hyperdrive"
 msg_galactic_hyperdrive:                                   ; >107a
-       text 'GALACTIC HYPERDRIV',>e5
+       text 'Galactic Hyperdriv',>e5
 
 ********************************************************************************
 * The message "Mining laser"
 msg_mining_laser:                                          ; >108d
-       text 'MINING LASE',>f2
+       text 'Mining lase',>f2
 
 ********************************************************************************
 * The message "Military laser"
 msg_military_laser:                                        ; >1099
-       text 'MILITARY LASE',>f2
+       text 'Military lase',>f2
 
 ********************************************************************************
 * Equipment-name list: 2 leading empty entries
@@ -1135,82 +1135,82 @@ equipment_name_list2_empty_slots:                          ; >10a7
 ********************************************************************************
 * The message "Large Cargo Bay"
 msg_large_cargo_bay_10a9:                                  ; >10a9
-       text 'LARGE CARGO BA',>f9
+       text 'Large Cargo Ba',>f9
 
 ********************************************************************************
 * The message "ECM System"
 msg_ecm_system_10b8:                                       ; >10b8
-       text 'ECM SYSTE',>ed
+       text 'ECM Syste',>ed
 
 ********************************************************************************
 * The message "Pulse "
 msg_pulse:                                                 ; >10c2
-       text 'PULSE',>a0
+       text 'Pulse',>a0
 
 ********************************************************************************
 * The message "Beam "
 msg_beam:                                                  ; >10c8
-       text 'BEAM',>a0
+       text 'Beam',>a0
 
 ********************************************************************************
 * The message "Fuel Scoop"
 msg_fuel_scoop_10cd:                                       ; >10cd
-       text 'FUEL SCOO',>f0
+       text 'Fuel Scoo',>f0
 
 ********************************************************************************
 * The message "Escape Capsule"
 msg_escape_capsule_10d7:                                   ; >10d7
-       text 'ESCAPE CAPSUL',>e5
+       text 'Escape Capsul',>e5
 
 ********************************************************************************
 * The message "Energy Bomb"
 msg_energy_bomb_10e5:                                      ; >10e5
-       text 'ENERGY BOM',>e2
+       text 'Energy Bom',>e2
 
 ********************************************************************************
 * The message "Energy Unit"
 msg_energy_unit:                                           ; >10f0
-       text 'ENERGY UNI',>f4
+       text 'Energy Uni',>f4
 
 ********************************************************************************
 * The message "Docking Computer"
 msg_docking_computer_10fb:                                 ; >10fb
-       text 'DOCKING COMPUTE',>f2
+       text 'Docking Compute',>f2
 
 ********************************************************************************
 * The message "Gal. Hyperdrive"
 msg_gal_hyperdrive:                                        ; >110b
-       text 'GAL. HYPERDRIV',>e5
+       text 'Gal. Hyperdriv',>e5
 
 ********************************************************************************
 * The message "Mining "
 msg_mining:                                                ; >111a
-       text 'MINING',>a0
+       text 'Mining',>a0
 
 ********************************************************************************
 * The message "Military "
 msg_military:                                              ; >1121
-       text 'MILITARY',>a0
+       text 'Military',>a0
 
 ********************************************************************************
 * The message "ECM Jammer"
 msg_ecm_jammer:                                            ; >112a
-       text 'ECM JAMME',>f2
+       text 'ECM Jamme',>f2
 
 ********************************************************************************
 * The message "Cloaking Device"
 msg_cloaking_device:                                       ; >1134
-       text 'CLOAKING DEVIC',>e5
+       text 'Cloaking Devic',>e5
 
 ********************************************************************************
 * The message "Documents"
 msg_documents:                                             ; >1143
-       text 'DOCUMENT',>f3
+       text 'Document',>f3
 
 ********************************************************************************
 * The message "Naval Energy Unt"
 msg_naval_energy_unt:                                      ; >114c
-       text 'NAVAL ENERGY UN',>f4
+       text 'Naval Energy Un',>f4
 
 ********************************************************************************
 * Equipment minimum tech levels
@@ -2954,17 +2954,17 @@ key_handler_l:                                             ; >1b25
 ********************************************************************************
 * The message "Energy Low"
 msg_energy_low:                                            ; >1b37
-       text 'ENERGY LO',>f7
+       text 'Energy Lo',>f7
 
 ********************************************************************************
 * The message "Altitude Low"
 msg_altitude_low:                                          ; >1b41
-       text 'ALTITUDE LO',>f7
+       text 'Altitude Lo',>f7
 
 ********************************************************************************
 * The message "Countdown:"
 msg_countdown:                                             ; >1b4d
-       text 'COUNTDOWN:'
+       text 'Countdown:'
 
 ********************************************************************************
 * Countdown digit-format buffer
@@ -2978,27 +2978,27 @@ countdown_digit_buffer:                                    ; >1b57
 ********************************************************************************
 * The message "Fuel Scoop Activated"
 msg_fuel_scoop_activated:                                  ; >1b59
-       text 'FUEL SCOOP ACTIVATE',>e4
+       text 'Fuel Scoop Activate',>e4
 
 ********************************************************************************
 * The message "Capsule released"
 msg_capsule_released:                                      ; >1b6d
-       text 'CAPSULE RELEASE',>e4
+       text 'Capsule release',>e4
 
 ********************************************************************************
 * The message "Game Over"
 msg_game_over_1b7d:                                        ; >1b7d
-       text 'GAME OVE',>f2
+       text 'Game Ove',>f2
 
 ********************************************************************************
 * The message "Danger: Supernova!"
 msg_danger_supernova:                                      ; >1b86
-       text 'DANGER: SUPERNOVA',>a1
+       text 'Danger: Supernova',>a1
 
 ********************************************************************************
 * The message "Malfunction!!!"
 msg_malfunction:                                           ; >1b98
-       text 'MALFUNCTION!!',>a1
+       text 'Malfunction!!',>a1
 
 ********************************************************************************
 * The message "Game Time: dd:hh:mm"
@@ -3007,19 +3007,19 @@ msg_malfunction:                                           ; >1b98
 * game time (#R$F742) into the digits at $1BB1. The last digit ends the
 * message (#R$3675 sets its bit 7).
 msg_game_time:                                             ; >1ba6
-       text 'GAME TIME: '
+       text 'Game Time: '
 game_time_digits:                                          ; >1bb1
        text '00:00:00'                                               ; days, hours, minutes
 
 ********************************************************************************
 * The message "Cargo lost"
 msg_cargo_lost:                                            ; >1bb9
-       text 'CARGO LOS',>f4
+       text 'Cargo los',>f4
 
 ********************************************************************************
 * The message " lost"
 msg_lost:                                                  ; >1bc3
-       text ' LOS',>f4
+       text ' los',>f4
 
 ********************************************************************************
 * The message "Score: " and its digits
@@ -3027,44 +3027,44 @@ msg_lost:                                                  ; >1bc3
 * Shown by #R$1A8A, which first formats the score (#R$EB13) into the digits
 * at $1BCF. The last digit ends the message (#R$3675 sets its bit 7).
 msg_score:                                                 ; >1bc8
-       text 'SCORE: '
+       text 'Score: '
 score_digits:                                              ; >1bcf
        byte >00,>00,>00,>00,>00,>00,>00,>00,>00,>00                  ; the digits
 
 ********************************************************************************
 * The message "Drive repaired"
 msg_drive_repaired:                                        ; >1bd9
-       text 'DRIVE REPAIRE',>e4
+       text 'Drive repaire',>e4
 
 ********************************************************************************
 * The message "Cloaking active"
 msg_cloaking_active:                                       ; >1be7
-       text 'CLOAKING ACTIV',>e5
+       text 'Cloaking activ',>e5
 
 ********************************************************************************
 * The message "Jammer active"
 msg_jammer_active:                                         ; >1bf6
-       text 'JAMMER ACTIV',>e5
+       text 'Jammer activ',>e5
 
 ********************************************************************************
 * The message "Version 1.0 1987"
 msg_version_1_0_1987:                                      ; >1c03
-       text 'VERSION 1.0 198',>b7
+       text 'Version 1.0 198',>b7
 
 ********************************************************************************
 * The message "MSX Conversion by"
 msg_msx_conversion:                                        ; >1c13
-       text 'MSX CONVERSION B',>f9
+       text 'MSX Conversion b',>f9
 
 ********************************************************************************
 * The message "Rob Nicholson of"
 msg_rob_nicholson:                                         ; >1c24
-       text 'ROB NICHOLSON O',>e6
+       text 'Rob Nicholson o',>e6
 
 ********************************************************************************
 * The message "Mr. Micro Ltd."
 msg_mr_micro_ltd:                                          ; >1c34
-       text 'MR. MICRO LTD',>ae
+       text 'Mr. Micro Ltd',>ae
 
 ********************************************************************************
 * Credits-screen message pointers
@@ -3543,7 +3543,7 @@ title_screen_letter_next_frame:                            ; >1ed0
 ********************************************************************************
 * The message "Load New Commander ?"
 msg_load_new_commander:                                    ; >1ed7
-       text 'LOAD NEW COMMANDER ',>bf
+       text 'Load New Commander ',>bf
 
 ********************************************************************************
 * The message "(c)1987 Firebird"
@@ -3552,12 +3552,12 @@ msg_load_new_commander:                                    ; >1ed7
 * measures and prints it as one string (#R$39C8), up to the bit-7-set "d".
 * Character $60 is the copyright symbol in this game's font (#R$0A9F).
 msg_copyright_1987_firebird:                               ; >1eeb
-       text >60,'1987 FIREBIR',>e4
+       text >60,'1987 Firebir',>e4
 
 ********************************************************************************
 * The message "Hit key for mission"
 msg_hit_key_mission:                                       ; >1ef9
-       text 'HIT KEY FOR MISSIO',>ee
+       text 'Hit key for missio',>ee
 
 ********************************************************************************
 * Title screen "ELITE" letters
@@ -6920,16 +6920,16 @@ object_handler_table:                                      ; >288d
 * 7 of the last digit; #R$2556 clears it again so that the message runs
 * on into " credits").
 msg_bounty:                                                ; >28ad
-       text 'BOUNTY:'
+       text 'Bounty:'
 bounty_digit_buffer:                                       ; >28b4
        byte >00,>00,>00,>00,>00                                      ; the digits
 msg_credits:                                               ; >28b9
-       text ' CREDIT',>f3
+       text ' credit',>f3
 
 ********************************************************************************
 * The message "No bounty!"
 msg_no_bounty:                                             ; >28c1
-       text 'NO BOUNTY',>a1
+       text 'No bounty',>a1
 
 ********************************************************************************
 * Maximum laser damage by combat rank
@@ -9494,27 +9494,27 @@ combat_rank_thresholds:                                    ; >336d
 ********************************************************************************
 * The message "Target Lost"
 msg_target_lost:                                           ; >337d
-       text 'TARGET LOS',>f4
+       text 'Target Los',>f4
 
 ********************************************************************************
 * The message "Condition RED!"
 msg_condition_red:                                         ; >3388
-       text 'CONDITION RED',>a1
+       text 'Condition RED',>a1
 
 ********************************************************************************
 * The message "Right On Commander"
 msg_right_commander:                                       ; >3396
-       text 'RIGHT ON COMMANDE',>f2
+       text 'Right On Commande',>f2
 
 ********************************************************************************
 * The message "Missile jammed!"
 msg_missile_jammed:                                        ; >33a8
-       text 'MISSILE JAMMED',>a1
+       text 'Missile jammed',>a1
 
 ********************************************************************************
 * The message "Incoming missile"
 msg_incoming_missile:                                      ; >33b7
-       text 'INCOMING MISSIL',>e5
+       text 'Incoming missil',>e5
 
 ********************************************************************************
 * Steering tolerances
@@ -13602,12 +13602,12 @@ option_bits:                                               ; >4208
 ********************************************************************************
 * The message "     Game Frozen     "
 msg_game_frozen:                                           ; >420d
-       text '     GAME FROZEN     ',>a0
+       text '     Game Frozen     ',>a0
 
 ********************************************************************************
 * The message "Game Frozen"
 msg_game_frozen_4223:                                      ; >4223
-       text 'GAME FROZE',>ee
+       text 'Game Froze',>ee
 
 ********************************************************************************
 * Draw the object
@@ -16289,7 +16289,7 @@ lerp_add:                                                  ; >4b96
 ********************************************************************************
 * The message "Missile Locked"
 msg_missile_locked:                                        ; >4b9a
-       text 'MISSILE LOCKE',>e4
+       text 'Missile Locke',>e4
 
 ********************************************************************************
 * Arrive in a system: its data and market
@@ -18785,7 +18785,7 @@ fuel_range_sprite_attributes:                              ; >565c
 * Printed by #R$4D0B (RST $20), followed by the galaxy number. A list of
 * (column, row, string) records ending with $FF (see #R$3596).
 galactic_chart_title:                                      ; >566c
-       text >11,>16,'GALAXY #',>00
+       text >11,>16,'Galaxy #',>00
        byte >FF
 
 ********************************************************************************
@@ -18803,7 +18803,7 @@ msg_colon_separator:                                       ; >5678
 ********************************************************************************
 * The message " Light Years"
 msg_light_years:                                           ; >567b
-       text ' LIGHT YEARS',>00
+       text ' Light Years',>00
 
 ********************************************************************************
 * Local chart title
@@ -18811,7 +18811,7 @@ msg_light_years:                                           ; >567b
 * Printed by #R$4F64 (RST $20). A list of (column, row, string) records ending
 * with $FF (see #R$3596).
 local_chart_title:                                         ; >5688
-       text >0a,>16,'LOCAL NAGIVATION CHART',>00
+       text >0a,>16,'Local Nagivation Chart',>00
        byte >FF
 
 ********************************************************************************
@@ -18819,14 +18819,14 @@ local_chart_title:                                         ; >5688
 * 
 * Printed via RST $08 (#R$55A3, at $55B3).
 msg_planet_name:                                           ; >56a2
-       text 'PLANET NAME ? ',>00
+       text 'Planet name ? ',>00
 
 ********************************************************************************
 * The message " not found."
 * 
 * Printed via RST $08 (#R$55D2, at $55F0/$55F4).
 msg_not_found:                                             ; >56b1
-       text ' NOT FOUND.',>00
+       text ' not found.',>00
 
 ********************************************************************************
 * Local chart label offsets: cosines
@@ -18850,27 +18850,27 @@ label_offset_sines:                                        ; >56c6
 * 
 * Printed by #R$6066.
 msg_market_prices:                                         ; >56cf
-       text ' MARKET PRICE',>f3
+       text ' Market Price',>f3
 
 ********************************************************************************
 * The message "Quantity of "
 msg_quantity:                                              ; >56dd
-       text 'QUANTITY OF',>a0
+       text 'Quantity of',>a0
 
 ********************************************************************************
 * The message "Amount to sell"
 msg_amount_sell:                                           ; >56e9
-       text 'AMOUNT TO SEL',>ec
+       text 'Amount to sel',>ec
 
 ********************************************************************************
 * The message "Data On "
 msg_data:                                                  ; >56f7
-       text 'DATA ON',>a0
+       text 'Data On',>a0
 
 ********************************************************************************
 * The message " Billion"
 msg_billion:                                               ; >56ff
-       text ' BILLIO',>ee
+       text ' Billio',>ee
 
 ********************************************************************************
 * The message " M CR"
@@ -18884,12 +18884,12 @@ msg_m_cr:                                                  ; >5707
 * $08 right after formatting a per-item field from #R$F74E via RST
 * $18 - a units suffix for that value.
 msg_km:                                                    ; >570c
-       text ' K',>ed
+       text ' k',>ed
 
 ********************************************************************************
 * The message "* No Cargo To Sell *"
 msg_no_cargo_sell:                                         ; >570f
-       text '* NO CARGO TO SELL ',>aa
+       text '* No Cargo To Sell ',>aa
 
 ********************************************************************************
 * The message ". "
@@ -18902,22 +18902,22 @@ msg_decimal_point:                                         ; >5723
 ********************************************************************************
 * The message "Tank Already Full."
 msg_tank_already_full:                                     ; >5725
-       text 'TANK ALREADY FULL',>ae
+       text 'Tank Already Full',>ae
 
 ********************************************************************************
 * The message "Missile launcher full."
 msg_missile_launcher_full:                                 ; >5737
-       text 'MISSILE LAUNCHER FULL',>ae
+       text 'Missile launcher full',>ae
 
 ********************************************************************************
 * The message "Only 1 "
 msg_only_1:                                                ; >574d
-       text 'ONLY 1',>a0
+       text 'Only 1',>a0
 
 ********************************************************************************
 * The message " allowed"
 msg_allowed:                                               ; >5754
-       text ' ALLOWE',>e4
+       text ' allowe',>e4
 
 ********************************************************************************
 * Equip Ship screen: "Item to purchase"
@@ -18925,28 +18925,28 @@ msg_allowed:                                               ; >5754
 * Printed by #R$5DBB. A list of (column, row, string) records ending with $FF
 * (see #R$3596).
 msg_item_to_purchase:                                      ; >575c
-       text >05,>16,'ITEM TO PURCHAS',>e5
+       text >05,>16,'Item to purchas',>e5
        byte >FF
 
 ********************************************************************************
 * The message "All lasers mounted."
 msg_all_lasers_mounted:                                    ; >576f
-       text 'ALL LASERS MOUNTED',>ae
+       text 'All lasers mounted',>ae
 
 ********************************************************************************
 * The message "Position ("
 msg_position:                                              ; >5782
-       text 'POSITION ',>a8
+       text 'Position ',>a8
 
 ********************************************************************************
 * The message "Invalid position."
 msg_invalid_position:                                      ; >578c
-       text 'INVALID POSITION',>ae
+       text 'Invalid position',>ae
 
 ********************************************************************************
 * The message "Invalid item."
 msg_invalid_item:                                          ; >579d
-       text 'INVALID ITEM',>ae
+       text 'Invalid item',>ae
 
 ********************************************************************************
 * Equip Ship screen title
@@ -18954,23 +18954,23 @@ msg_invalid_item:                                          ; >579d
 * Printed by #R$5DBB. A list of (column, row, string) records ending with $FF
 * (see #R$3596).
 equip_ship_title:                                          ; >57aa
-       text >10,>01,'EQUIP SHI',>f0
+       text >10,>01,'Equip Shi',>f0
        byte >FF
 
 ********************************************************************************
 * The message "No fuel available!"
 msg_no_fuel_available:                                     ; >57b7
-       text 'NO FUEL AVAILABLE',>a1
+       text 'No fuel available',>a1
 
 ********************************************************************************
 * The message "Witchspace"
 msg_witchspace:                                            ; >57c9
-       text 'WITCHSPAC',>e5
+       text 'Witchspac',>e5
 
 ********************************************************************************
 * The message "Commander "
 msg_commander:                                             ; >57d3
-       text 'COMMANDER',>a0
+       text 'Commander',>a0
 
 ********************************************************************************
 * The message "FBLR ? "
@@ -18982,47 +18982,47 @@ msg_query:                                                 ; >57e1
 ********************************************************************************
 * The message "Insufficient credits!"
 msg_insufficient_credits:                                  ; >57e4
-       text 'INSUFFICIENT CREDITS',>a1
+       text 'Insufficient credits',>a1
 
 ********************************************************************************
 * The message " credits, "
 msg_credits_57f9:                                          ; >57f9
-       text ' CREDITS,',>a0
+       text ' credits,',>a0
 
 ********************************************************************************
 * The message " credits left."
 msg_credits_left:                                          ; >5803
-       text ' CREDITS LEFT',>ae
+       text ' credits left',>ae
 
 ********************************************************************************
 * The message "Insufficient cargo space!"
 msg_insufficient_cargo_space:                              ; >5811
-       text 'INSUFFICIENT CARGO SPACE',>a1
+       text 'Insufficient cargo space',>a1
 
 ********************************************************************************
 * The message "Insufficient stock!"
 msg_insufficient_stock:                                    ; >582a
-       text 'INSUFFICIENT STOCK',>a1
+       text 'Insufficient stock',>a1
 
 ********************************************************************************
 * The message " tonnes."
 msg_tonnes:                                                ; >583d
-       text ' TONNES',>ae
+       text ' tonnes',>ae
 
 ********************************************************************************
 * The message " Light Years"
 msg_light_years_5845:                                      ; >5845
-       text ' LIGHT YEAR',>f3
+       text ' Light Year',>f3
 
 ********************************************************************************
 * The message " Credits"
 msg_credits_5851:                                          ; >5851
-       text ' CREDIT',>f3
+       text ' Credit',>f3
 
 ********************************************************************************
 * The message "Sell"
 msg_sell:                                                  ; >5859
-       text 'SEL',>ec
+       text 'Sel',>ec
 
 ********************************************************************************
 * Data on System: "There's a mean, nasty, vicious ship out there!"
@@ -19031,8 +19031,8 @@ msg_sell:                                                  ; >5859
 * is in the system (mission state $16, #R$E93D). A list of (column, row,
 * string) records ending with $FF (see #R$3596).
 msg_mean_nasty_vicious_ship:                               ; >585d
-       text >05,>0f,'THERE''S A MEAN, NASTY, VICIOU',>f3
-       text >05,>10,'SHIP OUT THERE',>a1
+       text >05,>0f,'There''s a mean, nasty, viciou',>f3
+       text >05,>10,'ship out there',>a1
        byte >FF
 
 ********************************************************************************
@@ -19041,9 +19041,9 @@ msg_mean_nasty_vicious_ship:                               ; >585d
 * Printed by #R$6066. A list of (column, row, string) records ending with $FF
 * (see #R$3596).
 market_screen_headings:                                    ; >588f
-       text >05,>02,'PRODUC',>f4
-       text >15,>02,'UNIT    QUANTIT',>f9
-       text >15,>03,'PRICE   FOR SAL',>e5
+       text >05,>02,'Produc',>f4
+       text >15,>02,'Unit    Quantit',>f9
+       text >15,>03,'Price   For Sal',>e5
        byte >FF
 
 ********************************************************************************
@@ -19065,10 +19065,10 @@ market_screen_frame:                                       ; >58bd
 * Printed by #R$5C8E. A list of (column, row, string) records ending with $FF
 * (see #R$3596).
 inventory_screen_headings:                                 ; >58d7
-       text >10,>01,'INVENTOR',>f9
-       text >05,>03,'FUEL',>ba
-       text >05,>04,'CASH',>ba
-       text >05,>05,'HOLD',>ba
+       text >10,>01,'Inventor',>f9
+       text >05,>03,'Fuel',>ba
+       text >05,>04,'Cash',>ba
+       text >05,>05,'Hold',>ba
        byte >FF
 
 ********************************************************************************
@@ -19090,8 +19090,8 @@ inventory_screen_frame:                                    ; >58f8
 * Printed by #R$5CEE. A list of (column, row, string) records ending with $FF
 * (see #R$3596).
 sell_cargo_screen_headings:                                ; >5912
-       text >10,>01,'SELL CARG',>ef
-       text >05,>03,'PRODUCT      CARGO PRIC',>e5
+       text >10,>01,'Sell Carg',>ef
+       text >05,>03,'Product      Cargo Pric',>e5
        byte >FF
 
 ********************************************************************************
@@ -19113,13 +19113,13 @@ sell_cargo_screen_frame:                                   ; >5939
 * Printed by #R$6164. A list of (column, row, string) records ending with $FF
 * (see #R$3596).
 data_on_system_headings:                                   ; >5953
-       text >05,>03,'DISTANCE',>ba
-       text >05,>05,'ECONOMY',>ba
-       text >05,>06,'GOVERNMENT',>ba
-       text >05,>07,'TECH. LEVEL',>ba
-       text >05,>09,'POPULATION',>ba
-       text >05,>0c,'GROSS PRODUCTIVITY',>ba
-       text >05,>0d,'AVERAGE RADIUS',>ba
+       text >05,>03,'Distance',>ba
+       text >05,>05,'Economy',>ba
+       text >05,>06,'Government',>ba
+       text >05,>07,'Tech. Level',>ba
+       text >05,>09,'Population',>ba
+       text >05,>0c,'Gross Productivity',>ba
+       text >05,>0d,'Average Radius',>ba
        byte >FF
 
 ********************************************************************************
@@ -19144,14 +19144,14 @@ data_on_system_frame:                                      ; >59b7
 * Printed by #R$6276. A list of (column, row, string) records ending with $FF
 * (see #R$3596).
 status_page_headings:                                      ; >59e0
-       text >05,>03,'PRESENT SYSTEM    ',>ba
-       text >05,>04,'HYPERSPACE SYSTEM ',>ba
-       text >05,>05,'CONDITION         ',>ba
-       text >05,>06,'FUEL',>ba
-       text >05,>07,'CASH',>ba
-       text >05,>08,'LEGAL STATUS',>ba
-       text >05,>09,'RATING',>ba
-       text >05,>0b,'EQUIPMENT',>ba
+       text >05,>03,'Present System    ',>ba
+       text >05,>04,'Hyperspace System ',>ba
+       text >05,>05,'Condition         ',>ba
+       text >05,>06,'Fuel',>ba
+       text >05,>07,'Cash',>ba
+       text >05,>08,'Legal Status',>ba
+       text >05,>09,'Rating',>ba
+       text >05,>0b,'Equipment',>ba
        byte >FF
 
 ********************************************************************************
@@ -19204,48 +19204,48 @@ hold_capacity_large:                                       ; >5a9b
 ********************************************************************************
 * The message "Green"
 msg_green_5a9f:                                            ; >5a9f
-       text 'GREE',>ee
+       text 'Gree',>ee
 
 ********************************************************************************
 * The message "Red"
 msg_red_5aa4:                                              ; >5aa4
-       text 'RE',>e4
+       text 'Re',>e4
 
 ********************************************************************************
 * The message "Red"
 msg_red_5aa7:                                              ; >5aa7
-       text 'RE',>e4
+       text 'Re',>e4
 
 ********************************************************************************
 * The message "Clean"
 msg_clean:                                                 ; >5aaa
-       text 'CLEA',>ee
+       text 'Clea',>ee
 
 ********************************************************************************
 * The message "Offender"
 msg_offender:                                              ; >5aaf
-       text 'OFFENDE',>f2
+       text 'Offende',>f2
 
 ********************************************************************************
 * The message "Fugitive"
 msg_fugitive:                                              ; >5ab7
-       text 'FUGITIV',>e5
+       text 'Fugitiv',>e5
 
 ********************************************************************************
 * Mass-unit suffix "t" (tonnes) - pointed to directly by `LD HL,$5ABF`
 * at $5B40/$5B91
 mass_unit_suffix_t:                                        ; >5abf
-       text 'T+>8'
+       text 't+>8'
 
 ********************************************************************************
 * The message "kg"
 msg_kg:                                                    ; >5ac0
-       text 'K',>e7
+       text 'k',>e7
 
 ********************************************************************************
 * Mass-unit suffix "g" (grams)
 mass_unit_suffix_g:                                        ; >5ac2
-       text 'G+>8'
+       text 'g+>8'
 
 ********************************************************************************
 * Equipment item numbers of the four lasers
@@ -23930,7 +23930,7 @@ ecm_indicator_glyph:                                       ; >6f0b
 ********************************************************************************
 * The message "Docked!"
 msg_docked:                                                ; >6f17
-       text 'DOCKED!',>00
+       text 'Docked!',>00
 
 ********************************************************************************
 * Stardust direction vectors
@@ -29377,32 +29377,32 @@ scoop_announce:                                            ; >8c2f
 ********************************************************************************
 * The message "Select System!"
 msg_select_system:                                         ; >8c3c
-       text 'SELECT SYSTEM',>a1
+       text 'Select System',>a1
 
 ********************************************************************************
 * The message "Beyond Range!"
 msg_beyond_range:                                          ; >8c4a
-       text 'BEYOND RANGE',>a1
+       text 'Beyond Range',>a1
 
 ********************************************************************************
 * The message "Hyperdrive Engaged"
 msg_hyperdrive_engaged:                                    ; >8c57
-       text 'HYPERDRIVE ENGAGE',>e4
+       text 'Hyperdrive Engage',>e4
 
 ********************************************************************************
 * The message "Fuel Leak!"
 msg_fuel_leak:                                             ; >8c69
-       text 'FUEL LEAK',>a1
+       text 'Fuel Leak',>a1
 
 ********************************************************************************
 * The message "Drive malfunction!"
 msg_drive_malfunction:                                     ; >8c73
-       text 'DRIVE MALFUNCTION',>a1
+       text 'Drive malfunction',>a1
 
 ********************************************************************************
 * The message "Cloaking device"
 msg_cloaking_device_8c85:                                  ; >8c85
-       text 'CLOAKING DEVIC',>e5
+       text 'Cloaking devic',>e5
 
 ********************************************************************************
 * Place the planet, the space station and the sun
@@ -30730,7 +30730,7 @@ clear_cargo_hold:                                          ; >9237
 * followed by the mission number. Like all the mission messages, it is a list
 * of (column, row, string) records ending with $FF (see #R$3596).
 mission_no_text:                                           ; >9245
-       text >0e,>01,'MISSION NO.',>a0
+       text >0e,>01,'Mission No.',>a0
        byte >FF
 
 ********************************************************************************
@@ -30738,7 +30738,7 @@ mission_no_text:                                           ; >9245
 * 
 * Printed by #R$90D3 (RST $20) and followed by the commander's name.
 attn_commander_text:                                       ; >9254
-       text >05,>04,'ATTN: COMMANDER',>a0
+       text >05,>04,'Attn: Commander',>a0
        byte >FF
 
 ********************************************************************************
@@ -30756,10 +30756,10 @@ mission_screen_frame:                                      ; >9267
 * 
 * Shown by #R$909F.
 msg_supernova_briefing:                                    ; >9272
-       text >05,>08,'OUR SUN IS GOING SUPERNOVA',>a1
-       text >05,>0a,'YOU ARE ADVISED TO HYPER-SPAC',>e5
-       text >05,>0b,'OUT OF THIS SYSTEM IMMEDIATELY',>a1
-       text >05,>16,'WILL YOU HELP U',>f3
+       text >05,>08,'Our sun is going supernova',>a1
+       text >05,>0a,'You are advised to hyper-spac',>e5
+       text >05,>0b,'out of this system immediately',>a1
+       text >05,>16,'Will you help u',>f3
        byte >FF
 
 ********************************************************************************
@@ -30769,10 +30769,10 @@ msg_supernova_briefing:                                    ; >9272
 * #R$922D.
 msg_supernova_complete:                                    ; >92e3
        text >05,>08,'TASK COMPLETE - CONGRATULATION',>d3
-       text >05,>0a,'THANKS FOR SAVING US. PLEAS',>e5
-       text >05,>0b,'ACCEPT SOME PRECIOUS GEM',>f3
+       text >05,>0a,'Thanks for saving us. Pleas',>e5
+       text >05,>0b,'accept some precious gem',>f3
 msg_press_any_key:                                         ; >933d
-       text >05,>16,'PRESS ANY KEY TO CONTINUE',>ae
+       text >05,>16,'Press any key to continue',>ae
        byte >FF
 
 ********************************************************************************
@@ -30780,12 +30780,12 @@ msg_press_any_key:                                         ; >933d
 * 
 * Shown by #R$909F when the player agrees to help.
 msg_supernova_accepted:                                    ; >935a
-       text >05,>06,'THANK YOU',>a1
-       text >05,>08,'I''M AFRAID THAT WE''VE HAD T',>ef
-       text >05,>09,'DUMP ANY CARGO YOU HAD TO GE',>f4
-       text >05,>0a,'ALL OF US REFUGEES IN. IF YO',>f5
-       text >05,>0b,'JUST DROP US OFF AT THE NEARES',>f4
-       text >05,>0c,'SYSTEM, THAT''LL BE FIN',>e5
+       text >05,>06,'Thank you',>a1
+       text >05,>08,'I''m afraid that we''ve had t',>ef
+       text >05,>09,'dump any cargo you had to ge',>f4
+       text >05,>0a,'all of us refugees in. If yo',>f5
+       text >05,>0b,'just drop us off at the neares',>f4
+       text >05,>0c,'system, that''ll be fin',>e5
        byte >FF
 
 ********************************************************************************
@@ -30793,11 +30793,11 @@ msg_supernova_accepted:                                    ; >935a
 * 
 * Shown by #R$909F when the player refuses.
 msg_supernova_declined:                                    ; >93fd
-       text >05,>09,'WE HOPE YOU DIE A HORRIBLY LON',>e7
-       text >05,>0a,'LINGERING DEATH AT THE HANDS O',>e6
-       text >05,>0b,'A SLIMEY GREEN LOBSTOID I',>e6
-       text >05,>0c,'YOU''RE NOT BLOWN TO BITS BY OU',>f2
-       text >05,>0d,'SUN',>a1
+       text >05,>09,'We hope you die a horribly lon',>e7
+       text >05,>0a,'lingering death at the hands o',>e6
+       text >05,>0b,'a slimey green lobstoid i',>e6
+       text >05,>0c,'you''re not blown to bits by ou',>f2
+       text >05,>0d,'sun',>a1
        byte >FF
 
 ********************************************************************************
@@ -30806,14 +30806,14 @@ msg_supernova_declined:                                    ; >93fd
 * Shown by #R$9120, which prints the name of the system with the research
 * centre after "centre at", at column 15, row 11.
 msg_constrictor_briefing:                                  ; >9483
-       text >05,>08,'A PROTOTYPE OF THE NEW MILITAR',>f9
-       text >05,>09,'SHIP, THE CONSTRICTOR, HAS BEE',>ee
-       text >05,>0a,'STOLEN FROM THE NAVY RESEARC',>e8
-       text >05,>0b,'CENTRE A',>f4
-       text >05,>0d,'DUE TO THE CAPABILITIES OF THI',>f3
-       text >05,>0e,'SHIP, IT MUST BE DESTROYE',>e4
-       text >05,>0f,'BEFORE FALLING INTO ENEMY HANDS',>ae
-       text >05,>16,'ACCEPT MISSIO',>ee
+       text >05,>08,'A prototype of the new militar',>f9
+       text >05,>09,'ship, the CONSTRICTOR, has bee',>ee
+       text >05,>0a,'stolen from the navy researc',>e8
+       text >05,>0b,'centre a',>f4
+       text >05,>0d,'Due to the capabilities of thi',>f3
+       text >05,>0e,'ship, it must be destroye',>e4
+       text >05,>0f,'before falling into enemy hands',>ae
+       text >05,>16,'Accept missio',>ee
        byte >FF
 
 ********************************************************************************
@@ -30822,8 +30822,8 @@ msg_constrictor_briefing:                                  ; >9483
 * Shown by #R$9120 once a mission is accepted, followed by the name of the
 * system (#R$EFA2) - which is why the second line is printed last.
 msg_report_to_station:                                     ; >955f
-       text >05,>0b,'FOR MISSION BRIEFING.',>ae
-       text >05,>0a,'REPORT TO THE STATION AT',>a0
+       text >05,>0b,'for mission briefing.',>ae
+       text >05,>0a,'Report to the station at',>a0
        byte >FF
 
 ********************************************************************************
@@ -30831,9 +30831,9 @@ msg_report_to_station:                                     ; >955f
 * 
 * Shown by #R$9190.
 msg_constrictor_jumped:                                    ; >9593
-       text >05,>0a,'INTELLIGENCE REPORTS THAT TH',>e5
-       text >05,>0b,'CONSTRICTOR MADE A GALACTIC JUM',>f0
-       text >05,>0c,'OUT OF THIS SYSTEM A WHILE AGO',>ae
+       text >05,>0a,'Intelligence reports that th',>e5
+       text >05,>0b,'Constrictor made a galactic jum',>f0
+       text >05,>0c,'out of this system a while ago',>ae
        byte >FF
 
 ********************************************************************************
@@ -30841,10 +30841,10 @@ msg_constrictor_jumped:                                    ; >9593
 * 
 * Shown by #R$91AA, followed by the name of the next system on the trail.
 msg_constrictor_trail:                                     ; >95f6
-       text >05,>0a,'INTELLIGENCE REPORTS THAT AFTE',>f2
-       text >05,>0b,'CAUSING HAVOC, THE CONSTRICTO',>f2
-       text >05,>0c,'LEFT THIS SYSTEM, DESTINATION I',>f3
-       text >05,>0d,'SYSTEM OF',>a0
+       text >05,>0a,'Intelligence reports that afte',>f2
+       text >05,>0b,'causing havoc, the Constricto',>f2
+       text >05,>0c,'left this system, destination i',>f3
+       text >05,>0d,'system of',>a0
        byte >FF
 
 ********************************************************************************
@@ -30852,10 +30852,10 @@ msg_constrictor_trail:                                     ; >95f6
 * 
 * Shown by #R$91F0.
 msg_constrictor_reward:                                    ; >9666
-       text >05,>09,'THE NAVY ARE FOREVER IN YOU',>f2
-       text >05,>0a,'DEBT, OH MIGHTY TRADE',>f2
-       text >05,>0c,'PLEASE ACCEPT A REWARD FOR YOU',>f2
-       text >05,>0d,'TROUBLE OF 10,000 CREDITS',>ae
+       text >05,>09,'The Navy are forever in you',>f2
+       text >05,>0a,'debt, oh mighty trade',>f2
+       text >05,>0c,'Please accept a reward for you',>f2
+       text >05,>0d,'trouble of 10,000 credits',>ae
        byte >FF
 
 ********************************************************************************
@@ -30864,15 +30864,15 @@ msg_constrictor_reward:                                    ; >9666
 * Shown by #R$9120, which prints the name of the system with the naval base at
 * column 5, row 11.
 msg_documents_briefing:                                    ; >96da
-       text >05,>07,'THE NAVY HAS MANAGED TO OBTAI',>ee
-       text >05,>08,'BLUEPRINTS OF A THARGOID BATTL',>e5
-       text >05,>09,'SHIP. THESE DOCUMENTS NEED TO B',>e5
-       text >05,>0a,'TAKEN TO THE MAIN NAVAL BASE A',>f4
-       text >05,>0d,'THE ENEMY IS UNAWARE THAT W',>e5
-       text >05,>0e,'HAVE THESE DOCUMENTS, SO TH',>e5
-       text >05,>0f,'JOURNEY SHOULD BE WITHOUT AN',>f9
-       text >05,>10,'UNFRIENDLY ENCOUNTERS',>ae
-       text >05,>16,'ACCEPT MISSIO',>ee
+       text >05,>07,'The navy has managed to obtai',>ee
+       text >05,>08,'blueprints of a Thargoid battl',>e5
+       text >05,>09,'ship. These documents need to b',>e5
+       text >05,>0a,'taken to the main naval base a',>f4
+       text >05,>0d,'The enemy is unaware that w',>e5
+       text >05,>0e,'have these documents, so th',>e5
+       text >05,>0f,'journey should be without an',>f9
+       text >05,>10,'unfriendly encounters',>ae
+       text >05,>16,'Accept missio',>ee
        byte >FF
 
 ********************************************************************************
@@ -30880,13 +30880,13 @@ msg_documents_briefing:                                    ; >96da
 * 
 * Shown by #R$91DB.
 msg_documents_reward:                                      ; >97e2
-       text >05,>08,'WE ARE (AGAIN) FOREVER IN YOU',>f2
-       text >05,>09,'DEBT FOR BRINGING THESE VER',>f9
-       text >05,>0a,'IMPORTANT DOCUMENTS TO US. A',>f3
-       text >05,>0b,'A REWARD, WE HAVE FITTED YOU',>f2
-       text >05,>0c,'SHIP WITH NAVAL ENERGY UNIT',>ae
-       text >05,>0e,'P.S. SORRY ABOUT THE SECURIT',>f9
-       text >05,>0f,'LEAK TO THE THARGOIDS',>a1
+       text >05,>08,'We are (again) forever in you',>f2
+       text >05,>09,'debt for bringing these ver',>f9
+       text >05,>0a,'important documents to us. A',>f3
+       text >05,>0b,'a reward, we have fitted you',>f2
+       text >05,>0c,'ship with naval energy unit',>ae
+       text >05,>0e,'P.S. sorry about the securit',>f9
+       text >05,>0f,'leak to the Thargoids',>a1
        byte >FF
 
 ********************************************************************************
@@ -30894,13 +30894,13 @@ msg_documents_reward:                                      ; >97e2
 * 
 * Shown by #R$9220.
 msg_thargoid_base_briefing:                                ; >98b4
-       text >05,>08,'INTELLEGENCE REPORTS THAT ',>e1
-       text >05,>09,'NEARBY SYSTEM HAS BEEN INVADE',>e4
-       text >05,>0a,'BY THARGOID SHIPS AND THAT TH',>e5
-       text >05,>0b,'SPACE STATION IS UNDER ATTACK. W',>e5
-       text >05,>0c,'SUGGEST THAT YOU DESTROY TH',>e5
-       text >05,>0d,'SPACE STATION AND DON''T TRY T',>ef
-       text >05,>0e,'DOCK',>ae
+       text >05,>08,'Intellegence reports that ',>e1
+       text >05,>09,'nearby system has been invade',>e4
+       text >05,>0a,'by Thargoid ships and that th',>e5
+       text >05,>0b,'space station is under attack. W',>e5
+       text >05,>0c,'suggest that you destroy th',>e5
+       text >05,>0d,'space station and don''t try t',>ef
+       text >05,>0e,'dock',>ae
        byte >FF
 
 ********************************************************************************
@@ -30908,13 +30908,13 @@ msg_thargoid_base_briefing:                                ; >98b4
 * 
 * Shown by #R$920F.
 msg_thargoid_base_reward:                                  ; >997a
-       text >05,>08,'THANKS FOR DESTROYING TH',>e5
-       text >05,>09,'THARGOID BASE. A NEW DEVICE WA',>f3
-       text >05,>0a,'SALVAGED FROM A THARGOID SHI',>f0
-       text >05,>0b,'WHICH WE HAVE FITTED TO YOU',>f2
-       text >05,>0c,'COBRA. THE DEVICE APPEARS TO JA',>ed
-       text >05,>0d,'ECM BROADCASTS AND IS ACTIVATE',>e4
-       text >05,>0e,'BY THE L KEY',>ae
+       text >05,>08,'Thanks for destroying th',>e5
+       text >05,>09,'Thargoid base. A new device wa',>f3
+       text >05,>0a,'salvaged from a Thargoid shi',>f0
+       text >05,>0b,'which we have fitted to you',>f2
+       text >05,>0c,'Cobra. The device appears to ja',>ed
+       text >05,>0d,'ECM broadcasts and is activate',>e4
+       text >05,>0e,'by the L key',>ae
        byte >FF
 
 ********************************************************************************
@@ -31284,83 +31284,83 @@ goatsoup_advance_seed_roll_0_51:                           ; >9bb2
 ********************************************************************************
 * Goatsoup: system-description word lists
 goatsoup_symbol_00:                                        ; >9bcb
-       text 'FABLED ',>00,'NOTABLE ',>00,'WELL KNOWN ',>00,'FAMOUS ',>00,'NOTED ',>00 ; symbol $80
+       text 'fabled ',>00,'notable ',>00,'well known ',>00,'famous ',>00,'noted ',>00 ; symbol $80
 goatsoup_symbol_01:                                        ; >9bf7
-       text 'VERY ',>00,'MILDLY ',>00,'MOST ',>00,'REASONABLY ',>00,>00 ; symbol $81
+       text 'very ',>00,'mildly ',>00,'most ',>00,'reasonably ',>00,>00 ; symbol $81
 goatsoup_symbol_02:                                        ; >9c18
-       text 'ANCIENT ',>00,>97,>00,'GREAT ',>00,'VAST ',>00,'PINK ',>00 ; symbol $82
+       text 'ancient ',>00,>97,>00,'great ',>00,'vast ',>00,'pink ',>00 ; symbol $82
 goatsoup_symbol_03:                                        ; >9c36
-       text >05,>9c,' ',>9b,>06,'PLANTATIONS ',>00,'MOUNTAINS ',>00,>9a,>00,>a5,'FORESTS ',>00,'OCEANS ',>00 ; symbol $83
+       text >05,>9c,' ',>9b,>06,'plantations ',>00,'mountains ',>00,>9a,>00,>a5,'forests ',>00,'oceans ',>00 ; symbol $83
 goatsoup_symbol_04:                                        ; >9c67
-       text >a6,>00,'MOUNTAIN ',>00,'EDIBLE ',>00,'TREE ',>00,'SPOTTED ',>00 ; symbol $84
+       text >a6,>00,'mountain ',>00,'edible ',>00,'tree ',>00,'spotted ',>00 ; symbol $84
 goatsoup_symbol_05:                                        ; >9c8a
-       text >9d,>00,>9e,>00,>86,>04,'OID ',>00,>a4,>00,>a3,>00       ; symbol $85
+       text >9d,>00,>9e,>00,>86,>04,'oid ',>00,>a4,>00,>a3,>00       ; symbol $85
 goatsoup_symbol_06:                                        ; >9c99
-       text 'WALKING ',>8d,>00,'CRAB ',>00,'BAT ',>00,'LOBST ',>00,>03,>00 ; symbol $86
+       text 'walking ',>8d,>00,'crab ',>00,'bat ',>00,'lobst ',>00,>03,>00 ; symbol $86
 goatsoup_symbol_07:                                        ; >9cb7
-       text 'ANCIENT ',>00,'EXCEPTIONAL ',>00,'ECCENTRIC ',>00,'INGRAINED ',>00,>97,>00 ; symbol $87
+       text 'ancient ',>00,'exceptional ',>00,'eccentric ',>00,'ingrained ',>00,>97,>00 ; symbol $87
 goatsoup_symbol_08:                                        ; >9ce5
-       text 'SHYNESS ',>00,'SILLINESS ',>00,'MATING TRADITIONS ',>00,'LOATHING OF ',>89,>00,'LOVE FOR ',>89,>00 ; symbol $88
+       text 'shyness ',>00,'silliness ',>00,'mating traditions ',>00,'loathing of ',>89,>00,'love for ',>89,>00 ; symbol $88
 goatsoup_symbol_09:                                        ; >9d25
-       text 'FOOD BLENDERS ',>00,'TOURISTS ',>00,'POETRY ',>00,'DISCOS ',>00,>91,>00 ; symbol $89
+       text 'food blenders ',>00,'tourists ',>00,'poetry ',>00,'discos ',>00,>91,>00 ; symbol $89
 goatsoup_symbol_10:                                        ; >9d50
-       text 'ITS ',>82,>83,>00,'THE ',>02,>84,>85,>00,'ITS INHABITANT''S ',>87,>88,>00,>9f,>06,>00,'ITS ',>90,>91,>00 ; symbol $8A
+       text 'its ',>82,>83,>00,'the ',>02,>84,>85,>00,'its inhabitant''s ',>87,>88,>00,>9f,>06,>00,'its ',>90,>91,>00 ; symbol $8A
 goatsoup_symbol_11:                                        ; >9d7d
-       text 'BESET ',>00,'PLAGUED ',>00,'RAVAGED ',>00,'CURSED ',>00,'SCOURGED ',>00 ; symbol $8B
+       text 'beset ',>00,'plagued ',>00,'ravaged ',>00,'cursed ',>00,'scourged ',>00 ; symbol $8B
 goatsoup_symbol_12:                                        ; >9da8
-       text >96,'CIVIL WAR ',>00,>8d,>84,>85,>04,'S ',>00,'A ',>8d,'DISEASE ',>00,>96,'EARTH QUAKES ',>00,>96,'SOLAR ACTIVITY ',>00 ; symbol $8C
+       text >96,'civil war ',>00,>8d,>84,>85,>04,'s ',>00,'a ',>8d,'disease ',>00,>96,'earth quakes ',>00,>96,'solar activity ',>00 ; symbol $8C
 goatsoup_symbol_13:                                        ; >9de7
-       text 'KILLER ',>00,'DEADLY ',>00,'EVIL ',>00,'LETHAL ',>00,'VICIOUS ',>00 ; symbol $8D
+       text 'killer ',>00,'deadly ',>00,'evil ',>00,'lethal ',>00,'vicious ',>00 ; symbol $8D
 goatsoup_symbol_14:                                        ; >9e0e
-       text 'JUICE ',>00,'BRANDY ',>00,'WATER ',>00,'BREW ',>00,'GARGLE BLASTERS ',>00 ; symbol $8E
+       text 'juice ',>00,'brandy ',>00,'water ',>00,'brew ',>00,'gargle blasters ',>00 ; symbol $8E
 goatsoup_symbol_15:                                        ; >9e3b
        text >03,>00,>02,>85,>00,>02,>03,>00,>02,>8d,>00,>8d,>03,>00  ; symbol $8F
 goatsoup_symbol_16:                                        ; >9e49
-       text 'FABULOUS ',>00,'EXOTIC ',>00,'HOOPY ',>00,'UNUSUAL ',>00,'EXCITING ',>00 ; symbol $90
+       text 'fabulous ',>00,'exotic ',>00,'hoopy ',>00,'unusual ',>00,'exciting ',>00 ; symbol $90
 goatsoup_symbol_17:                                        ; >9e75
-       text 'CUISINE ',>00,'NIGHT LIFE ',>00,'CASINOS ',>00,'SIT COMMS ',>00,>9f,>06,>00 ; symbol $91
+       text 'cuisine ',>00,'night life ',>00,'casinos ',>00,'sit comms ',>00,>9f,>06,>00 ; symbol $91
 goatsoup_symbol_18:                                        ; >9ea1
-       text >01,>00,'THE PLANET ',>01,>00,'THE WORLD ',>01,>00,'THIS PLANET ',>00,'THIS WORLD ',>00 ; symbol $92
+       text >01,>00,'The planet ',>01,>00,'The world ',>01,>00,'This planet ',>00,'This world ',>00 ; symbol $92
 goatsoup_symbol_19:                                        ; >9ed5
-       text >81,>80,'FOR ',>8a,>00,>81,>80,'FOR ',>8a,'AND ',>8a,>00,>8b,'BY ',>8c,>00,>81,>80,'FOR ',>8a,'BUT IS ',>8b,'BY ',>8c,>00,'A ',>94,>95,>00 ; symbol $93
+       text >81,>80,'for ',>8a,>00,>81,>80,'for ',>8a,'and ',>8a,>00,>8b,'by ',>8c,>00,>81,>80,'for ',>8a,'but is ',>8b,'by ',>8c,>00,'a ',>94,>95,>00 ; symbol $93
 goatsoup_symbol_20:                                        ; >9f09
-       text >04,'N UNREMARKABLE ',>00,'BORING ',>00,'DULL ',>00,'TEDIOUS ',>00,'REVOLTING ',>00 ; symbol $94
+       text >04,'n unremarkable ',>00,'boring ',>00,'dull ',>00,'tedious ',>00,'revolting ',>00 ; symbol $94
 goatsoup_symbol_21:                                        ; >9f3c
-       text 'PLANET ',>00,'WORLD ',>00,'PLACE ',>00,'LITTLE PLANET ',>00,'DUMP ',>00 ; symbol $95
+       text 'planet ',>00,'world ',>00,'place ',>00,'little planet ',>00,'dump ',>00 ; symbol $95
 goatsoup_symbol_22:                                        ; >9f67
-       text 'FREQUENT ',>00,'OCCASIONAL ',>00,'UNPREDICTABLE ',>00,'DREADFUL ',>00,'DEADLY ',>00 ; symbol $96
+       text 'frequent ',>00,'occasional ',>00,'unpredictable ',>00,'dreadful ',>00,'deadly ',>00 ; symbol $96
 goatsoup_symbol_23:                                        ; >9f9e
-       text 'FUNNY ',>00,'WIERD ',>00,'UNUSUAL ',>00,'STRANGE ',>00,'PECULIAR ',>00 ; symbol $97
+       text 'funny ',>00,'wierd ',>00,'unusual ',>00,'strange ',>00,'peculiar ',>00 ; symbol $97
 goatsoup_symbol_24:                                        ; >9fc8
-       text 'SON OF A BITCH ',>00,'SCOUNDREL ',>00,'BLACKGUARD ',>00,'ROUGUE ',>00,'WHORESON BEETLE HEADED FLAP EAR''D KNAVE',>00 ; symbol $98
+       text 'son of a bitch ',>00,'scoundrel ',>00,'blackguard ',>00,'rougue ',>00,'whoreson beetle headed flap ear''d knave',>00 ; symbol $98
 goatsoup_symbol_25:                                        ; >a01f
        text >00,>00,>00,>00,>00                                      ; symbol $99
 goatsoup_symbol_26:                                        ; >a024
-       text 'PARKING METERS ',>00,'DUST CLOUDS ',>00,'ICE BERGS ',>00,'ROCK FORMATIONS',>00,'VOLCANOES ',>00 ; symbol $9A
+       text 'parking meters ',>00,'dust clouds ',>00,'ice bergs ',>00,'rock formations',>00,'volcanoes ',>00 ; symbol $9A
 goatsoup_symbol_27:                                        ; >a067
-       text 'PLANT ',>00,'TULIP ',>00,'BANANA ',>00,'CORN ',>00,'WEED ',>00 ; symbol $9B
+       text 'plant ',>00,'tulip ',>00,'banana ',>00,'corn ',>00,'weed ',>00 ; symbol $9B
 goatsoup_symbol_28:                                        ; >a089
-       text >03,>00,>02,>03,>00,>02,>8d,>00,'INHABITANT ',>00,>02,>03,>00 ; symbol $9C
+       text >03,>00,>02,>03,>00,>02,>8d,>00,'inhabitant ',>00,>02,>03,>00 ; symbol $9C
 goatsoup_symbol_29:                                        ; >a0a0
-       text 'SHREW ',>00,'BEAST ',>00,'BISON ',>00,'SNAKE ',>00,'WOLF ',>00 ; symbol $9D
+       text 'shrew ',>00,'beast ',>00,'bison ',>00,'snake ',>00,'wolf ',>00 ; symbol $9D
 goatsoup_symbol_30:                                        ; >a0c2
-       text 'LEOPARD ',>00,'CAT ',>00,'MONKEY ',>00,'GOAT ',>00,'FISH ',>00 ; symbol $9E
+       text 'leopard ',>00,'cat ',>00,'monkey ',>00,'goat ',>00,'fish ',>00 ; symbol $9E
 goatsoup_symbol_31:                                        ; >a0e4
-       text >05,>8f,>8e,>00,>02,>05,>9d,>a0,>00,'ITS ',>05,>90,>9e,>a0,>00,>a1,>a2,>00,>05,>8f,>8e,>00 ; symbol $9F
+       text >05,>8f,>8e,>00,>02,>05,>9d,>a0,>00,'its ',>05,>90,>9e,>a0,>00,>a1,>a2,>00,>05,>8f,>8e,>00 ; symbol $9F
 goatsoup_symbol_32:                                        ; >a0fd
-       text 'MEAT ',>00,'CUTLET ',>00,'STEAK ',>00,'BURGERS ',>00,'SOUP ',>00 ; symbol $A0
+       text 'meat ',>00,'cutlet ',>00,'steak ',>00,'burgers ',>00,'soup ',>00 ; symbol $A0
 goatsoup_symbol_33:                                        ; >a121
-       text 'ICE ',>00,'MUD ',>00,'ZERO-G ',>00,'VACUUM ',>00,>02,'ULTRA ',>00 ; symbol $A1
+       text 'ice ',>00,'mud ',>00,'zero-G ',>00,'vacuum ',>00,>02,'ultra ',>00 ; symbol $A1
 goatsoup_symbol_34:                                        ; >a143
-       text 'HOCKEY ',>00,'CRICKET ',>00,'KARATE ',>00,'POLO ',>00,'TENNIS ',>00 ; symbol $A2
+       text 'hockey ',>00,'cricket ',>00,'karate ',>00,'polo ',>00,'tennis ',>00 ; symbol $A2
 goatsoup_symbol_35:                                        ; >a16a
-       text 'WASP ',>00,'MOTH ',>00,'GRUB ',>00,'ANT ',>00,>03,>00   ; symbol $A3
+       text 'wasp ',>00,'moth ',>00,'grub ',>00,'ant ',>00,>03,>00   ; symbol $A3
 goatsoup_symbol_36:                                        ; >a183
-       text 'POET ',>00,'ARTS GRADUATE ',>00,'YAK ',>00,'SNAIL ',>00,'SLUG ',>00 ; symbol $A4
+       text 'poet ',>00,'arts graduate ',>00,'yak ',>00,'snail ',>00,'slug ',>00 ; symbol $A4
 goatsoup_symbol_37:                                        ; >a1aa
-       text 'DENSE ',>00,'LUSH ',>00,'RAIN ',>00,'BAMBOO ',>00,'DECIDUOUS ',>00 ; symbol $A5
+       text 'dense ',>00,'lush ',>00,'rain ',>00,'bamboo ',>00,'deciduous ',>00 ; symbol $A5
 goatsoup_symbol_38:                                        ; >a1d0
-       text 'GREEN ',>00,'BLACK ',>00,'YELLOW STRIPEY ',>00,'PINKY GREY ',>00,'WHITE ',>00 ; symbol $A6
+       text 'green ',>00,'black ',>00,'yellow stripey ',>00,'pinky grey ',>00,'white ',>00 ; symbol $A6
 
 ********************************************************************************
 * Goatsoup: symbol table
@@ -31459,7 +31459,7 @@ goatsoup_symbols:                                          ; >a201
 * (#R$A2F4), which is never used.
 goatsoup_description_template_a2eb:                        ; >a2eb
        byte >06,>92                                                  ; control code 6 (#R$9B77), symbol $92
-       text 'IS '
+       text 'is '
        byte >93,>04                                                  ; symbol $93, control code 4 (#R$9B6E)
 goatsoup_control_code_dispatch:                            ; >a2f2
        text '.',>00                                                  ; a full stop, and the end
@@ -31484,14 +31484,14 @@ _a2f4:                                                     ; >a2f4
 * 
 * Added to a system's name by #R$9B43.
 adjective_ending:                                          ; >a300
-       text 'IAN ',>00
+       text 'ian ',>00
 
 ********************************************************************************
 * Vowels
 * 
 * The letters #R$9B43 replaces with "ian ".
 vowels:                                                    ; >a305
-       text 'AEIOU'
+       text 'aeiou'
 
 ********************************************************************************
 * Show the commander menu
@@ -32033,11 +32033,11 @@ commander_file_variables:                                  ; >a551
 * Printed by #R$A30A (RST $20): a list of (column, row, string) records ending
 * with $FF (see #R$3596).
 commander_menu_text:                                       ; >a58f
-       text >05,>04,'1. LOAD NEW COMMANDER',>00
-       text >05,>06,'2. SAVE COMMANDER',>00
-       text >05,>08,'3. CATALOG TAPE',>00
-       text >05,>0a,'4. DEFAULT JAMESON',>00
-       text >05,>0c,'5. EXIT',>00
+       text >05,>04,'1. Load new Commander',>00
+       text >05,>06,'2. Save Commander',>00
+       text >05,>08,'3. Catalog tape',>00
+       text >05,>0a,'4. Default JAMESON',>00
+       text >05,>0c,'5. Exit',>00
        byte >FF
 
 ********************************************************************************
@@ -32056,46 +32056,46 @@ commander_menu_frame:                                      ; >a5ed
 * 
 * Printed by #R$A30A.
 msg_select_option:                                         ; >a5fd
-       text >05,>16,'SELECT OPTION ? ',>00
+       text >05,>16,'Select option ? ',>00
        byte >FF
 
 ********************************************************************************
 * The message "Are you sure"
 msg_are_you_sure:                                          ; >a611
-       text 'ARE YOU SUR',>e5
+       text 'Are you sur',>e5
 
 ********************************************************************************
 * Commander menu: "Commander's name ?"
 * 
 * Printed by #R$A36B.
 msg_commanders_name:                                       ; >a61d
-       text >05,>16,'COMMANDER''S NAME ? ',>00
+       text >05,>16,'Commander''s name ? ',>00
        byte >FF
 
 ********************************************************************************
 * The message "Saving Commander "
 msg_saving_commander:                                      ; >a634
-       text 'SAVING COMMANDER ',>80
+       text 'Saving Commander ',>80
 
 ********************************************************************************
 * The message "Searching .. (CTRL-STOP to exit)"
 msg_searching:                                             ; >a646
-       text 'SEARCHING .. (CTRL-STOP TO EXIT',>a9
+       text 'Searching .. (CTRL-STOP to exit',>a9
 
 ********************************************************************************
 * The message "Tape I/O error!"
 msg_tape_io_error:                                         ; >a666
-       text 'TAPE I/O ERROR',>a1
+       text 'Tape I/O error',>a1
 
 ********************************************************************************
 * The message "Found Commander "
 msg_found_commander:                                       ; >a675
-       text 'FOUND COMMANDER',>a0
+       text 'Found Commander',>a0
 
 ********************************************************************************
 * The message "Start recording and press a key"
 msg_start_recording:                                       ; >a685
-       text 'START RECORDING AND PRESS A KE',>f9
+       text 'Start recording and press a ke',>f9
 
 ********************************************************************************
 * Pointer table
@@ -32385,11 +32385,11 @@ continue_a727_combine_slot_numbers:                        ; >a74d
 * set). They look like left-over words for the system descriptions
 * (#R$9A4B), but nothing refers to them.
 unused_text_a755:                                          ; >a755
-       text 'TLE PLANET ',>00
-       text 'DUMP ',>00
-       text 'FREQUENT ',>00
-       text 'OCCASIONAL ',>00
-       text 'UNP',>87
+       text 'tle planet ',>00
+       text 'dump ',>00
+       text 'frequent ',>00
+       text 'occasional ',>00
+       text 'unp',>87
 
 ********************************************************************************
 * Stack
@@ -32498,7 +32498,7 @@ ship_cougar_header:                                        ; >a817
 * The Cougar's name, which its blueprint header points to (#R$A817), ending
 * with a bit-7-set "r" like the other messages (see #R$4223).
 ship_cougar_name:                                          ; >a831
-       text 'COUGA',>f2
+       text 'Couga',>f2
 
 ********************************************************************************
 * Cougar: vertex array (6 bytes/vertex)
@@ -32581,7 +32581,7 @@ ship_constrictor_header:                                   ; >a941
 * 
 * The message "Constrictor".
 ship_constrictor_name:                                     ; >a95b
-       text 'CONSTRICTO',>f2
+       text 'Constricto',>f2
 
 ********************************************************************************
 * Constrictor: vertex array (6 bytes/vertex)
@@ -32652,7 +32652,7 @@ ship_cobra_mkiii_header:                                   ; >aa7c
 * 
 * The message "Cobra MkIII".
 ship_cobra_mkiii_name:                                     ; >aa96
-       text 'COBRA MKII',>c9
+       text 'Cobra MkII',>c9
 
 ********************************************************************************
 * Cobra MkIII: vertex array (6 bytes/vertex)
@@ -32741,7 +32741,7 @@ ship_asp_mkii_header:                                      ; >ac4b
 * 
 * The message "Asp MkII".
 ship_asp_mkii_name:                                        ; >ac65
-       text 'ASP MKI',>c9
+       text 'Asp MkI',>c9
 
 ********************************************************************************
 * Asp MkII: vertex array (6 bytes/vertex)
@@ -32824,7 +32824,7 @@ ship_adder_header:                                         ; >adc3
 * 
 * The message "Adder".
 ship_adder_name:                                           ; >addd
-       text 'ADDE',>f2
+       text 'Adde',>f2
 
 ********************************************************************************
 * Adder: vertex array (6 bytes/vertex)
@@ -32900,7 +32900,7 @@ ship_space_station_header:                                 ; >af26
 * 
 * The message "Space Station".
 ship_space_station_name:                                   ; >af40
-       text 'SPACE STATIO',>ee
+       text 'Space Statio',>ee
 
 ********************************************************************************
 * Space Station: vertex array (6 bytes/vertex)
@@ -32974,7 +32974,7 @@ ship_cargo_canister_header:                                ; >b089
 * 
 * The message "Cargo Canister".
 ship_cargo_canister_name:                                  ; >b0a3
-       text 'CARGO CANISTE',>f2
+       text 'Cargo Caniste',>f2
 
 ********************************************************************************
 * Cargo Canister: vertex array (6 bytes/vertex)
@@ -33031,7 +33031,7 @@ ship_gecko_header:                                         ; >b161
 * 
 * The message "Gecko".
 ship_gecko_name:                                           ; >b17b
-       text 'GECK',>ef
+       text 'Geck',>ef
 
 ********************************************************************************
 * Gecko: vertex array (6 bytes/vertex)
@@ -33093,7 +33093,7 @@ ship_missile_header:                                       ; >b258
 * 
 * The message "Missile".
 ship_missile_name:                                         ; >b272
-       text 'MISSIL',>e5
+       text 'Missil',>e5
 
 ********************************************************************************
 * Missile: vertex array (6 bytes/vertex)
@@ -33162,7 +33162,7 @@ ship_platlet_header:                                       ; >b38b
 * 
 * The message "Platlet".
 ship_platlet_name:                                         ; >b3a5
-       text 'PLATLE',>f4
+       text 'Platle',>f4
 
 ********************************************************************************
 * Platlet: vertex array (6 bytes/vertex)
@@ -33202,7 +33202,7 @@ ship_orbit_shuttle_header:                                 ; >b3d1
 * 
 * The message "Orbit Shuttle".
 ship_orbit_shuttle_name:                                   ; >b3eb
-       text 'ORBIT SHUTTL',>e5
+       text 'Orbit Shuttl',>e5
 
 ********************************************************************************
 * Orbit Shuttle: vertex array (6 bytes/vertex)
@@ -33279,7 +33279,7 @@ ship_krait_header:                                         ; >b540
 * 
 * The message "Krait".
 ship_krait_name:                                           ; >b55a
-       text 'KRAI',>f4
+       text 'Krai',>f4
 
 ********************************************************************************
 * Krait: vertex array (6 bytes/vertex)
@@ -33342,7 +33342,7 @@ ship_escape_capsule_header:                                ; >b63f
 * 
 * The message "Escape Capsule".
 ship_escape_capsule_name:                                  ; >b659
-       text 'ESCAPE CAPSUL',>e5
+       text 'Escape Capsul',>e5
 
 ********************************************************************************
 * Escape Capsule: vertex array (6 bytes/vertex)
@@ -33401,7 +33401,7 @@ ship_anaconda_header:                                      ; >b729
 * 
 * The message "Anaconda".
 ship_anaconda_name:                                        ; >b743
-       text 'ANACOND',>e1
+       text 'Anacond',>e1
 
 ********************************************************************************
 * Anaconda: vertex array (6 bytes/vertex)
@@ -33473,7 +33473,7 @@ ship_asteroid_header:                                      ; >b869
 * 
 * The message "Asteroid".
 ship_asteroid_name:                                        ; >b883
-       text 'ASTEROI',>e4
+       text 'Asteroi',>e4
 
 ********************************************************************************
 * Asteroid: vertex array (6 bytes/vertex)
@@ -33540,7 +33540,7 @@ ship_boa_class_cruiser_header:                             ; >b985
 * 
 * The message "Boa Class Cruiser".
 ship_boa_class_cruiser_name:                               ; >b99f
-       text 'BOA CLASS CRUISE',>f2
+       text 'Boa Class Cruise',>f2
 
 ********************************************************************************
 * Boa Class Cruiser: vertex array (6 bytes/vertex)
@@ -33609,7 +33609,7 @@ ship_cobra_mk1_header:                                     ; >bac6
 * 
 * The message "Cobra MK1".
 ship_cobra_mk1_name:                                       ; >bae0
-       text 'COBRA MK',>b1
+       text 'Cobra MK',>b1
 
 ********************************************************************************
 * Cobra MK1: vertex array (6 bytes/vertex)
@@ -33672,7 +33672,7 @@ ship_fer_de_lance_header:                                  ; >bbc3
 * 
 * The message "Fer-De-Lance".
 ship_fer_de_lance_name:                                    ; >bbdd
-       text 'FER-DE-LANC',>e5
+       text 'Fer-De-Lanc',>e5
 
 ********************************************************************************
 * Fer-De-Lance: vertex array (6 bytes/vertex)
@@ -33744,7 +33744,7 @@ ship_mamba_header:                                         ; >bd0e
 * 
 * The message "Mamba".
 ship_mamba_name:                                           ; >bd28
-       text 'MAMB',>e1
+       text 'Mamb',>e1
 
 ********************************************************************************
 * Mamba: vertex array (6 bytes/vertex)
@@ -33814,7 +33814,7 @@ ship_moray_star_boat_header:                               ; >be47
 * 
 * The message "Moray Star Boat".
 ship_moray_star_boat_name:                                 ; >be61
-       text 'MORAY STAR BOA',>f4
+       text 'Moray Star Boa',>f4
 
 ********************************************************************************
 * Moray Star Boat: vertex array (6 bytes/vertex)
@@ -33878,7 +33878,7 @@ ship_python_header:                                        ; >bf53
 * 
 * The message "Python".
 ship_python_name:                                          ; >bf6d
-       text 'PYTHO',>ee
+       text 'Pytho',>ee
 
 ********************************************************************************
 * Python: vertex array (6 bytes/vertex)
@@ -33947,7 +33947,7 @@ ship_sidewinder_header:                                    ; >c081
 * 
 * The message "Sidewinder".
 ship_sidewinder_name:                                      ; >c09b
-       text 'SIDEWINDE',>f2
+       text 'Sidewinde',>f2
 
 ********************************************************************************
 * Sidewinder: vertex array (6 bytes/vertex)
@@ -34005,7 +34005,7 @@ ship_thargoid_header:                                      ; >c157
 * 
 * The message "Thargoid".
 ship_thargoid_name:                                        ; >c171
-       text 'THARGOI',>e4
+       text 'Thargoi',>e4
 
 ********************************************************************************
 * Thargoid: vertex array (6 bytes/vertex)
@@ -34078,7 +34078,7 @@ ship_transporter_header:                                   ; >c2a7
 * 
 * The message "Transporter".
 ship_transporter_name:                                     ; >c2c1
-       text 'TRANSPORTE',>f2
+       text 'Transporte',>f2
 
 ********************************************************************************
 * Transporter: vertex array (6 bytes/vertex)
@@ -34177,7 +34177,7 @@ ship_viper_header:                                         ; >c4c6
 * 
 * The message "Viper".
 ship_viper_name:                                           ; >c4e0
-       text 'VIPE',>f2
+       text 'Vipe',>f2
 
 ********************************************************************************
 * Viper: vertex array (6 bytes/vertex)
@@ -34240,7 +34240,7 @@ ship_thargon_header:                                       ; >c5c1
 * 
 * The message "Thargon".
 ship_thargon_name:                                         ; >c5db
-       text 'THARGO',>ee
+       text 'Thargo',>ee
 
 ********************************************************************************
 * Thargon: vertex array (6 bytes/vertex)
@@ -34297,7 +34297,7 @@ ship_wolf_mkii_header:                                     ; >c692
 * 
 * The message "Wolf MKII".
 ship_wolf_mkii_name:                                       ; >c6ac
-       text 'WOLF MKI',>c9
+       text 'Wolf MKI',>c9
 
 ********************************************************************************
 * Wolf MKII: vertex array (6 bytes/vertex)

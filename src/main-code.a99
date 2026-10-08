@@ -6,56 +6,56 @@
 * "a".
 name_letter_pairs:                                         ; >0e41
        text '  '                                                  ; 0
-       text 'LE'                                                  ; 1
-       text 'XE'                                                  ; 2
-       text 'GE'                                                  ; 3
-       text 'ZA'                                                  ; 4
-       text 'CE'                                                  ; 5
-       text 'BI'                                                  ; 6
-       text 'SO'                                                  ; 7
-       text 'US'                                                  ; 8
-       text 'ES'                                                  ; 9
-       text 'AR'                                                  ; 10
-       text 'MA'                                                  ; 11
-       text 'IN'                                                  ; 12
-       text 'DI'                                                  ; 13
-       text 'RE'                                                  ; 14
-       text 'A '                                                  ; 15
-       text 'ER'                                                  ; 16
-       text 'AT'                                                  ; 17
-       text 'EN'                                                  ; 18
-       text 'BE'                                                  ; 19
-       text 'RA'                                                  ; 20
-       text 'LA'                                                  ; 21
-       text 'VE'                                                  ; 22
-       text 'TI'                                                  ; 23
-       text 'ED'                                                  ; 24
-       text 'OR'                                                  ; 25
-       text 'QU'                                                  ; 26
-       text 'AN'                                                  ; 27
-       text 'TE'                                                  ; 28
-       text 'IS'                                                  ; 29
-       text 'RI'                                                  ; 30
-       text 'ON'                                                  ; 31
+       text 'le'                                                  ; 1
+       text 'xe'                                                  ; 2
+       text 'ge'                                                  ; 3
+       text 'za'                                                  ; 4
+       text 'ce'                                                  ; 5
+       text 'bi'                                                  ; 6
+       text 'so'                                                  ; 7
+       text 'us'                                                  ; 8
+       text 'es'                                                  ; 9
+       text 'ar'                                                  ; 10
+       text 'ma'                                                  ; 11
+       text 'in'                                                  ; 12
+       text 'di'                                                  ; 13
+       text 'Re'                                                  ; 14
+       text 'a '                                                  ; 15
+       text 'er'                                                  ; 16
+       text 'at'                                                  ; 17
+       text 'en'                                                  ; 18
+       text 'be'                                                  ; 19
+       text 'ra'                                                  ; 20
+       text 'la'                                                  ; 21
+       text 've'                                                  ; 22
+       text 'ti'                                                  ; 23
+       text 'ed'                                                  ; 24
+       text 'or'                                                  ; 25
+       text 'qu'                                                  ; 26
+       text 'an'                                                  ; 27
+       text 'te'                                                  ; 28
+       text 'is'                                                  ; 29
+       text 'ri'                                                  ; 30
+       text 'on'                                                  ; 31
 
 ********************************************************************************
 * The message "Harmless"
 msg_harmless_0f25:                                         ; >0f25
-       text 'HARMLES',>f3                                         ; the combat ranks (#R$EB12), printed with RST $10
+       text 'Harmles',>f3                                         ; the combat ranks (#R$EB12), printed with RST $10
 msg_mostly_harmless:                                       ; >0f2d
-       text 'MOSTLY HARMLES',>f3                                  ; 
+       text 'Mostly Harmles',>f3                                  ; 
 msg_poor:                                                  ; >0f3c
-       text 'POO',>f2                                             ; 
+       text 'Poo',>f2                                             ; 
 msg_average:                                               ; >0f40
-       text 'AVERAG',>e5                                          ; 
+       text 'Averag',>e5                                          ; 
 msg_above_average:                                         ; >0f47
-       text 'ABOVE AVERAG',>e5                                    ; 
+       text 'Above averag',>e5                                    ; 
 msg_competent:                                             ; >0f54
-       text 'COMPETEN',>f4                                        ; 
+       text 'Competen',>f4                                        ; 
 msg_dangerous:                                             ; >0f5d
-       text 'DANGEROU',>f3                                        ; 
+       text 'Dangerou',>f3                                        ; 
 msg_deadly:                                                ; >0f66
-       text 'DEADL',>f9                                           ; 
+       text 'Deadl',>f9                                           ; 
 msg_e_l_i_t_e:                                             ; >0f6c
        text 'E-L-I-T-',>c5                                        ; 
 
@@ -73,40 +73,40 @@ msg_e_l_i_t_e:                                             ; >0f6c
 equipment_name_list2_empty_slots:                          ; >10a7
        byte >80,>80                                               ; two empty entries, then the equipment names
 msg_large_cargo_bay_10a9:                                  ; >10a9
-       text 'LARGE CARGO BA',>f9                                  ; 
+       text 'Large Cargo Ba',>f9                                  ; 
 msg_ecm_system_10b8:                                       ; >10b8
-       text 'ECM SYSTE',>ed                                       ; 
+       text 'ECM Syste',>ed                                       ; 
 msg_pulse:                                                 ; >10c2
-       text 'PULSE',>a0                                           ; 
+       text 'Pulse',>a0                                           ; 
 msg_beam:                                                  ; >10c8
-       text 'BEAM',>a0                                            ; 
+       text 'Beam',>a0                                            ; 
 msg_fuel_scoop_10cd:                                       ; >10cd
-       text 'FUEL SCOO',>f0                                       ; 
+       text 'Fuel Scoo',>f0                                       ; 
 msg_escape_capsule_10d7:                                   ; >10d7
-       text 'ESCAPE CAPSUL',>e5                                   ; 
+       text 'Escape Capsul',>e5                                   ; 
 msg_energy_bomb_10e5:                                      ; >10e5
-       text 'ENERGY BOM',>e2                                      ; 
+       text 'Energy Bom',>e2                                      ; 
 msg_energy_unit:                                           ; >10f0
-       text 'ENERGY UNI',>f4                                      ; 
+       text 'Energy Uni',>f4                                      ; 
 msg_docking_computer_10fb:                                 ; >10fb
-       text 'DOCKING COMPUTE',>f2                                 ; 
+       text 'Docking Compute',>f2                                 ; 
 msg_gal_hyperdrive:                                        ; >110b
-       text 'GAL. HYPERDRIV',>e5                                  ; 
+       text 'Gal. Hyperdriv',>e5                                  ; 
 msg_mining:                                                ; >111a
-       text 'MINING',>a0                                          ; 
+       text 'Mining',>a0                                          ; 
 msg_military:                                              ; >1121
-       text 'MILITARY',>a0                                        ; 
+       text 'Military',>a0                                        ; 
 msg_ecm_jammer:                                            ; >112a
-       text 'ECM JAMME',>f2                                       ; 
+       text 'ECM Jamme',>f2                                       ; 
 msg_cloaking_device:                                       ; >1134
-       text 'CLOAKING DEVIC',>e5                                  ; 
+       text 'Cloaking Devic',>e5                                  ; 
 msg_documents:                                             ; >1143
-       text 'DOCUMENT',>f3                                        ; 
+       text 'Document',>f3                                        ; 
 
 ********************************************************************************
 * The message "Naval Energy Unt"
 msg_naval_energy_unt:                                      ; >114c
-       text 'NAVAL ENERGY UN',>f4                                 ; 
+       text 'Naval Energy Un',>f4                                 ; 
 
 ********************************************************************************
 * "FRONT VIEW" bitmap
@@ -658,7 +658,7 @@ title_screen_letter_next_frame:                            ; >1ed0
 * The message "Load New Commander ?"
        .msxalign >1ed7
 msg_load_new_commander:                                    ; >1ed7
-       text 'LOAD NEW COMMANDER ',>bf
+       text 'Load New Commander ',>bf
 
 ********************************************************************************
 * The message "(c)1987 Firebird"
@@ -668,13 +668,13 @@ msg_load_new_commander:                                    ; >1ed7
 * Character $60 is the copyright symbol in this game's font (#R$0A9F).
        .msxalign >1eeb
 msg_copyright_1987_firebird:                               ; >1eeb
-       text >60,'1987 FIREBIR',>e4
+       text >60,'1987 Firebir',>e4
 
 ********************************************************************************
 * The message "Hit key for mission"
        .msxalign >1ef9
 msg_hit_key_mission:                                       ; >1ef9
-       text 'HIT KEY FOR MISSIO',>ee
+       text 'Hit key for missio',>ee
 
 ********************************************************************************
 * Title screen "ELITE" letters
@@ -5522,7 +5522,7 @@ lerp_add:                                                  ; >4b96
 * The message "Missile Locked"
        .msxalign >4b9a
 msg_missile_locked:                                        ; >4b9a
-       text 'MISSILE LOCKE',>e4
+       text 'Missile Locke',>e4
 
 ********************************************************************************
 * Work out a system's data from its seeds
@@ -5751,22 +5751,22 @@ _5613_twist:
 ********************************************************************************
 * The message "Witchspace"
 msg_witchspace:                                            ; >57c9
-       text 'WITCHSPAC',>e5                                       ; 
+       text 'Witchspac',>e5                                       ; 
 
 ********************************************************************************
 * The message "Commander "
 msg_commander:                                             ; >57d3
-       text 'COMMANDER',>a0                                       ; 
+       text 'Commander',>a0                                       ; 
 
 ********************************************************************************
 * The message " Light Years"
 msg_light_years_5845:                                      ; >5845
-       text ' LIGHT YEAR',>f3                                     ; 
+       text ' Light Year',>f3                                     ; 
 
 ********************************************************************************
 * The message " Credits"
 msg_credits_5851:                                          ; >5851
-       text ' CREDIT',>f3                                         ; 
+       text ' Credit',>f3                                         ; 
 
 ********************************************************************************
 * Show a message for a while
@@ -7637,7 +7637,7 @@ ecm_indicator_glyph:                                       ; >6f0b
 * The message "Docked!"
        .msxalign >6f17
 msg_docked:                                                ; >6f17
-       text 'DOCKED!',>00
+       text 'Docked!',>00
 
 ********************************************************************************
 * Stardust direction vectors

@@ -72,7 +72,7 @@ public class Z80Line {
                     }
                 }
                 if (type == null) {
-                    instruction = line.length() >= 8 ? line.substring(7).trim().toUpperCase() : "";
+                    instruction = line.length() >= 8 ? upperCaseOutsideQuotes(line.substring(7).trim()) : "";
                     if (instruction.startsWith("DEFB") || instruction.startsWith("DEFW") || instruction.startsWith("DEFM") || instruction.startsWith("DEFS")) {
                         type = Type.Data;
                     } else {
@@ -81,6 +81,19 @@ public class Z80Line {
                 }
             }
         }
+    }
+
+    // Upper case, except inside double quotes (the strings of DEFM, which are mixed case)
+    private static String upperCaseOutsideQuotes(String s) {
+        StringBuilder sb = new StringBuilder(s.length());
+        boolean quoted = false;
+        for (char ch : s.toCharArray()) {
+            if (ch == '"') {
+                quoted = !quoted;
+            }
+            sb.append(quoted ? ch : Character.toUpperCase(ch));
+        }
+        return sb.toString();
     }
 
     public Type getType() {

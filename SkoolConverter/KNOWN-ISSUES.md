@@ -1,57 +1,46 @@
 # SkoolConverter known issues
 
-Z80 constructs that the converter translates incorrectly or not at all. Each of these was found and
-fixed by hand in `src/main-code.a99`; the converter itself still produces them in `temp-src/`.
-Already fixed in the converter: `JP M`/`RET M`/`CALL M` (now `jgt`+`jeq`) and carry tests directly
-after `SUB`/`SBC` (now inverted).
+Z80 constructs that the converter can't translate correctly on its own. Those it does handle are listed first, so
+it's clear what to expect in `temp-src/`; lines it isn't sure about are marked `TODO: check code.`
 
-## Arithmetic
+## Handled by the converter
 
-- **`NEG` → `neg a`** negates the whole of R4, so A is off by one when F (R4's low byte) is non-zero.
-  Clear F first (`andi a,>ff00`).
-- **`SBC A,A` → `sb a,a`** is always 0. On the Z80 it gives 0 or $FF from the carry. The common
-  "negate HL/DE/BC" idiom (`XOR A / SUB L / LD L,A / SBC A,A / SUB H / LD H,A`) should become
-  `neg hl` (plus `ori ..,>8000` for the sign-magnitude variant).
-- **`ADC`/`SBC` lose the carry-in**: they become plain `a`/`ab`/`s`/`sb`.
-- **`AND r` / `XOR r` with a register operand** are left as comments. AND needs `inv` + `szcb`;
-  XOR needs the operand in a register.
-- **`OR A` to clear carry** (`socb a,a`) doesn't change the TI carry.
+- **Carry polarity.** The converter tracks the state of the TI carry compared with the Z80's: the same (after
+  ADD, ADC, shifts, SCF), inverted (after SUB, SBC, XOR A - the TMS9900 sets carry when there's no borrow), clear
+  (after AND/OR/XOR), or straight after CP (where `cb` sets no carry, but `jl`/`jhe` give it). Carry tests, ADC,
+  SBC and rotates through carry use it; when it's unknown (after INC/DEC, POP, calls, labels) they're marked TODO.
+- **Shifts and rotates** of 8-bit registers, `(HL)` and `(IX+d)` are emulated exactly, with the bit shifted out
+  in the TI carry. A shift of a register pair's two halves (SRL H/RR L, SLA E/RL D, RR H/RR L...) becomes one
+  16-bit shift.
+- **ADC/SBC** take the carry-in first and produce the Z80's carry-out; `SBC A,A` gives 0 or $FF.
+- **AND r / XOR r** with register operands, **NEG** (clears F first), **SCF**, **CCF**, and `LD r,0` (MOVB, which
+  leaves the carry alone).
+- **Z/NZ/P/M tests** are marked TODO when an instruction in between changes the TI status but not the Z80 flags
+  (an LD of anything but the result, INC/DEC rr, ADD HL,rr, PUSH/POP, calls...). After BIT 7, P/M become EQ/NE.
+- **Little-endian words**: `LD rr,(nn)` / `LD (nn),rr` become byte pairs (low byte at the address, high byte at
+  the address + 1) and DEFW becomes byte pairs, as in the hand-converted variables.
+- `JP M`/`RET M`/`CALL M` (`jgt`+`jeq`).
 
-## Shifts and rotates
+## Still to fix by hand
 
-- **`RLA`/`RRA`/`RL r`/`RR r`** (through carry) become word shifts of R4 or are commented out; the
-  carry-in is lost and `sla a,1` shifts F's top bit into A.
-- **Shifts of H, D or B alone** (`SRL H`, `SLA D`, `SRA B`...) shift the whole register pair,
-  corrupting L, E or C. `RR H` becomes `sra h,1`, which copies bit 15 instead of rotating the carry in.
-- **`RLC`/`RRC`/`RLCA`** (8-bit circular rotates) become plain shifts and lose the wrapped bit.
-- Many pairs are only correct by accident of the register mapping (`SRL H`/`RR L` = `srl h,1`); a
-  peephole pass could recognise them and emit one word shift.
-
-## Flags
-
-- **Flag tests after `PUSH`, `POP`, `CALL` or `RET`**: the stack macros' `mov` sets the TI status and
-  `dect` changes the carry, while the Z80 preserves flags. Routines that return a result in carry need
-  `.retc`/`.retnc`; sign/zero tests after a call or push need a re-test.
-- **Carry tests after `CP` with an instruction in between** become `joc`/`jnc`, but `cb` doesn't set
-  carry on the TI. Only a test directly after the `cb` becomes `jl`/`jhe`.
-- **Carry tests after `SUB`/`SBC` with an instruction in between** aren't inverted.
-- **16-bit `INC`/`DEC` (`INC HL`...)** don't affect the Z80 flags, but `inc hl` sets the TI status, so a
-  flag test after one tests the register instead (e.g. `LD A,(HL) / OR A / INC HL / JP P`).
-- **`EX AF,AF'`** doesn't save the TI status register.
-- **`BIT n,r` → `czc`** sets only EQ, so a following `JP P`/`JP M` tests stale status.
-- **`P` maps to `he`** in `getTMS9900Equivalent`; positive needs `jgt` or `jeq`. Harmless for now
-  (only reachable from `JR`, which can't test P).
-
-## Memory layout
-
-- **Page-aligned tables** reached by loading a page number (`LD H,$02`, `ADD A,$08`...) point into
-  console ROM on the TI. They need indexed addressing, and the tables need copying (the dependency
-  scan can't see them).
-- **Self-modifying code**: patch offsets are Z80 operand offsets (`+1`/`+2`), not TMS9900 ones; low-byte
-  address patches assume page-aligned tables; opcode patches (`RLC`/`RRC`, `INC L`/`DEC L`, `OR`/`XOR`)
-  write Z80 opcodes into TI code.
-- **Little-endian reads**: byte-wise loads of words from tables assume little-endian; `data` is
-  big-endian on the TI.
-- **`data` after an odd number of bytes** is word-aligned by the assembler, changing record layouts.
-- **`INC L`/`DEC L` on buffer pointers** assume the buffer doesn't cross a 256-byte page.
+- **Flag tests after PUSH, POP, CALL or RET**: the stack macros' `mov` sets the TI status and `dect` changes the
+  carry. Routines that return a result in carry need `.retc`/`.retnc`; sign/zero tests after a call need a re-test.
+  The converter marks the test TODO, but can't fix it.
+- **Flag tests after an LD or INC/DEC rr** (marked TODO): move the test, or test the value again (`mov hl,hl`...).
+  For example `LD A,(HL) / OR A / INC HL / JP P` becomes `movb *hl+,a / jlt`.
+- **CP followed by a carry test with an instruction in between**: `cb`'s status is gone (marked TODO).
+- **EX AF,AF'** doesn't save the TI status register.
+- **Page-aligned tables** reached by loading a page number (`LD H,$02`, `LD H,$E6`, `ADD A,$08`...) point at MSX
+  addresses. They need indexed addressing or base + offset, and the tables need copying (a dependency scan by
+  label can't see them).
+- **`INC L`/`DEC L` on table or buffer pointers** assume the table doesn't cross a 256-byte page; use `inc hl`.
+- **Self-modifying code**: patch offsets are Z80 operand offsets (`+1`/`+2`), not TMS9900 ones; low-byte address
+  patches assume page-aligned tables; opcode patches (`RLC`/`RRC`, `INC L`/`DEC L`, `OR`/`XOR`) write Z80 opcodes
+  into TI code.
+- **Big-endian `data`**: any table the TI code reads with `mov` (e.g. `log_table`) has to be big-endian, unlike
+  the DEFW output.
 - **`DEFW` snapshot values in variables** are turned into labels, creating false references.
+- **MSX hardware**: `IN`/`OUT` on ports other than the VDP (PSG, keyboard, slots), `OUTI`/`OTIR`, BIOS calls, and
+  `EI` (interrupts stay off on the TI) are left as TODO comments. So are `CPIR` and other block instructions.
+- **Speed**: the exact shift/rotate and ADC/SBC emulations are several instructions each; combine them by hand
+  where a routine can be rewritten (e.g. with MPY/DIV).

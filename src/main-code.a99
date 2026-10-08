@@ -6844,37 +6844,37 @@ _7157:                                                     ; >7157
        .msxalign >a7d7
 ship_blueprints:                                           ; >a7d7
        byte >00,>00                                                  ; $00: (none)
-       byte ship_space_station_header&>ff,(ship_space_station_header-(ship_space_station_header&>ff))/>100 ; $01: Space Station
-       byte ship_missile_header&>ff,(ship_missile_header-(ship_missile_header&>ff))/>100 ; $02: Missile
-       byte ship_cargo_canister_header&>ff,(ship_cargo_canister_header-(ship_cargo_canister_header&>ff))/>100 ; $03: Cargo Canister
-       byte ship_asteroid_header&>ff,(ship_asteroid_header-(ship_asteroid_header&>ff))/>100 ; $04: Asteroid
-       byte ship_escape_capsule_header&>ff,(ship_escape_capsule_header-(ship_escape_capsule_header&>ff))/>100 ; $05: Escape Capsule
-       byte ship_thargon_header&>ff,(ship_thargon_header-(ship_thargon_header&>ff))/>100 ; $06: Thargon
-       byte ship_platlet_header&>ff,(ship_platlet_header-(ship_platlet_header&>ff))/>100 ; $07: Platlet
-       byte ship_letter_e_header&>ff,(ship_letter_e_header-(ship_letter_e_header&>ff))/>100 ; $08: letter E (title screen)
-       byte ship_letter_l_header&>ff,(ship_letter_l_header-(ship_letter_l_header&>ff))/>100 ; $09: letter L (title screen)
-       byte ship_letter_i_header&>ff,(ship_letter_i_header-(ship_letter_i_header&>ff))/>100 ; $0A: letter I (title screen)
-       byte ship_letter_t_header&>ff,(ship_letter_t_header-(ship_letter_t_header&>ff))/>100 ; $0B: letter T (title screen)
-       byte ship_viper_header&>ff,(ship_viper_header-(ship_viper_header&>ff))/>100 ; $0C: Viper
-       byte ship_fer_de_lance_header&>ff,(ship_fer_de_lance_header-(ship_fer_de_lance_header&>ff))/>100 ; $0D: Fer-De-Lance
-       byte ship_cobra_mkiii_header&>ff,(ship_cobra_mkiii_header-(ship_cobra_mkiii_header&>ff))/>100 ; $0E: Cobra MkIII
-       byte ship_python_header&>ff,(ship_python_header-(ship_python_header&>ff))/>100 ; $0F: Python
-       byte ship_anaconda_header&>ff,(ship_anaconda_header-(ship_anaconda_header&>ff))/>100 ; $10: Anaconda
-       byte ship_cobra_mk1_header&>ff,(ship_cobra_mk1_header-(ship_cobra_mk1_header&>ff))/>100 ; $11: Cobra MK1
-       byte ship_krait_header&>ff,(ship_krait_header-(ship_krait_header&>ff))/>100 ; $12: Krait
-       byte ship_thargoid_header&>ff,(ship_thargoid_header-(ship_thargoid_header&>ff))/>100 ; $13: Thargoid
-       byte ship_boa_class_cruiser_header&>ff,(ship_boa_class_cruiser_header-(ship_boa_class_cruiser_header&>ff))/>100 ; $14: Boa Class Cruiser
-       byte ship_gecko_header&>ff,(ship_gecko_header-(ship_gecko_header&>ff))/>100 ; $15: Gecko
-       byte ship_moray_star_boat_header&>ff,(ship_moray_star_boat_header-(ship_moray_star_boat_header&>ff))/>100 ; $16: Moray Star Boat
-       byte ship_adder_header&>ff,(ship_adder_header-(ship_adder_header&>ff))/>100 ; $17: Adder
-       byte ship_mamba_header&>ff,(ship_mamba_header-(ship_mamba_header&>ff))/>100 ; $18: Mamba
-       byte ship_asp_mkii_header&>ff,(ship_asp_mkii_header-(ship_asp_mkii_header&>ff))/>100 ; $19: Asp MkII
-       byte ship_sidewinder_header&>ff,(ship_sidewinder_header-(ship_sidewinder_header&>ff))/>100 ; $1A: Sidewinder
-       byte ship_wolf_mkii_header&>ff,(ship_wolf_mkii_header-(ship_wolf_mkii_header&>ff))/>100 ; $1B: Wolf MkII
-       byte ship_orbit_shuttle_header&>ff,(ship_orbit_shuttle_header-(ship_orbit_shuttle_header&>ff))/>100 ; $1C: Orbit Shuttle
-       byte ship_transporter_header&>ff,(ship_transporter_header-(ship_transporter_header&>ff))/>100 ; $1D: Transporter
-       byte ship_cougar_header&>ff,(ship_cougar_header-(ship_cougar_header&>ff))/>100 ; $1E: Cougar
-       byte ship_constrictor_header&>ff,(ship_constrictor_header-(ship_constrictor_header&>ff))/>100 ; $1F: Constrictor
+       byte ship_space_station_header%%256,ship_space_station_header//256 ; $01: Space Station
+       byte ship_missile_header%%256,ship_missile_header//256        ; $02: Missile
+       byte ship_cargo_canister_header%%256,ship_cargo_canister_header//256 ; $03: Cargo Canister
+       byte ship_asteroid_header%%256,ship_asteroid_header//256      ; $04: Asteroid
+       byte ship_escape_capsule_header%%256,ship_escape_capsule_header//256 ; $05: Escape Capsule
+       byte ship_thargon_header%%256,ship_thargon_header//256        ; $06: Thargon
+       byte ship_platlet_header%%256,ship_platlet_header//256        ; $07: Platlet
+       byte ship_letter_e_header%%256,ship_letter_e_header//256      ; $08: letter E (title screen)
+       byte ship_letter_l_header%%256,ship_letter_l_header//256      ; $09: letter L (title screen)
+       byte ship_letter_i_header%%256,ship_letter_i_header//256      ; $0A: letter I (title screen)
+       byte ship_letter_t_header%%256,ship_letter_t_header//256      ; $0B: letter T (title screen)
+       byte ship_viper_header%%256,ship_viper_header//256            ; $0C: Viper
+       byte ship_fer_de_lance_header%%256,ship_fer_de_lance_header//256 ; $0D: Fer-De-Lance
+       byte ship_cobra_mkiii_header%%256,ship_cobra_mkiii_header//256 ; $0E: Cobra MkIII
+       byte ship_python_header%%256,ship_python_header//256          ; $0F: Python
+       byte ship_anaconda_header%%256,ship_anaconda_header//256      ; $10: Anaconda
+       byte ship_cobra_mk1_header%%256,ship_cobra_mk1_header//256    ; $11: Cobra MK1
+       byte ship_krait_header%%256,ship_krait_header//256            ; $12: Krait
+       byte ship_thargoid_header%%256,ship_thargoid_header//256      ; $13: Thargoid
+       byte ship_boa_class_cruiser_header%%256,ship_boa_class_cruiser_header//256 ; $14: Boa Class Cruiser
+       byte ship_gecko_header%%256,ship_gecko_header//256            ; $15: Gecko
+       byte ship_moray_star_boat_header%%256,ship_moray_star_boat_header//256 ; $16: Moray Star Boat
+       byte ship_adder_header%%256,ship_adder_header//256            ; $17: Adder
+       byte ship_mamba_header%%256,ship_mamba_header//256            ; $18: Mamba
+       byte ship_asp_mkii_header%%256,ship_asp_mkii_header//256      ; $19: Asp MkII
+       byte ship_sidewinder_header%%256,ship_sidewinder_header//256  ; $1A: Sidewinder
+       byte ship_wolf_mkii_header%%256,ship_wolf_mkii_header//256    ; $1B: Wolf MkII
+       byte ship_orbit_shuttle_header%%256,ship_orbit_shuttle_header//256 ; $1C: Orbit Shuttle
+       byte ship_transporter_header%%256,ship_transporter_header//256 ; $1D: Transporter
+       byte ship_cougar_header%%256,ship_cougar_header//256          ; $1E: Cougar
+       byte ship_constrictor_header%%256,ship_constrictor_header//256 ; $1F: Constrictor
 
 ********************************************************************************
 * Scratch buffer
@@ -10209,7 +10209,7 @@ constrictor_trail_count:                                   ; >efa3
 * #R$538B) keep their lists of systems at the address it holds. In this
 * snapshot its low byte is $00 rather than $44.
 reclaimed_range_end:                                       ; >efa4
-       byte (startup_code_stardust_table+>00a6)&>ff,((startup_code_stardust_table+>00a6)-((startup_code_stardust_table+>00a6)&>ff))/>100
+       byte (startup_code_stardust_table+>00a6)%%256,(startup_code_stardust_table+>00a6)//256
 
 ********************************************************************************
 * Stardust table address / reclaimed-memory range start (word)
@@ -10222,7 +10222,7 @@ reclaimed_range_end:                                       ; >efa4
 * and #R$699C (at $69A8) - the 15-particle stardust table (see #R$68CD),
 * which occupies the reclaimed $6F9F-$7043 space.
 reclaimed_range_start:                                     ; >efa6
-       byte (startup_code_stardust_table)&>ff,((startup_code_stardust_table)-((startup_code_stardust_table)&>ff))/>100
+       byte startup_code_stardust_table%%256,startup_code_stardust_table//256
 
 ********************************************************************************
 * ECM jammer active
@@ -10297,7 +10297,7 @@ commander_menu_buffer:                                     ; >f6c0
 * one-time startup code (#R$6F9F, step 1), and read by #R$7139, which
 * unpacks the picture (#R$390E) when entering flight.
 cockpit_picture_addr:                                      ; >f740
-       byte (cockpit_picture)&>ff,((cockpit_picture)-((cockpit_picture)&>ff))/>100
+       byte cockpit_picture%%256,cockpit_picture//256
 
 ********************************************************************************
 * In-game clock: seconds/minutes/hours/days

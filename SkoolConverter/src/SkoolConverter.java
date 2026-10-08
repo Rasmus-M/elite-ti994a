@@ -150,7 +150,7 @@ public class SkoolConverter {
                         if (z80Line.getType() == Z80Line.Type.Data) {
                             i += convertData(z80Line, tms9900Lines);
                         } else {
-                            i += convertInstruction(z80Line, tms9900Lines);
+                            i += convertInstruction(z80Lines, i, tms9900Lines);
                         }
                     }
                     break;
@@ -181,14 +181,27 @@ public class SkoolConverter {
             instruction = "text " + String.join(",", messageParts);
         } else {
             boolean isWord = z80Line.getInstruction().startsWith("DEFW");
-            instruction = z80Line.getInstruction().replace("DEFB", "byte").replace("DEFW", "data");
+            instruction = z80Line.getInstruction().replace("DEFB", "byte");
             if (isWord) {
+                // Words are stored little-endian, as the Z80 code reads them byte by byte
                 String[] words = instruction.substring(4).trim().split(",");
+                List<String> bytes = new ArrayList<>();
                 for (String word : words) {
-                    if (!word.isEmpty() && references.contains(Util.parseInt(word)) && !isLabelExcluded(Util.parseInt(word))) {
-                        instruction = instruction.replace(word, getValidLabel(Util.parseInt(word)));
+                    word = word.trim();
+                    if (word.isEmpty()) {
+                        continue;
+                    }
+                    int value = Util.parseInt(word);
+                    String label = references.contains(value) && !isLabelExcluded(value) ? getValidLabel(value) : null;
+                    if (label != null && !label.startsWith(">")) {
+                        bytes.add(label + "%%256");
+                        bytes.add(label + "//256");
+                    } else {
+                        bytes.add(Util.tiHexString(value & 0xff, false));
+                        bytes.add(Util.tiHexString(value >> 8, false));
                     }
                 }
+                instruction = "byte " + String.join(",", bytes);
             } else {
                 if (z80Line.getComment() != null) {
                     Matcher matcher = commentReferencePattern.matcher(z80Line.getComment());
@@ -208,27 +221,36 @@ public class SkoolConverter {
         return 0;
     }
 
-    private int convertInstruction(Z80Line z80Line, List<TMS9900Line> tms9900Lines) {
+    private int convertInstruction(List<Z80Line> z80Lines, int index, List<TMS9900Line> tms9900Lines) {
+        Z80Line z80Line = z80Lines.get(index);
         Instruction instruction = new Instruction(z80Line.getInstruction());
         Operand opr1 = instruction.getOpr1();
         Operand opr2 = instruction.getOpr2();
         TMS9900Line tms9900Line = new TMS9900Line(TMS9900Line.Type.Instruction, z80Line.getComment());
         tms9900Line.setZ80Instruction(z80Line.getInstruction());
         List<TMS9900Line> additionalLines = new ArrayList<>();
-        switch (instruction.getOpcode()) {
+        int consumed = 0;
+        String opcode = instruction.getOpcode();
+        switch (opcode) {
             case "add":
-            case "adc":
                 if (opr1 != null) {
                     boolean isWord = opr1.isWordOperand();
                     tms9900Line.setInstruction((isWord ? "a    " : "ab   ") + getTMS9900Equivalent(opr2) + "," + getTMS9900Equivalent(opr1));
+                }
+                break;
+            case "adc":
+                if (opr1 != null) {
+                    convertAdcSbc(true, opr1, opr2, carryState(tms9900Lines), tms9900Line, additionalLines);
                 }
                 break;
             case "and":
                 if (opr1 != null) {
                     if (opr1.getType() == Operand.Type.Immediate) {
                         tms9900Line.setInstruction("andi a," + (hexOutput ? Util.tiHexString(opr1.getValue() * 256, true) : opr1.getValue() + "*256"));
+                    } else if (opr1.getType() == Operand.Type.Register && opr1.getRegister().equals("a")) {
+                        tms9900Line.setInstruction("socb a,a");  // AND A: just tests A
                     } else {
-                        unhandledInstruction(tms9900Line, instruction);
+                        emit(tms9900Line, additionalLines, "movb " + getTMS9900Equivalent(opr1) + ",r0", "inv  r0", "szcb r0,a");
                     }
                 }
                 break;
@@ -251,6 +273,17 @@ public class SkoolConverter {
                     additionalLines.add(label);
                 } else {
                     unhandledInstruction(tms9900Line, instruction);
+                }
+                break;
+            case "ccf":
+                Carry before = carryState(tms9900Lines);
+                if (before == Carry.CLEAR) {
+                    emit(tms9900Line, additionalLines, "seto r0", "inc  r0");
+                } else if (before == Carry.COMPARE) {
+                    // The carry was A < the operand: set it when A >= the operand
+                    emit(tms9900Line, additionalLines, "jhe  !", "clr  r0", "inc  r0", "jmp  !!", "!", "seto r0", "inc  r0", "!");
+                } else {
+                    emit(tms9900Line, additionalLines, "joc  !", "seto r0", "inc  r0", "jmp  !!", "!", "clr  r0", "inc  r0", "!");
                 }
                 break;
             case "cp":
@@ -330,21 +363,32 @@ public class SkoolConverter {
                     tms9900Line.setInstruction("jmp  " + getTMS9900Equivalent(opr1));
                 } else if (opr1 != null && opr1.getType() == Operand.Type.Flag) {
                     String flag = opr1.getFlag();
-                    if ((flag.equals("c") || flag.equals("nc")) && getLastInstruction(tms9900Lines).startsWith("cb")) {
-                        if (flag.equals("c")) {
-                            tms9900Line.setInstruction("jl   " + getTMS9900Equivalent(opr2));
+                    String target = getTMS9900Equivalent(opr2);
+                    if (flag.equals("c") || flag.equals("nc")) {
+                        boolean c = flag.equals("c");
+                        if (getLastInstruction(tms9900Lines).startsWith("cb")) {
+                            tms9900Line.setInstruction((c ? "jl   " : "jhe  ") + target);
                         } else {
-                            tms9900Line.setInstruction("jhe  " + getTMS9900Equivalent(opr2));
-                        }
-                    } else if ((flag.equals("c") || flag.equals("nc")) && lastInstructionIsSubtraction(tms9900Lines)) {
-                        if (flag.equals("c")) {
-                            tms9900Line.setInstruction("jnc  " + getTMS9900Equivalent(opr2));
-                        } else {
-                            tms9900Line.setInstruction("joc  " + getTMS9900Equivalent(opr2));
+                            switch (carryState(tms9900Lines)) {
+                                case SAME:
+                                    tms9900Line.setInstruction((c ? "joc  " : "jnc  ") + target);
+                                    break;
+                                case INVERTED:
+                                    tms9900Line.setInstruction((c ? "jnc  " : "joc  ") + target);
+                                    break;
+                                case CLEAR:
+                                    tms9900Line.setInstruction(c ? ";" : "jmp  " + target);
+                                    tms9900Line.setComment("(carry is clear here) " + (tms9900Line.getComment() != null ? tms9900Line.getComment() : ""));
+                                    break;
+                                default:
+                                    tms9900Line.setInstruction((c ? "joc  " : "jnc  ") + target);
+                                    setUnhandledComment(tms9900Line);
+                                    break;
+                            }
                         }
                     } else {
-                        tms9900Line.setInstruction("j" + getTMS9900Equivalent(opr1) + "  " + getTMS9900Equivalent(opr2));
-                        if (flag.equals("c") || flag.equals("nc")) {
+                        tms9900Line.setInstruction("j" + getTMS9900Equivalent(opr1) + "  " + target);
+                        if (!flagsValid(tms9900Lines, flag)) {
                             setUnhandledComment(tms9900Line);
                         }
                     }
@@ -359,11 +403,19 @@ public class SkoolConverter {
                         isWord = opr1.isWordOperand();
                         if (isWord) {
                             tms9900Line.setInstruction("li   " + getTMS9900Equivalent(opr1) + "," + getTMS9900Equivalent(opr2, isWord));
-                        } else if (opr2.getValue() == 0) {
-                            tms9900Line.setInstruction("sb   " + getTMS9900Equivalent(opr1) + "," + getTMS9900Equivalent(opr1));
                         } else {
+                            // MOVB leaves the carry alone, as LD does
                             tms9900Line.setInstruction("movb " + getTMS9900Equivalent(opr2) + "," + getTMS9900Equivalent(opr1));
                         }
+                    } else if (opr2.getType() == Operand.Type.Indirect && isWordRegister(opr1)) {
+                        // Words in memory are little-endian
+                        String address = getTMS9900Equivalent(opr2);
+                        String register = getTMS9900Equivalent(opr1);
+                        emit(tms9900Line, additionalLines, "movb " + address + "+1," + register, "movb " + address + "," + lowByte(register));
+                    } else if (opr1.getType() == Operand.Type.Indirect && isWordRegister(opr2)) {
+                        String address = getTMS9900Equivalent(opr1);
+                        String register = getTMS9900Equivalent(opr2);
+                        emit(tms9900Line, additionalLines, "movb " + register + "," + address + "+1", "movb " + lowByte(register) + "," + address);
                     } else {
                         isWord = opr1.isWordOperand() && opr2.isWordOperand();
                         tms9900Line.setInstruction((isWord ? "mov " : "movb") + " " + getTMS9900Equivalent(opr2) + "," + getTMS9900Equivalent(opr1));
@@ -380,7 +432,8 @@ public class SkoolConverter {
                 tms9900Line.setInstruction(".ldir");
                 break;
             case "neg":
-                tms9900Line.setInstruction("neg a");
+                // NEG negates the whole of R4, so clear F first
+                emit(tms9900Line, additionalLines, "andi a,>ff00", "neg  a");
                 break;
             case "nop":
                 tms9900Line.setInstruction("nop");
@@ -420,35 +473,29 @@ public class SkoolConverter {
                 }
                 break;
             case "rl":
+            case "rr":
             case "rlc":
-                if (opr1.getType() == Operand.Type.Register && !lsbRegisterPattern.matcher(opr1.getRegister()).matches()) {
-                    tms9900Line.setInstruction("sla  " + getTMS9900Equivalent(opr1) + ",1");
-                    setUnhandledComment(tms9900Line);
+            case "rrc":
+            case "sla":
+            case "sra":
+            case "srl":
+                if (isShiftable(opr1)) {
+                    consumed = convertShift(opcode, opr1, z80Lines, index, tms9900Line, tms9900Lines, additionalLines);
                 } else {
                     unhandledInstruction(tms9900Line, instruction);
                 }
                 break;
             case "rla":
-            case "rlca":
-                tms9900Line.setInstruction("sla  a,1");
-                setUnhandledComment(tms9900Line);
-                break;
-            case "rr":
-            case "rrc":
-                if (opr1.getType() == Operand.Type.Register && !lsbRegisterPattern.matcher(opr1.getRegister()).matches()) {
-                    tms9900Line.setInstruction("sra  " + getTMS9900Equivalent(opr1) + ",1");
-                    setUnhandledComment(tms9900Line);
-                } else {
-                    unhandledInstruction(tms9900Line, instruction);
-                }
-                break;
             case "rra":
+            case "rlca":
             case "rrca":
-                tms9900Line.setInstruction("srl  a,1");
-                setUnhandledComment(tms9900Line);
+                emitShift(opcode.substring(0, opcode.length() - 1), "a", carryState(tms9900Lines), tms9900Line, additionalLines);
                 break;
             case "rst":
                 tms9900Line.setInstruction(".rst " + Util.intToStr(opr1.getValue(), hexOutput, false));
+                break;
+            case "scf":
+                emit(tms9900Line, additionalLines, "seto r0", "inc  r0");
                 break;
             case "set":
                 tms9900Line.setInstruction("socb @bit" + opr1.getValue() + "," + getTMS9900Equivalent(opr2));
@@ -459,42 +506,29 @@ public class SkoolConverter {
             case "sbc":
                 if (opr1 != null) {
                     boolean isWord = opr1.isWordOperand();
-                    tms9900Line.setInstruction((isWord ? "s    " : "sb   ") + getTMS9900Equivalent(opr2) + "," + getTMS9900Equivalent(opr1));
-                }
-                break;
-            case "sla":
-                if (opr1.getType() == Operand.Type.Register && !lsbRegisterPattern.matcher(opr1.getRegister()).matches()) {
-                    tms9900Line.setInstruction("sla  " + getTMS9900Equivalent(opr1) + ",1");
-                } else {
-                    unhandledInstruction(tms9900Line, instruction);
-                }
-                break;
-            case "sra":
-                if (opr1.getType() == Operand.Type.Register && !lsbRegisterPattern.matcher(opr1.getRegister()).matches()) {
-                    tms9900Line.setInstruction("sra  " + getTMS9900Equivalent(opr1) + ",1");
-                } else {
-                    unhandledInstruction(tms9900Line, instruction);
-                }
-                break;
-            case "srl":
-                if (opr1.getType() == Operand.Type.Register && !lsbRegisterPattern.matcher(opr1.getRegister()).matches()) {
-                    tms9900Line.setInstruction("srl  " + getTMS9900Equivalent(opr1) + ",1");
-                } else {
-                    unhandledInstruction(tms9900Line, instruction);
+                    Carry carry = carryState(tms9900Lines);
+                    if (!isWord && opr2 != null && opr2.getType() == Operand.Type.Register && opr2.getRegister().equals("a")) {
+                        // SBC A,A: 0 or $FF from the carry, which MOVB leaves alone
+                        if (carry == Carry.CLEAR) {
+                            tms9900Line.setInstruction("movb @zero,a");
+                        } else {
+                            emit(tms9900Line, additionalLines, carrySkip(carry) + "  !", "movb @b255,a", "jmp  !!", "!", "movb @zero,a", "!");
+                            if (carry == Carry.UNKNOWN) {
+                                setUnhandledComment(tms9900Line);
+                            }
+                        }
+                    } else {
+                        convertAdcSbc(false, opr1, opr2, carry, tms9900Line, additionalLines);
+                    }
                 }
                 break;
             case "xor":
                 if (opr1.getType() == Operand.Type.Register && opr1.getRegister().equals("a")) {
                     tms9900Line.setInstruction("sb   a,a");
                 } else if (opr1.getType() == Operand.Type.Immediate) {
-                    if (opr1.getValue() == 1) {
-                        tms9900Line.setInstruction("xor  one,a");
-                    } else {
-                        tms9900Line.setInstruction("li   r0," + opr1.getValue() + "*256");
-                        additionalLines.add(new TMS9900Line(TMS9900Line.Type.Instruction, null, "xor  r0,a"));
-                    }
+                    emit(tms9900Line, additionalLines, "li   r0," + (hexOutput ? Util.tiHexString(opr1.getValue() * 256, true) : opr1.getValue() + "*256"), "xor  a,r0", "movb r0,a");
                 } else {
-                    unhandledInstruction(tms9900Line, instruction);
+                    emit(tms9900Line, additionalLines, "movb " + getTMS9900Equivalent(opr1) + ",r0", "xor  a,r0", "movb r0,a");
                 }
                 break;
             default:
@@ -503,7 +537,209 @@ public class SkoolConverter {
         }
         tms9900Lines.add(tms9900Line);
         tms9900Lines.addAll(additionalLines);
+        if (consumed > 0) {
+            // The next line was combined into this one - keep its Z80 instruction and comment
+            Z80Line next = z80Lines.get(index + 1);
+            TMS9900Line combined = new TMS9900Line(TMS9900Line.Type.Instruction, next.getComment(), ";");
+            combined.setZ80Instruction(next.getInstruction());
+            tms9900Lines.add(combined);
+        }
+        return consumed;
+    }
+
+    // ----- Shifts and rotates
+
+    private boolean isShiftable(Operand operand) {
+        return operand != null && (operand.getType() == Operand.Type.Register || operand.getType() == Operand.Type.IndirectRegister || operand.getType() == Operand.Type.Indexed);
+    }
+
+    private static final String[][] REGISTER_PAIRS = {{"h", "l", "hl"}, {"d", "e", "de"}, {"b", "c", "bc"}};
+
+    private int convertShift(String opcode, Operand operand, List<Z80Line> z80Lines, int index, TMS9900Line tms9900Line, List<TMS9900Line> tms9900Lines, List<TMS9900Line> additionalLines) {
+        Carry carry = carryState(tms9900Lines);
+        // A shift of a register pair's high and low halves is a single 16-bit shift
+        Instruction next = nextInstruction(z80Lines, index);
+        if (next != null && operand.getType() == Operand.Type.Register && next.getOpr1() != null && next.getOpr1().getType() == Operand.Type.Register && next.getOpr2() == null) {
+            String reg = operand.getRegister();
+            String nextReg = next.getOpr1().getRegister();
+            String nextOpcode = next.getOpcode();
+            for (String[] pair : REGISTER_PAIRS) {
+                String high = pair[0], low = pair[1], rp = pair[2];
+                if (reg.equals(high) && nextReg.equals(low) && nextOpcode.equals("rr")) {
+                    switch (opcode) {
+                        case "srl":
+                            tms9900Line.setInstruction("srl  " + rp + ",1");
+                            return 1;
+                        case "sra":
+                            tms9900Line.setInstruction("sra  " + rp + ",1");
+                            return 1;
+                        case "rr":
+                            if (carry == Carry.CLEAR) {
+                                tms9900Line.setInstruction("srl  " + rp + ",1");
+                            } else {
+                                emit(tms9900Line, additionalLines, carrySkip(carry) + "  !", "srl  " + rp + ",1", "ori  " + rp + ",>8000", "jmp  !!", "!", "srl  " + rp + ",1", "!");
+                                if (carry == Carry.UNKNOWN) {
+                                    setUnhandledComment(tms9900Line);
+                                }
+                            }
+                            return 1;
+                    }
+                }
+                if (reg.equals(low) && nextReg.equals(high) && nextOpcode.equals("rl")) {
+                    switch (opcode) {
+                        case "sla":
+                            tms9900Line.setInstruction("sla  " + rp + ",1");
+                            return 1;
+                        case "rl":
+                            if (carry == Carry.CLEAR) {
+                                tms9900Line.setInstruction("sla  " + rp + ",1");
+                            } else {
+                                emit(tms9900Line, additionalLines, carrySkip(carry) + "  !", "sla  " + rp + ",1", "ori  " + rp + ",1", "jmp  !!", "!", "sla  " + rp + ",1", "!");
+                                if (carry == Carry.UNKNOWN) {
+                                    setUnhandledComment(tms9900Line);
+                                }
+                            }
+                            return 1;
+                    }
+                }
+            }
+        }
+        emitShift(opcode, getTMS9900Equivalent(operand), carry, tms9900Line, additionalLines);
         return 0;
+    }
+
+    // An 8-bit shift or rotate of x, with the result in x and the bit shifted out in the TI carry, as on the Z80.
+    // Left shifts work on the byte in R0's high byte, right shifts on the byte in its low byte.
+    private void emitShift(String opcode, String x, Carry carry, TMS9900Line tms9900Line, List<TMS9900Line> additionalLines) {
+        switch (opcode) {
+            case "sla":
+                emit(tms9900Line, additionalLines, "clr  r0", "movb " + x + ",r0", "sla  r0,1", "movb r0," + x);
+                break;
+            case "srl":
+                emit(tms9900Line, additionalLines, "clr  r0", "movb " + x + ",@r0lb", "srl  r0,1", "movb @r0lb," + x);
+                break;
+            case "sra":
+                emit(tms9900Line, additionalLines, "movb " + x + ",r0", "sra  r0,8", "sra  r0,1", "movb @r0lb," + x);
+                break;
+            case "rlc":
+                emit(tms9900Line, additionalLines, "movb " + x + ",r0", "movb " + x + ",@r0lb", "sla  r0,1", "movb r0," + x);
+                break;
+            case "rrc":
+                emit(tms9900Line, additionalLines, "movb " + x + ",r0", "movb " + x + ",@r0lb", "srl  r0,1", "movb @r0lb," + x);
+                break;
+            case "rl":
+                if (carry == Carry.CLEAR) {
+                    emitShift("sla", x, carry, tms9900Line, additionalLines);
+                } else {
+                    emit(tms9900Line, additionalLines, "clr  r0", carrySkip(carry) + "  !", "ori  r0,>0080", "!", "movb " + x + ",r0", "sla  r0,1", "movb r0," + x);
+                    if (carry == Carry.UNKNOWN) {
+                        setUnhandledComment(tms9900Line);
+                    }
+                }
+                break;
+            case "rr":
+                if (carry == Carry.CLEAR) {
+                    emitShift("srl", x, carry, tms9900Line, additionalLines);
+                } else {
+                    emit(tms9900Line, additionalLines, "clr  r0", carrySkip(carry) + "  !", "ori  r0,>0100", "!", "movb " + x + ",@r0lb", "srl  r0,1", "movb @r0lb," + x);
+                    if (carry == Carry.UNKNOWN) {
+                        setUnhandledComment(tms9900Line);
+                    }
+                }
+                break;
+        }
+    }
+
+    private Instruction nextInstruction(List<Z80Line> z80Lines, int index) {
+        if (index + 1 >= z80Lines.size()) {
+            return null;
+        }
+        Z80Line next = z80Lines.get(index + 1);
+        if (next.getType() != Z80Line.Type.Instruction || references.contains(next.getAddress())) {
+            return null;
+        }
+        return new Instruction(next.getInstruction());
+    }
+
+    // ----- Emitting
+
+    private void emit(TMS9900Line tms9900Line, List<TMS9900Line> additionalLines, String... instructions) {
+        tms9900Line.setInstruction(instructions[0]);
+        for (int i = 1; i < instructions.length; i++) {
+            if (instructions[i].equals("!")) {
+                TMS9900Line label = new TMS9900Line(TMS9900Line.Type.Label);
+                label.setLabel("!");
+                additionalLines.add(label);
+            } else {
+                additionalLines.add(new TMS9900Line(TMS9900Line.Type.Instruction, null, instructions[i]));
+            }
+        }
+    }
+
+    // ADC and SBC. With the Z80 carry clear they're a plain add or subtract. Otherwise the carry-in is taken first
+    // (before anything changes the status), and the carry-out is worked out to match the Z80's: for 8 bits by doing
+    // the sum on words, for 16 bits by handling the case where adding the carry-in wraps the register round.
+    private void convertAdcSbc(boolean add, Operand opr1, Operand opr2, Carry carry, TMS9900Line tms9900Line, List<TMS9900Line> additionalLines) {
+        String dst = getTMS9900Equivalent(opr1);
+        String src = getTMS9900Equivalent(opr2);
+        boolean isWord = opr1.isWordOperand();
+        if (carry == Carry.CLEAR) {
+            tms9900Line.setInstruction((add ? (isWord ? "a    " : "ab   ") : (isWord ? "s    " : "sb   ")) + src + "," + dst);
+            return;
+        }
+        String skip = carrySkip(carry) + "  !";
+        if (isWord) {
+            if (add) {
+                emit(tms9900Line, additionalLines, "clr  r1", skip, "inc  r1", "!", "a    r1," + dst, "jnc  !",
+                    "a    " + src + "," + dst, "seto r0", "inc  r0", "jmp  !!", "!", "a    " + src + "," + dst, "!");
+            } else {
+                emit(tms9900Line, additionalLines, "clr  r1", skip, "inc  r1", "!", "s    r1," + dst, "joc  !",
+                    "s    " + src + "," + dst, "clr  r0", "inc  r0", "jmp  !!", "!", "s    " + src + "," + dst, "!");
+            }
+        } else {
+            if (add) {
+                emit(tms9900Line, additionalLines, "clr  r0", skip, "inc  r0", "!", "clr  r1", "movb " + src + ",@r1lb", "a    r1,r0",
+                    "movb " + dst + ",@r1lb", "a    r1,r0", "movb @r0lb," + dst, "srl  r0,9", "movb " + dst + "," + dst);
+            } else {
+                emit(tms9900Line, additionalLines, "clr  r1", skip, "inc  r1", "!", "clr  r0", "movb " + src + ",@r0lb", "a    r0,r1",
+                    "clr  r0", "movb " + dst + ",@r0lb", "s    r1,r0", "movb @r0lb," + dst);
+            }
+        }
+        if (carry == Carry.UNKNOWN) {
+            setUnhandledComment(tms9900Line);
+        }
+    }
+
+    // The jump that skips code when the Z80 carry is clear
+    private String carrySkip(Carry carry) {
+        switch (carry) {
+            case INVERTED:
+                return "joc";
+            case COMPARE:
+                return "jhe";  // A >= the operand: no borrow
+            default:
+                return "jnc";
+        }
+    }
+
+    private boolean isByteRegister(Operand operand) {
+        return operand.getType() == Operand.Type.Register && operand.getRegister().matches("[abcdehl]|ixh|ixl|iyh|iyl");
+    }
+
+    private boolean isWordRegister(Operand operand) {
+        return operand.getType() == Operand.Type.Register && operand.getRegister().matches("hl|de|bc|ix|iy|sp");
+    }
+
+    private String lowByte(String register) {
+        switch (register) {
+            case "hl": return "@l";
+            case "de": return "@e";
+            case "bc": return "@c";
+            case "ix": return "@ixl";
+            case "iy": return "@iyl";
+            case "sp": return "@splb";
+        }
+        return "?";
     }
 
     private void unhandledInstruction(TMS9900Line tms9900Line, Instruction instruction) {
@@ -515,46 +751,248 @@ public class SkoolConverter {
         tms9900Line.setComment("TODO: check code. " + (tms9900Line.getComment() != null ? tms9900Line.getComment() : ""));
     }
 
+    // Sets the jump that skips the following instruction (a call, a jump or a return) when the condition is false
     private void setInverseJumpInstruction(TMS9900Line tms9900Line, List<TMS9900Line> tms9900Lines, List<TMS9900Line> additionalLines, Operand opr1) {
         String flag = opr1.getFlag();
-        if ((flag.equals("c") || flag.equals("nc")) && getLastInstruction(tms9900Lines).startsWith("cb")) {
-            if (flag.equals("c")) {
-                tms9900Line.setInstruction("jhe  !");
-            } else {
-                tms9900Line.setInstruction("jl   !");
+        if (flag.equals("c") || flag.equals("nc")) {
+            boolean c = flag.equals("c");
+            if (getLastInstruction(tms9900Lines).startsWith("cb")) {
+                tms9900Line.setInstruction(c ? "jhe  !" : "jl   !");
+                return;
             }
-        } else if ((flag.equals("c") || flag.equals("nc")) && lastInstructionIsSubtraction(tms9900Lines)) {
-            if (flag.equals("c")) {
-                tms9900Line.setInstruction("joc  !");
-            } else {
-                tms9900Line.setInstruction("jnc  !");
-            }
-        } else {
-            switch (flag) {
-                case "z":
-                    tms9900Line.setInstruction("jne  !");
+            switch (carryState(tms9900Lines)) {
+                case SAME:
+                    tms9900Line.setInstruction(c ? "jnc  !" : "joc  !");
                     break;
-                case "nz":
-                    tms9900Line.setInstruction("jeq  !");
+                case INVERTED:
+                    tms9900Line.setInstruction(c ? "joc  !" : "jnc  !");
                     break;
-                case "c":
-                    tms9900Line.setInstruction("jnc  !");
+                case CLEAR:
+                    tms9900Line.setInstruction(c ? "jmp  !" : ";");
+                    tms9900Line.setComment("(carry is clear here) " + (tms9900Line.getComment() != null ? tms9900Line.getComment() : ""));
+                    break;
+                default:
+                    tms9900Line.setInstruction(c ? "jnc  !" : "joc  !");
                     setUnhandledComment(tms9900Line);
                     break;
-                case "nc":
-                    tms9900Line.setInstruction("joc  !");
-                    setUnhandledComment(tms9900Line);
-                    break;
-                case "p":
-                    tms9900Line.setInstruction("jlt  !");
-                    break;
-                case "m":
-                    // Not negative: there is no single TMS9900 jump for A> or EQ
-                    tms9900Line.setInstruction("jgt  !");
-                    additionalLines.add(new TMS9900Line(TMS9900Line.Type.Instruction, null, "jeq  !"));
-                    break;
+            }
+            return;
+        }
+        if ((flag.equals("p") || flag.equals("m")) && lastZ80Instruction(tms9900Lines, "bit")) {
+            Instruction bit = lastPrimaryInstruction(tms9900Lines);
+            if (bit.getOpr1() != null && bit.getOpr1().getValue() == 7) {
+                // After BIT 7, P means the bit is clear (EQ) and M that it's set
+                tms9900Line.setInstruction(flag.equals("p") ? "jne  !" : "jeq  !");
+                return;
             }
         }
+        switch (flag) {
+            case "z":
+                tms9900Line.setInstruction("jne  !");
+                break;
+            case "nz":
+                tms9900Line.setInstruction("jeq  !");
+                break;
+            case "p":
+                tms9900Line.setInstruction("jlt  !");
+                break;
+            case "m":
+                // Not negative: there is no single TMS9900 jump for A> or EQ
+                tms9900Line.setInstruction("jgt  !");
+                additionalLines.add(new TMS9900Line(TMS9900Line.Type.Instruction, null, "jeq  !"));
+                break;
+        }
+        if (!flagsValid(tms9900Lines, flag)) {
+            setUnhandledComment(tms9900Line);
+        }
+    }
+
+    // The state of the TI carry compared with the Z80's at the end of the code converted so far
+    private enum Carry {
+        SAME,       // The TI carry is the Z80 carry
+        INVERTED,   // The TI carry is the opposite (after a subtraction: the TMS9900 sets it when there's no borrow)
+        CLEAR,      // The Z80 carry is clear (after AND/OR/XOR), whatever the TI carry is
+        COMPARE,    // Right after CP: CB sets no carry, but its status gives it (L> = A < the operand)
+        UNKNOWN
+    }
+
+    private Carry carryState(List<TMS9900Line> tms9900Lines) {
+        if (getLastInstruction(tms9900Lines).startsWith("cb")) {
+            return Carry.COMPARE;
+        }
+        for (int i = tms9900Lines.size() - 1; i >= 0; i--) {
+            TMS9900Line line = tms9900Lines.get(i);
+            if (line.getType() == TMS9900Line.Type.Label) {
+                if (!"!".equals(line.getLabel())) {
+                    return Carry.UNKNOWN;  // other code can jump here
+                }
+                continue;  // the end of a conditional jump/return/call: the fallthrough path continues
+            }
+            if (line.getType() != TMS9900Line.Type.Instruction || line.getZ80Instruction() == null) {
+                continue;
+            }
+            Instruction z80 = new Instruction(line.getZ80Instruction());
+            Operand opr1 = z80.getOpr1();
+            Operand opr2 = z80.getOpr2();
+            switch (z80.getOpcode()) {
+                case "add":
+                case "adc":
+                case "rl":
+                case "rr":
+                case "rla":
+                case "rra":
+                case "rlc":
+                case "rrc":
+                case "rlca":
+                case "rrca":
+                case "sla":
+                case "sra":
+                case "srl":
+                case "scf":
+                    return Carry.SAME;
+                case "sub":
+                    return Carry.INVERTED;
+                case "sbc":
+                    if (opr1 != null && opr2 != null && opr1.getOperand().equals("a") && opr2.getOperand().equals("a")) {
+                        continue;  // SBC A,A leaves the carry as it was
+                    }
+                    return Carry.INVERTED;
+                case "xor":
+                    // XOR A is converted to SB A,A, which sets the TI carry
+                    return opr1 != null && opr1.getOperand().equals("a") ? Carry.INVERTED : Carry.CLEAR;
+                case "and":
+                case "or":
+                    return Carry.CLEAR;
+                case "ccf": {
+                    Carry before = carryState(tms9900Lines.subList(0, i));
+                    return before == Carry.CLEAR || before == Carry.COMPARE ? Carry.SAME : before;
+                }
+                // Instructions that leave the Z80 carry alone, converted to TI instructions that leave it alone too
+                case "ld":
+                case "push":
+                case "bit":
+                case "set":
+                case "res":
+                case "out":
+                case "in":
+                case "di":
+                case "ei":
+                case "nop":
+                case "cpl":
+                    continue;
+                case "ex":
+                    if (opr1 != null && opr1.getOperand().startsWith("af")) {
+                        return Carry.UNKNOWN;
+                    }
+                    continue;
+                case "jr":
+                case "jp":
+                case "ret":
+                    if (opr1 != null && opr1.getType() == Operand.Type.Flag) {
+                        continue;  // the fallthrough path of a conditional jump
+                    }
+                    return Carry.UNKNOWN;
+                default:
+                    // INC/DEC, POP, CP, calls...: the TI carry is changed (or wasn't set) where the Z80's isn't
+                    return Carry.UNKNOWN;
+            }
+        }
+        return Carry.UNKNOWN;
+    }
+
+    private static final Set<String> FLAG_SETTERS = new HashSet<>(Arrays.asList(
+        "add", "adc", "sub", "sbc", "and", "or", "xor", "cp", "inc", "dec", "neg", "rl", "rr", "rlc", "rrc", "sla", "sra", "srl", "bit", "daa"
+    ));
+
+    // Whether the TI status still reflects the Z80 flag a Z/NZ/P/M test is about. LDs between the instruction that
+    // set the flags and the test change the TI status (MOVB tests the byte it moves) but not the Z80 flags, so
+    // they're fine only if the last byte moved is the result itself.
+    private boolean flagsValid(List<TMS9900Line> tms9900Lines, String flag) {
+        List<Instruction> loads = new ArrayList<>();  // the LDs in between, last first
+        for (int i = tms9900Lines.size() - 1; i >= 0; i--) {
+            TMS9900Line line = tms9900Lines.get(i);
+            if (line.getType() == TMS9900Line.Type.Label) {
+                if (!"!".equals(line.getLabel())) {
+                    return false;
+                }
+                continue;
+            }
+            if (line.getType() != TMS9900Line.Type.Instruction || line.getZ80Instruction() == null) {
+                continue;
+            }
+            Instruction z80 = new Instruction(line.getZ80Instruction());
+            String opcode = z80.getOpcode();
+            Operand opr1 = z80.getOpr1();
+            if (FLAG_SETTERS.contains(opcode)) {
+                if ((opcode.equals("inc") || opcode.equals("dec") || opcode.equals("add")) && opr1 != null && opr1.isWordOperand()) {
+                    return false;  // INC/DEC rr and ADD rr,rr leave the Z80 Z and S flags alone
+                }
+                if ((flag.equals("p") || flag.equals("m")) && (opcode.equals("cp") || opcode.equals("bit"))) {
+                    return false;  // CB compares signed, BIT sets no sign
+                }
+                if (loads.isEmpty()) {
+                    return true;
+                }
+                // The register holding the result, and whether only its sign is known (a 16-bit result's high byte)
+                String result;
+                boolean signOnly = false;
+                if (opr1 != null && opr1.isWordOperand()) {
+                    result = opr1.getOperand().substring(0, 1);  // hl -> h
+                    signOnly = true;
+                } else if (opcode.equals("inc") || opcode.equals("dec")) {
+                    result = opr1 != null ? opr1.getOperand() : "?";
+                } else if (opcode.equals("cp") || opcode.equals("bit")) {
+                    return false;  // no result register
+                } else {
+                    result = "a";
+                }
+                if (signOnly && !(flag.equals("p") || flag.equals("m"))) {
+                    return false;
+                }
+                // Follow the result through the loads, in program order
+                Set<String> holders = new HashSet<>(Collections.singletonList(result));
+                String lastSource = null;
+                for (int k = loads.size() - 1; k >= 0; k--) {
+                    Instruction ld = loads.get(k);
+                    String dst = ld.getOpr1().getOperand(), src = ld.getOpr2().getOperand();
+                    if (holders.contains(src)) {
+                        holders.add(dst);
+                    } else {
+                        holders.remove(dst);
+                    }
+                    lastSource = src;
+                }
+                return lastSource != null && holders.contains(lastSource) && !lastSource.startsWith("(");
+            }
+            if ((opcode.equals("jr") || opcode.equals("jp") || opcode.equals("ret")) && opr1 != null && opr1.getType() == Operand.Type.Flag) {
+                continue;  // the fallthrough path of a conditional jump, which doesn't change the status
+            }
+            if (opcode.equals("di") || opcode.equals("ei") || opcode.equals("nop")) {
+                continue;
+            }
+            if (opcode.equals("ld") && opr1 != null && z80.getOpr2() != null && (isByteRegister(opr1) || isByteRegister(z80.getOpr2()))) {
+                loads.add(z80);  // an 8-bit LD: MOVB sets the status from the byte it moves
+                continue;
+            }
+            // Anything else leaves the Z80 flags alone but changes the TI status
+            return false;
+        }
+        return false;
+    }
+
+    private Instruction lastPrimaryInstruction(List<TMS9900Line> tms9900Lines) {
+        for (int i = tms9900Lines.size() - 1; i >= 0; i--) {
+            TMS9900Line line = tms9900Lines.get(i);
+            if (line.getType() == TMS9900Line.Type.Instruction && line.getZ80Instruction() != null) {
+                return new Instruction(line.getZ80Instruction());
+            }
+        }
+        return null;
+    }
+
+    private boolean lastZ80Instruction(List<TMS9900Line> tms9900Lines, String opcode) {
+        Instruction last = lastPrimaryInstruction(tms9900Lines);
+        return last != null && last.getOpcode().equals(opcode);
     }
 
     private String getTMS9900Equivalent(Operand operand) {
@@ -656,22 +1094,6 @@ public class SkoolConverter {
             }
         }
         return "";
-    }
-
-    // The TMS9900 sets carry on a subtraction when there is no borrow, the Z80 when there is.
-    private boolean lastInstructionIsSubtraction(List<TMS9900Line> tms9900Lines) {
-        for (int i = tms9900Lines.size() - 1; i >= 0; i--) {
-            TMS9900Line tms9900Line = tms9900Lines.get(i);
-            if (tms9900Line.getType() == TMS9900Line.Type.Instruction) {
-                String z80Instruction = tms9900Line.getZ80Instruction();
-                if (z80Instruction == null) {
-                    return false;
-                }
-                String opcode = new Instruction(z80Instruction).getOpcode();
-                return opcode.equals("sub") || opcode.equals("sbc");
-            }
-        }
-        return false;
     }
 
     private boolean lastLineWasAGlobalLabel(List<TMS9900Line> tms9900Lines) {

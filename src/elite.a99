@@ -5,6 +5,7 @@ main_program:                          ; The ROM banks are copied only for their
        equ  1
        copy "rom-banks/rom-bank-4.a99"
        copy "rom-banks/rom-bank-5.a99"
+       copy "rom-banks/rom-bank-6.a99"
 
        aorg >2000
        copy "lower-memory.a99"

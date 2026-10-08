@@ -1,0 +1,18 @@
+* ROM bank 6: the math tables, the cockpit picture and the font
+* Copied into elite.a99 with main_program defined, only for its labels
+       .ifdef main_program
+       dorg >6000
+       .else
+       aorg >6000
+       .endif
+       bss  >40
+       .ifdef main_program
+       bss  math_tables_end-math_tables  ; the math tables, as in bank 4 (the labels come from there)
+       .else
+       copy "../math-tables.a99"
+       .endif
+       copy "../cockpit-picture.a99"
+       copy "../font.a99"
+rom_bank_6_end:
+       equ  $
+       bss  >8000-$

@@ -1,3 +1,4 @@
+* ROM bank 5: the math tables and the blueprints for ship types 23-31
 * Copied into elite.a99 with main_program defined, only for its labels
        .ifdef main_program
        dorg >6000
@@ -5,9 +6,12 @@
        aorg >6000
        .endif
        bss  >40
+       .ifdef main_program
+       bss  math_tables_end-math_tables  ; the math tables, as in bank 4 (the labels come from there)
+       .else
+       copy "../math-tables.a99"
+       .endif
        copy "../ship-blueprints-2.a99"
-       copy "../cockpit-picture.a99"
-       copy "../font.a99"
 rom_bank_5_end:
        equ  $
        bss  >8000-$

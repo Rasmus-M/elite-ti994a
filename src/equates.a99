@@ -136,7 +136,9 @@ blueprints_1_bank_select:
        equ  >6008
 blueprints_2_bank_select:
        equ  >600a
+blueprints_2_first_type:               ; Ship types from here on are in bank 5
+       equ  23
 cockpit_picture_bank_select:
-       equ  >600a
+       equ  >600c
 font_bank_select:
-       equ  >600a
+       equ  >600c

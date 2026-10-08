@@ -20,9 +20,9 @@ data from extra 8K cartridge ROM banks into `>6000` while main code runs in 32K 
 
 1. `xas99.py -i -q -R -L elite.lst -E symbols.txt src/elite.a99 -o bin/elite` — assemble to EA5 program
    image(s) (`bin/elite`, `bin/elitf`, ... when larger than one file).
-2. `xas99.py src/rom-banks/rom-bank-N.a99 -B ...` — assemble the data banks 4 and 5 (`bin/bankN.bin`).
+2. `xas99.py src/rom-banks/rom-bank-N.a99 -B ...` — assemble the data banks 4-6 (`bin/bankN.bin`).
 3. `java -jar tools/ea5tocart.jar bin\elite "elite"` — pack the program (lower and upper RAM only) with a loader
-   into a 32K cartridge image (banks 0-3), then append banks 4 and 5 (`elite8.bin`).
+   into a 32K cartridge image (banks 0-3), then append banks 4-6 and an empty bank 7 (`elite8.bin`).
 4. Package `elite8.bin` + `layout.xml` into `elite.rpk` (MAME cartridge, PCB type `paged378`).
 
 There are no tests; verification is running the cartridge in an emulator.
@@ -82,10 +82,12 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   `copy_space_view_row_pad` (`>26`), `clear_space_view_rows_pad` (`>20`) and `line_loops_pad` (`>50`), ending at
   `pad_max` (`>83F8`, overlapping GPLWS - fine while interrupts and console routines are unused). The slot sizes
   are constants; update them if those routines change. Code there runs without wait states.
-- **ROM banks** (`src/rom-banks/`): bank 4 holds ship blueprints 1-28, bank 5 the blueprints for types 29+, the
-  cockpit picture and the font. Select a bank with `seto @..._bank_select` (`equates.a99`) before reading its
-  data; `draw_object` and `get_blueprint_data` select the blueprint bank themselves (`select_blueprint_bank`).
-  The bank files are copied into `elite.a99` under `dorg` only for their labels (`main_program` is defined).
+- **ROM banks** (`src/rom-banks/`): every data bank starts with the math tables (`math-tables.a99`) at `>6040`,
+  so they're readable whichever bank is selected. Bank 4 then holds the blueprints for ship types 1-22, bank 5
+  types 23+ (`blueprints_2_first_type`), bank 6 the cockpit picture and the font. Select a bank with
+  `seto @..._bank_select` (`equates.a99`) before reading its data; `draw_object` and `get_blueprint_data` select
+  the blueprint bank themselves (`select_blueprint_bank`). The bank files are copied into `elite.a99` under `dorg`
+  only for their labels (`main_program` is defined); banks 5 and 6 then reserve the tables' space with `bss`.
 - Interrupts stay disabled (`limi 0` once at startup); the converted `DI`/`EI` are commented out. Frame timing
   (VBlank) isn't implemented yet.
 

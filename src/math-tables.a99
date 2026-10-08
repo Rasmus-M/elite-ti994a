@@ -1,3 +1,6 @@
+* The math tables, at the same address (right after the header) in every data bank
+math_tables:
+       equ  $
 ********************************************************************************
 * Bit-length table
 * 
@@ -270,4 +273,5 @@ trig_table_coarse:                                         ; >1311
        byte >16,>7E
        byte >0B,>7F
        byte >00,>80
-
+math_tables_end:
+       equ  $

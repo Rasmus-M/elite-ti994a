@@ -17,11 +17,11 @@ view_name_front:                                           ; >118f
 ********************************************************************************
 * Select the ROM bank with the blueprint for the object's ship type
 *
-* TI-specific. Ship types below 29 are in bank 4, the rest in bank 5.
+* TI-specific. Ship types below blueprints_2_first_type are in bank 4, the rest in bank 5.
 *
 * I:($F7E7) Ship type
 select_blueprint_bank:
-       cb   @ship_type,@bytes+29
+       cb   @ship_type,@bytes+blueprints_2_first_type
        jhe  !
        seto @blueprints_1_bank_select
        rt
@@ -1174,7 +1174,7 @@ clear_all_ship_slots:                                      ; >28d4
 * I:A Ship type
 * O:IY The blueprint (see #R$A817 for the layout)
 get_blueprint:                                             ; >2fe9
-       cb   a,@bytes+29
+       cb   a,@bytes+blueprints_2_first_type
        jhe  !
        seto @blueprints_1_bank_select                                          ; Select blueprints ROM bank 1
        jmp  !!

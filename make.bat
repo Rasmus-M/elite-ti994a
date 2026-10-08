@@ -4,7 +4,7 @@ xas99.py src/rom-banks/rom-bank-4.a99 -B -q -R -o bin/bank4.bin
 xas99.py src/rom-banks/rom-bank-5.a99 -B -q -R -o bin/bank5.bin
 xas99.py src/rom-banks/rom-bank-6.a99 -B -q -R -o bin/bank6.bin
 
-java -jar tools/ea5tocart.jar bin\elite "elite"
+java -jar tools/ea5tocart.jar bin\elite "elite demo"
 
 copy /b bin\elite8.bin ^
     + bin\bank4.bin ^

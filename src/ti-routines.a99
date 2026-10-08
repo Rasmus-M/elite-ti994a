@@ -953,10 +953,14 @@ ti_ldir_end:
 *
 * Changes R0 and R1 (and R0-R2 as the routine does).
 *
+* far_call_r0_r1 is the same with the bank select address in R0 and the
+* routine in R1, for calls through a table.
+*
 far_call:
-       mov  @current_bank,*sp+         ; Save the caller's bank
        mov  *r11+,r0                   ; R0 = the routine's bank select address
        mov  *r11+,r1                   ; R1 = the routine
+far_call_r0_r1:
+       mov  @current_bank,*sp+         ; Save the caller's bank
        mov  r11,*sp+                   ; Save the return address
        mov  r0,@current_bank
        seto *r0                        ; Select the routine's bank

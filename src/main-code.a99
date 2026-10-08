@@ -1,4 +1,27 @@
 ********************************************************************************
+* Main loop: the pass run over and over while a game is on
+*
+* The part of #R$0106 from $010F, reached from the title screen (#R$1C5C) once
+* a game has started. Counts the pass (#R$F746), restarts the frame timing
+* (#R$F748), and reads the controls and keys (#R$401C).
+* .
+* TI: polls for VBlank first (interrupts are off). In flight it would run the
+* per-frame pass (#R$13FD), and when the game is over (#R$F749) go back to
+* the title screen; neither is converted yet, so this only runs docked.
+main_loop_wait_tick:                                       ; >010f
+       movb @main_loop_tick_counter+1,hl                   ; LD HL,($F746)     ; 
+       movb @main_loop_tick_counter,@l                     ;                   ; 
+       inc  hl                                             ; INC HL            ; 
+       movb hl,@main_loop_tick_counter+1                   ; LD ($F746),HL     ; advance the frame counter
+       movb @l,@main_loop_tick_counter                     ;                   ; 
+       sb   @vblank_subtick_counter,@vblank_subtick_counter; XOR A / LD ($F748),A; 
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
+       bl   @read_controls                                 ; CALL $401C        ; 
+* TI: LD A,($E90A) / OR A / CALL Z,$13FD - the per-frame pass in flight - and
+* the game over check ($0124) aren't converted yet.
+       jmp  main_loop_wait_tick                            ; JR Z,$010F        ; loop
+
+********************************************************************************
 * Market prices
 * 
 * The goods' prices and availability, as in BBC Elite (QQ23), 5 bytes
@@ -442,20 +465,15 @@ title_screen_key:                                          ; >1db5
        .pop af                                             ; POP AF            ;
        cb   a,@bytes+>59                                   ; CP $59            ;
        jeq  !                                              ; JP NZ,$6276       ; N - the docked screen
-       sb   a,a                                            ;                   ; (TI: show the status page from ROM bank 7,
-       movb a,@current_screen                              ;                   ; then wait for a key and start the title
-       .far_call code_bank_7_select,status_page            ; JP NZ,$6276       ; screen again - a pilot until the docked
-_title_screen_status_wait:
-       bl   @ti_poll_vblank                                ;                   ; screens and the main loop are converted)
-       movb @pending_debounced_keypress_byte_status,a      ;                   ; 
-       jeq  _title_screen_status_wait                      ;                   ; 
-       sb   @pending_debounced_keypress_byte_status,@pending_debounced_keypress_byte_status;                   ; 
-       b    @title_screen                                  ;                   ; 
+       sb   a,a                                            ;                   ; (TI: the title screen jumps to the status page,
+       movb a,@current_screen                              ;                   ; in ROM bank 7, which returns to the main loop)
+       .far_call code_bank_7_select,status_page            ; JP NZ,$6276       ; N - the docked screen
+       b    @main_loop_wait_tick                           ;                   ; 
 !
        movb @b255,a                                        ; LD A,$FF          ;
        movb a,@load_new_commander                          ; LD ($E924),A      ;
        .far_call code_bank_7_select,commander_menu         ; JP $A30A          ; Y - load a commander (TI: the menu in ROM bank 7)
-       jmp  _title_screen_status_wait                      ;                   ; (TI: its "5. Exit" shows the status page and returns)
+       b    @main_loop_wait_tick                           ;                   ; (TI: "5. Exit" shows the status page and returns)
 
 ********************************************************************************
 * Title screen: swing an angle back and forth
@@ -3958,6 +3976,71 @@ _3f64:                                                     ; >3f64
        .msxalign >4014
 partial_byte_right_mask_table_8:                           ; >4014
        byte >FF,>7F,>3F,>1F,>0F,>07,>03,>01
+
+********************************************************************************
+* Read the flight controls and dispatch key presses
+* 
+* Used by the routine at #R$0106.
+* .
+* Called by the main loop (#R$0106) every pass. In flight ($E903 set), and
+* unless the flight controls are off (#R$EF8E), it reads the flight
+* controls: SPACE speeds up (#R$6956) and '/' ('?') slows down (#R$699C),
+* both read straight from the keyboard matrix; then the control bits from
+* #R$40A6 roll left or right (#R$69E5, #R$69F8), pitch (#R$69FD climb,
+* #R$6A10 dive) and fire the laser (#R$2AD0); and 'J' engages the Torus Jump
+* Drive (#R$86E6). All the matrix keys are active low.
+* .
+* Then, if a key has been typed (($E8F5), from the keyboard scan), looks it
+* up in the 33-entry table at #R$419B and jumps to its handler via $409B.
+* While ($EF8E) is set, only the pause key ($86) is accepted.
+* .
+* At $409B, with HL pointing at the matching entry in the key table, plays
+* a click (#R$7468, event 0) and jumps to the handler address in the entry.
+read_controls:                                             ; >401c
+* TI: the flight controls ($401C-$4074: speed, roll, pitch, fire and 'J')
+* aren't converted yet; only the keys typed are dispatched.
+       movb @pending_debounced_keypress_byte_status,a      ; LD A,($E8F5) / OR A; A = key typed, if any
+       jne  _407c                                          ; RET Z             ; none
+       rt                                                  ;                   ; 
+_407c:                                                     ; >407c
+       sb   @pending_debounced_keypress_byte_status,@pending_debounced_keypress_byte_status; XOR A / LD ($E8F5),A; consume it
+       movb @flight_controls_off,r0                        ; LD A,($EF8E) / OR A; flight controls off?
+       jeq  _408b                                          ; JR Z,$408B        ; no
+       cb   a,@bytes+>86                                   ; CP $86            ; 
+       jeq  _408b                                          ; RET NZ            ; yes: only the pause key is accepted
+       rt                                                  ;                   ; 
+_408b:                                                     ; >408b
+       li   r1,key_table                                   ; LD HL,$419B       ; R1 -> the key table
+_4094:                                                     ; >4094
+       mov  *r1,r0                                         ; CP (HL)           ; 
+       jeq  _409a                                          ;                   ; (TI: the table ends with 0)
+       cb   *r1,a                                          ;                   ; 
+       jeq  run_key_handler                                ; JR Z,$409B        ; found
+       ai   r1,6                                           ; ADD HL,DE         ; next entry
+       jmp  _4094                                          ; DJNZ $4094        ; 
+_409a:                                                     ; >409a
+       rt                                                  ; RET               ; not one of them
+run_key_handler:                                           ; >409b
+* TI: no click (sound effect 0, #R$7468), as the sound effects aren't converted yet
+       mov  @2(r1),r0                                      ; INC HL / LD A,(HL) ...; R0 = the handler's ROM bank
+       mov  @4(r1),r1                                      ;                   ; R1 = the handler
+       b    @far_call_r0_r1                                ; JP (HL)           ; run the handler (in its ROM bank), which returns to the caller
+
+********************************************************************************
+* Key table
+* 
+* 33 entries of 3 bytes - a key code (as produced by the key-code table at
+* #R$0A57) and the address of its handler - searched by #R$401C, which
+* runs the matching handler via #R$409B. Keys 1-4 (and F1-F4) switch
+* view in flight but launch, buy, sell and equip when docked (see their
+* handlers). Most keys match the manual's key lists; F5 and 'F' aren't
+* in it.
+key_table:                                                 ; >419b
+* TI: (key in the high byte, the handler's ROM bank, the handler) words,
+* only for the keys whose handlers are converted so far, ending with 0
+       data >3900,code_bank_7_select,status_page                  ; '9': commander status (#R$6276)
+       data >5b00,code_bank_7_select,commander_menu               ; '[' (FCTN-R): load/save commander menu (#R$A30A)
+       data 0                                                     ; end of the table
 
 ********************************************************************************
 * Draw the object

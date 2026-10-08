@@ -552,6 +552,124 @@ ti_check_key:
        rt
 *// ti_check_key
 
+*********************************************************************
+*
+* Read the keyboard
+*
+* TI-specific replacement for #R$347A, called once per (MSX) frame by
+* ti_poll_vblank with BLWP @keyboard_vector, in its own workspace (it uses
+* R12 for the CRU, which is AF' in the main workspace).
+*
+* While the key found last time is still held, does nothing, so that each
+* press counts once. Otherwise scans the keyboard (columns 0-5): if a key
+* is pressed, remembers it and stores its character in #R$E8F5, as on the
+* MSX (#R$0A57): upper case letters, digits, space, Enter (>0D). With FCTN,
+* 1-5 give F1-F5 (>80->84), 6 STOP (>86), 7 TAB (>09), 8 HOME (>87),
+* 9 (BACK) Esc (>1B) and R "[".
+*
+* Workspace registers: R1 the column's rows (a bit set for each key
+* pressed), R2 the column (high byte), R3 the row's bit, R4 the row,
+* R7 column 0 (for FCTN), R12 CRU base.
+*
+keyboard_vector:
+       data keyboard_ws,ti_read_keyboard
+
+ti_read_keyboard:
+       mov  @key_held_column,r2
+       jlt  ti_read_keyboard_scan      ; no key held
+       bl   @ti_read_keyboard_column
+       coc  @key_held_row,r1
+       jne  ti_read_keyboard_scan      ; released
+       rtwp                            ; still held - nothing new
+ti_read_keyboard_scan:
+       clr  r2
+       bl   @ti_read_keyboard_column   ; column 0: = space enter fctn shift ctrl
+       mov  r1,r7
+       andi r1,>0700                   ; only =, space and enter count as keys
+       jne  ti_read_keyboard_found
+ti_read_keyboard_next:
+       ai   r2,>0100
+       ci   r2,>0600
+       jhe  ti_read_keyboard_none
+       bl   @ti_read_keyboard_column
+       mov  r1,r1
+       jeq  ti_read_keyboard_next
+ti_read_keyboard_found:
+       li   r3,>0100                   ; find the first row pressed
+       clr  r4
+ti_read_keyboard_row:
+       coc  r3,r1
+       jeq  ti_read_keyboard_key
+       sla  r3,1
+       inc  r4
+       jmp  ti_read_keyboard_row
+ti_read_keyboard_key:
+       mov  r2,@key_held_column        ; remember the key
+       mov  r3,@key_held_row
+       mov  r2,r5
+       srl  r5,5                       ; R5 = column * 8 + row
+       a    r4,r5
+       coc  @key_fctn_bit,r7
+       jne  ti_read_keyboard_char
+       movb @key_fctn_chars(r5),r0     ; with FCTN
+       jne  ti_read_keyboard_store
+ti_read_keyboard_char:
+       movb @key_chars(r5),r0
+       jeq  ti_read_keyboard_return    ; no character
+ti_read_keyboard_store:
+       movb r0,@pending_debounced_keypress_byte_status
+ti_read_keyboard_return:
+       rtwp
+ti_read_keyboard_none:
+       seto @key_held_column           ; no key held
+       rtwp
+*// ti_read_keyboard
+
+*********************************************************************
+*
+* Read a keyboard column
+*
+* I:R2 The column (high byte)
+* O:R1 A bit set in the high byte for each row pressed (bit 8 = row 0)
+*
+ti_read_keyboard_column:
+       li   r12,>0024                  ; CRU address of the column decoder
+       ldcr r2,3                       ; select the column
+       li   r12,>0006                  ; CRU address of the rows
+       clr  r1
+       stcr r1,8                       ; read them (0 = pressed)
+       inv  r1
+       andi r1,>ff00
+       rt
+*// ti_read_keyboard_column
+
+key_held_column:                       ; The column of the key held (high byte), or -1
+       data -1
+key_held_row:                          ; Its row's bit (as from ti_read_keyboard_column)
+       data 0
+key_fctn_bit:                          ; FCTN in column 0
+       data >1000
+keyboard_ws:
+       bss  >20
+
+* The character for each key, by column (0-5) and row (0-7), as in #R$0A57
+key_chars:
+       byte '=',' ',>0d,0,0,0,0,0
+       byte '.','L','O','9','2','S','W','X'
+       byte ',','K','I','8','3','D','E','C'
+       byte 'M','J','U','7','4','F','R','V'
+       byte 'N','H','Y','6','5','G','T','B'
+       byte '/',';','P','0','1','A','Q','Z'
+* The same with FCTN (0 = as without)
+key_fctn_chars:
+       byte 0,0,0,0,0,0,0,0
+       byte 0,0,0,>1b,>81,0,0,0        ; 9 (BACK) Esc, 2 F2
+       byte 0,0,0,>87,>82,0,0,0        ; 8 HOME, 3 F3
+       byte 0,0,0,>09,>83,0,'[',0      ; 7 TAB, 4 F4, R [
+       byte 0,0,0,>86,>84,0,0,0        ; 6 STOP, 5 F5
+       byte 0,0,0,0,>80,0,0,0          ; 1 F1
+       even
+
 ti_read_joystick:
        li   r12,>0024                  ; CRU address of the column decoder
        ldcr r0,3                       ; Select column

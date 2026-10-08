@@ -105,7 +105,8 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   only for their labels (`main_program` is defined); banks 5 and 6 then reserve the tables' space with `bss`.
 - Interrupts stay disabled (`limi 0` once at startup); the converted `DI`/`EI` are commented out. Instead,
   `ti_poll_vblank` (`music-player.a99`) reads the VDP status and, on a new frame, does the MSX VBlank handler's
-  work: it counts the frame (`vblank_frame_counter`, `vblank_subtick_counter`) and plays a tick of the music. It
+  work: it counts the frame (`vblank_frame_counter`, `vblank_subtick_counter`), plays a tick of the music and reads
+  the keyboard (`ti_read_keyboard`: each new key press's character goes to `pending_debounced_keypress_byte_status`). It
   ignores every sixth frame, to keep the MSX's 50 Hz timing. It changes no registers, but must be called at least
   once a frame (it's in `clear_space_view`, `copy_space_view`, `draw_object`'s face loop and after each edge) and
   never between the two bytes of a VDP address.

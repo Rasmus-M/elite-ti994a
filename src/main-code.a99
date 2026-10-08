@@ -309,6 +309,7 @@ title_screen_key:                                          ; >1db5
        movb @b255,a                                        ; LD A,$FF          ;
        movb a,@load_new_commander                          ; LD ($E924),A      ;
 ;       b    @commander_menu                                ; JP $A30A          ; Y - load a commander
+       b    @title_screen                                  ;                   ; (TI: neither screen is converted yet - start again)
 
 ********************************************************************************
 * Title screen: swing an angle back and forth

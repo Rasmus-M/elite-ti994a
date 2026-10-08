@@ -270,8 +270,8 @@ music_ws:
 *
 * TI-specific. Interrupts stay off, so this takes the place of the MSX
 * VBlank handler (#R$7202): call it often enough to see every frame. When
-* the VDP has flagged a new frame, it counts the frame (#R$E90B, #R$F748)
-* and plays a tick of the music. The MSX runs at 50 Hz, so every sixth
+* the VDP has flagged a new frame, it counts the frame (#R$E90B, #R$F748),
+* plays a tick of the music and reads the keyboard (#R$347A). The MSX runs at 50 Hz, so every sixth
 * (60 Hz) frame is ignored to keep the same timing.
 *
 * Reading the VDP status resets the VDP's address latch, so this mustn't be
@@ -292,6 +292,7 @@ ti_poll_vblank_2:
        ab   one,@vblank_frame_counter
        ab   one,@vblank_subtick_counter
        blwp @music_tick_vector
+       blwp @keyboard_vector
        rt
 *// ti_poll_vblank
 

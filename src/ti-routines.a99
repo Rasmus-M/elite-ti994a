@@ -15,6 +15,7 @@ ti_setup_environment:
        bl   @graphics_mode
        li   r0,>1b80                   ; The view messages read the font from VRAM >1A80 + 8 * code
        bl   @vwad
+       seto @font_bank_select          ; The font is in ROM bank 5
        li   r1,font
        li   r2,96*8                    ; Codes >20->7F
 ti_setup_environment_1:

@@ -1,7 +1,13 @@
+* Copied into elite.a99 with main_program defined, only for its labels
+       .ifdef main_program
+       dorg >6000
+       .else
        aorg >6000
+       .endif
        bss  >40
        copy "../ship-blueprints-2.a99"
        copy "../cockpit-picture.a99"
+       copy "../font.a99"
 rom_bank_5_end:
        equ  $
        bss  >8000-$

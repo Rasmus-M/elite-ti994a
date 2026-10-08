@@ -1,4 +1,9 @@
+* Copied into elite.a99 with main_program defined, only for its labels
+       .ifdef main_program
+       dorg >6000
+       .else
        aorg >6000
+       .endif
        bss  >40
        copy "../ship-blueprints-1.a99"
 rom_bank_4_end:

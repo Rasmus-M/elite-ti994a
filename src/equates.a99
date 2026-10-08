@@ -138,3 +138,5 @@ blueprints_2_bank_select:
        equ  >600a
 cockpit_picture_bank_select:
        equ  >600a
+font_bank_select:
+       equ  >600a

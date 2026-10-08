@@ -1,6 +1,8 @@
        copy "macros.a99"
        copy "equates.a99"
 
+main_program:                          ; The ROM banks are copied only for their labels
+       equ  1
        copy "rom-banks/rom-bank-4.a99"
        copy "rom-banks/rom-bank-5.a99"
 

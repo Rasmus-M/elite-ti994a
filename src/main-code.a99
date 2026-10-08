@@ -1,4 +1,114 @@
 ********************************************************************************
+* Letter pairs for names
+* 
+* The 32 two-letter pairs system names are made from (#R$4CB8), as in BBC
+* Elite. Spaces are left out, so pair 0 adds nothing and pair 15 just
+* "a".
+name_letter_pairs:                                         ; >0e41
+       text '  '                                                  ; 0
+       text 'LE'                                                  ; 1
+       text 'XE'                                                  ; 2
+       text 'GE'                                                  ; 3
+       text 'ZA'                                                  ; 4
+       text 'CE'                                                  ; 5
+       text 'BI'                                                  ; 6
+       text 'SO'                                                  ; 7
+       text 'US'                                                  ; 8
+       text 'ES'                                                  ; 9
+       text 'AR'                                                  ; 10
+       text 'MA'                                                  ; 11
+       text 'IN'                                                  ; 12
+       text 'DI'                                                  ; 13
+       text 'RE'                                                  ; 14
+       text 'A '                                                  ; 15
+       text 'ER'                                                  ; 16
+       text 'AT'                                                  ; 17
+       text 'EN'                                                  ; 18
+       text 'BE'                                                  ; 19
+       text 'RA'                                                  ; 20
+       text 'LA'                                                  ; 21
+       text 'VE'                                                  ; 22
+       text 'TI'                                                  ; 23
+       text 'ED'                                                  ; 24
+       text 'OR'                                                  ; 25
+       text 'QU'                                                  ; 26
+       text 'AN'                                                  ; 27
+       text 'TE'                                                  ; 28
+       text 'IS'                                                  ; 29
+       text 'RI'                                                  ; 30
+       text 'ON'                                                  ; 31
+
+********************************************************************************
+* The message "Harmless"
+msg_harmless_0f25:                                         ; >0f25
+       text 'HARMLES',>f3                                         ; the combat ranks (#R$EB12), printed with RST $10
+msg_mostly_harmless:                                       ; >0f2d
+       text 'MOSTLY HARMLES',>f3                                  ; 
+msg_poor:                                                  ; >0f3c
+       text 'POO',>f2                                             ; 
+msg_average:                                               ; >0f40
+       text 'AVERAG',>e5                                          ; 
+msg_above_average:                                         ; >0f47
+       text 'ABOVE AVERAG',>e5                                    ; 
+msg_competent:                                             ; >0f54
+       text 'COMPETEN',>f4                                        ; 
+msg_dangerous:                                             ; >0f5d
+       text 'DANGEROU',>f3                                        ; 
+msg_deadly:                                                ; >0f66
+       text 'DEADL',>f9                                           ; 
+msg_e_l_i_t_e:                                             ; >0f6c
+       text 'E-L-I-T-',>c5                                        ; 
+
+********************************************************************************
+* Equipment-name list: 2 leading empty entries
+* 
+* A separate, independently-addressed RST $10 list head from
+* #R$0FFC's - #R$19A1 (at $19BB) and #R$6355 both `LD HL,$10A7`
+* directly, walking
+* it as its own list rather than continuing #R$0FFC's. These 2 empty
+* entries (indices 0-1, skipping Fuel/Missiles) let the same physical
+* strings from #R$10A9 ("Large Cargo Bay") onward serve as indices 2+
+* here, reusing #R$0FFC's text under a second, differently-numbered
+* entry point rather than duplicating it.
+equipment_name_list2_empty_slots:                          ; >10a7
+       byte >80,>80                                               ; two empty entries, then the equipment names
+msg_large_cargo_bay_10a9:                                  ; >10a9
+       text 'LARGE CARGO BA',>f9                                  ; 
+msg_ecm_system_10b8:                                       ; >10b8
+       text 'ECM SYSTE',>ed                                       ; 
+msg_pulse:                                                 ; >10c2
+       text 'PULSE',>a0                                           ; 
+msg_beam:                                                  ; >10c8
+       text 'BEAM',>a0                                            ; 
+msg_fuel_scoop_10cd:                                       ; >10cd
+       text 'FUEL SCOO',>f0                                       ; 
+msg_escape_capsule_10d7:                                   ; >10d7
+       text 'ESCAPE CAPSUL',>e5                                   ; 
+msg_energy_bomb_10e5:                                      ; >10e5
+       text 'ENERGY BOM',>e2                                      ; 
+msg_energy_unit:                                           ; >10f0
+       text 'ENERGY UNI',>f4                                      ; 
+msg_docking_computer_10fb:                                 ; >10fb
+       text 'DOCKING COMPUTE',>f2                                 ; 
+msg_gal_hyperdrive:                                        ; >110b
+       text 'GAL. HYPERDRIV',>e5                                  ; 
+msg_mining:                                                ; >111a
+       text 'MINING',>a0                                          ; 
+msg_military:                                              ; >1121
+       text 'MILITARY',>a0                                        ; 
+msg_ecm_jammer:                                            ; >112a
+       text 'ECM JAMME',>f2                                       ; 
+msg_cloaking_device:                                       ; >1134
+       text 'CLOAKING DEVIC',>e5                                  ; 
+msg_documents:                                             ; >1143
+       text 'DOCUMENT',>f3                                        ; 
+
+********************************************************************************
+* The message "Naval Energy Unt"
+msg_naval_energy_unt:                                      ; >114c
+       text 'NAVAL ENERGY UN',>f4                                 ; 
+
+********************************************************************************
 * "FRONT VIEW" bitmap
 * 
 * The view name shown when switching to the front view (#R$64A1): 7
@@ -123,7 +233,6 @@ title_screen:                                              ; >1c5c
        movb @bytes+>87,a                                   ; LD A,$87          ;
        movb a,@vdpwa                                       ; OUT ($99),A       ;
        ; EI                                                ; EI                ;
-       .far_call code_bank_7_select,bank_7_test            ;                   ; (TI: temporary test of code in ROM bank 7: dark blue backdrop)
        sb   a,a                                            ; XOR A             ;
        movb a,@docked                                      ; LD ($E90A),A      ;
        sb   one,a                                          ; DEC A             ;
@@ -305,7 +414,15 @@ title_screen_key:                                          ; >1db5
        .pop af                                             ; POP AF            ;
        cb   a,@bytes+>59                                   ; CP $59            ;
        jeq  !                                              ; JP NZ,$6276       ; N - the docked screen
-;       b    @status_page                                   ;
+       sb   a,a                                            ;                   ; (TI: show the status page from ROM bank 7,
+       movb a,@current_screen                              ;                   ; then wait for a key and start the title
+       .far_call code_bank_7_select,status_page            ; JP NZ,$6276       ; screen again - a pilot until the docked
+_title_screen_status_wait:
+       bl   @ti_poll_vblank                                ;                   ; screens and the main loop are converted)
+       movb @pending_debounced_keypress_byte_status,a      ;                   ; 
+       jeq  _title_screen_status_wait                      ;                   ; 
+       sb   @pending_debounced_keypress_byte_status,@pending_debounced_keypress_byte_status;                   ; 
+       b    @title_screen                                  ;                   ; 
 !
        movb @b255,a                                        ; LD A,$FF          ;
        movb a,@load_new_commander                          ; LD ($E924),A      ;
@@ -773,6 +890,67 @@ divide_hl_a:                                               ; >2079
        mov  hl,r2                                          ; LD C,L            ; R1:R2 = the dividend
        div  r0,r1                                          ; SBC HL,DE         ; R1 = the quotient, R2 = the remainder
        mov  r1,hl                                          ; LD H,A            ; HL = the quotient
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Divide: 24-bit / 10, extracting one decimal digit
+* 
+* Used by the routines at #R$3675 and #R$5E6B.
+* .
+* Same shift-subtract-restore shape as #R$2079's 16-bit divide, but
+* hardwired to divide by 10 and widened to a 24-bit dividend (verified
+* by simulation, e.g. 65535 -> quotient 6553, remainder 5). This is the
+* standard single step of converting a binary value to decimal one
+* digit at a time - #R$3675 loops it until the quotient reaches zero,
+* collecting a full digit string; #R$5E8B makes one call on its own,
+* keeping only the quotient and discarding the remainder digit, to
+* strip a fractional decimal place from a fixed-point product.
+* 
+* I:C Dividend, low byte
+* I:L Dividend, middle byte
+* I:H Dividend, high byte
+* O:A Remainder (the extracted digit, 0-9)
+* O:C Quotient, low byte
+* O:L Quotient, middle byte
+* O:H Quotient, high byte
+divide_c_l_h_by_10:                                        ; >20c6
+       li   r2,10                                          ; XOR A             ; (TI: two DIVs instead of the 24-step shift and subtract)
+       clr  r0                                             ; LD B,$18          ; 
+       mov  hl,r1                                          ;                   ; 
+       div  r2,r0                                          ;                   ; R0 = H:L / 10, R1 = the remainder
+       mov  r0,hl                                          ;                   ; H:L = the quotient's upper 16 bits
+       swpb r1                                             ;                   ; 
+       movb @c,@r1lb                                       ;                   ; R1 = the remainder * 256 + C
+       clr  r0                                             ;                   ; 
+       div  r2,r0                                          ;                   ; R0 = that / 10 (< 256), R1 = the remainder
+       swpb r0                                             ;                   ; 
+       movb r0,@c                                          ;                   ; C = the quotient's low byte
+       swpb r1                                             ;                   ; 
+       movb r1,a                                           ;                   ; A = the remainder (the digit)
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Twist the seeds once
+* 
+* Used by the routine at #R$4CE7.
+* .
+* Turns the three 16-bit seeds (s0, s1, s2) at #R$E904 into (s1, s2, s0 +
+* s1 + s2), as in BBC Elite.
+twist_seeds:                                               ; >2147
+       movb @system_seeds+1,hl                             ; LD HL,($E904)     ; HL = the oldest slot
+       movb @system_seeds,@l                               ;                   ; 
+       movb @seed_s1+1,de                                  ; LD DE,($E906)     ; DE = the middle slot
+       movb @seed_s1,@e                                    ;                   ; 
+       movb @seed_s2+1,bc                                  ; LD BC,($E908)     ; BC = the newest slot
+       movb @seed_s2,@c                                    ;                   ; 
+       a    de,hl                                          ; ADD HL,DE         ; HL = oldest+middle
+       a    bc,hl                                          ; ADD HL,BC         ; HL = oldest+middle+newest (the new sum)
+       movb de,@system_seeds+1                             ; LD ($E904),DE     ; shift: middle becomes the new oldest
+       movb @e,@system_seeds                               ;                   ; 
+       movb bc,@seed_s1+1                                  ; LD ($E906),BC     ; shift: newest becomes the new middle
+       movb @c,@seed_s1                                    ;                   ; 
+       movb hl,@seed_s2+1                                  ; LD ($E908),HL     ; the sum becomes the new newest
+       movb @l,@seed_s2                                    ;                   ; 
        rt                                                  ; RET               ; 
 
 ********************************************************************************
@@ -1505,6 +1683,33 @@ set_cursor_position:                                       ; >3548
        rt                                                  ; RET               ; 
 
 ********************************************************************************
+* Set the text cursor to column A
+* 
+* Used by the routines at #R$35E7, #R$3619, #R$3631, #R$5AF8, #R$5B4D, #R$5CEE,
+* #R$5DBB, #R$6066, #R$6164 and #R$6377.
+* .
+* Like #R$3548, but leaves the cursor on the same row (the high byte of
+* #R$E70F).
+* 
+* I:A Column
+set_cursor_position_combined:                              ; >3564
+       movb a,@cursor_column                               ; LD ($E72C),A      ; the column
+       movb a,r1                                           ;                   ; 
+       srl  r1,8                                           ;                   ; 
+       mov  r1,r0                                          ;                   ; 
+       sla  r1,1                                           ;                   ; 
+       a    r0,r1                                          ;                   ; 
+       sla  r1,1                                           ;                   ; R1 = column * 6
+       mov  r1,r0                                          ;                   ; 
+       andi r0,>00f8                                       ; AND $F8           ; 
+       swpb r0                                             ;                   ; 
+       movb r0,@cursor_vram_addr                           ; LD ($E70F),A      ; the character cell
+       andi r1,>0007                                       ; AND $07           ; 
+       swpb r1                                             ;                   ; 
+       movb r1,@cursor_subpixel_offset                     ; LD ($E70E),A      ; the pixel within the cell
+       rt                                                  ; RET               ; 
+
+********************************************************************************
 * RST $08 target: print a tokenised string at HL
 * [text]
 * 
@@ -1536,6 +1741,64 @@ rst_08_target_print_tokenised_string_jmp:
        jmp  rst_08_target_print_tokenised_string_jmp       ; JR $357A          ; 
 
 ********************************************************************************
+* RST $10 target: print the A'th tokenised string in a list at HL
+* [text]
+* 
+* Used by the routine at #R$0010.
+* .
+* Skips A strings via #R$358D, then prints the one HL now points to via
+* RST $08 (#R$357A).
+rst_10_target_print_ath_tokenised:                         ; >3588
+       .proc                                               ;                   ; 
+       bl   @skip_tokenised_strings_advancing_hl_past      ; CALL $358D        ; 
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Skip A tokenised strings, advancing HL past each one
+* 
+* Used by the routines at #R$193F, #R$3588 and #R$8BA6.
+* .
+* Each string ends at the first byte with its top bit set (the same
+* terminator convention #R$357A prints by). Returns once A strings have
+* been skipped (A=0 on entry does nothing).
+skip_tokenised_strings_advancing_hl_past:                  ; >358d
+       sb   one,a                                          ; DEC A             ; 
+       jlt  skip_tokenised_strings_end                     ; RET M             ; 
+_358f:                                                     ; >358f
+       movb *hl+,r0                                        ; BIT 7,(HL) / INC HL; 
+       jgt  _358f                                          ; JR Z,$358F        ; not the last character
+       jeq  _358f                                          ;                   ; 
+       jmp  skip_tokenised_strings_advancing_hl_past       ; JR $358D          ; 
+skip_tokenised_strings_end:                                
+       rt                                                  ;                   ; 
+
+********************************************************************************
+* RST $20 target: print a list of positioned tokenised strings
+* [text]
+* 
+* Used by the routine at #R$0020.
+* .
+* Reads (column, row, tokenised-string) records from HL: a negative
+* column byte ends the list; otherwise positions the cursor via #R$3548,
+* prints the string via RST $08 (#R$357A), advances past it, and
+* repeats.
+rst_20_target_print_list_positioned:                       ; >3596
+       .proc                                               ;                   ; 
+_3596:                                                     
+       movb *hl,a                                          ; LD A,(HL)         ; A = the column
+       jlt  _3596_end                                      ; RET M             ; bit 7 set - the end of the list
+       movb a,b                                            ; LD B,A            ; 
+       inc  hl                                             ; INC HL            ; 
+       movb *hl+,@c                                        ; LD C,(HL)         ; C = the row
+       bl   @set_cursor_position                           ; CALL $3548        ; put the cursor there (#R$3548)
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print the string (#R$357A)
+       inc  hl                                             ; INC HL            ; move past its last byte
+       jmp  _3596                                          ; JR $3596          ; next record
+_3596_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
 * Fill BC bytes of VRAM with a fixed byte
 * 
 * Used by the routine at #R$3955.
@@ -1553,6 +1816,28 @@ fill_vram_bytes:                                           ; >35a4
        movb b,a                                            ; LD A,B            ; 
        socb @c,a                                           ; OR C              ; 
        jne  fill_vram_bytes                                ; JR NZ,$35A4       ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Fill up to 256*C bytes of VRAM with a fixed byte
+* 
+* Used by the routine at #R$70E8.
+* .
+* Writes A to the VDP data port in chunks of 256 bytes (the inner counter B
+* is loaded with 0, so DJNZ wraps it to 256), repeated C times. Like
+* #R$35A4, the caller must set the VRAM write address first.
+* 
+* I:A Fill byte
+* I:C Number of 256-byte chunks to write
+fill_vram_256:                                             ; >35ad
+       li   r2,vdpwd                                       ;                   ; 
+       clr  r1                                             ; LD B,$00          ; 
+       movb @c,r1                                          ;                   ; R1 = C * 256 bytes
+_35af:                                                     ; >35af
+       movb a,*r2                                          ; OUT ($98),A       ; 
+       dec  r1                                             ; DJNZ $35AF / DEC C; 
+       jne  _35af                                          ; JR NZ,$35AD       ; 
+       sb   @c,@c                                          ;                   ; C = 0, as on the MSX
        rt                                                  ; RET               ; 
 
 ********************************************************************************
@@ -1615,6 +1900,375 @@ _35db:                                                     ; >35db
        sb   one,@c                                         ; DEC C             ; 
        jne  _35bc                                          ; JR NZ,$35BC       ; 
        rt                                                  ; RET               ; 
+
+********************************************************************************
+* Format a number
+* 
+* Used by the routines at #R$1651, #R$1A8A, #R$2556 and #R$36E1.
+* .
+* Writes the digits of the 24-bit number H:L:C at IX, with bit 7 of the
+* last one set, as tokenised text. Divides by 10 (#R$20C6) until it's 0,
+* pushing each digit. If bit 7 of the control byte (kept in $E738) is set,
+* pads the number to the width in bits 0-5 with #R$EF96 (normally a space).
+* If bit 6 is set, the number is in tenths: it gets at least two digits,
+* and (at $36C1) a decimal point before the last one. At $36B8 and $36D7,
+* writes a digit.
+* 
+* I:A Control byte: bit 7 pads to the width in bits 0-5, bit 6 adds a
+* .   decimal point
+* I:H:L:C The number (C the low byte)
+* I:IX Where to write it
+* O:IX One past the last byte written
+format_number:                                             ; >3675
+       .proc                                               ;                   ; 
+       movb a,@format_control                              ; LD ($E738),A      ; cache the control byte
+       sb   @e,@e                                          ; LD E,$00          ; E = digit count so far
+       seto r0                                             ; LD A,$FF          ; push the bottom-of-stack sentinel
+       .push r0                                            ; PUSH AF           ; 
+_367d:                                                     ; >367d
+       bl   @divide_c_l_h_by_10                            ; CALL $20C6        ; A = the next digit, H:L:C = the reduced quotient
+       .push af                                            ; PUSH AF           ; push this digit
+       ab   one,@e                                         ; INC E             ; one more digit
+       movb @c,a                                           ; LD A,C            ; 
+       socb h,a                                            ; OR H              ; 
+       socb @l,a                                           ; OR L              ; 
+       jne  _367d                                          ; JR NZ,$367D       ; quotient not yet zero - extract another digit
+       movb @format_control,a                              ; LD A,($E738)      ; A = the control byte again
+       movb a,d                                            ; LD D,A            ; D = the control byte, for the bit-6 tests below
+       czc  @bit6,a                                        ; BIT 6,A           ; 
+       jeq  _3696                                          ; JR Z,$3696        ; clear - skip the two-digit-minimum check
+       movb @e,b                                           ; LD B,E            ; was exactly one digit produced?
+       ab   one,@e                                         ; INC E             ; 
+       sb   one,b                                          ; DEC B             ; 
+       jne  _3696                                          ; JR NZ,$3696       ; no - move on
+       .push bc                                            ; PUSH BC           ; yes - push an extra placeholder digit (0)
+       ab   one,@e                                         ; INC E             ; 
+_3696:                                                     ; >3696
+       movb @format_control,a                              ; OR A              ; test the control byte's sign
+       jgt  format_number_digits                           ; JP P,$36AA        ; bit 7 clear - no minimum-width padding
+       jeq  format_number_digits                           ;                   ; 
+       andi a,>3f00                                        ; AND $3F           ; A = the minimum field width
+       sb   @e,a                                           ; SUB E             ; minus the digits actually produced
+       jeq  format_number_digits                           ; JR Z,$36AA        ; exactly enough already - no padding needed
+       jlt  format_number_digits                           ;                   ; (TI: more than enough - no padding either)
+       movb a,b                                            ; LD B,A            ; B = the padding count
+       movb @number_fill_char,a                            ; LD A,($EF96)      ; A = the fill character
+_36a3:                                                     ; >36a3
+       movb a,*ix+                                         ; LD (IX+$00),A / INC IX; write B fill bytes
+       sb   one,b                                          ; DJNZ $36A3        ; 
+       jne  _36a3                                          ;                   ; 
+format_number_digits:                                      ; >36aa
+       czc  @bit6,d                                        ; BIT 6,D           ; the decimal-point/two-digit-minimum flag again
+       jne  continue_3675_write_digit_decimal_point        ; JR NZ,$36C1       ; set - with a decimal point
+_36ae:                                                     ; >36ae
+       .pop af                                             ; POP AF / OR A     ; pop the next digit (most significant first)
+       jlt  format_number_end                              ; JP P,$36B8        ; the sentinel - finish
+       ab   @bytes+>30,a                                   ; ADD A,$30         ; digit -> ASCII
+       movb a,*ix+                                         ; LD (IX+$00),A / INC IX; write it
+       jmp  _36ae                                          ; JR $36AE          ; next digit
+continue_3675_write_digit_decimal_point:                   ; >36c1
+       sb   one,@e                                         ; DEC E             ; account for the terminal $FF popped, but not written
+_36c2:                                                     ; >36c2
+       movb @e,a                                           ; LD A,E            ; exactly one digit left to write?
+       sb   one,a                                          ; DEC A             ; 
+       jne  _36cd                                          ; JR NZ,$36CD       ; no - write the next digit as usual
+       movb @bytes+>2e,a                                   ; LD A,$2E          ; yes - insert '.' first
+       movb a,*ix+                                         ; LD (IX+$00),A / INC IX; 
+_36cd:                                                     ; >36cd
+       .pop af                                             ; POP AF / OR A     ; pop the next digit
+       jlt  format_number_end                              ; JP P,$36D7        ; the sentinel - finish
+       ab   @bytes+>30,a                                   ; ADD A,$30         ; digit -> ASCII
+       movb a,*ix+                                         ; LD (IX+$00),A / INC IX; write it
+       sb   one,@e                                         ; DEC E             ; one fewer digit remaining
+       jmp  _36c2                                          ; JR $36C2          ; check for the decimal point again
+format_number_end:                                         
+       socb @bit7,@-1(ix)                                  ; SET 7,(IX-$01)    ; flag the last byte written
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* RST $18 target: format a value into $E717 and print it [text]
+* 
+* Used by the routine at #R$0018.
+* .
+* Runs #R$3675's format-into-$E717 loop, then prints the result via
+* RST $08 (#R$357A).
+rst_18_target_format_value_print:                          ; >36e1
+       .proc                                               ;                   ; 
+       .push ix                                            ; PUSH IX           ; 
+       li   ix,text_buffer                                 ; LD IX,$E717       ; 
+       bl   @format_number                                 ; CALL $3675        ; 
+       .pop ix                                             ; POP IX            ; 
+       li   hl,text_buffer                                 ; LD HL,$E717       ; 
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* RST $28 target: colour a list of rectangles
+* 
+* Used by the routines at #R$0028 and #R$90D3.
+* .
+* Reads 5-byte records from IX until one starts with a byte with bit 7 set
+* (usually $FF): the column, row, width and height of a rectangle (in text
+* columns, 6 pixels wide, and character rows), and a colour byte. Fills
+* the colour table for the rectangle with the colour (#R$35B8), from the
+* character cell containing its left edge (column * 6 pixels) to the one
+* containing the pixel just after its right edge ((column + width) * 6) -
+* so it can reach one cell further right than the rectangle. Used for the
+* frames and colour bars of the screens (e.g. #R$58BD).
+* 
+* I:IX The list of rectangles
+rst_28_target_draw_list_tile:                              ; >36f1
+       .proc                                               ;                   ; 
+_36f1:                                                     
+       movb *ix,r1                                         ; LD A,(IX+$00)     ; the column
+       jlt  _36f1_end                                      ; RET M             ; end of the list
+       srl  r1,8                                           ;                   ; 
+       mov  r1,r0                                          ;                   ; 
+       sla  r1,1                                           ;                   ; 
+       a    r0,r1                                          ;                   ; 
+       sla  r1,1                                           ;                   ; R1 = column * 6 (the left edge in pixels)
+       andi r1,>00f8                                       ; AND $F8           ; 8 * the character cell it's in
+       mov  r1,r2                                          ;                   ; 
+       swpb r1                                             ;                   ; 
+       movb r1,@l                                          ; LD L,A            ; 
+       movb @1(ix),h                                       ; LD A,(IX+$01)     ; 
+       ab   @bytes+>20,h                                   ; ADD A,$20 / LD H,A; HL = the colour table address for that cell
+       movb *ix,r1                                         ; LD A,B            ; 
+       ab   @2(ix),r1                                      ; ADD A,(IX+$02)    ; 
+       srl  r1,8                                           ;                   ; 
+       mov  r1,r0                                          ;                   ; 
+       sla  r1,1                                           ;                   ; 
+       a    r0,r1                                          ;                   ; 
+       sla  r1,1                                           ;                   ; (column + width) * 6 (the right edge in pixels)
+       andi r1,>00f8                                       ; AND $F8           ; 
+       ai   r1,8                                           ; ADD A,$08         ; 
+       s    r2,r1                                          ; SUB L             ; 
+       srl  r1,3                                           ; RRA x 3           ; 
+       andi r1,>001f                                       ; AND $1F           ; 
+       swpb r1                                             ;                   ; 
+       movb r1,@c                                          ; LD C,A            ; C = the number of character cells across
+       movb @3(ix),r1                                      ; LD A,(IX+$03)     ; 
+       sla  r1,3                                           ; ADD A,A x 3       ; 
+       movb r1,b                                           ; LD B,A            ; B = height * 8 (pixel rows)
+       movb @4(ix),a                                       ; LD A,(IX+$04)     ; A = the colour
+       bl   @fill_vram_rect                                ; CALL $35B8        ; fill the rectangle
+       ai   ix,5                                           ; ADD IX,BC         ; IX -> the next rectangle
+       jmp  _36f1                                          ; JR $36F1          ; 
+_36f1_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Draw a Bresenham line from (B,C) to (D,E), pixel-precise [line-draw]
+* 
+* Used by the routines at #R$37E2, #R$523A, #R$541E and #R$5584.
+* .
+* A second, independent Bresenham line-drawer alongside the #R$3C48 family,
+* plotting via #R$3793 - which self-modifies the displacement of its own
+* `OR (IX+d)` instruction to `C AND 7` before each use, so IX (fixed at
+* $E700, the bit-position table $80..$01) still selects the correct single
+* pixel bit within the target byte despite never being re-pointed. Caches
+* the original (D,E) endpoint to #R$E730 (for #R$37E2's fan-drawing use),
+* then swaps the two endpoints if needed so the row always decreases from B
+* down to D, works out the column step direction and the row/column deltas,
+* plots the first point, and picks $3773's steep-line loop if the row delta
+* exceeds the column delta, or its own shallow-line loop (row-major vs.
+* column-major Bresenham stepping) otherwise.
+* .
+* At $3773, the loop for a steep line, stepping the row every time and the
+* column only sometimes.
+draw_bresenham_line_372b:                                  ; >372b
+       .proc                                               ;                   ; (TI: the pixel masks come from pixel_bitmask_table in plot_line_pixel, IX isn't used)
+       movb de,@bresenham_cached_endpoint+1                ; LD ($E730),DE     ; cache the original second endpoint
+       movb @e,@bresenham_cached_endpoint                  ;                   ; 
+       movb d,a                                            ; LD A,D            ; 
+       cb   a,b                                            ; CP B              ; first endpoint's row < second's?
+       jl   _373c                                          ; JR C,$373C        ; yes - no swap needed
+       movb b,d                                            ; LD D,B            ; no - swap rows...
+       movb a,b                                            ; LD B,A            ; 
+       movb @e,a                                           ; LD A,E            ; 
+       movb @c,@e                                          ; LD E,C            ; ...and columns, so (D,E) becomes the smaller-row endpoint
+       movb a,@c                                           ; LD C,A            ; 
+_373c:                                                     ; >373c
+       movb @e,a                                           ; LD A,E            ; 
+       sb   @c,a                                           ; SUB C             ; dx = E - C (signed column delta, post-swap)
+       movb one,@l                                         ; LD L,$01          ; L = +1 (default column step)
+       joc  _3746                                          ; JR NC,$3746       ; dx >= 0 - keep that step
+       andi a,>ff00                                        ; NEG               ; dx < 0 - take the magnitude...
+       neg  a                                              ;                   ; 
+       movb @b255,@l                                       ; LD L,$FF          ; ...and step -1 instead
+_3746:                                                     ; >3746
+       movb a,@e                                           ; LD E,A            ; E = abs(dx)
+       movb b,a                                            ; LD A,B            ; 
+       sb   d,a                                            ; SUB D             ; dy = B - D (always >= 0, since D <= B after the swap)
+       movb a,d                                            ; LD D,A            ; D = dy
+       .push hl                                            ; PUSH HL           ; 
+       bl   @plot_line_pixel                               ; CALL $3793        ; plot the first point (B,C)
+       .pop hl                                             ; POP HL            ; 
+       cb   @e,d                                           ; LD A,E / CP D     ; dx < dy (steeper than 45 degrees)?
+       jl   draw_bresenham_line_372b_steep                 ; JR C,$3773        ; yes - a steep line
+       movb @e,r0                                          ; LD H,E            ; 
+       srl  r0,1                                           ; SRL H             ; 
+       movb r0,h                                           ;                   ; H = dx/2, the error accumulator
+       movb @e,a                                           ; LD A,E / OR A     ; 
+       jeq  _3792                                          ; RET Z             ; dx == 0 - a single point, already plotted above
+       movb a,@line_points_left                            ; LD ($E734),A      ; E734 = dx, the remaining-points loop counter
+_375c:                                                     ; >375c
+       ab   @l,@c                                          ; LD A,C / ADD A,L / LD C,A; column += step (the major axis)
+       movb h,a                                            ; LD A,H            ; 
+       sb   d,a                                            ; SUB D             ; error -= dy
+       joc  _3765                                          ; JR NC,$3765       ; still >= 0 - no row step this time
+       sb   one,b                                          ; DEC B             ; underflowed - row -= 1 (towards D)
+       ab   @e,a                                           ; ADD A,E           ; and restore the error by += dx
+_3765:                                                     ; >3765
+       movb a,h                                            ; LD H,A            ; store the updated error
+       .push hl                                            ; PUSH HL           ; 
+       bl   @plot_line_pixel                               ; CALL $3793        ; plot (B,C)
+       .pop hl                                             ; POP HL            ; 
+       sb   one,@line_points_left                          ; DEC ($E734)       ; one fewer point to plot (after the POP, which changes the status)
+       jne  _375c                                          ; JR NZ,$375C       ; more to go - next point
+       jmp  _3792                                          ; JR $3792          ; done
+draw_bresenham_line_372b_steep:                            ; >3773
+       movb d,r0                                           ; LD H,D            ; 
+       srl  r0,1                                           ; SRL H             ; 
+       movb r0,h                                           ;                   ; H = dy/2, the error accumulator
+       movb d,a                                            ; LD A,D / OR A     ; 
+       jeq  _3792                                          ; RET Z             ; dy = 0 - a single point, already plotted
+       movb a,@line_points_left                            ; LD ($E734),A      ; E734 = dy, the remaining-points loop counter
+_377c:                                                     ; >377c
+       sb   one,b                                          ; DEC B             ; row -= 1 (the major axis)
+       movb h,a                                            ; LD A,H            ; 
+       sb   @e,a                                           ; SUB E             ; error -= dx
+       movb a,h                                            ; LD H,A            ; 
+       joc  _3787                                          ; JR NC,$3787       ; still >= 0 - no column step this time
+       ab   d,a                                            ; ADD A,D           ; underflowed - restore the error by += dy...
+       movb a,h                                            ; LD H,A            ; 
+       ab   @l,@c                                          ; LD A,C / ADD A,L / LD C,A; ...and step the column
+_3787:                                                     ; >3787
+       .push hl                                            ; PUSH HL           ; 
+       bl   @plot_line_pixel                               ; CALL $3793        ; plot (B,C)
+       .pop hl                                             ; POP HL            ; 
+       sb   one,@line_points_left                          ; DEC ($E734)       ; one fewer point to plot
+       jne  _377c                                          ; JR NZ,$377C       ; more to go - next point
+_3792:                                                     ; >3792
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Plot a pixel of a line
+* 
+* Used by the routines at #R$372B and #R$4D0B.
+* .
+* Sets pixel (x, y) in the pattern table in VRAM, ORing in its bit from
+* the table at $E700 (by patching the displacement of an (IX+d)
+* instruction). While #R$E90F is set, only plots in character cells
+* coloured $F1 (white on black).
+* 
+* I:B y
+* I:C x
+plot_line_pixel:                                           ; >3793
+       .proc                                               ;                   ; 
+       bl   @pixel_address                                 ; CALL $37D1        ; HL = the pixel's address
+       movb @e90f_equip_op_flag,a                          ; LD A,($E90F)      ; only in white on black cells?
+       jeq  _37ad                                          ; OR A / JR Z,$37AD ; no
+       movb @l,@vdpwa                                      ; LD A,L / OUT ($99),A; VRAM address low byte
+       movb h,r0                                           ; LD A,H            ; 
+       ab   @bytes+>20,r0                                  ; ADD A,$20         ; its colour (at +$2000)
+       movb r0,@vdpwa                                      ; OUT ($99),A       ; 
+       cb   @vdprd,@bytes+>f1                              ; IN A,($98) / CP $F1; white on black?
+       jne  _37be                                          ; RET NZ            ; no - don't plot
+_37ad:                                                     ; >37ad
+       movb @c,r1                                          ; LD A,C            ; 
+       srl  r1,8                                           ;                   ; 
+       andi r1,>0007                                       ; AND $07           ; the column's bit position within its byte (0-7)
+       movb @l,@vdpwa                                      ; LD A,L / OUT ($99),A; VRAM address low byte
+       movb h,@vdpwa                                       ; LD A,H / OUT ($99),A; ...high byte, read mode
+       movb @vdprd,r0                                      ; IN A,($98)        ; A = the current byte there
+       socb @pixel_bitmask_table(r1),r0                    ; OR (IX+d)         ; combine in the pixel bit (TI: indexed, not self-modified)
+       movb @l,@vdpwa                                      ; LD A,L / OUT ($99),A; re-issue the address, low byte
+       movb h,r1                                           ; LD A,H            ; 
+       socb @bytes+>40,r1                                  ; OR $40            ; ...high byte, this time in write mode
+       movb r1,@vdpwa                                      ; OUT ($99),A       ; 
+       movb r0,@vdpwd                                      ; OUT ($98),A       ; write it back
+_37be:                                                     
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Get the address of a pixel in the pattern table
+* 
+* Used by the routines at #R$3793, #R$50CE, #R$512F and #R$8205.
+* .
+* For screen 2: (y / 8) * 256 + (x AND $F8) + (y AND 7).
+* 
+* I:B y
+* I:C x
+* O:HL Address
+pixel_address:                                             ; >37d1
+       movb b,r0                                           ; LD A,B            ; 
+       srl  r0,8                                           ;                   ; R0 = y
+       mov  r0,r1                                          ;                   ; 
+       andi r1,>0007                                       ; AND $07           ; y AND 7
+       srl  r0,3                                           ; RRA x 3 / AND $1F ; 
+       swpb r0                                             ;                   ; H = y / 8
+       a    r1,r0                                          ;                   ; 
+       movb @c,r1                                          ; LD A,C            ; 
+       srl  r1,8                                           ;                   ; 
+       andi r1,>00f8                                       ; AND $F8           ; x AND $F8
+       a    r1,r0                                          ; ADD A,L           ; 
+       mov  r0,hl                                          ;                   ; HL = (y / 8) * 256 + (x AND $F8) + (y AND 7)
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Draw a line on from the last point
+* 
+* Used by the routine at #R$37E9.
+* .
+* Draws a line from the end of the last line (#R$E730, cached by
+* #R$372B) to (D, E).
+* 
+* I:D y
+* I:E x
+draw_line_on:                                              ; >37e2
+       movb @bresenham_cached_endpoint+1,bc                ; LD BC,($E730)     ; BC = the endpoint #R$372B cached last time
+       movb @bresenham_cached_endpoint,@c                  ;                   ; 
+       b    @draw_bresenham_line_372b                      ; JP $372B          ; draw a line from there to (D,E)
+
+********************************************************************************
+* Draw lines
+* 
+* Used by the routine at #R$70E8.
+* .
+* Draws the lines in the list at HL: each group is a starting point (y, x)
+* and the points (y, x) to draw lines to in turn (#R$37E2, #R$372B), ending
+* with $FF; the list ends with another $FF.
+* .
+* At $3805, the next group.
+* 
+* I:HL The list
+draw_lines:                                                ; >37e9
+       .proc                                               ;                   ; 
+draw_lines_1:                                              
+       movb *hl,a                                          ; LD A,(HL)         ; 
+       cb   a,@b255                                        ; CP $FF            ; 
+       jeq  draw_lines_end                                 ; RET Z             ; end of the list
+       movb a,b                                            ; LD B,A            ; 
+       inc  hl                                             ; INC HL            ; 
+       movb *hl+,@c                                        ; LD C,(HL) / INC HL; 
+       movb bc,@bresenham_cached_endpoint+1                ; LD ($E730),BC     ; the starting point
+       movb @c,@bresenham_cached_endpoint                  ;                   ; 
+_37f5:                                                     ; >37f5
+       movb *hl,a                                          ; LD A,(HL)         ; 
+       cb   a,@b255                                        ; CP $FF            ; 
+       jeq  draw_lines_2                                   ; JR Z,$3805        ; end of the group
+       movb *hl+,d                                         ; LD D,(HL) / INC HL; 
+       movb *hl+,@e                                        ; LD E,(HL) / INC HL; DE = the next point
+       .push hl                                            ; PUSH HL           ; 
+       bl   @draw_line_on                                  ; CALL $37E2        ; draw a line to it
+       .pop hl                                             ; POP HL            ; 
+       jmp  _37f5                                          ; JR $37F5          ; 
+draw_lines_2:                                              ; >3805
+       inc  hl                                             ; INC HL            ; HL -> past the $FF terminator
+       jmp  draw_lines_1                                   ; JR $37E9          ; process whatever list (if any) follows
+draw_lines_end:                                            
+       .endproc                                            ;                   ; 
 
 ********************************************************************************
 * Busy-wait delay loop (~3*65536 iterations)
@@ -4871,6 +5525,250 @@ msg_missile_locked:                                        ; >4b9a
        text 'MISSILE LOCKE',>e4
 
 ********************************************************************************
+* Work out a system's data from its seeds
+* 
+* Used by the routines at #R$4C9B and #R$55A3.
+* .
+* Copies the seeds (#R$E904) to #R$F74B, and works out the system's
+* coordinates (#R$F751, #R$F752), government (#R$F753), economy
+* (#R$F754) and tech level (#R$F755), then its name (#R$4CE7).
+system_data_from_seeds:                                    ; >4c2b
+       .proc                                               ;                   ; 
+       li   hl,system_seeds                                ; LD HL,$E904       ; source: rotating_accumulator
+       li   de,system_s0_lo                                ; LD DE,$F74B       ; 
+       li   bc,>0006                                       ; LD BC,$0006       ; 6 bytes
+       .ldir                                               ; LDIR              ; copy the seeds
+       movb @seed_s0_hi,a                                  ; LD A,($E905)      ; A = s0_hi
+       srl  a,1                                            ; SRL A             ; 
+       movb a,@system_y                                    ; LD ($F752),A      ; y = s0_hi / 2
+       movb @seed_s1_hi,a                                  ; LD A,($E907)      ; A = s1_hi
+       movb @bytes+>fc,@e                                  ; LD E,$FC          ; 
+       bl   @multiply_a_e_16bit                            ; CALL $1F60        ; 
+       movb @bytes+>02,a                                   ; LD A,$02          ; 
+       ab   h,a                                            ; ADD A,H           ; 
+       movb a,@system_x                                    ; LD ($F751),A      ; x = 2 + s1_hi * 252 / 256
+       movb @seed_s1,a                                     ; LD A,($E906)      ; A = s1_lo
+       srl  a,3                                            ; RRCA x 3          ; 
+       andi a,>0700                                        ; AND $07           ; 
+       movb a,@system_government                           ; LD ($F753),A      ; government = bits 3-5 of s1_lo
+       sb   @c,@c                                          ;                   ; 
+       cb   a,@bytes+>02                                   ; CP $02            ; 
+       jhe  _4c58                                          ; SBC A,A / AND $02 ; 
+       movb @bytes+>02,@c                                  ; LD C,A            ; C = 2 for Anarchy or Feudal, 0 otherwise
+_4c58:                                                     
+       movb @seed_s0_hi,a                                  ; LD A,($E905)      ; 
+       andi a,>0700                                        ; AND $07           ; 
+       socb @c,a                                           ; OR C              ; 
+       li   r0,>0700                                       ; XOR $07           ; 
+       xor  a,r0                                           ;                   ; 
+       movb r0,a                                           ;                   ; 
+       movb a,@system_economy                              ; LD ($F754),A      ; economy
+       ab   @bytes+>03,a                                   ; ADD A,$03         ; 
+       movb @seed_s1_hi,r0                                 ; LD HL,$E907 / AND (HL); 
+       inv  r0                                             ;                   ; 
+       szcb r0,a                                           ;                   ; 
+       movb @seed_s2,r0                                    ; LD A,($E908) / RRA; bit 0 of s2_lo...
+       andi r0,>0100                                       ;                   ; 
+       ab   r0,a                                           ; LD A,B / ADC A,$00; ...added in
+       movb a,@system_tech_level                           ; LD ($F755),A      ; tech level
+       li   ix,system_name                                 ; LD IX,$F756       ; 
+       bl   @system_name_from_seeds                        ; JP $4CE7          ; work out the name
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Generate the data for a system
+* 
+* Used by the routines at #R$4BA8, #R$4CAF, #R$4DAB, #R$4F64, #R$538B, #R$53ED,
+* #R$53FD, #R$6141 and #R$894D.
+* .
+* As in BBC Elite, each system's seeds are those of the one before,
+* twisted four times: starts from the galaxy's seeds (#R$5607), twists
+* them 4 * A times (#R$5613), and works out the system's data from the
+* result (#R$4C2B). Preserves BC, DE and HL.
+* 
+* I:A System number (0-255)
+generate_system:                                           ; >4c9b
+       .proc                                               ;                   ; 
+       .exx                                                ; EXX               ; 
+       bl   @galaxy_seeds_to_system                        ; CALL $5607        ; start from the galaxy's seeds
+       movb a,a                                            ; OR A              ; 
+       jeq  _4caa                                          ; JR Z,$4CAA        ; system 0
+_4ca2:                                                     ; >4ca2
+       .push af                                            ; EX AF,AF'         ; 
+       bl   @next_system_seeds                             ; CALL $5613        ; move on to the next system
+       .pop af                                             ; EX AF,AF'         ; 
+       sb   one,a                                          ; DEC A             ; 
+       jne  _4ca2                                          ; JR NZ,$4CA2       ; 
+_4caa:                                                     ; >4caa
+       bl   @system_data_from_seeds                        ; CALL $4C2B        ; work out the system's data
+       .exx                                                ; EXX               ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Generate a system's name
+* 
+* Used by the routines at #R$4F64, #R$52CE, #R$6066, #R$6164, #R$6276, #R$9120,
+* #R$91AA, #R$9A4B, #R$9B43 and #R$9B7C.
+* .
+* Generates the data for system A (#R$4C9B), then expands its name from
+* the digram indices at $F756 into #R$E717 (#R$4CB8).
+* 
+* I:A System number
+* O:A Length of the name
+generate_system_name:                                      ; >4caf
+       .proc                                               ;                   ; 
+       bl   @generate_system                               ; CALL $4C9B        ; 
+       li   hl,system_name                                 ; LD HL,$F756       ; 
+       bl   @expand_name                                   ; JP $4CB8          ; 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Expand a name from its letter pairs
+* 
+* Used by the routines at #R$4CAF, #R$55A3 and #R$9B7C.
+* .
+* Builds a name in #R$E717 from the four letter-pair indices at HL (0-31,
+* into the table at #R$0E41), leaving out spaces (so index 0 adds
+* nothing), and capitalises its first letter. Used for system names
+* (#R$4CAF, #R$55D2) and the random names in descriptions (#R$9B7C).
+* 
+* I:HL The four indices
+* O:A The name's length
+expand_name:                                               ; >4cb8
+       li   de,text_buffer                                 ; LD DE,$E717       ; DE -> the output buffer
+       sb   @c,@c                                          ; LD C,$00          ; C = output character count
+       movb @bytes+>04,b                                   ; LD B,$04          ; 4 index bytes
+_4cbf:                                                     ; >4cbf
+       movb *hl+,r1                                        ; LD A,(HL) / INC HL; the next index byte
+       srl  r1,8                                           ;                   ; 
+       sla  r1,1                                           ; ADD A,A           ; (TI: indexed, not built from the page $0E)
+       movb @name_letter_pairs(r1),r0                      ; LD A,(HL)         ; the pair's first character
+       cb   r0,@bytes+>20                                  ; CP $20            ; a space (padding, not a real letter)?
+       jeq  _4cd7                                          ; JR Z,$4CD7        ; yes - skip it
+       movb r0,*de+                                        ; LD (DE),A / INC DE; no - append it
+       ab   one,@c                                         ; INC C             ; 
+_4cd7:                                                     ; >4cd7
+       movb @name_letter_pairs+1(r1),r0                    ; LD A,(HL)         ; and the second
+       cb   r0,@bytes+>20                                  ; CP $20            ; 
+       jeq  _4cd7_2                                        ; JR Z,$4CD7        ; 
+       movb r0,*de+                                        ; LD (DE),A / INC DE; 
+       ab   one,@c                                         ; INC C             ; 
+_4cd7_2:                                                   
+       sb   one,b                                          ; DJNZ $4CBF        ; next index byte
+       jne  _4cbf                                          ;                   ; 
+       sb   a,a                                            ; XOR A             ; 
+       movb a,*de                                          ; LD (DE),A         ; null-terminate the name
+       szcb @bit5,@text_buffer                             ; RES 5,(HL)        ; force the first character to uppercase
+       movb @c,a                                           ; LD A,C            ; A = the character count
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Work out a system's name
+* 
+* Used by the routines at #R$4C2B and #R$9B7C.
+* .
+* Stores four indices (0-31) into the letter pairs at #R$0E41, from the
+* seeds (#R$E904), twisting them between each (#R$2147). As in BBC Elite,
+* the name has only three pairs (the fourth index being 0) if bit 6 of
+* s0_lo is clear.
+* 
+* I:IX Where to store them (#R$F756)
+system_name_from_seeds:                                    ; >4ce7
+       .proc                                               ;                   ; 
+       movb @system_seeds,a                                ; LD A,($E904)      ; A = s0_lo
+       .push af                                            ; PUSH AF           ; 
+       movb @bytes+>04,b                                   ; LD B,$04          ; 4 bytes
+_4ced:                                                     ; >4ced
+       movb @seed_s2_hi,a                                  ; LD A,($E909)      ; A = s2_hi
+       andi a,>1f00                                        ; AND $1F           ; 0-31
+       movb a,*ix                                          ; LD (IX+$00),A     ; store the index
+       .push bc                                            ; PUSH BC           ; 
+       bl   @twist_seeds                                   ; CALL $2147        ; twist the seeds
+       .pop bc                                             ; POP BC            ; 
+       cb   b,one                                          ; LD A,B / DEC A    ; was this the last iteration?
+       jne  _4d06                                          ; JR NZ,$4D06       ; not the fourth pair
+       .pop af                                             ; POP AF            ; yes - recover the original #R$E904 byte
+       andi a,>4000                                        ; AND $40           ; bit 6 of s0_lo set?
+       jne  _4d06                                          ; JR NZ,$4D06       ; yes - four pairs
+       movb a,*ix                                          ; LD (IX+$00),A     ; no - three
+_4d06:                                                     ; >4d06
+       inc  ix                                             ; INC IX            ; 
+       sb   one,b                                          ; DJNZ $4CED        ; 
+       jne  _4ced                                          ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Start from the galaxy's seeds
+* 
+* Used by the routines at #R$4C9B, #R$4D0B, #R$502C, #R$5325 and #R$55A3.
+* .
+* Copies the galaxy's seeds (#R$E711) to the seeds of the system being
+* generated (#R$E904): the seeds of system 0.
+galaxy_seeds_to_system:                                    ; >5607
+       .proc
+       li   hl,galaxy_seeds                                ; LD HL,$E711       ; source: the galaxy's seeds
+       li   de,system_seeds                                ; LD DE,$E904       ; dest: rotating_accumulator
+       li   bc,>0006                                       ; LD BC,$0006       ; 6 bytes
+       .ldir                                               ; LDIR              ; 
+       .endproc                                            ; RET               ; (TI: .proc, since .ldir is a BL)
+
+********************************************************************************
+* Move on to the next system: twist the seeds four times
+* 
+* Used by the routines at #R$4C80 and #R$4C9B.
+* .
+* Each twist, as in BBC Elite, turns the three 16-bit seeds (s0, s1, s2)
+* at #R$E904 into (s1, s2, s0 + s1 + s2).
+next_system_seeds:                                         ; >5613
+       movb @system_seeds+1,hl                             ; LD HL,($E904)     ; HL = s0
+       movb @system_seeds,@l                               ;                   ; 
+       movb @seed_s1+1,de                                  ; LD DE,($E906)     ; DE = s1
+       movb @seed_s1,@e                                    ;                   ; 
+       movb @seed_s2+1,bc                                  ; LD BC,($E908)     ; BC = s2
+       movb @seed_s2,@c                                    ;                   ; 
+       li   r2,4                                           ;                   ; (TI: a loop for the four twists)
+_5613_twist:                                               
+       a    de,hl                                          ; ADD HL,DE         ; HL = s0 + s1 + s2
+       a    bc,hl                                          ; ADD HL,BC         ; 
+       mov  de,r0                                          ; EX DE,HL / LD A,B / LD B,D ...; HL = s1, DE = s2, BC = the sum
+       mov  bc,de                                          ;                   ; 
+       mov  hl,bc                                          ;                   ; 
+       mov  r0,hl                                          ;                   ; 
+       dec  r2                                             ;                   ; 
+       jne  _5613_twist                                    ;                   ; 
+       movb hl,@system_seeds+1                             ; LD ($E904),DE     ; store the new seeds
+       movb @l,@system_seeds                               ;                   ; 
+       movb de,@seed_s1+1                                  ; LD ($E906),BC     ; 
+       movb @e,@seed_s1                                    ;                   ; 
+       movb bc,@seed_s2+1                                  ; LD ($E908),HL     ; 
+       movb @c,@seed_s2                                    ;                   ; 
+       mov  bc,r0                                          ;                   ; (TI: the registers as the MSX leaves them:
+       mov  de,bc                                          ;                   ; DE = s0, BC = s1, HL = s2)
+       mov  hl,de                                          ;                   ; 
+       mov  r0,hl                                          ;                   ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* The message "Witchspace"
+msg_witchspace:                                            ; >57c9
+       text 'WITCHSPAC',>e5                                       ; 
+
+********************************************************************************
+* The message "Commander "
+msg_commander:                                             ; >57d3
+       text 'COMMANDER',>a0                                       ; 
+
+********************************************************************************
+* The message " Light Years"
+msg_light_years_5845:                                      ; >5845
+       text ' LIGHT YEAR',>f3                                     ; 
+
+********************************************************************************
+* The message " Credits"
+msg_credits_5851:                                          ; >5851
+       text ' CREDIT',>f3                                         ; 
+
+********************************************************************************
 * Show a message for a while
 * 
 * Used by the routines at #R$1683, #R$5C01, #R$5CEE, #R$5D72, #R$5DBB, #R$5E6B,
@@ -4885,6 +5783,108 @@ show_message:                                              ; >5ffb
        .rst >08                                            ; RST $08           ; 
        bl   @busy_wait_delay                               ; CALL $3808        ; 
        b    @clear_message_line_jmp                        ; JP $3955          ; clear the message line
+
+********************************************************************************
+* Format and print the current cash total
+* 
+* Used by the routines at #R$5C8E, #R$5E6B, #R$6002, #R$612D and #R$6276.
+* .
+* Reassembles the 24-bit cash total from $EB16 (low byte, via A/C),
+* $EB17/$EB18 (the upper 16 bits, loaded together as HL) and prints it
+* via RST $18 with format byte $40.
+format_print_current_cash_total:                           ; >6037
+       movb @player_cash,@c                                ; LD A,($EB16) / LD C,A; C = the cash total's low byte
+       movb @cash_1+1,hl                                   ; LD HL,($EB17)     ; HL = its upper 16 bits
+       movb @cash_1,@l                                     ;                   ; 
+       movb @bytes+>40,a                                   ; LD A,$40          ; control byte: decimal-point handling, no width padding
+       b    @rst_18_target_format_value_print              ; RST $18 / RET     ; format and print the cash total
+
+********************************************************************************
+* Print the fuel level, then a fixed label
+* 
+* Used by the routines at #R$5C8E and #R$6276.
+print_fuel:                                                ; >6042
+       .proc                                               ;                   ; 
+       movb @fuel_level,@c                                 ; LD A,($F775) / LD C,A; C = the fuel level
+       clr  hl                                             ; LD HL,$0000       ; 
+       movb @bytes+>40,a                                   ; LD A,$40          ; control byte: decimal-point handling
+       bl   @rst_18_target_format_value_print              ; RST $18           ; format and print it
+       li   hl,msg_light_years_5845                        ; LD HL,$5845       ; " Light Years"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Hide the sprites and clear the page
+* 
+* Used by the routines at #R$4D0B, #R$4F64, #R$5B99, #R$5BBD, #R$5C8E, #R$5CEE,
+* #R$5DBB, #R$6164, #R$6276, #R$90D3 and #R$A30A.
+* .
+* Used before showing one of the text pages. If the space view is showing
+* (#R$E903), leaves it (#R$60B1), hiding all 32 sprites. Otherwise (at
+* $6097), if the chart cursor is on (#R$E70B), turns it off and hides the
+* first 5 sprites; then clears the page (#R$60CA) and the message line
+* (#R$3955).
+hide_sprites_clear_page:                                   ; >608c
+       .proc                                               ;                   ; 
+       movb @space_view_showing,a                          ; LD A,($E903) / OR A; space view showing?
+       jeq  hide_few_sprites                               ; JR Z,$6097        ; no
+       bl   @hide_all_sprites                              ; CALL $60B1        ; yes: leave it (#R$60B1)
+       jmp  _60b0                                          ; JR $60B0          ; 
+hide_few_sprites:                                          ; >6097
+       movb @chart_cursor_active_flag,a                    ; LD HL,$E70B / LD A,(HL) / OR A; chart cursor on?
+       jeq  _60aa                                          ; JR Z,$60AA        ; no
+       sb   @chart_cursor_active_flag,@chart_cursor_active_flag; LD (HL),$00       ; turn it off
+       li   hl,>1b00                                       ; LD HL,$1B00       ; 
+       movb @bytes+>05,b                                   ; LD B,$05          ; 
+       bl   @hide_sprites                                  ; CALL $3942        ; hide sprites 0-4 (#R$3942)
+_60aa:                                                     ; >60aa
+       bl   @clear_page                                    ; CALL $60CA        ; clear the page (#R$60CA)
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+_60b0:                                                     ; >60b0
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Hide all the sprites and leave the space view
+* 
+* Used by the routine at #R$608C.
+* .
+* Resets $EB02 (the scanner-queue-ready flag #R$8380 checks),
+* hides all 32 sprites via #R$3942, calls #R$70E8, clears the message
+* line (#R$3955),
+* then clears #R$E903 - the space view is no longer showing.
+hide_all_sprites:                                          ; >60b1
+       .proc                                               ;                   ; 
+       sb   a,a                                            ; XOR A             ; 
+       movb a,@scanner_queue_ready                         ; LD ($EB02),A      ; no scanner to erase (#R$EB02)
+       movb @bytes+>20,b                                   ; LD B,$20          ; 32 sprites
+       li   hl,>1b00                                       ; LD HL,$1B00       ; 
+       bl   @hide_sprites                                  ; CALL $3942        ; hide them (#R$3942)
+       bl   @clear_screen_draw_frame                       ; CALL $70E8        ; clear the screen and draw its frame (#R$70E8)
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       sb   a,a                                            ; XOR A             ; 
+       movb a,@space_view_showing                          ; LD ($E903),A      ; the space view isn't showing
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Clear the page
+* 
+* Used by the routine at #R$608C.
+* .
+* Clears the page area of a text screen - character rows 1-20, columns 3-28
+* (#R$35B8) - with white on black, and sets the current screen (#R$E902) to 0.
+clear_page:                                                ; >60ca
+       .proc                                               ;                   ; 
+       sb   a,a                                            ; XOR A             ; 
+       movb a,@current_screen                              ; LD ($E902),A      ; the current screen
+       li   hl,>0118                                       ; LD HL,$0118       ; HL = $0118: the pattern table at row 1, column 3
+       li   bc,>a01a                                       ; LD BC,$A01A       ; 160 pixel rows (20 character rows), 26 characters
+       sb   a,a                                            ; XOR A             ; 
+       bl   @fill_vram_rect                                ; CALL $35B8        ; clear the patterns (#R$35B8)
+       li   hl,>2118                                       ; LD HL,$2118       ; HL = $2118: the colours
+       li   bc,>a01a                                       ; LD BC,$A01A       ; 
+       movb @bytes+>f1,a                                   ; LD A,$F1          ; white on black
+       bl   @fill_vram_rect                                ; JP $35B8          ; 
+       .endproc                                            ;                   ; 
 
 ********************************************************************************
 * Enter flight mode: set up the cockpit screen
@@ -6724,6 +7724,43 @@ startup_code_stardust_table:                               ; >6f9f
        byte >00,>3F,>00,>21,>37,>00,>1F,>00,>00,>0D,>07              ; particle 14
 
 ********************************************************************************
+* Clear the screen and draw its frame
+* 
+* Used by the routine at #R$60B1.
+* .
+* Called when a text screen replaces the space view (#R$60B1). Turns the
+* display off (VDP register 1), clears the pattern table, sets the colour
+* table to white on black ($F1), draws the frame (#R$7161, #R$37E9), and
+* turns the display back on.
+clear_screen_draw_frame:                                   ; >70e8
+       .proc                                               ;                   ; 
+       movb @vdp_reg1_cache,a                              ; LD A,($F3E0)      ; 
+       .push af                                            ; PUSH AF           ; 
+       andi a,>bf00                                        ; AND $BF           ; display off
+       movb a,@vdpwa                                       ; OUT ($99),A       ; 
+       movb @bytes+>81,@vdpwa                              ; LD A,$81 / OUT ($99),A; VDP register 1
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@vram_busy_flag                             ; LD ($EF9E),A      ; VRAM busy
+       movb @zero,@vdpwa                                   ; LD A,$00 / OUT ($99),A; 
+       movb @bytes+>40,@vdpwa                              ; LD A,$40 / OUT ($99),A; VRAM address $0000
+       movb @bytes+>18,@c                                  ; LD C,$18          ; 24 rows of the pattern table...
+       sb   a,a                                            ; LD A,$00          ; 
+       bl   @fill_vram_256                                 ; CALL $35AD        ; ...cleared
+       movb @zero,@vdpwa                                   ; LD A,$00 / OUT ($99),A; 
+       movb @bytes+>60,@vdpwa                              ; LD A,$60 / OUT ($99),A; VRAM address $2000
+       movb @bytes+>18,@c                                  ; LD C,$18          ; 24 rows of the colour table...
+       movb @bytes+>f1,a                                   ; LD A,$F1          ; 
+       bl   @fill_vram_256                                 ; CALL $35AD        ; ...white on black
+       sb   a,a                                            ; XOR A             ; 
+       movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; 
+       li   hl,screen_frame                                ; LD HL,$7161       ; the frame
+       bl   @draw_lines                                    ; CALL $37E9        ; draw it
+       .pop af                                             ; POP AF            ; 
+       movb a,@vdpwa                                       ; OUT ($99),A       ; 
+       movb @bytes+>81,@vdpwa                              ; LD A,$81 / OUT ($99),A; display back on
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
 * Draw the cockpit picture
 * 
 * Used by the routine at #R$63F1.
@@ -6760,6 +7797,26 @@ _7157:                                                     ; >7157
        movb a,@vdpwa                                       ; OUT ($99),A       ; turn the display back on
        ; EI                                                ; EI                ;
        .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Screen frame
+* 
+* Used by the routine at #R$70E8.
+* .
+* The lines drawn round text screens by #R$70E8 (see #R$37E9): a box from
+* (22, 3) to (233, 188), and a line across at y = 171 above the message
+* line.
+screen_frame:                                              ; >7161
+       byte >03,>16                                               ; box: from (22, 3)
+       byte >03,>E9                                               ; to (233, 3)
+       byte >BC,>E9                                               ; to (233, 188)
+       byte >BC,>16                                               ; to (22, 188)
+       byte >03,>16                                               ; back to (22, 3)
+       byte >FF                                                   ; 
+       byte >AB,>17                                               ; line: from (23, 171)
+       byte >AB,>E8                                               ; to (232, 171)
+       byte >FF                                                   ; 
+       byte >FF                                                   ; end of the list
 
 ********************************************************************************
 * Ship blueprint table
@@ -9343,8 +10400,9 @@ station_in_range:                                          ; >eb05
 * then sets #R$EB11 to 7. #R$6377 (at $638E, `LD HL,$EB06 / RST $08`)
 * prints it as tokenised text. In this snapshot the "S" and the last two
 * bytes hold bytes written by the tune-restart bug (#R$7603).
+* TI: the "S" is restored, until the default commander (#R$A469) is set up.
 commander_name:                                            ; >eb06
-       byte >4A,>41,>4D,>45,>01,>4F,>4E,>00
+       byte >4A,>41,>4D,>45,>53,>4F,>4E,>00
        byte >00,>C3,>A8
 
 ********************************************************************************

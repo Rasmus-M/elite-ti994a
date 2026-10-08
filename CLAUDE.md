@@ -98,7 +98,9 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
 - **Code in ROM banks**: `program.a99` holds the whole program and is assembled twice: by `elite.a99` with RAM
   real (`aorg`) and the code banks `dorg`, and by `code-banks.a99` the other way round, so RAM and the banks can use
   each other's labels. Bank 7 (`code_bank_7_select`) holds code; call into it with `.far_call`. Code in a bank may
-  read RAM, the math tables and its own bank only.
+  read RAM, the math tables and its own bank only. As a pilot, bank 7 holds the status page (`status_page`,
+  `print_commander_name` and their own text and data); the routines and text other screens share (printing,
+  number formatting, system names, clearing the page) are in RAM. 'N' on the title screen shows it.
 - **ROM banks** (`src/rom-banks/`): every data bank starts with the math tables (`math-tables.a99`) at `>6040`,
   so they're readable whichever bank is selected. Bank 4 then holds the blueprints for ship types 1-22, bank 5
   types 23+ (`blueprints_2_first_type`), bank 6 the cockpit picture, the font and the title music. Select a bank with

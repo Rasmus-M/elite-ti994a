@@ -1,4 +1,4 @@
-* ROM bank 7: the math tables and code
+* ROM bank 7: the math tables, and code: the status page
 * Assembled for real by code-banks.a99, and DORG in elite.a99 for its labels
        .ifdef code_banks
        aorg >6000
@@ -12,21 +12,248 @@
        bss  math_tables_end-math_tables
        .endif
 
-*********************************************************************
-*
-* Test that code runs from a ROM bank (temporary)
-*
-* Called with .far_call from title_screen: sets the backdrop colour from
-* data in this bank, so the colour shows the bank was selected.
-*
-bank_7_test:
-       movb @bank_7_test_colour,@vdpwa
-       li   r0,>8700
-       movb r0,@vdpwa                  ; VDP register 7: the backdrop colour
-       rt
-bank_7_test_colour:
-       byte >04                        ; dark blue
-       even
+* The status page (a pilot for code in ROM banks), with its own data
+
+********************************************************************************
+* The message "FBLR ? "
+msg_fblr:                                                  ; >57dd
+       text 'FBLR'                                                ; the laser mounts (TI: without the " ?" that follows on the MSX)
+
+********************************************************************************
+* Status page headings
+* 
+* Printed by #R$6276. A list of (column, row, string) records ending with $FF
+* (see #R$3596).
+status_page_headings:                                      ; >59e0
+       text >05,>03,'PRESENT SYSTEM    ',>ba                      ; 
+       text >05,>04,'HYPERSPACE SYSTEM ',>ba                      ; 
+       text >05,>05,'CONDITION         ',>ba                      ; 
+       text >05,>06,'FUEL',>ba                                    ; 
+       text >05,>07,'CASH',>ba                                    ; 
+       text >05,>08,'LEGAL STATUS',>ba                            ; 
+       text >05,>09,'RATING',>ba                                  ; 
+       text >05,>0b,'EQUIPMENT',>ba                               ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Status page frame
+* 
+* Drawn by #R$6276. A list of (RST $28) rectangles ending with $FF (see
+* #R$36F1).
+status_page_frame:                                         ; >5a52
+       byte >05,>01,>20,>01,>91                                   ; 
+       byte >05,>03,>13,>09,>21                                   ; 
+       byte >18,>03,>0A,>02,>71                                   ; 
+       byte >0B,>06,>14,>02,>71                                   ; 
+       byte >13,>08,>08,>01,>71                                   ; 
+       byte >0D,>09,>14,>01,>71                                   ; 
+       byte >05,>0C,>21,>08,>D1                                   ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* The message "Green"
+msg_green_5a9f:                                            ; >5a9f
+       text 'GREE',>ee                                            ; the conditions, printed with RST $10
+msg_red_5aa4:                                              ; >5aa4
+       text 'RE',>e4                                              ; 
+msg_red_5aa7:                                              ; >5aa7
+       text 'RE',>e4                                              ; 
+
+********************************************************************************
+* The message "Clean"
+msg_clean:                                                 ; >5aaa
+       text 'CLEA',>ee                                            ; the legal statuses, printed with RST $10
+msg_offender:                                              ; >5aaf
+       text 'OFFENDE',>f2                                         ; 
+msg_fugitive:                                              ; >5ab7
+       text 'FUGITIV',>e5                                         ; 
+
+********************************************************************************
+* Show the status page
+* 
+* Used by the routines at #R$1873, #R$1C5C and #R$5DBB.
+* .
+* Does nothing if it's already showing (#R$E902 = 3). Hides the sprites,
+* draws the frame and labels, and prints "Commander" and the name
+* (#R$6377); then the present system - or "Witchspace" (#R$EEC1) - and the
+* rest ($629C).
+* .
+* At $629C, prints the present system (#R$EB67), the hyperspace system
+* (#R$E72B), the condition (#R$E90C, coloured green or red), the fuel, the
+* cash, the legal status (#R$EB65), the rating (#R$EB12), and the equipment
+* fitted (#R$F777 onwards, two columns), with the mounts of each laser
+* ($6355) and "Naval Energy Unit" for the naval energy unit (#R$F77E = 2).
+* .
+* At $6355, prints the name of equipment item A (from the list at #R$10A7).
+* At $6359, for a laser (bit 7 of E set), prints the letters of the mounts
+* it's fitted to ("F", "B", "L" and "R", bits 0-3). At $636D moves on to
+* the next item, and marks the status page as showing (#R$E902 = 3) after
+* the last.
+status_page:                                               ; >6276
+       .proc                                               ;                   ; 
+       cb   @current_screen,@bytes+>03                     ; LD A,($E902) / CP $03; 
+       jne  !                                              ; RET Z             ; already showing
+       b    @status_page_end                               ;                   ; 
+!
+       bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide the sprites
+       li   ix,status_page_frame                           ; LD IX,$5A52       ; 
+       bl   @rst_28_target_draw_list_tile                  ; RST $28           ; draw the frame
+       li   hl,status_page_headings                        ; LD HL,$59E0       ; the labels
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print them
+       bl   @print_commander_name                          ; CALL $6377        ; print "Commander" and the name
+       li   bc,>1903                                       ; LD BC,$1903       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; 
+       movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; 
+       jeq  status_page_2                                  ; JR Z,$629C        ; not in witchspace
+       li   hl,msg_witchspace                              ; LD HL,$57C9       ; "Witchspace"
+       jmp  _62a5                                          ; JR $62A5          ; 
+status_page_2:                                             ; >629c
+       movb @current_system,a                              ; LD A,($EB67)      ; A = present system
+       bl   @generate_system_name                          ; CALL $4CAF        ; generate its name
+       li   hl,text_buffer                                 ; LD HL,$E717       ; 
+_62a5:                                                     ; >62a5
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   bc,>1904                                       ; LD BC,$1904       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; 
+       movb @selected_system,a                             ; LD A,($E72B)      ; A = hyperspace system
+       bl   @generate_system_name                          ; CALL $4CAF        ; generate its name
+       li   hl,text_buffer                                 ; LD HL,$E717       ; 
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   bc,>1905                                       ; LD BC,$1905       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; 
+       movb @alert_level,a                                 ; LD A,($E90C)      ; A = alert level
+       li   hl,msg_green_5a9f                              ; LD HL,$5A9F       ; "Green", "Red" or "Red"
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print the condition
+       movb @bytes+>90,@vdpwa                              ; LD A,$90 / OUT ($99),A; 
+       movb @bytes+>65,@vdpwa                              ; LD A,$65 / OUT ($99),A; VRAM address $2590
+       movb @bytes+>31,a                                   ; LD A,$31          ; green...
+       movb @alert_level,r0                                ; OR A              ; (TI: tested before the load)
+       jeq  _62d8                                          ; JR Z,$62D8        ; 
+       movb @bytes+>81,a                                   ; LD A,$81          ; ...or red
+       movb a,@vram_flash_toggle                           ; LD ($E90E),A      ; 
+_62d8:                                                     ; >62d8
+       movb @bytes+>40,b                                   ; LD B,$40          ; 
+_62da:                                                     ; >62da
+       movb a,@vdpwd                                       ; OUT ($98),A       ; colour the condition
+       sb   one,b                                          ; DJNZ $62DA        ; 
+       jne  _62da                                          ;                   ; 
+       li   bc,>0b06                                       ; LD BC,$0B06       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; 
+       bl   @print_fuel                                    ; CALL $6042        ; print the fuel
+       li   bc,>0b07                                       ; LD BC,$0B07       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; 
+       bl   @format_print_current_cash_total               ; CALL $6037        ; print the cash
+       li   hl,msg_credits_5851                            ; LD HL,$5851       ; " Credits"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; 
+       li   bc,>1308                                       ; LD BC,$1308       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; 
+       movb @legal_status,a                                ; LD A,($EB65) / OR A; A = legal status
+       jeq  _6309                                          ; JR Z,$6309        ; 0: Clean
+       cb   a,@bytes+>32                                   ; CP $32            ; 
+       jhe  status_page_fugitive                           ; JR NC,$6309       ; (TI: CB sets no carry - JHE straight after it)
+       movb one,a                                          ; LD A,$02 / DEC A  ; 1-49: Offender
+       jmp  _6309                                          ;                   ; 
+status_page_fugitive:                                      
+       movb @bytes+>02,a                                   ;                   ; 50 or more: Fugitive
+_6309:                                                     ; >6309
+       li   hl,msg_clean                                   ; LD HL,$5AAA       ; "Clean", "Offender" or "Fugitive"
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print the legal status
+       li   bc,>0d09                                       ; LD BC,$0D09       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; 
+       movb @combat_rank,a                                 ; LD A,($EB12)      ; A = combat rank
+       li   hl,msg_harmless_0f25                           ; LD HL,$0F25       ; "Harmless" ...
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print the rank
+       li   hl,>050c                                       ; LD HL,$050C       ; the first equipment column
+       movb hl,@status_equipment_position+1                ; LD ($E74B),HL     ; 
+       movb @l,@status_equipment_position                  ;                   ; 
+       li   hl,item_large_cargo_bay                        ; LD HL,$F777       ; the equipment, from the large cargo bay
+       movb @bytes+>0f,b                                   ; LD B,$0F          ; 15 items
+_6325:                                                     ; >6325
+       .push hl                                            ; PUSH HL           ; 
+       movb *hl,a                                          ; LD A,(HL)         ; 
+       movb a,@e                                           ; LD E,A            ; 
+       andi a,>7f00                                        ; AND $7F           ; 
+       jeq  _636d                                          ; JR Z,$636D        ; not fitted
+       .push bc                                            ; PUSH BC           ; 
+       movb @status_equipment_position+1,bc                ; LD BC,($E74B)     ; 
+       movb @status_equipment_position,@c                  ;                   ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; 
+       movb b,a                                            ; LD A,B            ; 
+       ab   @bytes+>11,a                                   ; ADD A,$11         ; 
+       movb a,b                                            ; LD B,A            ; 
+       cb   a,@bytes+>27                                   ; CP $27            ; 
+       jne  _633f                                          ; JR NZ,$633F       ; 
+       movb @bytes+>05,b                                   ; LD B,$05          ; the second column
+       ab   one,@c                                         ; INC C             ; 
+_633f:                                                     ; >633f
+       movb bc,@status_equipment_position+1                ; LD ($E74B),BC     ; 
+       movb @c,@status_equipment_position                  ;                   ; 
+       .pop bc                                             ; POP BC            ; 
+       movb @bytes+>11,a                                   ; LD A,$11          ; 
+       sb   b,a                                            ; SUB B             ; 
+       cb   a,@bytes+>09                                   ; CP $09            ; the energy unit?
+       jne  status_page_equipment                          ; JR NZ,$6355       ; 
+       movb @e,r0                                          ; BIT 1,E           ; a naval one?
+       andi r0,>0200                                       ;                   ; 
+       jeq  status_page_equipment                          ; JR Z,$6355        ; 
+       li   hl,msg_naval_energy_unt                        ; LD HL,$114C       ; "Naval Energy Unit"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       jmp  _6359                                          ; JR $6359          ; 
+status_page_equipment:                                     ; >6355
+       li   hl,equipment_name_list2_empty_slots            ; LD HL,$10A7       ; the equipment names
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print it
+_6359:                                                     ; >6359
+       movb @e,r0                                          ; BIT 7,E           ; a laser?
+       andi r0,>8000                                       ;                   ; 
+       jeq  _636d                                          ; JR Z,$636D        ; no - nothing more to show
+       .push bc                                            ; PUSH BC           ; 
+       li   hl,msg_fblr                                    ; LD HL,$57DD       ; "FBLR"
+       movb @bytes+>04,b                                   ; LD B,$04          ; 
+_6363:                                                     ; >6363
+       movb @e,r0                                          ; RR E              ; fitted to this mount?
+       srl  r0,9                                           ;                   ; (TI: the bit shifted out is E's bit 0, in the carry)
+       swpb r0                                             ;                   ; 
+       movb r0,@e                                          ;                   ; (SWPB and MOVB leave the carry alone)
+       jnc  _6369                                          ; JR NC,$6369       ; clear - not fitted, skip its letter
+       movb *hl,a                                          ; LD A,(HL)         ; print its letter
+       bl   @print_char                                    ; RST $00           ; 
+_6369:                                                     ; >6369
+       inc  hl                                             ; INC HL            ; 
+       sb   one,b                                          ; DJNZ $6363        ; next sub-option bit
+       jne  _6363                                          ;                   ; 
+       .pop bc                                             ; POP BC            ; 
+_636d:                                                     ; >636d
+       .pop hl                                             ; POP HL            ; recover the pointer
+       inc  hl                                             ; INC HL            ; -> the next slot
+       sb   one,b                                          ; DJNZ $6325        ; next item
+       jne  _6325                                          ;                   ; 
+       movb @bytes+>03,a                                   ; LD A,$03          ; 
+       movb a,@current_screen                              ; LD ($E902),A      ; the status page is showing
+status_page_end:                                           
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Print "Commander" and the commander's name
+* 
+* Used by the routines at #R$6276 and #R$A30A.
+* .
+* Centred on the line: at column (42 - (10 + the length of the name,
+* #R$EB11)) / 2.
+print_commander_name:                                      ; >6377
+       .proc                                               ;                   ; 
+       movb one,@cursor_vram_addr_row                      ; LD A,$01 / LD ($E710),A; text row 1
+       movb @name_length,a                                 ; LD A,($EB11)      ; A = length of the name
+       ab   @bytes+>0a,a                                   ; ADD A,$0A         ; 
+       sb   @bytes+>2a,a                                   ; SUB $2A           ; 
+       andi a,>ff00                                        ; NEG               ; 
+       neg  a                                              ;                   ; 
+       srl  a,1                                            ; SRL A             ; 
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; 
+       li   hl,msg_commander                               ; LD HL,$57D3       ; "Commander "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   hl,commander_name                              ; LD HL,$EB06       ; the commander's name
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       .endproc                                            ; RET               ; 
 
 rom_bank_7_end:
        equ  $

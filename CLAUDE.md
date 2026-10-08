@@ -72,8 +72,11 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   MSX address. Words are stored **little-endian**, as the Z80 code reads and writes them byte by byte: a word
   variable is accessed as a byte pair (`movb @x+1,hl` / `movb @x,@l`), never with `mov`. The exceptions are the
   blueprint pointers `bp_vertices`/`bp_edges`/`bp_faces`/`bp_name`, which are big-endian because the blueprint
-  headers use `data`. `rotated_vector`/`_y`/`_z` are also big-endian `data` words, for speed in `rotate_vertex`;
-  the code that copies blueprint vertices and normals into them swaps the bytes of each word. Constant tables read only by TI code (`log_table`, `antilog_table`) are big-endian `data`.
+  headers use `data`. Also big-endian `data` words, for speed in
+  `rotate_vertex`, are `rotated_vector`/`_y`/`_z` (the code that copies blueprint vertices and normals into it
+  swaps the bytes of each word) and the orientation logs `side_vector_logs`, `roof_vector_logs` and
+  `nose_vector_logs` (also used by the MSX code at $869A, not converted yet). Constant tables read only by TI
+  code (`log_table`, `antilog_table`) are big-endian `data`.
 - **No MSX page assumptions**: Z80 code that builds addresses from page numbers (`LD H,$E6`, `LD H,$02` for the
   $0200 table, `ADD A,$08` for $0800) or steps pointers with `INC L` relies on MSX page-aligned tables. On the TI,
   compute the real address (indexed addressing, e.g. `@bit_length_table(r1)`, or base + offset) and use `inc hl`.

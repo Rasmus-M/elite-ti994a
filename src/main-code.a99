@@ -3387,51 +3387,42 @@ cache_orientation:                                         ; >433f
        movb @side_vector+1,hl                              ; LD HL,($F7D4)     ; HL = a position/axis word
        movb @side_vector,@l                                ;                   ;
        bl   @log_sign_tagged                               ; CALL $1FCF        ; side vector's x
-       movb hl,@side_vector_logs+1                         ; LD ($E6CC),HL     ; cache the result
-       movb @l,@side_vector_logs                           ;                   ;
+       mov  hl,@side_vector_logs                           ; LD ($E6CC),HL     ; cache the result
        movb @side_vector_y+1,hl                            ; LD HL,($F7D6)     ; side y
        movb @side_vector_y,@l                              ;                   ;
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       movb hl,@side_vector_log_y+1                        ; LD ($E6CE),HL     ; cache the result
-       movb @l,@side_vector_log_y                          ;                   ;
+       mov  hl,@side_vector_log_y                          ; LD ($E6CE),HL     ; cache the result
        movb @side_vector_z+1,hl                            ; LD HL,($F7D8)     ; side z
        movb @side_vector_z,@l                              ;                   ;
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       movb hl,@side_vector_log_z+1                        ; LD ($E6D0),HL     ; cache the result
-       movb @l,@side_vector_log_z                          ;                   ;
+       mov  hl,@side_vector_log_z                          ; LD ($E6D0),HL     ; cache the result
        movb @roof_vector+1,hl                              ; LD HL,($F7E0)     ; roof x
        movb @roof_vector,@l                                ;                   ;
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       movb hl,@roof_vector_logs+1                         ; LD ($E6D2),HL     ; cache the result
-       movb @l,@roof_vector_logs                           ;                   ;
+       mov  hl,@roof_vector_logs                           ; LD ($E6D2),HL     ; cache the result
        movb @roof_vector_y+1,hl                            ; LD HL,($F7E2)     ; roof y
        movb @roof_vector_y,@l                              ;                   ;
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       movb hl,@roof_vector_log_y+1                        ; LD ($E6D4),HL     ; cache the result
-       movb @l,@roof_vector_log_y                          ;                   ;
+       mov  hl,@roof_vector_log_y                          ; LD ($E6D4),HL     ; cache the result
        movb @roof_vector_z+1,hl                            ; LD HL,($F7E4)     ; roof z
        movb @roof_vector_z,@l                              ;                   ;
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       movb hl,@roof_vector_log_z+1                        ; LD ($E6D6),HL     ; cache the result
-       movb @l,@roof_vector_log_z                          ;                   ;
+       mov  hl,@roof_vector_log_z                          ; LD ($E6D6),HL     ; cache the result
        movb @object_status_byte,a                          ; LD A,($F7CD)      ; A = the object status byte
        andi a,>1000                                        ; AND $10           ; test bit 4
        jne  _4397                                          ; JR NZ,$4397       ; skip the nose vector
        movb @nose_vector+1,hl                              ; LD HL,($F7DA)     ; nose x
        movb @nose_vector,@l                                ;                   ;
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       movb hl,@nose_vector_logs+1                         ; LD ($EB68),HL     ; cache the result
-       movb @l,@nose_vector_logs                           ;                   ;
+       mov  hl,@nose_vector_logs                           ; LD ($EB68),HL     ; cache the result
        movb @nose_vector_y+1,hl                            ; LD HL,($F7DC)     ; nose y
        movb @nose_vector_y,@l                              ;                   ;
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       movb hl,@nose_vector_log_y+1                        ; LD ($EB6A),HL     ; cache the result
-       movb @l,@nose_vector_log_y                          ;                   ;
+       mov  hl,@nose_vector_log_y                          ; LD ($EB6A),HL     ; cache the result
        movb @nose_vector_z+1,hl                            ; LD HL,($F7DE)     ; nose z
        movb @nose_vector_z,@l                              ;                   ;
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       movb hl,@nose_vector_log_z+1                        ; LD ($EB6C),HL     ; cache the result
-       movb @l,@nose_vector_log_z                          ;                   ;
+       mov  hl,@nose_vector_log_z                          ; LD ($EB6C),HL     ; cache the result
 _4397:                                                     ; >4397
        movb @b255,a                                        ; LD A,$FF          ; A = $FF
        movb a,@vector_cache_valid_flag                     ; LD ($E6F0),A      ; the cache is valid
@@ -3456,53 +3447,44 @@ _4397:                                                     ; >4397
 rotate_vertex:                                             ; >4464
        .proc
        mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; x * side.x
-       movb @side_vector_logs+1,bc                         ; LD BC,($E6CC)     ; BC = row 1's first coefficient
-       movb @side_vector_logs,@c                           ;                   ;
+       mov  @side_vector_logs,bc                           ; LD BC,($E6CC)     ; BC = row 1's first coefficient
        bl   @multiply_logs                                 ; CALL $2160        ; combine it via #R$2160
        .ex_de_hl                                           ; EX DE,HL          ; DE = that combine's result
        mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; y * roof.x
-       movb @roof_vector_logs+1,bc                         ; LD BC,($E6D2)     ; BC = row 1's second coefficient
-       movb @roof_vector_logs,@c                           ;                   ;
+       mov  @roof_vector_logs,bc                           ; LD BC,($E6D2)     ; BC = row 1's second coefficient
        bl   @multiply_logs                                 ; CALL $2160        ; combine it
        a    de,hl                                          ; ADD HL,DE         ; HL = the running sum for row 1
        .ex_de_hl                                           ; EX DE,HL          ; DE = that sum
        mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; z * nose.x
-       movb @nose_vector_logs+1,bc                         ; LD BC,($EB68)     ; BC = row 1's third coefficient
-       movb @nose_vector_logs,@c                           ;                   ;
+       mov  @nose_vector_logs,bc                           ; LD BC,($EB68)     ; BC = row 1's third coefficient
        bl   @multiply_logs                                 ; CALL $2160        ; combine it
        a    de,hl                                          ; ADD HL,DE         ; x'
        .push hl                                            ; PUSH HL           ; save it
        mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; x * side.y
-       movb @side_vector_log_y+1,bc                        ; LD BC,($E6CE)     ; 
-       movb @side_vector_log_y,@c                          ;                   ;
+       mov  @side_vector_log_y,bc                          ; LD BC,($E6CE)     ; 
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        .ex_de_hl                                           ; EX DE,HL          ; DE = that result
        mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; y * roof.y
-       movb @roof_vector_log_y+1,bc                        ; LD BC,($E6D4)     ; BC = row 2's second coefficient
-       movb @roof_vector_log_y,@c                          ;                   ;
+       mov  @roof_vector_log_y,bc                          ; LD BC,($E6D4)     ; BC = row 2's second coefficient
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        a    de,hl                                          ; ADD HL,DE         ; running sum for row 2
        .ex_de_hl                                           ; EX DE,HL          ; DE = that sum
        mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; z * nose.y
-       movb @nose_vector_log_y+1,bc                        ; LD BC,($EB6A)     ; BC = row 2's third coefficient
-       movb @nose_vector_log_y,@c                          ;                   ;
+       mov  @nose_vector_log_y,bc                          ; LD BC,($EB6A)     ; BC = row 2's third coefficient
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        a    de,hl                                          ; ADD HL,DE         ; y'
        .push hl                                            ; PUSH HL           ; save it
        mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; x * side.z
-       movb @side_vector_log_z+1,bc                        ; LD BC,($E6D0)     ; BC = row 3's first coefficient
-       movb @side_vector_log_z,@c                          ;                   ;
+       mov  @side_vector_log_z,bc                          ; LD BC,($E6D0)     ; BC = row 3's first coefficient
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        .ex_de_hl                                           ; EX DE,HL          ; DE = that result
        mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; y * roof.z
-       movb @roof_vector_log_z+1,bc                        ; LD BC,($E6D6)     ; BC = row 3's second coefficient
-       movb @roof_vector_log_z,@c                          ;                   ;
+       mov  @roof_vector_log_z,bc                          ; LD BC,($E6D6)     ; BC = row 3's second coefficient
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        a    de,hl                                          ; ADD HL,DE         ; running sum for row 3
        .ex_de_hl                                           ; EX DE,HL          ; DE = that sum
        mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; z * nose.z
-       movb @nose_vector_log_z+1,bc                        ; LD BC,($EB6C)     ; BC = row 3's third coefficient
-       movb @nose_vector_log_z,@c                          ;                   ;
+       mov  @nose_vector_log_z,bc                          ; LD BC,($EB6C)     ; BC = row 3's third coefficient
        bl   @multiply_logs                                 ; CALL $2160        ; combine
        a    de,hl                                          ; ADD HL,DE         ; z'
        .pop bc                                             ; POP BC            ; BC = the second output component
@@ -6977,24 +6959,26 @@ unused_e6ca:                                               ; >e6ca
 * 
 * The x, y and z of the object's side vector (#R$F7D4) as sign-tagged
 * logarithms (#R$1FCF), cached by #R$433F for #R$4464.
+* Unlike the other variables, the words are big-endian, for word access.
 side_vector_logs:                                          ; >e6cc
-       byte >00,>00                                                  ; 
+       data 0
 side_vector_log_y:                                         ; >e6ce
-       byte >00,>00                                                  ; 
+       data 0
 side_vector_log_z:                                         ; >e6d0
-       byte >00,>00                                                  ; 
+       data 0
 
 ********************************************************************************
 * Logarithms of the roof vector
 * 
 * The x, y and z of the object's roof vector (#R$F7E0) as sign-tagged
 * logarithms (#R$1FCF), cached by #R$433F for #R$4464.
+* Unlike the other variables, the words are big-endian, for word access.
 roof_vector_logs:                                          ; >e6d2
-       byte >00,>00                                                  ; 
+       data 0
 roof_vector_log_y:                                         ; >e6d4
-       byte >00,>00                                                  ; 
+       data 0
 roof_vector_log_z:                                         ; >e6d6
-       byte >00,>00                                                  ; 
+       data 0
 
 ********************************************************************************
 * Object's position in the view: x
@@ -9526,12 +9510,13 @@ current_system:                                            ; >eb67
 * 
 * The object's nose vector (#R$F7DA) as sign-tagged logarithms, cached by
 * #R$433F for #R$4464.
+* Unlike the other variables, the words are big-endian, for word access.
 nose_vector_logs:                                          ; >eb68
-       byte >00,>00                                                  ; 
+       data 0
 nose_vector_log_y:                                         ; >eb6a
-       byte >00,>00                                                  ; 
+       data 0
 nose_vector_log_z:                                         ; >eb6c
-       byte >00,>00                                                  ; 
+       data 0
 
 ********************************************************************************
 * Distance to the reference point

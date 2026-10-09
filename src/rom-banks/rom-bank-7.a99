@@ -1,12 +1,12 @@
 * ROM bank 7: the math tables, and code: the status page, the commander menu, the inventory, the market prices, buying and selling cargo and equipping the ship
-* Assembled for real by code-banks.a99, and DORG in elite.a99 for its labels
-       .ifdef code_banks
+* Assembled for real by code-bank-7.a99, and DORG in the other builds for its labels
+       .ifdef code_bank_7
        aorg >6000
        .else
        dorg >6000
        .endif
        bss  >40
-       .ifdef code_banks
+       .ifdef code_bank_7
        bcopy "../../bin/math-tables.bin" ; the math tables, as in the other banks
        .else
        bss  math_tables_end-math_tables

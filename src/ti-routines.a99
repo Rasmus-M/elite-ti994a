@@ -7,7 +7,7 @@ ti_setup_environment:
        li   one,>0100
        li   r0,>fffe
        mov  r0,@b255
-       li   sp,pad_stack
+       li   sp,ram_stack
        .proc
        bl   @init_bits
        bl   @clear_pad

@@ -7,6 +7,12 @@
        copy "ti-tables.a99"
        copy "music-player.a99"
 
+* The stack (TI-specific): 256 bytes, growing up (see the .push macro). It is in
+* RAM rather than scratchpad (pad_stack, 48 bytes), since the system
+* description (#R$9AB9) recurses up to 10 levels deep.
+ram_stack:
+       bss  >100
+
 * Space view bitmap buffer
 *
 * 128 rows of 32 bytes (256 pixels), one bit per pixel, of which the first

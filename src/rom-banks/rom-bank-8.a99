@@ -1,0 +1,856 @@
+* ROM bank 8: the math tables, and code: the data on system screen
+* Assembled for real by code-bank-8.a99, and DORG in the other builds for its labels
+       .ifdef code_bank_8
+       aorg >6000
+       .else
+       dorg >6000
+       .endif
+       bss  >40
+       .ifdef code_bank_8
+       bcopy "../../bin/math-tables.bin" ; the math tables, as in the other banks
+       .else
+       bss  math_tables_end-math_tables
+       .endif
+
+* The data on system screen, with its own data and the system description
+* generator ("goatsoup")
+
+********************************************************************************
+* The message "Human Colonial)"
+* 
+* Shown for the inhabitants of some systems (#R$60E3).
+msg_human_colonial:                                        ; >0e81
+       text 'Human Colonial)',>00                                 ; 
+msg_large:                                                 ; >0e91
+       text 'Large',>a0                                           ; 
+msg_fierce:                                                ; >0e97
+       text 'Fierce',>a0                                          ; 
+msg_small:                                                 ; >0e9e
+       text 'Small',>a0                                           ; 
+size_word_table_empty_slots:                               ; >0ea4
+       byte >80,>80,>80,>80,>80                                   ; 
+msg_green:                                                 ; >0ea9
+       text 'Green',>a0                                           ; 
+msg_red:                                                   ; >0eaf
+       text 'Red',>a0                                             ; 
+msg_yellow:                                                ; >0eb3
+       text 'Yellow',>a0                                          ; 
+msg_blue:                                                  ; >0eba
+       text 'Blue',>a0                                            ; 
+msg_black:                                                 ; >0ebf
+       text 'Black',>a0                                           ; 
+msg_harmless:                                              ; >0ec5
+       text 'Harmless',>a0                                        ; 
+colour_word_table_empty_slot:                              ; >0ece
+       byte >80                                                   ; 
+msg_slimy:                                                 ; >0ecf
+       text 'Slimy',>a0                                           ; 
+msg_bug_eyed:                                              ; >0ed5
+       text 'Bug-eyed',>a0                                        ; 
+msg_horned:                                                ; >0ede
+       text 'Horned',>a0                                          ; 
+msg_bony:                                                  ; >0ee5
+       text 'Bony',>a0                                            ; 
+msg_fat:                                                   ; >0eea
+       text 'Fat',>a0                                             ; 
+msg_furry:                                                 ; >0eee
+       text 'Furry',>a0                                           ; 
+species_adj_word_table_empty_slots:                        ; >0ef4
+       byte >80,>80                                               ; 
+msg_rodent:                                                ; >0ef6
+       text 'Roden',>f4                                           ; 
+msg_frog:                                                  ; >0efc
+       text 'Fro',>e7                                             ; 
+msg_lizard:                                                ; >0f00
+       text 'Lizar',>e4                                           ; 
+msg_lobster:                                               ; >0f06
+       text 'Lobste',>f2                                          ; 
+msg_bird:                                                  ; >0f0d
+       text 'Bir',>e4                                             ; 
+msg_humanoid:                                              ; >0f11
+       text 'Humanoi',>e4                                         ; 
+msg_feline:                                                ; >0f19
+       text 'Felin',>e5                                           ; 
+msg_insect:                                                ; >0f1f
+       text 'Insec',>f4                                           ; 
+
+********************************************************************************
+* The message "Poor "
+msg_poor_0f75:                                             ; >0f75
+       text 'Poor',>a0                                            ; 
+msg_average_0f7a:                                          ; >0f7a
+       text 'Averag',>e5                                          ; 
+msg_mainly:                                                ; >0f81
+       text 'Mainly',>a0                                          ; 
+msg_rich:                                                  ; >0f88
+       text 'Rich',>a0                                            ; 
+msg_agricultural:                                          ; >0f8d
+       text ' Agricultural',>00                                   ; 
+msg_industrial:                                            ; >0f9b
+       text ' Industrial',>00                                     ; 
+msg_anarchy:                                               ; >0fa7
+       text 'Anarch',>f9                                          ; 
+msg_feudal:                                                ; >0fae
+       text 'Feuda',>ec                                           ; 
+msg_multi_government:                                      ; >0fb4
+       text 'Multi-governmen',>f4                                 ; 
+msg_dictatorship:                                          ; >0fc4
+       text 'Dictatorshi',>f0                                     ; 
+msg_communist:                                             ; >0fd0
+       text 'Communis',>f4                                        ; 
+msg_confederacy:                                           ; >0fd9
+       text 'Confederac',>f9                                      ; 
+msg_democracy:                                             ; >0fe4
+       text 'Democrac',>f9                                        ; 
+msg_corporate_state:                                       ; >0fed
+       text 'Corporate stat',>e5                                  ; 
+
+********************************************************************************
+* The message "Data On "
+msg_data:                                                  ; >56f7
+       text 'Data On',>a0                                         ; 
+msg_billion:                                               ; >56ff
+       text ' Billio',>ee                                         ; 
+msg_m_cr:                                                  ; >5707
+       text ' M C',>d2                                            ; 
+msg_km:                                                    ; >570c
+       text ' k',>ed                                              ; 
+
+********************************************************************************
+* Data on System: "There's a mean, nasty, vicious ship out there!"
+* 
+* Printed by #R$6164 instead of the system's description when the Constrictor
+* is in the system (mission state $16, #R$E93D). A list of (column, row,
+* string) records ending with $FF (see #R$3596).
+msg_mean_nasty_vicious_ship:                               ; >585d
+       text >05,>0f,'There''s a mean, nasty, viciou',>f3          ; 
+       text >05,>10,'ship out there',>a1                          ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Data on System headings
+* 
+* Printed by #R$6164. A list of (column, row, string) records ending with $FF
+* (see #R$3596).
+data_on_system_headings:                                   ; >5953
+       text >05,>03,'Distance',>ba                                ; 
+       text >05,>05,'Economy',>ba                                 ; 
+       text >05,>06,'Government',>ba                              ; 
+       text >05,>07,'Tech. Level',>ba                             ; 
+       text >05,>09,'Population',>ba                              ; 
+       text >05,>0c,'Gross Productivity',>ba                      ; 
+       text >05,>0d,'Average Radius',>ba                          ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Data on System frame
+* 
+* Drawn by #R$6164. A list of (RST $28) rectangles ending with $FF (see
+* #R$36F1).
+data_on_system_frame:                                      ; >59b7
+       byte >05,>01,>21,>01,>91                                   ; 
+       byte >05,>03,>13,>0F,>21                                   ; 
+       byte >0F,>03,>16,>01,>71                                   ; 
+       byte >12,>05,>14,>03,>71                                   ; 
+       byte >11,>09,>0C,>01,>71                                   ; 
+       byte >05,>0A,>21,>01,>51                                   ; 
+       byte >19,>0C,>0A,>02,>71                                   ; 
+       byte >05,>0F,>21,>05,>D1                                   ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Show the Data on System screen: the inhabitants
+* 
+* Used by the routine at #R$6164.
+* .
+* Part of #R$6189. Prints "(" and then, as BBC Elite does, "Human
+* Colonial)" (#R$0E81) if bit 7 of the seed s2_lo (#R$F74F) is clear;
+* otherwise a description of the inhabitants ($60F8).
+* .
+* At $60F8, as BBC Elite does, builds the species from up to four words,
+* picked by bits of the seeds s2_hi (#R$F750), s1_hi (#R$F74E) and s0_hi
+* (#R$F74C) from the lists at $0E91, $0EA9, $0ECF and $0EF6, and then
+* prints the closing ")".
+show_inhabitants:                                          ; >60e3
+       .proc                                               ;                   ; 
+       li   bc,>050a                                       ; LD BC,$050A       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       movb @bytes+>28,a                                   ; LD A,$28          ; '('
+       bl   @print_char                                    ; RST $00           ; print it
+       movb @system_s2_lo,a                                ; LD A,($F74F) / OR A; 
+       jlt  build_object_description_words                 ; JP M,$60F8        ; bit 7 set - describe them
+       li   hl,msg_human_colonial                          ; LD HL,$0E81       ; "Human Colonial)"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       .endproc                                            ; RET               ; 
+build_object_description_words:                            ; >60f8
+       movb @system_s2_hi,a                                ; LD A,($F750)      ; 
+       srl  a,2                                            ; RRA x 2           ; 
+       andi a,>0700                                        ; AND $07           ; bits 2-4
+       li   hl,msg_large                                   ; LD HL,$0E91       ; 
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print the first word
+       movb @system_s2_hi,a                                ; POP AF / RRA x 3  ; 
+       srl  a,5                                            ;                   ; 
+       andi a,>0700                                        ; AND $07           ; bits 5-7
+       li   hl,msg_green                                   ; LD HL,$0EA9       ; 
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print the second word
+       movb @system_s1_hi,a                                ; LD A,($F74E)      ; 
+       xor  @system_s0_hi,a                                ; LD HL,$F74C / XOR (HL); (TI: XOR of words - only the high byte is used)
+       andi a,>0700                                        ; AND $07           ; bits 0-2
+       .push af                                            ; PUSH AF           ; 
+       li   hl,msg_slimy                                   ; LD HL,$0ECF       ; 
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print the third word
+       movb @system_s2_hi,a                                ; LD A,($F750)      ; 
+       andi a,>0300                                        ; AND $03           ; bits 0-1
+       .pop bc                                             ; POP BC            ; 
+       ab   b,a                                            ; ADD A,B           ; + the third word's number
+       andi a,>0700                                        ; AND $07           ; 
+       li   hl,msg_rodent                                  ; LD HL,$0EF6       ; 
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print the fourth word
+       movb @bytes+>29,a                                   ; LD A,$29          ; ')'
+       bl   @print_char                                    ; RST $00           ; print it
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Key '7': Data on System
+* 
+* Reached via the key table at #R$419B. First checks for mission 1's events
+* (states $11 and $13: #R$9190, #R$91AA). Then, unless the screen is
+* already showing, selects the system nearest the cursor on a chart
+* (#R$5314 on the galactic chart, #R$538B on the local chart) and shows the
+* data on the selected system ($6189).
+* .
+* At $6189, for the selected system: hides the sprites, draws a frame, and
+* prints its name (as #R$6066 does) and distance (#R$6141), then its data
+* from #R$4C9B: economy (#R$F754, from the words at #R$0F75), government
+* (#R$F753, #R$0FA7), tech level (#R$F755), population (tech level *
+* economy / 2 + 20 + bits 3-5 of s1_lo, in billions) and species (#R$60E3),
+* gross productivity ((government + 8)^2 * population / 4, in M CR) and
+* average radius (s2_lo, in km). In mission state $16 (#R$E93D), adds
+* "There's a mean, nasty, vicious ship out there!"; otherwise the system's
+* description.
+* .
+* At $626D, adds the system's description (#R$9A4B). At $6270, marks the
+* Data on System screen as showing (#R$E902 = 1).
+key_data_on_system:                                        ; >6164
+       .proc                                               ;                   ; 
+* TI: the mission 1 checks (states $11 and $13, #R$9190, #R$91AA) aren't
+* converted yet; neither can happen before the missions are.
+       cb   @current_screen,one                            ; LD A,($E902) / CP $01; Data on System showing?
+       jne  show_system_data_screen                        ; RET Z             ; yes - nothing to do
+       .endproc                                            ;                   ; 
+* TI: selecting the system nearest the cursor on a chart (#R$5314, #R$538B)
+* isn't converted yet, as the charts aren't.
+show_system_data_screen:                                   ; >6189
+       bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide sprites
+       li   ix,data_on_system_frame                        ; LD IX,$59B7       ; 
+       bl   @rst_28_target_draw_list_tile                  ; RST $28           ; draw a frame
+       li   hl,data_on_system_headings                     ; LD HL,$5953       ; 
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print the Distance/Economy/.../Present System field list
+       movb one,@cursor_vram_addr_row                      ; LD A,$01 / LD ($E710),A; text row 1
+       movb @selected_system,a                             ; LD A,($E72B)      ; the selected system
+       bl   @generate_system_name                          ; CALL $4CAF        ; generate and format its name
+       sb   @bytes+>22,a                                   ; SUB $22           ; compute a centering column from the character count
+       andi a,>ff00                                        ; NEG               ; 
+       neg  a                                              ;                   ; 
+       srl  a,1                                            ; SRL A             ; 
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; position the cursor there
+       li   hl,msg_data                                    ; LD HL,$56F7       ; "Data on "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   hl,text_buffer                                 ; LD HL,$E717       ; the generated name
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   bc,>0f03                                       ; LD BC,$0F03       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       bl   @distance_to_selected_system                   ; CALL $6141        ; compute the distance to it
+       movb @l,@c                                          ; LD C,L            ; 
+       movb h,@l                                           ; LD L,H            ; 
+       sb   h,h                                            ; LD H,$00          ; 
+       movb @bytes+>40,a                                   ; LD A,$40          ; control byte: pad to width 0, decimal-point handling
+       bl   @rst_18_target_format_value_print              ; RST $18           ; format and print the distance
+       li   hl,msg_light_years_5845                        ; LD HL,$5845       ; " Light Years"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   bc,>1205                                       ; LD BC,$1205       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       li   de,msg_agricultural                            ; LD DE,$0F8D       ; the economy word-list, lower half
+       movb @system_economy,a                              ; LD A,($F754)      ; A = the economy code
+       cb   a,@bytes+>04                                   ; CP $04            ; 
+       jl   _61da                                          ; JR C,$61DA        ; below 4 - use the lower half
+       sb   @bytes+>04,a                                   ; SUB $04           ; above - use the upper half instead
+       li   de,msg_industrial                              ; LD DE,$0F9B       ; 
+_61da:                                                     ; >61da
+       li   hl,msg_poor_0f75                               ; LD HL,$0F75       ; the economy word-list, first word
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print it
+       .ex_de_hl                                           ; EX DE,HL          ; 
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print the second word
+       li   bc,>1206                                       ; LD BC,$1206       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       movb @system_government,a                           ; LD A,($F753)      ; A = the government code
+       li   hl,msg_anarchy                                 ; LD HL,$0FA7       ; the government-name list
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print it
+       li   bc,>1207                                       ; LD BC,$1207       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       movb @system_tech_level,@c                          ; LD A,($F755) / LD C,A; tech level
+       sb   a,a                                            ; XOR A             ; 
+       clr  hl                                             ; SBC HL,HL         ; 
+       bl   @rst_18_target_format_value_print              ; RST $18           ; format and print it
+       li   bc,>1109                                       ; LD BC,$1109       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       movb @system_tech_level,r1                          ; LD A,($F755) / LD E,A; population:
+       srl  r1,8                                           ;                   ; 
+       movb @system_economy,r0                             ; LD A,($F754) / LD D,A; 
+       srl  r0,8                                           ;                   ; 
+       mpy  r0,r1                                          ; CALL $1F51        ; tech level * economy (TI: MPY)
+       andi r2,>00ff                                       ;                   ; (8 bits, as on the MSX)
+       srl  r2,1                                           ; SRL A             ; / 2
+       ai   r2,>14                                         ; ADD A,$14         ; + 20
+       movb @system_s1_lo,r0                               ; LD A,($F74D)      ; 
+       srl  r0,11                                          ; RRA x 3           ; 
+       andi r0,>0007                                       ; AND $07           ; 
+       a    r0,r2                                          ; ADD A,C           ; + bits 3-5 of s1_lo
+       swpb r2                                             ;                   ; 
+       movb r2,a                                           ;                   ; A = the population (8 bits, as on the MSX)
+       .push af                                            ; PUSH AF           ; stash it (needed again below)
+       movb a,@c                                           ; LD C,A            ; 
+       clr  hl                                             ; SBC HL,HL         ; 
+       movb @bytes+>40,a                                   ; LD A,$40          ; control byte: pad to width 0, decimal-point handling
+       bl   @rst_18_target_format_value_print              ; RST $18           ; print the population
+       li   hl,msg_billion                                 ; LD HL,$56FF       ; " Billion"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       bl   @show_inhabitants                              ; CALL $60E3        ; print the species
+       li   bc,>190c                                       ; LD BC,$190C       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       movb @system_government,r1                          ; LD A,($F753)      ; productivity: (government + 8)^2...
+       srl  r1,8                                           ;                   ; 
+       ai   r1,8                                           ; ADD A,$08         ; 
+       mpy  r1,r1                                          ; CALL $1F51        ; (TI: MPY)
+       andi r2,>00ff                                       ; LD E,A            ; (8 bits, as on the MSX)
+       .pop af                                             ; POP AF            ; the population
+       movb a,r0                                           ;                   ; 
+       srl  r0,8                                           ;                   ; 
+       mpy  r2,r0                                          ; CALL $1F60        ; ...* population
+       srl  r1,2                                           ; SRL H / RR L x 2  ; / 4
+       swpb r1                                             ;                   ; 
+       movb r1,@c                                          ; LD C,L            ; 
+       swpb r1                                             ;                   ; 
+       movb r1,@l                                          ; LD L,H            ; 
+       sb   a,a                                            ; XOR A             ; 
+       sb   h,h                                            ; LD H,A            ; 
+       bl   @rst_18_target_format_value_print              ; RST $18           ; print the productivity
+       li   hl,msg_m_cr                                    ; LD HL,$5707       ; " M CR"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   bc,>190d                                       ; LD BC,$190D       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       movb @system_s1_hi,@c                               ; LD BC,($F74E)     ; radius: s2_lo:s1_hi
+       movb @system_s2_lo,@l                               ; LD L,B            ; 
+       sb   a,a                                            ; XOR A             ; 
+       sb   h,h                                            ; LD H,A            ; 
+       bl   @rst_18_target_format_value_print              ; RST $18           ; print the radius
+       li   hl,msg_km                                      ; LD HL,$570C       ; " km"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       cb   @mission_state,@bytes+>16                      ; LD A,($E93D) / CP $16; the Constrictor is here?
+       jne  show_system_data_2                             ; JR NZ,$626D       ; 
+       li   hl,msg_mean_nasty_vicious_ship                 ; LD HL,$585D       ; 
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print "There's a mean, nasty, vicious ship out there!"
+       jmp  _6270                                          ; JR $6270          ; 
+show_system_data_2:                                        ; >626d
+       bl   @show_system_description                       ; CALL $9A4B        ; the system's description
+_6270:                                                     ; >6270
+       movb one,@current_screen                            ; LD A,$01 / LD ($E902),A; Data on System is showing
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Goatsoup: show the system's description
+* 
+* Used by the routine at #R$6164.
+* .
+* As BBC Elite does, generates the selected system's description (#R$E72B)
+* from the goatsoup template at #R$A2EB (#R$9AB9) into the buffer at $E9D7,
+* with its random choices seeded from the system's seeds (#R$EAD7, #R$EAD9,
+* from #R$F74B-#R$F750). Then prints it from row 15, column 5, word-wrapped
+* at 33 characters: at $9A9E, goes back from the 34th character to the last
+* space, and (at $9AA6) prints the line up to there and moves on to the
+* next row.
+show_system_description:                                   ; >9a4b
+       .proc                                               ;                   ; 
+       movb @selected_system,a                             ; LD A,($E72B)      ; the selected system
+       bl   @generate_system_name                          ; CALL $4CAF        ; generate its name-seed fields
+       movb @system_s0_hi,r0                               ; LD HL,($F74B)     ; (TI: the seeds as words)
+       movb @system_s0_lo,@r0lb                            ;                   ; 
+       movb @system_s1_hi,r1                               ; LD DE,($F74D)     ; 
+       movb @system_s1_lo,@r1lb                            ;                   ; 
+       xor  r1,r0                                          ; XOR D / XOR E     ; 
+       movb r0,@goatsoup_seed_word1+1                      ; LD ($EAD7),HL     ; the first seed word
+       movb @r0lb,@goatsoup_seed_word1                     ;                   ; 
+       movb @system_s2_hi,r1                               ; LD DE,($F74F)     ; 
+       movb @system_s2_lo,@r1lb                            ;                   ; 
+       xor  r1,r0                                          ; XOR D / XOR E     ; 
+       movb r0,@goatsoup_seed_word2+1                      ; LD ($EAD9),HL     ; the second seed word
+       movb @r0lb,@goatsoup_seed_word2                     ;                   ; 
+       li   r1,shared_blit_or_goatsoup_buffer              ; LD HL,$E9D6 / LD (HL),$00; clear the buffer
+       li   r2,>80                                         ; LD BC,$00FF / LDIR; (TI: 256 bytes, a word at a time)
+_9a6e_clear:                                               
+       clr  *r1+                                           ;                   ; 
+       dec  r2                                             ;                   ; 
+       jne  _9a6e_clear                                    ;                   ; 
+       li   bc,>050f                                       ; LD BC,$050F       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       li   ix,goatsoup_description_template_a2eb          ; LD IX,$A2EB       ; IX -> the goatsoup template
+       li   iy,shared_blit_or_goatsoup_buffer+1            ; LD IY,$E9D7       ; IY -> the expanded-text buffer
+       bl   @goatsoup_expand_one_byte                      ; CALL $9AB9        ; expand the whole template
+       sb   *iy,*iy                                        ; LD (IY+$00),$00   ; null-terminate it
+       li   de,shared_blit_or_goatsoup_buffer+1            ; LD DE,$E9D7       ; DE -> the start of the expanded text
+_9a93:                                                     ; >9a93
+       mov  de,hl                                          ; LD HL,$0021 / ADD HL,DE; look 33 columns ahead
+       ai   hl,>21                                         ;                   ; 
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; ran off the end of the text?
+       jne  _9a9e                                          ; JR NZ,$9A9E       ; no - find a place to wrap
+       .ex_de_hl                                           ; EX DE,HL          ; yes - print the rest as one final line
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; 
+       .endproc                                            ; RET               ; 
+_9a9e:                                                     ; >9a9e
+       cb   *hl,@bytes+>20                                 ; LD A,(HL) / CP $20; this character a space?
+       jeq  _9aa6                                          ; JR Z,$9AA6        ; yes - split the line there
+       dec  hl                                             ; DEC HL            ; no - look one character earlier
+       jmp  _9a9e                                          ; JR $9A9E          ; 
+_9aa6:                                                     ; >9aa6
+       sb   *hl,*hl                                        ; LD (HL),$00       ; split the line there (temporarily)
+       .push hl                                            ; PUSH HL           ; 
+       .ex_de_hl                                           ; EX DE,HL          ; 
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print this line
+       movb @cursor_vram_addr_row,@c                       ; LD BC,($E710) / INC C; advance to the next row
+       ab   one,@c                                         ;                   ; 
+       movb @bytes+>05,b                                   ; LD B,$05          ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       .pop de                                             ; POP DE            ; recover the split point
+       inc  de                                             ; INC DE            ; DE -> the next line's start
+       jmp  _9a93                                          ; JR $9A93          ; wrap the rest
+
+********************************************************************************
+* Goatsoup: expand one template byte from (IX) into (IY)
+* 
+* Used by the routines at #R$9A4B, #R$9B35, #R$9B43 and #R$9B7C.
+* .
+* $00 ends the expansion. $01-$1F dispatch through the #R$A2F2 word table
+* to a control-code handler (#R$9B34's `JP (HL)` trampoline -
+* #R$9B35/$9B43/$9B6E/$9B71/$9B77/$9B7C are the Ctrl-A..Ctrl-F handlers).
+* $20 (space) and above fall to $9ADA.
+* .
+* At $9ADA, $20-$7F are literal characters, printed via $9B0A. $80 and
+* above ($9A/$A5/$A6/etc in the word lists - see #R$9BCB) are symbol
+* references: index (byte AND $7F) into a 6-byte-stride table at $A201 to
+* get a new IX (a sub-template to recurse into), rolling a random choice
+* among that symbol's alternatives via #R$9BB2 (which also advances the
+* ship-name seed) if it returns nonzero. Either way recurses via #R$9AB9
+* for the chosen sub-template, then continues expanding the outer template.
+* .
+* At $9B0A, collapses a run of spaces into one. If auto-capitalise
+* (#R$EAD6) is armed and the previous character was a space following
+* (elsewhere) a full stop, and this character is lowercase, clears its bit
+* 5 to capitalise it.
+goatsoup_expand_one_byte:                                  ; >9ab9
+       .proc                                               ;                   ; (TI: recursive, so the stack is in RAM - see ram_stack)
+_9ab9:                                                     
+       movb *ix+,a                                         ; LD A,(IX+$00) / INC IX / OR A; A = the next template byte
+       jeq  _9ab9_end                                      ; RET Z             ; end of template
+       cb   a,@bytes+>20                                   ; CP $20            ; a control code (1-31)?
+       jhe  goatsoup_expand_literal_or_symbol              ; JR NC,$9ADA       ; no
+       clr  r1                                             ; ADD A,A / LD E,A / LD D,$00; 
+       movb a,r1                                           ;                   ; 
+       srl  r1,7                                           ;                   ; R1 = the code * 2
+       movb @goatsoup_control_code_dispatch+1(r1),r0       ; LD HL,$A2F2 / ADD HL,DE / LD A,(HL) ...; R0 -> this control code's handler
+       movb @goatsoup_control_code_dispatch(r1),@r0lb      ;                   ; 
+       .push ix                                            ; PUSH IX           ; 
+       bl   *r0                                            ; CALL $9B34        ; run it (TI: BL *R0 instead of the JP (HL) trampoline)
+       .pop ix                                             ; POP IX            ; 
+       jmp  _9ab9                                          ; JP $9AB9          ; expand the next byte
+goatsoup_expand_literal_or_symbol:                         ; >9ada
+       movb a,a                                            ; OR A              ; a literal character?
+       jgt  goatsoup_print_literal_capitalise              ; JP P,$9B0A        ; yes - print it
+       .push ix                                            ; PUSH IX           ; no - a symbol reference
+       andi a,>7f00                                        ; AND $7F           ; the symbol's index
+       clr  r1                                             ;                   ; 
+       movb a,r1                                           ;                   ; 
+       srl  r1,8                                           ;                   ; 
+       mov  r1,r0                                          ;                   ; 
+       sla  r1,1                                           ;                   ; 
+       a    r0,r1                                          ;                   ; 
+       sla  r1,1                                           ; ADD HL,HL ...     ; *6 (the symbol table's stride)
+       ai   r1,goatsoup_symbols                            ; LD DE,$A201 / ADD HL,DE; 
+       mov  r1,hl                                          ;                   ; HL -> this symbol's entry
+       movb @1(hl),ix                                      ; LD A,(HL) / LD IXl,A ...; IX -> its default sub-template
+       movb *hl,@ixl                                       ;                   ; 
+       bl   @goatsoup_advance_seed_roll_0_51               ; CALL $9BB2        ; roll a random alternative (0-4)
+       movb a,a                                            ; OR A              ; 
+       jeq  _9b02                                          ; JR Z,$9B02        ; none rolled - use the default sub-template
+       clr  r1                                             ; LD E,A / LD D,$00 ; 
+       movb a,r1                                           ;                   ; 
+       srl  r1,8                                           ;                   ; 
+       a    r1,hl                                          ; ADD HL,DE         ; 
+       movb @1(hl),r1                                      ; LD E,(HL)         ; that alternative's offset
+       srl  r1,8                                           ;                   ; 
+       a    r1,ix                                          ; ADD IX,DE         ; -> that alternative's sub-template
+_9b02:                                                     ; >9b02
+       bl   @goatsoup_expand_one_byte                      ; CALL $9AB9        ; recurse into the sub-template
+       .pop ix                                             ; POP IX            ; restore the outer template
+       jmp  _9ab9                                          ; JP $9AB9          ; continue expanding it
+goatsoup_print_literal_capitalise:                         ; >9b0a
+       cb   a,@bytes+>20                                   ; CP $20            ; a space?
+       jne  _9b13                                          ; JR NZ,$9B13       ; no - print it as-is
+       cb   a,@-1(iy)                                      ; CP (IY-$01)       ; yes - was the previous character a space too?
+       jeq  _9ab9                                          ; JR Z,$9AB9        ; yes - collapse it
+_9b13:                                                     ; >9b13
+       movb @goatsoup_capitalize_flag,r0                   ; LD A,($EAD6) / OR A; the auto-capitalise flag
+       jeq  _9b2c                                          ; JR Z,$9B2C        ; not armed - print as-is
+       cb   @-1(iy),@bytes+>20                             ; LD A,(IY-$01) / CP $20; armed: was the previous character a space?
+       jne  _9b2c                                          ; JR NZ,$9B2C       ; no - print as-is
+       cb   a,@bytes+>61                                   ; CP $61            ; lowercase?
+       jl   _9b2c                                          ; JR C,$9B2C        ; no - print as-is
+       cb   a,@bytes+>7b                                   ; CP $7B            ; 
+       jhe  _9b2c                                          ; JR NC,$9B2C       ; no - print as-is
+       andi a,>df00                                        ; RES 5,C           ; yes - capitalise it
+_9b2c:                                                     ; >9b2c
+       movb a,*iy+                                         ; LD (IY+$00),C / INC IY; store the character
+       jmp  _9ab9                                          ; JP $9AB9          ; expand the next byte
+_9ab9_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Goatsoup Ctrl-A: expand $E717's contents into the output, plus a space
+* 
+* Reached only through the control-code handler table at #R$A2F2, indexed by
+* the code doubled - not a literal CALL/JP. #R$E717 is the same buffer
+* #R$4C9B/$4CB8 and the value-formatting helpers write generated
+* names/numbers into, so this control code inserts whatever was most
+* recently generated there into the goatsoup output.
+line_editor_ctrl_a:                                        ; >9b35
+       .proc                                               ;                   ; 
+       li   ix,text_buffer                                 ; LD IX,$E717       ; IX -> the last-generated text
+       bl   @goatsoup_expand_one_byte                      ; CALL $9AB9        ; expand it into the output
+       movb @bytes+>20,*iy+                                ; LD (IY+$00),$20 / INC IY; append a space
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Goatsoup control code 2: the system's name as an adjective
+* 
+* Reached via the table at #R$A2F2. Turns the system's name in #R$E717
+* into an adjective, as BBC Elite does ("Lave" becomes "Lavian"): finds
+* the end of the name, and adds "ian " (#R$A300) to it - replacing its
+* last letter if that's a vowel (#R$A305) - and expands it into the
+* description (#R$9AB9). Then generates the selected system's name
+* (#R$E72B, #R$4CAF) into #R$E717 again.
+goatsoup_adjective:                                        ; >9b43
+       .proc                                               ;                   ; 
+       li   de,text_buffer                                 ; LD DE,$E717       ; the system's name
+_9b46:                                                     ; >9b46
+       movb *de+,a                                         ; LD A,(DE) / OR A / INC DE; 
+       jne  _9b46                                          ; JR Z,$9B4D        ; found the end
+       dect de                                             ; DEC DE            ; DE -> the last letter
+       movb *de,a                                          ; LD A,(DE)         ; 
+       li   hl,vowels                                      ; LD HL,$A305       ; the vowels
+       li   r1,5                                           ; LD BC,$0005       ; 
+_9b55:                                                     
+       cb   a,*hl+                                         ; CPIR              ; (TI: a loop) a vowel?
+       jeq  goatsoup_adjective_2                           ; JR Z,$9B5A        ; yes - replace it
+       dec  r1                                             ;                   ; 
+       jne  _9b55                                          ;                   ; 
+       inc  de                                             ; INC DE            ; no - add after it
+goatsoup_adjective_2:                                      ; >9b5a
+       li   hl,adjective_ending                            ; LD HL,$A300       ; "ian "
+       li   bc,>0006                                       ; LD C,$06          ; "ian " and the terminator (and one more)
+       .ldir                                               ; LDIR              ; add it
+       li   ix,text_buffer                                 ; LD IX,$E717       ; expand the result
+       bl   @goatsoup_expand_one_byte                      ; CALL $9AB9        ; expand the name into the description
+       movb @selected_system,a                             ; LD A,($E72B)      ; the selected system
+       bl   @generate_system_name                          ; JP $4CAF          ; generate its name again
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Goatsoup Ctrl-D: back up the output cursor by one character
+* 
+* Reached only via the same $A2F2 dispatch table as #R$9B35 (index 4) - not
+* a literal CALL/JP.
+line_editor_ctrl_d:                                        ; >9b6e
+       dec  iy                                             ; DEC IY            ; back up the output cursor
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Goatsoup Ctrl-E: arm auto-capitalisation
+* 
+* Reached only via the same $A2F2 dispatch table as #R$9B35 (index 5) - not a
+* literal CALL/JP. Never triggered in this capture.
+line_editor_ctrl_e:                                        ; >9b71
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@goatsoup_capitalize_flag                   ; LD ($EAD6),A      ; arm the auto-capitalise flag
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Goatsoup Ctrl-F: disarm auto-capitalisation
+* 
+* Reached only via the same $A2F2 dispatch table as #R$9B35 (index 6) - not
+* a literal CALL/JP.
+line_editor_ctrl_f:                                        ; >9b77
+       sb   @goatsoup_capitalize_flag,@goatsoup_capitalize_flag; XOR A / LD ($EAD6),A; disarm the auto-capitalise flag
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Goatsoup Ctrl-C: generate and insert a random ship name
+* 
+* Reached only via the same $A2F2 dispatch table as #R$9B35 (index 3) - not a
+* literal CALL/JP. Never triggered in this capture. Advances rotating_
+* accumulator from the two seed words #R$9A4B derived (#R$EAD7/$EAD9,
+* XORed together into #R$E904/$E906/$E908), then generates 4 more
+* name-seed bytes (#R$4CE7) and expands them into a name via #R$4CB8 -
+* the same machinery #R$4C9B/#R$4CE7 use for system names - before
+* expanding the result into the output (#R$9AB9) and appending a space.
+line_editor_ctrl_c:                                        ; >9b7c
+       .proc                                               ;                   ; 
+       movb @goatsoup_seed_word1+1,r0                      ; LD HL,($EAD7)     ; combine the two seed words...
+       movb @goatsoup_seed_word1,@r0lb                     ;                   ; 
+       movb r0,@system_seeds+1                             ; LD ($E904),HL     ; 
+       movb @r0lb,@system_seeds                            ;                   ; 
+       movb @goatsoup_seed_word2+1,r1                      ; LD HL,($EAD9)     ; 
+       movb @goatsoup_seed_word2,@r1lb                     ;                   ; 
+       movb r1,@seed_s1+1                                  ; LD ($E906),HL     ; 
+       movb @r1lb,@seed_s1                                 ;                   ; 
+       xor  r0,r1                                          ; XOR D / XOR E     ; 
+       movb r1,@seed_s2+1                                  ; LD ($E908),HL     ; ...into rotating_accumulator
+       movb @r1lb,@seed_s2                                 ;                   ; 
+       .push ix                                            ;                   ; (TI: system_name_from_seeds changes IX)
+       li   ix,goatsoup_name_pairs                         ; LD IX,$EADB       ; 
+       bl   @system_name_from_seeds                        ; CALL $4CE7        ; build 4 more name-seed bytes
+       li   hl,goatsoup_name_pairs                         ; LD HL,$EADB       ; expand the name-seed digrams via $E717...
+       bl   @expand_name                                   ; CALL $4CB8        ; 
+       li   ix,text_buffer                                 ; LD IX,$E717       ; ...and expand the generated name into the output
+       bl   @goatsoup_expand_one_byte                      ; CALL $9AB9        ; 
+       .pop ix                                             ;                   ; 
+       movb @bytes+>20,*iy+                                ; LD (IY+$00),$20 / INC IY; append a space
+       movb @selected_system,a                             ; LD A,($E72B)      ; then overwrite $E717 with the selected system's
+       bl   @generate_system_name                          ; JP $4CAF          ; name too, and return
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Goatsoup: advance the ship-name seed (Fibonacci-style), roll a 0-51 value
+* 
+* Used by the routine at #R$9AB9.
+* .
+* Advances the two seed words #R$9A4B set up (#R$EAD7/$EAD9) in a
+* Fibonacci-like fashion (new second word = sum of both, old second
+* word becomes the new first), then scales the high byte of the sum by
+* 52/256 (#R$2079) to roll a value 0-51 - #R$9ADA's random-alternative
+* selector for a symbol's weighted choices.
+goatsoup_advance_seed_roll_0_51:                           ; >9bb2
+       .proc                                               ;                   ; 
+       .push hl                                            ; PUSH HL           ; 
+       movb @goatsoup_seed_word2+1,r0                      ; LD HL,($EAD9)     ; R0 = the second seed word
+       movb @goatsoup_seed_word2,@r0lb                     ;                   ; 
+       movb @goatsoup_seed_word1+1,r1                      ; LD DE,($EAD7)     ; R1 = the first seed word
+       movb @goatsoup_seed_word1,@r1lb                     ;                   ; 
+       movb r0,@goatsoup_seed_word1+1                      ; LD ($EAD7),HL     ; the second word becomes the new first
+       movb @r0lb,@goatsoup_seed_word1                     ;                   ; 
+       a    r1,r0                                          ; ADD HL,DE         ; sum them
+       movb r0,@goatsoup_seed_word2+1                      ; LD ($EAD9),HL     ; the sum becomes the new second word
+       movb @r0lb,@goatsoup_seed_word2                     ;                   ; 
+       andi r0,>00ff                                       ; LD H,$00          ; HL = the sum's low byte
+       mov  r0,hl                                          ;                   ; 
+       movb @bytes+>34,a                                   ; LD A,$34          ; 52
+       bl   @divide_hl_a                                   ; CALL $2079        ; / 52
+       movb @l,a                                           ; LD A,L            ; A = the rolled value, 0-4
+       .pop hl                                             ; POP HL            ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Goatsoup: system-description word lists
+goatsoup_symbol_00:                                        ; >9bcb
+       text 'fabled ',>00,'notable ',>00,'well known ',>00,'famous ',>00,'noted ',>00; symbol $80
+goatsoup_symbol_01:                                        ; >9bf7
+       text 'very ',>00,'mildly ',>00,'most ',>00,'reasonably ',>00,>00; symbol $81
+goatsoup_symbol_02:                                        ; >9c18
+       text 'ancient ',>00,>97,>00,'great ',>00,'vast ',>00,'pink ',>00; symbol $82
+goatsoup_symbol_03:                                        ; >9c36
+       text >05,>9c,' ',>9b,>06,'plantations ',>00,'mountains ',>00,>9a,>00,>a5,'forests ',>00,'oceans ',>00; symbol $83
+goatsoup_symbol_04:                                        ; >9c67
+       text >a6,>00,'mountain ',>00,'edible ',>00,'tree ',>00,'spotted ',>00; symbol $84
+goatsoup_symbol_05:                                        ; >9c8a
+       text >9d,>00,>9e,>00,>86,>04,'oid ',>00,>a4,>00,>a3,>00    ; symbol $85
+goatsoup_symbol_06:                                        ; >9c99
+       text 'walking ',>8d,>00,'crab ',>00,'bat ',>00,'lobst ',>00,>03,>00; symbol $86
+goatsoup_symbol_07:                                        ; >9cb7
+       text 'ancient ',>00,'exceptional ',>00,'eccentric ',>00,'ingrained ',>00,>97,>00; symbol $87
+goatsoup_symbol_08:                                        ; >9ce5
+       text 'shyness ',>00,'silliness ',>00,'mating traditions ',>00,'loathing of ',>89,>00,'love for ',>89,>00; symbol $88
+goatsoup_symbol_09:                                        ; >9d25
+       text 'food blenders ',>00,'tourists ',>00,'poetry ',>00,'discos ',>00,>91,>00; symbol $89
+goatsoup_symbol_10:                                        ; >9d50
+       text 'its ',>82,>83,>00,'the ',>02,>84,>85,>00,'its inhabitant''s ',>87,>88,>00,>9f,>06,>00,'its ',>90,>91,>00; symbol $8A
+goatsoup_symbol_11:                                        ; >9d7d
+       text 'beset ',>00,'plagued ',>00,'ravaged ',>00,'cursed ',>00,'scourged ',>00; symbol $8B
+goatsoup_symbol_12:                                        ; >9da8
+       text >96,'civil war ',>00,>8d,>84,>85,>04,'s ',>00,'a ',>8d,'disease ',>00,>96,'earth quakes ',>00,>96,'solar activity ',>00; symbol $8C
+goatsoup_symbol_13:                                        ; >9de7
+       text 'killer ',>00,'deadly ',>00,'evil ',>00,'lethal ',>00,'vicious ',>00; symbol $8D
+goatsoup_symbol_14:                                        ; >9e0e
+       text 'juice ',>00,'brandy ',>00,'water ',>00,'brew ',>00,'gargle blasters ',>00; symbol $8E
+goatsoup_symbol_15:                                        ; >9e3b
+       text >03,>00,>02,>85,>00,>02,>03,>00,>02,>8d,>00,>8d,>03,>00; symbol $8F
+goatsoup_symbol_16:                                        ; >9e49
+       text 'fabulous ',>00,'exotic ',>00,'hoopy ',>00,'unusual ',>00,'exciting ',>00; symbol $90
+goatsoup_symbol_17:                                        ; >9e75
+       text 'cuisine ',>00,'night life ',>00,'casinos ',>00,'sit comms ',>00,>9f,>06,>00; symbol $91
+goatsoup_symbol_18:                                        ; >9ea1
+       text >01,>00,'The planet ',>01,>00,'The world ',>01,>00,'This planet ',>00,'This world ',>00; symbol $92
+goatsoup_symbol_19:                                        ; >9ed5
+       text >81,>80,'for ',>8a,>00,>81,>80,'for ',>8a,'and ',>8a,>00,>8b,'by ',>8c,>00,>81,>80,'for ',>8a,'but is ',>8b,'by ',>8c,>00,'a ',>94,>95,>00; symbol $93
+goatsoup_symbol_20:                                        ; >9f09
+       text >04,'n unremarkable ',>00,'boring ',>00,'dull ',>00,'tedious ',>00,'revolting ',>00; symbol $94
+goatsoup_symbol_21:                                        ; >9f3c
+       text 'planet ',>00,'world ',>00,'place ',>00,'little planet ',>00,'dump ',>00; symbol $95
+goatsoup_symbol_22:                                        ; >9f67
+       text 'frequent ',>00,'occasional ',>00,'unpredictable ',>00,'dreadful ',>00,'deadly ',>00; symbol $96
+goatsoup_symbol_23:                                        ; >9f9e
+       text 'funny ',>00,'wierd ',>00,'unusual ',>00,'strange ',>00,'peculiar ',>00; symbol $97
+goatsoup_symbol_24:                                        ; >9fc8
+       text 'son of a bitch ',>00,'scoundrel ',>00,'blackguard ',>00,'rougue ',>00,'whoreson beetle headed flap ear''d knave',>00; symbol $98
+goatsoup_symbol_25:                                        ; >a01f
+       text >00,>00,>00,>00,>00                                   ; symbol $99
+goatsoup_symbol_26:                                        ; >a024
+       text 'parking meters ',>00,'dust clouds ',>00,'ice bergs ',>00,'rock formations',>00,'volcanoes ',>00; symbol $9A
+goatsoup_symbol_27:                                        ; >a067
+       text 'plant ',>00,'tulip ',>00,'banana ',>00,'corn ',>00,'weed ',>00; symbol $9B
+goatsoup_symbol_28:                                        ; >a089
+       text >03,>00,>02,>03,>00,>02,>8d,>00,'inhabitant ',>00,>02,>03,>00; symbol $9C
+goatsoup_symbol_29:                                        ; >a0a0
+       text 'shrew ',>00,'beast ',>00,'bison ',>00,'snake ',>00,'wolf ',>00; symbol $9D
+goatsoup_symbol_30:                                        ; >a0c2
+       text 'leopard ',>00,'cat ',>00,'monkey ',>00,'goat ',>00,'fish ',>00; symbol $9E
+goatsoup_symbol_31:                                        ; >a0e4
+       text >05,>8f,>8e,>00,>02,>05,>9d,>a0,>00,'its ',>05,>90,>9e,>a0,>00,>a1,>a2,>00,>05,>8f,>8e,>00; symbol $9F
+goatsoup_symbol_32:                                        ; >a0fd
+       text 'meat ',>00,'cutlet ',>00,'steak ',>00,'burgers ',>00,'soup ',>00; symbol $A0
+goatsoup_symbol_33:                                        ; >a121
+       text 'ice ',>00,'mud ',>00,'zero-G ',>00,'vacuum ',>00,>02,'ultra ',>00; symbol $A1
+goatsoup_symbol_34:                                        ; >a143
+       text 'hockey ',>00,'cricket ',>00,'karate ',>00,'polo ',>00,'tennis ',>00; symbol $A2
+goatsoup_symbol_35:                                        ; >a16a
+       text 'wasp ',>00,'moth ',>00,'grub ',>00,'ant ',>00,>03,>00; symbol $A3
+goatsoup_symbol_36:                                        ; >a183
+       text 'poet ',>00,'arts graduate ',>00,'yak ',>00,'snail ',>00,'slug ',>00; symbol $A4
+goatsoup_symbol_37:                                        ; >a1aa
+       text 'dense ',>00,'lush ',>00,'rain ',>00,'bamboo ',>00,'deciduous ',>00; symbol $A5
+goatsoup_symbol_38:                                        ; >a1d0
+       text 'green ',>00,'black ',>00,'yellow stripey ',>00,'pinky grey ',>00,'white ',>00; symbol $A6
+
+********************************************************************************
+* Goatsoup: symbol table
+* 
+* One 6-byte entry for each of the symbols $80-$A6 in the system description
+* templates (#R$A2EB), looked up by #R$9ADA: the address of the first of the
+* symbol's five alternative words or phrases, then the offsets of the other
+* four from it. #R$9BB2 picks one at random.
+goatsoup_symbols:                                          ; >a201
+       byte goatsoup_symbol_00%%256,goatsoup_symbol_00//256       ; symbol $80
+       byte >08,>11,>1D,>25                                       ; 
+       byte goatsoup_symbol_01%%256,goatsoup_symbol_01//256       ; symbol $81
+       byte >06,>0E,>14,>20                                       ; 
+       byte goatsoup_symbol_02%%256,goatsoup_symbol_02//256       ; symbol $82
+       byte >09,>0B,>12,>18                                       ; 
+       byte goatsoup_symbol_03%%256,goatsoup_symbol_03//256       ; symbol $83
+       byte >12,>1D,>1F,>29                                       ; 
+       byte goatsoup_symbol_04%%256,goatsoup_symbol_04//256       ; symbol $84
+       byte >02,>0C,>14,>1A                                       ; 
+       byte goatsoup_symbol_05%%256,goatsoup_symbol_05//256       ; symbol $85
+       byte >02,>04,>0B,>0D                                       ; 
+       byte goatsoup_symbol_06%%256,goatsoup_symbol_06//256       ; symbol $86
+       byte >0A,>10,>15,>1C                                       ; 
+       byte goatsoup_symbol_07%%256,goatsoup_symbol_07//256       ; symbol $87
+       byte >09,>16,>21,>2C                                       ; 
+       byte goatsoup_symbol_08%%256,goatsoup_symbol_08//256       ; symbol $88
+       byte >09,>14,>27,>35                                       ; 
+       byte goatsoup_symbol_09%%256,goatsoup_symbol_09//256       ; symbol $89
+       byte >0F,>19,>21,>29                                       ; 
+       byte goatsoup_symbol_10%%256,goatsoup_symbol_10//256       ; symbol $8A
+       byte >07,>0F,>23,>26                                       ; 
+       byte goatsoup_symbol_11%%256,goatsoup_symbol_11//256       ; symbol $8B
+       byte >07,>10,>19,>21                                       ; 
+       byte goatsoup_symbol_12%%256,goatsoup_symbol_12//256       ; symbol $8C
+       byte >0C,>13,>1F,>2E                                       ; 
+       byte goatsoup_symbol_13%%256,goatsoup_symbol_13//256       ; symbol $8D
+       byte >08,>10,>16,>1E                                       ; 
+       byte goatsoup_symbol_14%%256,goatsoup_symbol_14//256       ; symbol $8E
+       byte >07,>0F,>16,>1C                                       ; 
+       byte goatsoup_symbol_15%%256,goatsoup_symbol_15//256       ; symbol $8F
+       byte >02,>05,>08,>0B                                       ; 
+       byte goatsoup_symbol_16%%256,goatsoup_symbol_16//256       ; symbol $90
+       byte >0A,>12,>19,>22                                       ; 
+       byte goatsoup_symbol_17%%256,goatsoup_symbol_17//256       ; symbol $91
+       byte >09,>15,>1E,>29                                       ; 
+       byte goatsoup_symbol_18%%256,goatsoup_symbol_18//256       ; symbol $92
+       byte >02,>0F,>1B,>28                                       ; 
+       byte goatsoup_symbol_19%%256,goatsoup_symbol_19//256       ; symbol $93
+       byte >08,>15,>1B,>2F                                       ; 
+       byte goatsoup_symbol_20%%256,goatsoup_symbol_20//256       ; symbol $94
+       byte >11,>19,>1F,>28                                       ; 
+       byte goatsoup_symbol_21%%256,goatsoup_symbol_21//256       ; symbol $95
+       byte >08,>0F,>16,>25                                       ; 
+       byte goatsoup_symbol_22%%256,goatsoup_symbol_22//256       ; symbol $96
+       byte >0A,>16,>25,>2F                                       ; 
+       byte goatsoup_symbol_23%%256,goatsoup_symbol_23//256       ; symbol $97
+       byte >07,>0E,>17,>20                                       ; 
+       byte goatsoup_symbol_24%%256,goatsoup_symbol_24//256       ; symbol $98
+       byte >10,>1B,>27,>2F                                       ; 
+       byte goatsoup_symbol_25%%256,goatsoup_symbol_25//256       ; symbol $99
+       byte >01,>02,>03,>04                                       ; 
+       byte goatsoup_symbol_26%%256,goatsoup_symbol_26//256       ; symbol $9A
+       byte >10,>1D,>28,>38                                       ; 
+       byte goatsoup_symbol_27%%256,goatsoup_symbol_27//256       ; symbol $9B
+       byte >07,>0E,>16,>1C                                       ; 
+       byte goatsoup_symbol_28%%256,goatsoup_symbol_28//256       ; symbol $9C
+       byte >02,>05,>08,>14                                       ; 
+       byte goatsoup_symbol_29%%256,goatsoup_symbol_29//256       ; symbol $9D
+       byte >07,>0E,>15,>1C                                       ; 
+       byte goatsoup_symbol_30%%256,goatsoup_symbol_30//256       ; symbol $9E
+       byte >09,>0E,>16,>1C                                       ; 
+       byte goatsoup_symbol_31%%256,goatsoup_symbol_31//256       ; symbol $9F
+       byte >04,>09,>12,>15                                       ; 
+       byte goatsoup_symbol_32%%256,goatsoup_symbol_32//256       ; symbol $A0
+       byte >06,>0E,>15,>1E                                       ; 
+       byte goatsoup_symbol_33%%256,goatsoup_symbol_33//256       ; symbol $A1
+       byte >05,>0A,>12,>1A                                       ; 
+       byte goatsoup_symbol_34%%256,goatsoup_symbol_34//256       ; symbol $A2
+       byte >08,>11,>19,>1F                                       ; 
+       byte goatsoup_symbol_35%%256,goatsoup_symbol_35//256       ; symbol $A3
+       byte >06,>0C,>12,>17                                       ; 
+       byte goatsoup_symbol_36%%256,goatsoup_symbol_36//256       ; symbol $A4
+       byte >06,>15,>1A,>21                                       ; 
+       byte goatsoup_symbol_37%%256,goatsoup_symbol_37//256       ; symbol $A5
+       byte >07,>0D,>13,>1B                                       ; 
+       byte goatsoup_symbol_38%%256,goatsoup_symbol_38//256       ; symbol $A6
+       byte >07,>0E,>1E,>2A                                       ; 
+
+********************************************************************************
+* Goatsoup: the system description template
+* 
+* The top-level template for a system's description, which #R$9A4B (at
+* $9A81) expands with #R$9AB9. Control code 4 takes back the space after
+* the last word, so that the full stop follows it directly. The last two
+* bytes, at $A2F2, double as entry 0 of the control-code handler table
+* (#R$A2F4), which is never used.
+goatsoup_description_template_a2eb:                        ; >a2eb
+       byte >06,>92                                               ; control code 6 (#R$9B77), symbol $92
+       text 'is '                                                 ; 
+       byte >93,>04                                               ; symbol $93, control code 4 (#R$9B6E)
+goatsoup_control_code_dispatch:                            ; >a2f2
+       text '.',>00                                               ; a full stop, and the end
+_a2f4:                                                     ; >a2f4
+       byte line_editor_ctrl_a%%256,line_editor_ctrl_a//256       ; 1: #R$9B35
+       byte goatsoup_adjective%%256,goatsoup_adjective//256       ; 2: #R$9B43
+       byte line_editor_ctrl_c%%256,line_editor_ctrl_c//256       ; 3: #R$9B7C
+       byte line_editor_ctrl_d%%256,line_editor_ctrl_d//256       ; 4: #R$9B6E
+       byte line_editor_ctrl_e%%256,line_editor_ctrl_e//256       ; 5: #R$9B71
+       byte line_editor_ctrl_f%%256,line_editor_ctrl_f//256       ; 6: #R$9B77
+adjective_ending:                                          ; >a300
+       text 'ian ',>00                                            ; 
+vowels:                                                    ; >a305
+       text 'aeiou'                                               ; 
+
+rom_bank_8_end:
+       equ  $
+       bss  >8000-$

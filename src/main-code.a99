@@ -815,6 +815,26 @@ mission_briefing_ship:                                     ; >1f4f
        byte >1F,>00
 
 ********************************************************************************
+* Multiply: 8-bit x 8-bit -> 8-bit, unsigned, truncated
+* 
+* Used by the routines at #R$4BA8, #R$6164 and #R$63AA.
+* .
+* A = D * E via the standard double-and-add algorithm, using the same
+* SRL-B/INC-B/DJNZ early-exit trick as #R$1F86 (see there for how that
+* works) but on a single 8-bit accumulator/multiplicand pair instead of a
+* 24-bit one - so the result silently truncates if the true product
+* would exceed 255.
+multiply_d_e_8bit:                                         ; >1f51
+       movb d,r1                                           ;                   ; (TI: with MPY)
+       srl  r1,8                                           ;                   ; 
+       movb @e,r0                                          ;                   ; 
+       srl  r0,8                                           ;                   ; 
+       mpy  r0,r1                                          ;                   ; R1:R2 = D * E
+       swpb r2                                             ;                   ; 
+       movb r2,a                                           ;                   ; A = its low byte, as on the MSX
+       rt                                                  ; RET               ; 
+
+********************************************************************************
 * Multiply: HL = L * L, or A * E
 * 
 * Used by the routines at #R$205D and #R$8570.
@@ -886,6 +906,47 @@ multiply_16x8:                                             ; >1f86
        mov  r2,hl                                          ;                   ; HL = bits 0-15 of the product
        swpb r1                                             ;                   ; 
        movb r1,a                                           ; ADC A,C           ; A = bits 16-23
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Integer square root
+* 
+* Used by the routines at #R$2054 and #R$8570.
+* .
+* Returns the square root of A:HL, rounded down, using the usual
+* bit-by-bit method: two bits of the number are brought down into the
+* remainder (A:HL) at a time, and the trial value - the root so far with
+* binary 01 appended (C:D:$40) - is subtracted if it fits, giving the next
+* bit of the root. The number is first shifted left 6 bits so that it
+* fills the 24 bits, so it must be less than $40000 (2^18), giving a root
+* of up to 511 in 9 steps. Used for distances (#R$2054) and by the compass
+* (#R$8570).
+* 
+* I:A:HL Number (less than $40000)
+* O:HL Its square root
+square_root:                                               ; >1f9c
+* TI: a binary search with MPY. For the values that occur (up to 2 * 255^2)
+* it gives the same root as the MSX's restoring square root.
+       movb a,ix                                           ;                   ; IX = the number's high word (A)
+       srl  ix,8                                           ;                   ; 
+       clr  bc                                             ;                   ; BC = the root so far
+       li   de,>0100                                       ;                   ; DE = the next bit to try
+_1f9c_bit:                                                 
+       mov  bc,r0                                          ;                   ; 
+       soc  de,r0                                          ;                   ; R0 = the root with this bit
+       mov  r0,r1                                          ;                   ; 
+       mpy  r0,r1                                          ;                   ; R1:R2 = its square
+       c    r1,ix                                          ;                   ; 
+       jh   _1f9c_next                                     ;                   ; too big
+       jl   _1f9c_keep                                     ;                   ; 
+       c    r2,hl                                          ;                   ; 
+       jh   _1f9c_next                                     ;                   ; too big
+_1f9c_keep:                                                
+       mov  r0,bc                                          ;                   ; keep the bit
+_1f9c_next:                                                
+       srl  de,1                                           ;                   ; 
+       jne  _1f9c_bit                                      ;                   ; 
+       mov  bc,hl                                          ; LD H,C / LD L,D   ; HL = the root
        rt                                                  ; RET               ; 
 
 ********************************************************************************
@@ -964,6 +1025,56 @@ multiply_components:                                       ; >200a
        rt                                                  ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negative: negate HL
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Distance between two points on a chart
+* 
+* Used by the routine at #R$6141.
+* .
+* Returns 4 * sqrt(dx^2 + dy^2) for the points (D,E) and (B,C), from
+* #R$205D's squared distance and #R$1F9C's square root.
+* 
+* I:B,C One point
+* I:D,E The other point
+* O:HL Four times the distance between them
+distance_between_two_2d_points_d:                          ; >2054
+       .proc                                               ;                   ; 
+       bl   @squared_distance_2d                           ; CALL $205D        ; 
+       bl   @square_root                                   ; CALL $1F9C        ; 
+       sla  hl,2                                           ; ADD HL,HL x 2     ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Squared distance between two 2D points: (D,E) and (B,C)
+* 
+* Used by the routines at #R$2054, #R$5325 and #R$538B.
+* .
+* Computes dx=|E-C| and dy=|D-B|, squares each via #R$1F5E (using the
+* alternate register set to hold dx's square across the second call),
+* then adds them: HL = dx^2 + dy^2. A's bit 0 on return holds any carry
+* out of the 16-bit sum (ADC A,A folding the final #R$1F5E's overflow in).
+squared_distance_2d:                                       ; >205d
+       movb @e,r0                                          ; LD A,E            ; (TI: with MPY)
+       srl  r0,8                                           ;                   ; 
+       movb @c,r1                                          ;                   ; 
+       srl  r1,8                                           ;                   ; 
+       s    r1,r0                                          ; SUB C             ; 
+       abs  r0                                             ; NEG               ; dx
+       mpy  r0,r0                                          ; CALL $1F5E        ; R1 = dx^2
+       mov  r1,hl                                          ;                   ; 
+       movb d,r0                                           ; LD A,D            ; 
+       srl  r0,8                                           ;                   ; 
+       movb b,r1                                           ;                   ; 
+       srl  r1,8                                           ;                   ; 
+       s    r1,r0                                          ; SUB B             ; 
+       abs  r0                                             ; NEG               ; dy
+       mpy  r0,r0                                          ; CALL $1F5E        ; R1 = dy^2
+       sb   a,a                                            ; XOR A             ; 
+       a    r1,hl                                          ; ADD HL,DE         ; 
+       jnc  _205d_end                                      ; ADC A,A           ; A:HL = dx^2 + dy^2
+       movb one,a                                          ;                   ; 
+_205d_end:                                                 
        rt                                                  ; RET               ; 
 
 ********************************************************************************
@@ -4276,6 +4387,7 @@ key_table:                                                 ; >419b
        data >3200,code_bank_7_select,buy_cargo                    ; '2': buy cargo when docked (#R$417D, #R$5BBD) (TI: no rear view yet)
        data >3300,code_bank_7_select,sell_cargo                   ; '3': sell cargo when docked (#R$4187, #R$5CEE) (TI: no left view yet)
        data >3400,code_bank_7_select,equip_ship                   ; '4': equip ship when docked (#R$4191, #R$5DBB) (TI: no right view yet)
+       data >3700,code_bank_8_select,key_data_on_system           ; '7': data on system (#R$6164)
        data >3800,code_bank_7_select,key_handler_8                ; '8': market prices (#R$5B99)
        data >3900,code_bank_7_select,status_page                  ; '9': commander status (#R$6276)
        data >5b00,code_bank_7_select,commander_menu               ; '[' (FCTN-R): load/save commander menu (#R$A30A)
@@ -6520,6 +6632,34 @@ clear_page:                                                ; >60ca
        li   bc,>a01a                                       ; LD BC,$A01A       ; 
        movb @bytes+>f1,a                                   ; LD A,$F1          ; white on black
        bl   @fill_vram_rect                                ; JP $35B8          ; 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Distance to the selected system
+* 
+* Used by the routines at #R$52CE, #R$6164 and #R$88AC.
+* .
+* Works out the distance (#R$2054) from the current system (#R$EB67) - or,
+* in witchspace (#R$EEC1), from the ship's position (at $6153) - to the
+* selected system (#R$E72B).
+distance_to_selected_system:                               ; >6141
+       .proc                                               ;                   ; 
+       movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; in witchspace?
+       jne  distance_from_witchspace                       ; JR NZ,$6153       ; yes - from the ship's position
+       movb @current_system,a                              ; LD A,($EB67)      ; the current system
+       bl   @generate_system                               ; CALL $4C9B        ; generate its name-seed coordinates
+       movb @system_y,d                                    ; LD DE,($F751)     ; DE = its (X, Y)
+       movb @system_x,@e                                   ;                   ; 
+       jmp  _6157                                          ; JR $6157          ; 
+distance_from_witchspace:                                  ; >6153
+       movb @witchspace_position+1,d                       ; LD DE,($EEC3)     ; DE = the ship's position in witchspace
+       movb @witchspace_position,@e                        ;                   ; 
+_6157:                                                     ; >6157
+       movb @selected_system,a                             ; LD A,($E72B)      ; the selected system
+       bl   @generate_system                               ; CALL $4C9B        ; generate its name-seed coordinates
+       movb @system_y,b                                    ; LD BC,($F751)     ; BC = its (X, Y)
+       movb @system_x,@c                                   ;                   ; 
+       bl   @distance_between_two_2d_points_d              ; JP $2054          ; compute the distance between them
        .endproc                                            ;                   ; 
 
 ********************************************************************************

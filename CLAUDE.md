@@ -20,11 +20,11 @@ data from extra 8K cartridge ROM banks into `>6000` while main code runs in 32K 
 
 1. `xas99.py -i -q -R -L elite.lst -E symbols.txt src/elite.a99 -o bin/elite` — assemble to EA5 program
    image(s) (`bin/elite`, `bin/elitf`, ... when larger than one file).
-2. `xas99.py src/math-tables-bin.a99 -b ...` and `xas99.py src/code-banks.a99 -B ...` — assemble the code bank 7
-   (`bin/bank7.bin`), which includes the math tables (`bin/math-tables.bin`) with `bcopy`.
+2. `xas99.py src/math-tables-bin.a99 -b ...` and `xas99.py src/code-bank-N.a99 -B ...` — assemble the code banks 7
+   and 8 (`bin/bankN.bin`), which include the math tables (`bin/math-tables.bin`) with `bcopy`.
 3. `xas99.py src/rom-banks/rom-bank-N.a99 -B ...` — assemble the data banks 4-6 (`bin/bankN.bin`).
 4. `java -jar tools/ea5tocart.jar bin\elite "elite"` — pack the program (lower and upper RAM only) with a loader
-   into a 32K cartridge image (banks 0-3), then append banks 4-7 (`elite8.bin`).
+   into a 32K cartridge image (banks 0-3), then append banks 4-8 and 7 empty banks: a 128K image (`elite8.bin`).
 5. Package `elite8.bin` + `layout.xml` into `elite.rpk` (MAME cartridge, PCB type `paged378`).
 
 There are no tests; verification is running the cartridge in an emulator.
@@ -50,7 +50,8 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   `ix`=R8, `iy`=R9, `sp`=R10, shadow set `af_`..`hl_`=R12–R15. R0–R2 are scratch, R3 (`one`) holds `>0100`.
   8-bit Z80 registers live in the **high byte** of the TMS9900 register; the low-byte registers (`c`, `e`, `l`,
   `f`, `ixl`, `iyl`, `c_`...) are addressed as memory (`wrksp+n`), so they're written `@c`, `@e`, `@l`.
-- **Simulated stack** at `pad_stack` in scratchpad, pointed to by `sp`, growing *up*. Macros (invoked with a
+- **Simulated stack** at `ram_stack` (256 bytes in low RAM: the system description recurses deeply), pointed to by
+  `sp`, growing *up*. Macros (invoked with a
   leading dot) `.call`, `.ret`, `.push`, `.pop`, `.proc`/`.endproc`, plus `.ldir`, `.ldi`, `.lddr`, `.exx`,
   `.ex_de_hl`, `.daa`, `.rst` etc. emulate multi-instruction Z80 ops. `.ldir` calls `ti_ldir` (in RAM).
 - **Calling convention**: routines are called with `bl`. Leaf routines return with `rt`; routines that call
@@ -91,13 +92,13 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   compute the real address (indexed addressing, e.g. `@bit_length_table(r1)`, or base + offset) and use `inc hl`.
 - **Variables cleared by the MSX startup code** ($D600-$EFAA) start at 0, except the values it sets afterwards
   (see `temp-src/startup-code.a99`); values above that keep the snapshot.
-- **Scratchpad** (`equates.a99`): `pad_stack`, then the routines `copy_to_pad` installs at startup:
+- **Scratchpad** (`equates.a99`): `pad_stack` (no longer used), then the routines `copy_to_pad` installs at startup:
   `copy_space_view_row_pad` (`>26`), `clear_space_view_rows_pad` (`>20`) and `line_loops_pad` (`>50`), ending at
   `pad_max` (`>83F8`, overlapping GPLWS - fine while interrupts and console routines are unused). The slot sizes
   are constants; update them if those routines change. Code there runs without wait states.
-- **Code in ROM banks**: `program.a99` holds the whole program and is assembled twice: by `elite.a99` with RAM
-  real (`aorg`) and the code banks `dorg`, and by `code-banks.a99` the other way round, so RAM and the banks can use
-  each other's labels. Bank 7 (`code_bank_7_select`) holds code; call into it with `.far_call`. Code in a bank may
+- **Code in ROM banks**: `program.a99` holds the whole program and is assembled once per output: by `elite.a99` with
+  RAM real (`aorg`) and the code banks `dorg`, and by `code-bank-N.a99` with only bank N real, so RAM and the banks
+  can use each other's labels. Banks 7 and 8 (`code_bank_7_select`, `code_bank_8_select`) hold code; call into it with `.far_call`. Code in a bank may
   read RAM, the math tables and its own bank only. As a pilot, bank 7 holds the status page (`status_page`,
   `print_commander_name` and their own text and data); the routines and text other screens share (printing,
   number formatting, system names, clearing the page) are in RAM. 'N' on the title screen shows it, and 'Y' the

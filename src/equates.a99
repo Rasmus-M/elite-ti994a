@@ -146,3 +146,5 @@ music_bank_select:
        equ  >600c
 code_bank_7_select:                    ; Code (rom-bank-7.a99)
        equ  >600e
+code_bank_8_select:                    ; Code (rom-bank-8.a99)
+       equ  >6010

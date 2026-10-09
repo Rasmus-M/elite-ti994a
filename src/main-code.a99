@@ -327,7 +327,7 @@ get_blueprint_data:                                        ; >16e3
        cb   a,@bytes+>64                                   ; CP $64            ; 
        jl   !                                              ; RET NC            ; the planet or the sun - no blueprint
        .restore_bank                                       ;                   ; 
-       .endproc                                            ;                   
+       jmp  get_blueprint_data_exit                        ;                   ; 
 !
        ab   a,a                                            ; ADD A,A           ; 
        movb a,@l                                           ; LD L,A            ; 
@@ -354,6 +354,7 @@ get_blueprint_data:                                        ; >16e3
        jl   -!                                             ;                   ; their name pointer points at their vertices)
 !
        .restore_bank                                       ;                   ; 
+get_blueprint_data_exit:
        .endproc                                            ; RET               ; 
 
 * TI-specific. The object's name, copied from its blueprint (bp_name) by
@@ -810,13 +811,13 @@ multiply_logs:                                             ; >2160
        joc  overflow_case_return_0                         ; JR C,$2172        ; overflow - return 0
        bl   @antilog                                       ; CALL $1FF2        ; HL = antilog
        andi r2,>4000                                       ; EX AF,AF'         ; 
-       jne  !                                              ; RET P             ; positive - done
-       .endproc                                            ;                   ; 
+       jeq  multiply_logs_exit                             ; RET P             ; positive - done
 !
        neg  hl                                             ; SUB L             ; negative: negate HL
-       .endproc                                            ; RET               ; 
+       jmp  multiply_logs_exit                             ; RET               ; 
 overflow_case_return_0:                                    ; >2172
        clr  hl                                             ; LD HL,$0000       ; 
+multiply_logs_exit:
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -960,8 +961,8 @@ _21cf_no_borrow:
 lookup_rotation_coeffs:                                    ; >21da
        socb a,a                                            ; OR A              ; 
        .push af                                            ; PUSH AF           ; save the sign
-       jlt  !                                              ; JP P,$21E1        ; 
-       b    @lookup_rotation_coeffs_abs                    ;                   
+       jgt  lookup_rotation_coeffs_abs                     ; JP P,$21E1        ; 
+       jeq  lookup_rotation_coeffs_abs                     ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = |rate|
@@ -1143,8 +1144,8 @@ pitch_object:                                              ; >2365
        .pop de                                             ; POP DE            ; 
        socb a,a                                            ; OR A              ; 
        a    de,hl                                          ; ADC HL,DE         ; HL = nose.x * cos + roof.x * sin
-       jlt  !                                              ; JP P,$2393        ; positive - store it
-       b    @pitch_object_nose_x                           ;                   
+       jgt  pitch_object_nose_x                            ; JP P,$2393        ; positive - store it
+       jeq  pitch_object_nose_x                            ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
@@ -1161,8 +1162,8 @@ pitch_object_nose_x:                                       ; >2393
        .pop de                                             ; POP DE            ; 
        socb a,a                                            ; OR A              ; 
        a    de,hl                                          ; ADC HL,DE         ; HL = nose.y * cos + roof.y * sin
-       jlt  !                                              ; JP P,$23B2        ; positive - store it
-       b    @pitch_object_nose_y                           ;                   
+       jgt  pitch_object_nose_y                            ; JP P,$23B2        ; positive - store it
+       jeq  pitch_object_nose_y                            ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
@@ -1179,8 +1180,8 @@ pitch_object_nose_y:                                       ; >23b2
        .pop de                                             ; POP DE            ; 
        socb a,a                                            ; OR A              ; 
        a    de,hl                                          ; ADC HL,DE         ; HL = nose.z * cos + roof.z * sin
-       jlt  !                                              ; JP P,$23D1        ; positive - store it
-       b    @pitch_object_nose_z                           ;                   
+       jgt  pitch_object_nose_z                            ; JP P,$23D1        ; positive - store it
+       jeq  pitch_object_nose_z                            ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
@@ -1219,8 +1220,8 @@ roll_object:                                               ; >23d9
        .ex_de_hl                                           ; EX DE,HL          ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; HL = side.x * cos - roof.x * sin
-       jlt  !                                              ; JP P,$2408        ; positive - store it
-       b    @roll_object_side_x                            ;                   
+       jgt  roll_object_side_x                             ; JP P,$2408        ; positive - store it
+       jeq  roll_object_side_x                             ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
@@ -1238,8 +1239,8 @@ roll_object_side_x:                                        ; >2408
        .ex_de_hl                                           ; EX DE,HL          ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; HL = side.y * cos - roof.y * sin
-       jlt  !                                              ; JP P,$2428        ; positive - store it
-       b    @roll_object_side_y                            ;                   
+       jgt  roll_object_side_y                             ; JP P,$2428        ; positive - store it
+       jeq  roll_object_side_y                             ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
@@ -1257,8 +1258,8 @@ roll_object_side_y:                                        ; >2428
        .ex_de_hl                                           ; EX DE,HL          ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; HL = side.z * cos - roof.z * sin
-       jlt  !                                              ; JP P,$2448        ; positive - store it
-       b    @roll_object_side_z                            ;                   
+       jgt  roll_object_side_z                             ; JP P,$2448        ; positive - store it
+       jeq  roll_object_side_z                             ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
@@ -1332,7 +1333,7 @@ _24a2:                                                     ; >24a2
        mov  hl,de                                          ; EX DE,HL          ; DE = Y'
        mov  @-2(sp),hl                                     ; LD HL,($E802)     ; HL = X'
        ai   sp,-6                                          ;                   ; drop the saved values
-       .endproc                                            ; RET               ; 
+       jmp  rotate_pair_exit                               ; RET               ; 
 * TI: rotate a pair of the object's axis vector components (sign-magnitude
 * words, little-endian, the second 2 bytes after the first) by the rotation
 * record at IX, as #R$221B and #R$22C0 do inline: X' = X.cos - Y.sin and
@@ -1381,6 +1382,7 @@ rotate_axis_pair_2:
        movb r0,@1(r1)                                      ; LD (X),HL         ; store it
        movb @r0lb,*r1                                      ;                   ; 
        ai   sp,-6                                          ;                   ; drop the saved values
+rotate_pair_exit:
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -1605,8 +1607,7 @@ _3052:                                                     ; >3052
        movb @>0c(iy),a                                     ; LD A,(IY+$0C)     ; 
        movb a,@object_energy                               ; LD ($F7E9),A      ; energy
        li   hl,object_speed                                ; LD HL,$F7E6       ; 
-       movb *hl,a                                          ; LD A,(HL)         ; 
-       socb a,a                                            ; OR A              ; 
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; 
        jeq  _306c                                          ; JR Z,$306C        ; speed 0 - leave it
        movb @>0d(iy),a                                     ; LD A,(IY+$0D)     ; 
        movb a,*hl                                          ; LD (HL),A         ; speed
@@ -1684,8 +1685,7 @@ print_char:                                                ; >34a8
        li   de,scratch_buffer_5+>0004                      ; LD DE,$E609       ; ...and the following 7 bytes too
        movb @bytes+>07,@c                                  ; LD C,$07          ; 
        .ldir                                               ; LDIR              ; ($E608-$E60F: the buffer's "spillover" half, initially all zero)
-       movb @cursor_subpixel_offset,a                      ; LD A,($E70E)      ; A = the cursor's sub-pixel shift (0-7)
-       socb a,a                                            ; OR A              ; 
+       movb @cursor_subpixel_offset,a                      ; LD A,($E70E) / OR A; A = the cursor's sub-pixel shift (0-7)
        jeq  _34e5                                          ; JR Z,$34E5        ; no shift needed - the buffer's ready as-is
        movb a,b                                            ; LD B,A            ; B = the shift amount
        li   hl,scratch_buffer                              ; LD HL,$E600       ; HL -> the glyph half of the buffer
@@ -1855,10 +1855,8 @@ set_cursor_position_combined:                              ; >3564
 rst_08_target_print_tokenised_string:                      ; >357a
        .proc
 rst_08_target_print_tokenised_string_jmp:
-       movb *hl,a                                          ; LD A,(HL)         ; 
-       socb a,a                                            ; OR A              ; 
-       jne  !                                              ; RET Z             ; 0 - the end
-       .endproc                                            ;                   
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; 
+       jeq  rst_08_target_print_tokenised_string_exit      ; RET Z             ; 0 - the end
 !
        andi a,>7f00                                        ; AND $7F           ; 
        jeq  !                                              ; CALL NZ,$34A8     ; print the character (#R$34A8)
@@ -1867,6 +1865,7 @@ rst_08_target_print_tokenised_string_jmp:
        movb *hl,r0                                         ; BIT 7,(HL)        ; bit 7 set?
        andi r0,>8000                                       ;                   
        jeq  !                                              ; RET NZ            ; yes - that was the last character
+rst_08_target_print_tokenised_string_exit:
        .endproc                                            ;                   
 !
        inc  hl                                             ; INC HL            ; 
@@ -2704,8 +2703,7 @@ _392a:                                                     ; >392a
        inc  hl                                             ; INC HL            ; 
        movb *hl,b                                          ; LD B,(HL)         ; ...and the byte after that is the repeat count
        inc  hl                                             ; INC HL            ; 
-       movb b,a                                            ; LD A,B            ; 
-       socb a,a                                            ; OR A              ; 
+       movb b,a                                            ; LD A,B / OR A     ; 
        jne  !                                              ; RET Z             ; Count of 0 marks the end of the stream
        rt                                                  ;                   
 !
@@ -2851,8 +2849,7 @@ set_sprite:                                                ; >39a4
 * 
 * I:HL Pointer to a (count, value) byte stream, 0-terminated
 write_run_length_encoded_byte_stream:                      ; >39b9
-       movb *hl,a                                          ; LD A,(HL)         ; A = the count
-       socb a,a                                            ; OR A              ; 
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; A = the count
        jne  !                                              ; RET Z             ; 0 - the end
        rt                                                  ;                   
 !
@@ -2892,8 +2889,8 @@ show_view_message_count:                                   ; >39cd
        movb *hl+,a                                         ; LD A,(HL)         ; the next character (MOVB sets the status; INC HL would change it on the TI)
        ;                                                   ; OR A              ; 
        ;                                                   ; INC HL            ; 
-       jlt  !                                              ; JP P,$39CD        ; 
-       b    @show_view_message_count                       ;                   
+       jgt  show_view_message_count                        ; JP P,$39CD        ; 
+       jeq  show_view_message_count                        ;                   ; 
 !
        movb @c,a                                           ; LD A,C            ; 
        czc  @bit0,a                                        ; BIT 0,A           ; 
@@ -2928,22 +2925,17 @@ _39da:                                                     ; >39da
 * entry at $3A34 moves on to the next character.
 count_message_timer:                                       ; >39f1
        li   hl,message_timer                               ; LD HL,$E919       ; 
-       movb *hl,a                                          ; LD A,(HL)         ; A = the message timer
-       socb a,a                                            ; OR A              ; 
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; A = the message timer
        jne  !                                              ; RET Z             ; 0 - nothing to do
        rt                                                  ;                   
 !
-       jgt  !                                              ; JP M,$39FC        ; negative - a message is showing
-       jeq  !                                              ;                   ; 
-       b    @count_message_timer_2                         ;                   
+       jlt  count_message_timer_2                          ; JP M,$39FC        ; negative - a message is showing
 !
        sb   one,*hl                                        ; DEC (HL)          ; counting down to when the next message can be shown
        rt                                                  ; RET               ; 
 count_message_timer_2:                                     ; >39fc
        sb   one,*hl                                        ; DEC (HL)          ; 
-       jgt  !                                              ; JP M,$3A03        ; still showing - draw it
-       jeq  !                                              ;                   ; 
-       b    @draw_view_message                             ;                   
+       jlt  draw_view_message                              ; JP M,$3A03        ; still showing - draw it
 !
        movb @bytes+>19,*hl                                 ; LD (HL),$19       ; 25 frames before the next message
        rt                                                  ; RET               ; 
@@ -3306,7 +3298,7 @@ move_point_to_edge:                                        ; >3be0
        movb @clip_reference_x,@e                           ;                   ;
        movb @clip_reference_y+1,hl                         ; LD HL,($E829)     ; and reference Y
        movb @clip_reference_y,@l                           ;                   ;
-       .endproc                                            ; RET               ; 
+       jmp  move_point_to_edge_exit                        ; RET               ; 
 bisect_clip_single_outside_endpoint:                       ; >3bec
        mov  @clip_point2_x,hl                              ; LD HL,($EB96)     ; HL = the outside point's current X
        movb @clip_reference_x+1,de                         ; LD DE,($E827)     ; DE = the reference X
@@ -3344,6 +3336,7 @@ _3c0b:                                                     ; >3c0b
        movb @c,a                                           ; LD A,C            ; midpoint passes both true-outcode tests
        andi a,>f000                                        ; AND $F0           ; test the "exactly on boundary" bits
        jeq  !                                              ; RET NZ            ; on a boundary - done, DE/HL hold the midpoint
+move_point_to_edge_exit:
        .endproc                                            ;                   
 !
        movb de,@clip_reference_x+1                         ; LD ($E827),DE     ; fully inside - it becomes the new reference X
@@ -3475,8 +3468,7 @@ shallow_line_loop:                                         ; >3c86
        srl  r0,1                                           ; LD H,A            ; R0 (high byte) = dx/2, the Bresenham error term
        b    @line_shallow_rotate_pad                       ;                   ; the pixel loop runs in scratchpad (line_loops)
 steep_line_loop:                                           ; >3cc6
-       movb d,a                                            ; LD A,D            ; A = dy (also the loop count)
-       socb a,a                                            ; OR A              ; 
+       movb d,a                                            ; LD A,D / OR A     ; A = dy (also the loop count)
        jne  !                                              ; RET Z             ; dy=0 - nothing to draw
        .ret                                                ;                   ; 
 !
@@ -3567,8 +3559,7 @@ plot_pixel_mask:                                           ; >3d06
 draw_circle:                                               ; >3d0e
        .proc
 draw_circle_jmp:
-       movb h,a                                            ; LD A,H            ; A = the magnitude's high byte
-       socb a,a                                            ; OR A              ; already fits in a byte (high byte 0)?
+       movb h,a                                            ; LD A,H / OR A     ; A = the magnitude's high byte
        jeq  _3d1d                                          ; JR Z,$3D1D        ; yes - shift count stays 0, skip the normalizing loop
        sb   @c,@c                                          ; LD C,$00          ; C = shift count so far
 draw_circle_shift:                                         ; >3d14
@@ -3577,10 +3568,8 @@ draw_circle_shift:                                         ; >3d14
        movb @l,@r0lb                                       ; RR L              ; ...and L along with it
        srl  r0,1                                           ;                   ; 
        movb @r0lb,@l                                       ;                   ; 
-       movb r0,a                                           ;                   ; 
-       socb a,a                                            ; OR A              ; does the high byte still not fit in L alone?
-       jeq  !                                              ; JP NZ,$3D14       ; keep shifting until it does
-       b    @draw_circle_shift                             ;                   
+       movb r0,a                                           ; OR A              ; does the high byte still not fit in L alone?
+       jne  draw_circle_shift                              ; JP NZ,$3D14       ; keep shifting until it does
 !
        movb @c,a                                           ; LD A,C            ; A = the final shift count
 _3d1d:                                                     ; >3d1d
@@ -3607,8 +3596,7 @@ _3d32:                                                     ; >3d32
        bl   @scale_by_trig_byte                            ; CALL $3D76        ; HL = the scaled cos offset
        .ex_de_hl                                           ; EX DE,HL          ; DE = the scaled cos offset
        .pop bc                                             ; POP BC            ; BC = the scaled sin offset (popped back in LIFO order)
-       movb @circle_first_step,a                           ; LD A,($E80C)      ; is this the very first step (flag still nonzero)?
-       socb a,a                                            ; OR A              ; 
+       movb @circle_first_step,a                           ; LD A,($E80C) / OR A; is this the very first step (flag still nonzero)?
        jeq  plot_one_table_steps_vertex_all                ; JR Z,$3D4E        ; no - the 4 slots already hold the previous step's points
        li   hl,circle_saved_sp                             ; LD HL,$E81D       ; yes - nothing to connect to yet; target the (still-empty) slots directly
        jmp  _3d51                                          ; JR $3D51          ; 
@@ -3661,8 +3649,7 @@ scale_by_trig_byte:                                        ; >3d76
        sb   @bytes+>07,a                                   ; SUB $07           ; 
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = 7 - shift count
-       jne  !                                              ; RET Z             ; already correctly scaled - done
-       .endproc                                            ;                   
+       jeq  scale_by_trig_byte_exit                        ; RET Z             ; already correctly scaled - done
 !
        movb a,b                                            ; LD B,A            ; B = the remaining shift count
 _3d85:                                                     ; >3d85
@@ -3670,6 +3657,7 @@ _3d85:                                                     ; >3d85
        ; RR L                                              ; RR L              ; ...one bit at a time (done by the SRL H above, which shifts all of HL)
        sb   one,b                                          ; DJNZ $3D85        ; 
        jne  _3d85                                          ;                   
+scale_by_trig_byte_exit:
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -3704,7 +3692,7 @@ draw_circle_point:                                         ; >3d8c
        movb r0,@-4(hl)                                     ; PUSH HL           ; the vertex's Y, 4 bytes below the cursor
        movb @r0lb,@-3(hl)                                  ;                   ; 
        ai   hl,-4                                          ; LD HL,$0000 / ADD HL,SP; HL = the new cursor (old cursor - 4)
-       .endproc                                            ; RET               ; 
+       jmp  draw_circle_point_exit                         ; RET               ; 
 write_vertex_and_draw_edge:                                ; >3dac
        movb *hl,r0                                         ; POP HL            ; R0 = the slot's old Y (this quadrant's vertex from the last step)
        movb @1(hl),@r0lb                                   ;                   ; 
@@ -3732,6 +3720,7 @@ write_vertex_and_draw_edge:                                ; >3dac
        .pop hl                                             ; POP HL            ; 
        .pop de                                             ; POP DE            ; 
        .pop bc                                             ; POP BC            ; 
+draw_circle_point_exit:
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -3790,8 +3779,7 @@ clip_test_and_plot_single_point:                           ; >3dd7
 * I:IX Centre x
 * I:IY Centre y
 draw_disc:                                                 ; >3df4
-       movb h,a                                            ; LD A,H            ; A = the magnitude's high byte
-       socb a,a                                            ; OR A              ; fits in a byte?
+       movb h,a                                            ; LD A,H / OR A     ; A = the magnitude's high byte
        jeq  !                                              ; RET NZ            ; no - out of range for this routine, do nothing
        .ret                                                ;                   
 !
@@ -3841,8 +3829,7 @@ _3e29:                                                     ; >3e29
        movb a,@c                                           ; LD C,A            ; C = the scaled cos value
        .ex_af_af_                                          ; EX AF,AF'         ; A = the scaled sin value (stashed above)
        movb a,b                                            ; LD B,A            ; B = the scaled sin value
-       movb @circle_first_step,a                           ; LD A,($E80C)      ; still the first step (nothing to connect to yet)?
-       socb a,a                                            ; OR A              ; 
+       movb @circle_first_step,a                           ; LD A,($E80C) / OR A; still the first step (nothing to connect to yet)?
        jeq  fill_disc_connect_to_previous_step             ; JR Z,$3E58        ; no - go connect to the previous step
        movb bc,@circle_previous_points+1                   ; LD ($E80D),BC     ; yes - just cache this (scaled cos, scaled sin) pair for next step
        movb @c,@circle_previous_points                     ;                   ;
@@ -3885,10 +3872,8 @@ draw_disc_fill_between_steps:                              ; >3e6a
        jl   fill_disc_span_walk_y_major                    ; JR C,$3E92        ; row delta smaller - a steep line
        movb @e,h                                           ; LD H,E            ; H = row delta (Bresenham error term init)
        srl  h,1                                            ; SRL H             ; H = row delta / 2
-       movb @e,a                                           ; LD A,E            ; A = the row delta (also the loop count)
-       socb a,a                                            ; OR A              ; 
-       jne  !                                              ; RET Z             ; nothing to fill
-       .endproc                                            ;                   
+       movb @e,a                                           ; LD A,E / OR A     ; A = the row delta (also the loop count)
+       jeq  _3eac                                          ; RET Z             ; nothing to fill
 !
        movb a,@ixl                                         ; LD IXL,A          ; IXl = loop count
 draw_disc_next_row:                                        ; >3e7e
@@ -3904,17 +3889,14 @@ _3e87:                                                     ; >3e87
        movb a,h                                            ; LD H,A            ; H = corrected error term
        bl   @draw_disc_fill_row                            ; CALL $3EAD        ; fill this row's span at (B,C)
        sb   one,@ixl                                       ; DEC IXL           ; one fewer column to go
-       jeq  !                                              ; JP NZ,$3E7E       ; loop
-       b    @draw_disc_next_row                            ;                   
+       jne  draw_disc_next_row                             ; JP NZ,$3E7E       ; loop
 !
        jmp  _3eac                                          ; JR $3EAC          ; done
 fill_disc_span_walk_y_major:                               ; >3e92
        movb d,h                                            ; LD H,D            ; H = column delta (Bresenham error term init)
        srl  h,1                                            ; SRL H             ; H = column delta / 2
-       movb d,a                                            ; LD A,D            ; A = column delta (also the loop count)
-       socb a,a                                            ; OR A              ; 
-       jne  !                                              ; RET Z             ; nothing to fill
-       .endproc                                            ;                   
+       movb d,a                                            ; LD A,D / OR A     ; A = column delta (also the loop count)
+       jeq  _3eac                                          ; RET Z             ; nothing to fill
 !
        movb a,@ixl                                         ; LD IXL,A          ; IXl = loop count
 _3e9a:                                                     ; >3e9a
@@ -3951,8 +3933,7 @@ draw_disc_fill_row:                                        ; >3ead
        .push bc                                            ; PUSH BC           ; save (row, column)
        .push de                                            ; PUSH DE           ; save (row delta, column delta)
        .push hl                                            ; PUSH HL           ; 
-       movb @scratch_buffer,a                              ; LD A,($E600)      ; A = the row-fill countdown
-       socb a,a                                            ; OR A              ; 
+       movb @scratch_buffer,a                              ; LD A,($E600) / OR A; A = the row-fill countdown
        jne  fill_disc_decay_dither_value                   ; JR NZ,$3EC4       ; not time to reseed - decay the existing value
        .push bc                                            ; PUSH BC           ; time to reseed: save (row, column) again across the RNG calls
        bl   @random_byte                                   ; CALL $2176        ; A = a random byte
@@ -3983,8 +3964,8 @@ _3ec7:                                                     ; >3ec7
 _3eda:                                                     ; >3eda
        li   hl,lineplot_scratch_vars_e603                  ; LD HL,$E603       ; -> the running sign-accumulator
        ab   *hl,a                                          ; ADD A,(HL)        ; add this step's +-1 jitter to it
-       jlt  !                                              ; JP P,$3EE4        ; still non-negative - go compute the span
-       b    @fill_disc_row_span_bounds                     ;                   
+       jgt  fill_disc_row_span_bounds                      ; JP P,$3EE4        ; still non-negative - go compute the span
+       jeq  fill_disc_row_span_bounds                      ;                   ; 
 !
        sb   a,a                                            ; XOR A             ; negative - clamp to 0
        jmp  _3ee8                                          ; JR $3EE8          ; 
@@ -4310,8 +4291,7 @@ draw_ship:                                                 ; >4255
        bl   @convert_to_view                               ; CALL $44CE        ; project the object's position
        mov  de,@view_x                                     ; LD ($E6D8),DE     ; store the projected first half
        mov  hl,@view_z                                     ; LD ($E6DC),HL     ; store the projected second half
-       movb h,a                                            ; LD A,H            ; A = the projected second half's high byte
-       socb a,a                                            ; OR A              ; 
+       movb h,a                                            ; LD A,H / OR A     ; A = the projected second half's high byte
        jgt  !                                              ; RET M             ; behind the player
        jeq  !                                              ;                   ; 
        .endproc                                            ;                   
@@ -4352,7 +4332,7 @@ _427c:                                                     ; >427c
        bl   @on_screen                                     ; CALL $4A99        ; is it on screen?
        socb a,a                                            ; OR A              ; 
        jne  !                                              ; RET Z             ; no
-       .endproc                                            ;                   
+       jmp  draw_object_exit                               ;                   ; 
 !
        movb @object_status_byte,a                          ; LD A,($F7CD)      ; A = the object status byte
        andi a,>0800                                        ; AND $08           ; 
@@ -4403,8 +4383,7 @@ _42bc:                                                     ; >42bc
 _4303:                                                     ; >4303
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
        .push bc                                            ; PUSH BC           ; save the loop counter
-       movb @bp_face_normals,a                             ; LD A,($F804)      ; A = faces have normals?
-       socb a,a                                            ; OR A              ; 
+       movb @bp_face_normals,a                             ; LD A,($F804) / OR A; A = faces have normals?
        jeq  _4325                                          ; JR Z,$4325        ; no
        movb *hl,a                                          ; LD A,(HL)         ; else: A = the next data byte
        inc  hl                                             ; INC HL            ; 
@@ -4421,13 +4400,12 @@ _4303:                                                     ; >4303
        movb *hl+,@rotated_vector_z+1                       ; LDI               ; 
        movb *hl+,@rotated_vector_z                         ; LDI x 2           ; (DE and BC are not used afterwards)
 _4325:                                                     ; >4325
-       movb @bp_face_normals,a                             ; LD A,($F804)      ; A = the per-entry mode/flag byte again
-       socb a,a                                            ; OR A              ; 
+       movb @bp_face_normals,a                             ; LD A,($F804) / OR A; A = the per-entry mode/flag byte again
        jeq  _4331                                          ; JR Z,$4331        ; clear - skip #R$4873's combine step
        bl   @face_visible                                  ; CALL $4873        ; does the face face the player?
        movb a,a                                            ;                   ; (the RET changed the status)
-       jlt  !                                              ; JP P,$4336        ; no - skip it
-       b    @draw_ship_skip_face                           ;                   
+       jgt  draw_ship_skip_face                            ; JP P,$4336        ; no - skip it
+       jeq  draw_ship_skip_face                            ;                   ; 
 !
 _4331:                                                     ; >4331
        bl   @draw_face_edges                               ; CALL $491A        ; yes - draw its edges
@@ -4441,6 +4419,7 @@ _433b:                                                     ; >433b
        .pop bc                                             ; POP BC            ; restore the loop counter
        sb   one,b                                          ; DJNZ $4303        ; one entry done - loop for the next
        jne  _4303                                          ;                   
+draw_object_exit:
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -4587,7 +4566,6 @@ add_object_position:                                       ; >44d2
        a    bc,hl                                          ; ADD HL,BC         ; HL += BC
        .ex_sp_hl                                           ; EX (SP),HL        ; swap HL with the saved value on the stack
        mov  @view_z2,bc                                    ; LD BC,($E6DA)     ; BC = the depth scale (see #R$4255/#R$43C2)
-       mov  bc,bc                                          ;                   ;
        jnc  !                                              ;                   ; (ADC: add the carry first)
        inc  hl                                             ;                   ; 
 !
@@ -4648,8 +4626,8 @@ straighten_orientation:                                    ; >4503
        .pop hl                                             ; POP HL            ; HL = the first product (vector1.y * vector3.z)
        socb a,a                                            ; OR A              ; clear carry
        s    de,hl                                          ; SBC HL,DE         ; nose.x = the difference
-       jlt  !                                              ; JP P,$4545        ; non-negative - keep it
-       b    @straighten_nose_x                             ;                   
+       jgt  straighten_nose_x                              ; JP P,$4545        ; non-negative - keep it
+       jeq  straighten_nose_x                              ;                   ; 
 !
        neg  hl                                             ; SUB L             ; ...H:L = abs(HL)
        socb @bit7,h                                        ; SET 7,H           ; ...and tag it negative, sign-magnitude style
@@ -4671,8 +4649,8 @@ straighten_nose_x:                                         ; >4545
        .pop hl                                             ; POP HL            ; HL = the first product (vector3.x * vector1.z)
        socb a,a                                            ; OR A              ; clear carry
        s    de,hl                                          ; SBC HL,DE         ; nose.y
-       jlt  !                                              ; JP P,$456D        ; non-negative - keep it
-       b    @straighten_nose_y                             ;                   
+       jgt  straighten_nose_y                              ; JP P,$456D        ; non-negative - keep it
+       jeq  straighten_nose_y                              ;                   ; 
 !
        neg  hl                                             ; SUB L             ; ...H:L = abs(HL)
        socb @bit7,h                                        ; SET 7,H           ; ...and tag it negative, sign-magnitude style
@@ -4694,8 +4672,8 @@ straighten_nose_y:                                         ; >456d
        .pop hl                                             ; POP HL            ; HL = the first product (vector1.x * vector3.y)
        socb a,a                                            ; OR A              ; clear carry
        s    de,hl                                          ; SBC HL,DE         ; nose.z
-       jlt  !                                              ; JP P,$4595        ; non-negative - keep it
-       b    @straighten_nose_z                             ;                   
+       jgt  straighten_nose_z                              ; JP P,$4595        ; non-negative - keep it
+       jeq  straighten_nose_z                              ;                   ; 
 !
        neg  hl                                             ; SUB L             ; ...H:L = abs(HL)
        socb @bit7,h                                        ; SET 7,H           ; ...and tag it negative, sign-magnitude style
@@ -4737,8 +4715,8 @@ work_out_roof:                                             ; >4599
        .pop hl                                             ; POP HL            ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; roof.x = the difference
-       jlt  !                                              ; JP P,$45C6        ; positive - store it
-       b    @work_out_roof_x                               ;                   
+       jgt  work_out_roof_x                                ; JP P,$45C6        ; positive - store it
+       jeq  work_out_roof_x                                ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; (sign-magnitude)
@@ -4760,8 +4738,8 @@ work_out_roof_x:                                           ; >45c6
        .pop hl                                             ; POP HL            ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; roof.y
-       jlt  !                                              ; JP P,$45EE        ; positive - store it
-       b    @work_out_roof_y                               ;                   
+       jgt  work_out_roof_y                                ; JP P,$45EE        ; positive - store it
+       jeq  work_out_roof_y                                ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
@@ -4783,8 +4761,8 @@ work_out_roof_y:                                           ; >45ee
        .pop hl                                             ; POP HL            ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; roof.z
-       jlt  !                                              ; JP P,$4616        ; positive - store it
-       b    @work_out_roof_z                               ;                   
+       jgt  work_out_roof_z                                ; JP P,$4616        ; positive - store it
+       jeq  work_out_roof_z                                ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
@@ -4952,8 +4930,7 @@ ship_screen_size:                                          ; >46ca
        movb @object_distance+1,de                          ; LD DE,($EB8E)     ; their distance
        movb @object_distance,@e                            ;                   ;
 _46d9:                                                     ; >46d9
-       movb d,a                                            ; LD A,D            ; A = DE's high byte
-       socb a,a                                            ; OR A              ; 
+       movb d,a                                            ; LD A,D / OR A     ; A = DE's high byte
        jeq  _46e7                                          ; JR Z,$46E7        ; zero - skip the normalize loop below
        movb d,r1                                           ; LD L,A            ; 
        srl  r1,8                                           ; LD H,$02          ; 
@@ -5001,9 +4978,7 @@ _4721:                                                     ; >4721
        ab   a,a                                            ; ADD A,A           ; 
        ab   a,a                                            ; ADD A,A           ; A = -exponent * 4
        ab   h,a                                            ; ADD A,H           ; A += HL's high byte
-       jgt  !                                              ; JP M,$4735        ; too small
-       jeq  !                                              ;                   ; 
-       b    @check_sights                                  ;                   
+       jlt  check_sights                                   ; JP M,$4735        ; too small
 !
        movb a,h                                            ; LD H,A            ; else: H = the combined high byte
        bl   @antilog16                                     ; CALL $21A3        ; antilog
@@ -5012,11 +4987,8 @@ check_sights:                                              ; >4735
        li   hl,>0000                                       ; LD HL,$0000       ; HL = 0
 _4738:                                                     ; >4738
        mov  hl,@screen_radius                              ; LD ($EB9E),HL     ; 
-       movb @view_laser_type,a                             ; LD A,($F818)      ; A = a sign byte at $F818
-       socb a,a                                            ; OR A              ; test its sign
-       jgt  !                                              ; RET M             ; no laser in this view
-       jeq  !                                              ;                   ; 
-       .endproc                                            ;                   
+       movb @view_laser_type,a                             ; LD A,($F818) / OR A; A = a sign byte at $F818
+       jlt  ship_screen_size_exit                          ; RET M             ; no laser in this view
 !
        mov  @view_x,hl                                     ; LD HL,($E6D8)     ; HL = X coordinate
        bl   @project_coordinate                            ; CALL $47F0        ; scale it by the distance
@@ -5025,8 +4997,7 @@ _4738:                                                     ; >4738
        .ex_de_hl                                           ; EX DE,HL          ; DE = that threshold, HL = #R$47F0's result
        socb a,a                                            ; OR A              ; clear carry
        s    de,hl                                          ; SBC HL,DE         ; HL -= DE
-       jnc  !                                              ; RET NC            ; outside the sights
-       .endproc                                            ;                   
+       joc  ship_screen_size_exit                          ; RET NC            ; outside the sights
 !
        movb @object_position_y+1,hl                        ; LD HL,($F7D0)     ; HL = Y coordinate
        movb @object_position_y,@l                          ;                   ;
@@ -5036,16 +5007,13 @@ _4738:                                                     ; >4738
        .ex_de_hl                                           ; EX DE,HL          ; DE = that threshold, HL = #R$47F0's result
        socb a,a                                            ; OR A              ; clear carry
        s    de,hl                                          ; SBC HL,DE         ; HL -= DE
-       jnc  !                                              ; RET NC            ; outside the sights
-       .endproc                                            ;                   
+       joc  ship_screen_size_exit                          ; RET NC            ; outside the sights
 !
        movb @object_status_byte,a                          ; LD A,($F7CD)      ; A = a flag byte at $F7CD
        andi a,>0400                                        ; AND $04           ; test bit 2
-       jeq  !                                              ; RET NZ            ; exploding
-       .endproc                                            ;                   
+       jne  ship_screen_size_exit                          ; RET NZ            ; exploding
 !
-       movb @identify_target,a                             ; LD A,($EF9D)      ; A = a flag at $EF9D
-       socb a,a                                            ; OR A              ; test it
+       movb @identify_target,a                             ; LD A,($EF9D) / OR A; A = a flag at $EF9D
        jeq  _4777                                          ; JR Z,$4777        ; 'I' not pressed
        movb @bp_name,hl                                    ; LD HL,($F7FB)     ; HL -> the ship's name
        movb @bp_name+1,@l                                  ;                   ;
@@ -5059,13 +5027,13 @@ _4777:                                                     ; >4777
        movb a,@in_sights                                   ; LD ($EF99),A      ; in the sights
        movb @missile_state,a                               ; LD A,($E910)      ; A = a state byte at $E910
        sb   one,a                                          ; DEC A             ; A -= 1
-       jeq  !                                              ; RET NZ            ; missile not armed
-       .endproc                                            ;                   
+       jne  ship_screen_size_exit                          ; RET NZ            ; missile not armed
 !
        movb @current_slot,a                                ; LD A,($E911)      ; C = this object's slot
        movb a,@c                                           ; LD C,A            ; C = that value
        bl   @find_missile_at_object                        ; CALL $3016        ; a missile on its way to it already?
        jne  !                                              ; RET Z             ; yes
+ship_screen_size_exit:
        .endproc                                            ;                   
 !
        li   hl,missile_state                               ; LD HL,$E910       ; HL -> $E910
@@ -5132,8 +5100,7 @@ explosion_dot:                                             ; >47a1
 project_point:                                             ; >47c4
        .proc
        .push bc                                            ; PUSH BC           ; save the caller's BC (the second value to combine)
-       movb h,a                                            ; LD A,H            ; A = HL's high byte
-       socb a,a                                            ; OR A              ; 
+       movb h,a                                            ; LD A,H / OR A     ; A = HL's high byte
        jeq  _47d5                                          ; JR Z,$47D5        ; z under 256
        movb h,r1                                           ; LD L,A            ; 
        srl  r1,8                                           ; LD H,$02          ; 
@@ -5177,11 +5144,10 @@ _47d5:                                                     ; >47d5
 project_coordinate:                                        ; >47f0
        .proc
        .ex_de_hl                                           ; EX DE,HL          ; HL = the caller's value; DE = whatever it swaps with
-       movb d,a                                            ; LD A,D            ; A = DE's high byte (the value's sign)
-       socb a,a                                            ; OR A              ; 
+       movb d,a                                            ; LD A,D / OR A     ; A = DE's high byte (the value's sign)
        .push af                                            ; PUSH AF           ; save the sign
-       jlt  !                                              ; JP P,$47FD        ; non-negative - skip the negate below
-       b    @project_coordinate_abs                        ;                   
+       jgt  project_coordinate_abs                         ; JP P,$47FD        ; non-negative - skip the negate below
+       jeq  project_coordinate_abs                         ;                   ; 
 !
        neg  de                                             ; SUB E             ; negative: negate DE (absolute value)
        movb d,a                                            ; LD D,A            ; 
@@ -5215,15 +5181,13 @@ _4809:                                                     ; >4809
        s    de,hl                                          ; SBC HL,DE         ; HL -= DE
        .ex_af_af_                                          ; EX AF,AF'         ; restore the stashed exponent*4 value
        ab   h,a                                            ; ADD A,H           ; A += HL's high byte
-       jgt  !                                              ; JP M,$4839        ; negative - out of range
-       jeq  !                                              ;                   ; 
-       b    @project_coordinate_2                          ;                   
+       jlt  project_coordinate_2                           ; JP M,$4839        ; negative - out of range
 !
        movb a,h                                            ; LD H,A            ; else: H = the combined high byte
        bl   @antilog16                                     ; CALL $21A3        ; combine via #R$21A3
        mov  hl,hl                                          ; BIT 7,H           ; test the result's sign bit
-       jlt  !                                              ; JP P,$4837        ; non-negative - keep it
-       b    @project_coordinate_join                       ;                   
+       jgt  project_coordinate_join                        ; JP P,$4837        ; non-negative - keep it
+       jeq  project_coordinate_join                        ;                   ; 
 !
        szcb @bit7,h                                        ; RES 7,H           ; else clear the sign bit (magnitude only)
 project_coordinate_join:                                   ; >4837
@@ -5234,10 +5198,11 @@ _483c:                                                     ; >483c
        movb h,d                                            ; LD D,H            ; D = H
        movb @l,@e                                          ; LD E,L            ; E = L (DE = HL, the magnitude copy)
        .pop af                                             ; POP AF            ; restore the value's original sign
-       jlt  !                                              ; RET P             ; non-negative - return as-is
-       .endproc                                            ;                   
+       jgt  project_coordinate_exit                        ; RET P             ; non-negative - return as-is
+       jeq  project_coordinate_exit                        ;                   ; 
 !
        neg  hl                                             ; SUB L             ; negative: negate HL
+project_coordinate_exit:
        .endproc                                            ; RET               ; return with the original sign reapplied to HL
 
 ********************************************************************************
@@ -5410,8 +5375,7 @@ _491c:                                                     ; >491c
        movb *hl,a                                          ; LD A,(HL)         ; A = the next edge
        movb a,@draw_face_edge_flag+>0003                   ; LD ($4922),A      ; point (IX+d) at the edge's flag (#R$4920+2)
 draw_face_edge_flag:                                       ; >4920
-       movb @>05(ix),a                                     ; LD A,(IX+$05)     ; A = the edge's flag
-       socb a,a                                            ; OR A              ; 
+       movb @>05(ix),a                                     ; LD A,(IX+$05) / OR A; A = the edge's flag
        jne  draw_face_edges_3                              ; JR NZ,$4957       ; already drawn or skipped
        .push hl                                            ; PUSH HL           ; 
        movb *hl,a                                          ; LD A,(HL)         ; 
@@ -5420,16 +5384,12 @@ draw_face_edge_flag:                                       ; >4920
        ab   a,a                                            ; ADD A,A           ; 
        ab   @l,a                                           ; ADD A,L           ; 
        movb a,@l                                           ; LD L,A            ; 
-       joc  !                                              ; JP NC,$4932       ;
-       b    @draw_face_edge                                ;                   
+       jnc  draw_face_edge                                 ; JP NC,$4932       ; 
 !
        ab   one,h                                          ; INC H             ; 
 draw_face_edge:                                            ; >4932
-       movb *hl,a                                          ; LD A,(HL)         ; A = the edge's first vertex
-       socb a,a                                            ; OR A              ; 
-       jgt  !                                              ; JP M,$4948        ; bit 7 set - skip it
-       jeq  !                                              ;                   ; 
-       b    @draw_face_edges_2                             ;                   
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; A = the edge's first vertex
+       jlt  draw_face_edges_2                              ; JP M,$4948        ; bit 7 set - skip it
 !
        movb a,@e                                           ; LD E,A            ; E = the first vertex
        inc  hl                                             ; INC HL            ; 
@@ -5453,8 +5413,8 @@ draw_face_edge_skipped:                                    ; >4951
 _4955:                                                     ; >4955
        jmp  draw_face_next_edge                            ; JR $4969          ; next edge
 draw_face_edges_3:                                         ; >4957
-       jlt  !                                              ; JP P,$4969        ; already drawn - next edge
-       b    @draw_face_next_edge                           ;                   
+       jgt  draw_face_next_edge                            ; JP P,$4969        ; already drawn - next edge
+       jeq  draw_face_next_edge                            ;                   ; 
 !
        movb *hl,a                                          ; LD A,(HL)         ; skipped:
        movb a,@draw_face_edge_drawn_2+>0003                ; LD ($4960),A      ; point (IX+d) at the edge's flag (#R$495E+2)
@@ -5588,8 +5548,7 @@ project_vertex:                                            ; >49fd
        movb @e,a                                           ; LD A,E            ; A = the vertex index
        movb a,@project_vertex_flag+>0003                   ; LD ($4A03),A      ; patch the (IY+d) read to (IY+E) (#R$4A01+2)
 project_vertex_flag:                                       ; >4a01
-       movb @>00(iy),a                                     ; LD A,(IY+$00)     ; A = this vertex's cache flag
-       socb a,a                                            ; OR A              ; 
+       movb @>00(iy),a                                     ; LD A,(IY+$00) / OR A; A = this vertex's cache flag
        jne  project_vertex_from_cache                      ; JR NZ,$4A4C       ; already cached - read it back
        movb @e,a                                           ; LD A,E            ; not cached: A = the vertex index again
        movb a,@project_vertex_set_flag+>0005               ; LD ($4A0D),A      ; patch the (IY+d) write to (IY+E) (#R$4A0B+2)
@@ -5608,8 +5567,7 @@ project_vertex_set_flag:                                   ; >4a0b
        mov  r0,@vertex_cache_slot                          ;                   ; 
        ab   @l,a                                           ; ADD A,L           ; A += table base low byte
        movb a,@l                                           ; LD L,A            ; L = table base low byte + index*4
-       joc  !                                              ; JP NC,$4A21       ; no carry - skip the high-byte bump
-       b    @project_vertex_record                         ;                   
+       jnc  project_vertex_record                          ; JP NC,$4A21       ; no carry - skip the high-byte bump
 !
        ab   one,h                                          ; INC H             ; carry into the high byte
 project_vertex_record:                                     ; >4a21
@@ -5622,8 +5580,7 @@ project_vertex_record:                                     ; >4a21
        movb *hl+,@rotated_vector_z                         ; LDI x 2           ; (DE and BC are not used afterwards)
        bl   @rotate_vertex                                 ; CALL $4464        ; combine via #R$4464
        bl   @add_object_position                           ; CALL $44D2        ; combine that result via #R$44D2
-       movb h,a                                            ; LD A,H            ; test the combined result's sign
-       socb a,a                                            ; OR A              ; 
+       movb h,a                                            ; LD A,H / OR A     ; test the combined result's sign
        jgt  !                                              ; RET M             ; negative - no valid projection, carry clear
        jeq  !                                              ;                   ; 
        .retnc                                              ;                   
@@ -5682,8 +5639,7 @@ vertex_relative:                                           ; >4a5c
        ab   a,a                                            ; ADD A,A           ; A = the index * 4
        ab   @l,a                                           ; ADD A,L           ; A += the table base's low byte
        movb a,@l                                           ; LD L,A            ; L = table base low byte + index*4
-       joc  !                                              ; JP NC,$4A6A       ; no carry from that add - skip the high-byte bump
-       b    @vertex_relative_record                        ;                   
+       jnc  vertex_relative_record                         ; JP NC,$4A6A       ; no carry from that add - skip the high-byte bump
 !
        ab   one,h                                          ; INC H             ; else carry into the high byte
 vertex_relative_record:                                    ; >4a6a
@@ -5700,8 +5656,7 @@ vertex_relative_record:                                    ; >4a6a
        jne  !                                              ; RET Z             ; zero (from #R$44D2's result) - return with its data-dependent carry
        .retc                                               ; (the add's carry can't survive the return on the TI - treat zero as valid)
 !
-       movb h,a                                            ; LD A,H            ; A = the combined result's high byte
-       socb a,a                                            ; OR A              ; test its sign (also clears carry)
+       movb h,a                                            ; LD A,H / OR A     ; A = the combined result's high byte
        jgt  !                                              ; RET M             ; negative - return with carry clear
        jeq  !                                              ;                   ; 
        .retnc                                              ;                   
@@ -5860,8 +5815,8 @@ clip_line_at_player:                                       ; >4b22
        movb @line_end_1_z,@e                               ;                   ;
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; HL = z2 - z1
-       jlt  !                                              ; JP P,$4B35        ; non-negative - keep it
-       b    @clip_line_dz                                  ;                   
+       jgt  clip_line_dz                                   ; JP P,$4B35        ; non-negative - keep it
+       jeq  clip_line_dz                                   ;                   ; 
 !
        neg  hl                                             ; SUB L             ; ...HL = |z2 - z1|
 clip_line_dz:                                              ; >4b35
@@ -5871,8 +5826,8 @@ clip_line_dz:                                              ; >4b35
        movb @line_end_1_z,@c                               ;                   ;
        socb a,a                                            ; OR A              ; 
        s    bc,hl                                          ; SBC HL,BC         ; HL = 1 - z1
-       jlt  !                                              ; JP P,$4B49        ; non-negative - keep it
-       b    @clip_line_divide                              ;                   
+       jgt  clip_line_divide                               ; JP P,$4B49        ; non-negative - keep it
+       jeq  clip_line_divide                               ;                   ; 
 !
        neg  hl                                             ; SUB L             ; ...HL = |1 - z1|
 clip_line_divide:                                          ; >4b49
@@ -5924,8 +5879,8 @@ lerp_towards:                                              ; >4b76
        s    de,hl                                          ; SBC HL,DE         ; HL := HL - DE
        movb h,a                                            ;                   ; A = the difference's high byte, so the PUSH/POP AF below keep its sign
        .push af                                            ; PUSH AF           ; Save the difference's sign for later
-       jlt  !                                              ; JP P,$4B86        ; 
-       b    @lerp_multiply                                 ;                   
+       jgt  lerp_multiply                                  ; JP P,$4B86        ; 
+       jeq  lerp_multiply                                  ;                   ; 
 !
        neg  hl                                             ; SUB L             ; HL := |HL-DE|
 lerp_multiply:                                             ; >4b86
@@ -5934,8 +5889,8 @@ lerp_multiply:                                             ; >4b86
        movb h,@l                                           ; LD L,H            ; 
        movb a,h                                            ; LD H,A            ; Keep the product's top 16 bits (product >> 8), truncated
        .pop af                                             ; POP AF            ; Recover the difference's sign
-       jlt  !                                              ; JP P,$4B96        ; 
-       b    @lerp_add                                      ;                   
+       jgt  lerp_add                                       ; JP P,$4B96        ; 
+       jeq  lerp_add                                       ;                   ; 
 !
        neg  hl                                             ; SUB L             ; Reapply the sign of (HL-DE)
 lerp_add:                                                  ; >4b96
@@ -6599,8 +6554,7 @@ redraw_all_dashboard_gauges:                               ; >6433
 switch_view:                                               ; >645b
        mov  hl,@stardust_move_handler+>0002                ; LD ($6945),HL     ; patch the stardust move handler (#R$6944+1)
        .push de                                            ; PUSH DE           ; save DE
-       movb @space_view_showing,a                          ; LD A,($E903)      ; in flight?
-       socb a,a                                            ; OR A              ; 
+       movb @space_view_showing,a                          ; LD A,($E903) / OR A; in flight?
        jne  _646f                                          ; JR NZ,$646F       ; yes
        .push bc                                            ; PUSH BC           ; 
        bl   @enter_flight_mode                             ; CALL $63F1        ; no: set up the cockpit screen (#R$63F1)
@@ -6636,8 +6590,7 @@ _6486:                                                     ; >6486
        jne  _647c                                          ; JR NZ,$647C       ; 
        bl   @scatter_stardust                              ; CALL $6882        ; scatter the stardust for the new view (#R$6882)
 _6496:                                                     ; >6496
-       movb @show_tunnel,a                                 ; LD A,($E8F6)      ; launching?
-       socb a,a                                            ; OR A              ; 
+       movb @show_tunnel,a                                 ; LD A,($E8F6) / OR A; launching?
        jeq  !                                              ; CALL NZ,$6CB2     ; yes - show the tunnel rings (#R$6CB2)
        bl   @tunnel_rings                                  ;                   
 !
@@ -6718,10 +6671,9 @@ stardust_move_outwards:                                    ; >6520
        movb @>01(ix),h                                     ; LD H,(IX+$01)     ; HL = X
        movb @>04(ix),@e                                    ; LD E,(IX+$04)     ; 
        movb @>05(ix),d                                     ; LD D,(IX+$05)     ; DE = X velocity
-       movb h,a                                            ; LD A,H            ; 
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$6533        ; 
-       b    @stardust_front_x                              ;                   
+       movb h,a                                            ; LD A,H / OR A     ; 
+       jgt  stardust_front_x                               ; JP P,$6533        ; 
+       jeq  stardust_front_x                               ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = |X|
@@ -6743,10 +6695,9 @@ _653c:                                                     ; >653c
        movb @>03(ix),h                                     ; LD H,(IX+$03)     ; HL = Y
        movb @>06(ix),@e                                    ; LD E,(IX+$06)     ; 
        movb @>07(ix),d                                     ; LD D,(IX+$07)     ; DE = Y velocity
-       movb h,a                                            ; LD A,H            ; 
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$6558        ; 
-       b    @stardust_front_y                              ;                   
+       movb h,a                                            ; LD A,H / OR A     ; 
+       jgt  stardust_front_y                               ; JP P,$6558        ; 
+       jeq  stardust_front_y                               ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = |Y|
@@ -6797,11 +6748,10 @@ stardust_rotate:                                           ; >66dc
        movb @bytes+>0f,b                                   ; LD B,$0F          ; B = 15 particles
 stardust_rotate_particle:                                  ; >66ef
        .push bc                                            ; PUSH BC           ; 
-       movb @>01(ix),a                                     ; LD A,(IX+$01)     ; A = X
-       socb a,a                                            ; OR A              ; 
+       movb @>01(ix),a                                     ; LD A,(IX+$01) / OR A; A = X
        .push af                                            ; PUSH AF           ; save its sign
-       jlt  !                                              ; JP P,$66FA        ; 
-       b    @stardust_rotate_log_x                         ;                   
+       jgt  stardust_rotate_log_x                          ; JP P,$66FA        ; 
+       jeq  stardust_rotate_log_x                          ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = |X|
@@ -6812,18 +6762,17 @@ stardust_rotate_log_x:                                     ; >66fa
 stardust_log_x_lookup:                                     ; >66fe
        mov  @log_table(r1),hl                              ; LD HL,($0800)     ; HL = log |X|
        .pop af                                             ; POP AF            ; 
-       jlt  !                                              ; JP P,$6707        ; 
-       b    @stardust_rotate_save_log_x                    ;                   
+       jgt  stardust_rotate_save_log_x                     ; JP P,$6707        ; 
+       jeq  stardust_rotate_save_log_x                     ;                   ; 
 !
        socb @bit6,h                                        ; SET 6,H           ; tag the sign of X
 stardust_rotate_save_log_x:                                ; >6707
        movb hl,@stardust_log_x+1                           ; LD ($E77D),HL     ; save log X
        movb @l,@stardust_log_x                             ;                   ;
-       movb @>03(ix),a                                     ; LD A,(IX+$03)     ; A = Y
-       socb a,a                                            ; OR A              ; 
+       movb @>03(ix),a                                     ; LD A,(IX+$03) / OR A; A = Y
        .push af                                            ; PUSH AF           ; save its sign
-       jlt  !                                              ; JP P,$6714        ; 
-       b    @stardust_rotate_log_y                         ;                   
+       jgt  stardust_rotate_log_y                          ; JP P,$6714        ; 
+       jeq  stardust_rotate_log_y                          ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = |Y|
@@ -6834,8 +6783,8 @@ stardust_rotate_log_y:                                     ; >6714
 stardust_log_y_lookup:                                     ; >6718
        mov  @log_table(r1),hl                              ; LD HL,($0800)     ; HL = log |Y|
        .pop af                                             ; POP AF            ; 
-       jlt  !                                              ; JP P,$6721        ; 
-       b    @stardust_rotate_save_log_y                    ;                   
+       jgt  stardust_rotate_save_log_y                     ; JP P,$6721        ; 
+       jeq  stardust_rotate_save_log_y                     ;                   ; 
 !
        socb @bit6,h                                        ; SET 6,H           ; tag the sign of Y
 stardust_rotate_save_log_y:                                ; >6721
@@ -6866,19 +6815,17 @@ stardust_rotate_save_log_y:                                ; >6721
        bl   @multiply_logs                                 ; CALL $2160        ; HL = Y * cos
        a    de,hl                                          ; ADD HL,DE         ; Y' = X * sin + Y * cos
        movb @l,@>03(ix)                                    ; LD (IX+$03),L     ; store the new Y
-       movb @l,a                                           ; LD A,L            ; 
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$675C        ; 
-       b    @stardust_rotate_abs_y                         ;                   
+       movb @l,a                                           ; LD A,L / OR A     ; 
+       jgt  stardust_rotate_abs_y                          ; JP P,$675C        ; 
+       jeq  stardust_rotate_abs_y                          ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; 
 stardust_rotate_abs_y:                                     ; >675c
        movb a,b                                            ; LD B,A            ; B = |Y|
-       movb @>01(ix),a                                     ; LD A,(IX+$01)     ; 
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$6766        ; 
-       b    @stardust_rotate_abs_x                         ;                   
+       movb @>01(ix),a                                     ; LD A,(IX+$01) / OR A; 
+       jgt  stardust_rotate_abs_x                          ; JP P,$6766        ; 
+       jeq  stardust_rotate_abs_x                          ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; 
@@ -6924,17 +6871,16 @@ _6784:                                                     ; >6784
        movb a,@>03(ix)                                     ; LD (IX+$03),A     ; 
        .push bc                                            ; PUSH BC           ; 
        movb a,a                                            ;                   ; (the PUSH changed the status)
-       jlt  !                                              ; JP P,$6791        ; 
-       b    @stardust_move_abs_y                           ;                   
+       jgt  stardust_move_abs_y                            ; JP P,$6791        ; 
+       jeq  stardust_move_abs_y                            ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; 
 stardust_move_abs_y:                                       ; >6791
        movb a,b                                            ; LD B,A            ; B = |Y|
-       movb @>01(ix),a                                     ; LD A,(IX+$01)     ; 
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$679B        ; 
-       b    @stardust_move_abs_x                           ;                   
+       movb @>01(ix),a                                     ; LD A,(IX+$01) / OR A; 
+       jgt  stardust_move_abs_x                            ; JP P,$679B        ; 
+       jeq  stardust_move_abs_x                            ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; 
@@ -7103,9 +7049,7 @@ stardust_set_velocity:                                     ; >6805
        srl  r1,8                                           ; LD H,$02          ; 
        movb @bit_length_table(r1),a                        ; LD A,(HL)         ; A = bit length of (C OR B)
        sb   @bytes+>04,a                                   ; SUB $04           ; 
-       jgt  !                                              ; JP M,$6818        ; both already fit in 3 bits
-       jeq  !                                              ;                   ; 
-       b    @stardust_set_velocity_lookup                  ;                   
+       jlt  stardust_set_velocity_lookup                   ; JP M,$6818        ; both already fit in 3 bits
 !
        ab   one,a                                          ; INC A             ; A = number of bits to shift out
 _6811:                                                     ; >6811
@@ -7144,8 +7088,7 @@ _6831:                                                     ; >6831
        ; RR E                                              ; RR E              ; (done by the SRA D above, which shifts all of DE)
        sra  d,1                                            ; SRA D             ; 
        ; RR E                                              ; RR E              ; DE = b = v / 4 (done by the SRA D above, which shifts all of DE)
-       movb @speed_gauge_value,a                           ; LD A,($F814)      ; A = speed
-       socb a,a                                            ; OR A              ; 
+       movb @speed_gauge_value,a                           ; LD A,($F814) / OR A; A = speed
        jeq  _6849                                          ; JR Z,$6849        ; stationary - velocity is just v
        movb a,b                                            ; LD B,A            ; 
 _6846:                                                     ; >6846
@@ -7173,8 +7116,7 @@ _685b:                                                     ; >685b
        ; RR E                                              ; RR E              ; (done by the SRA D above, which shifts all of DE)
        sra  d,1                                            ; SRA D             ; 
        ; RR E                                              ; RR E              ; DE = b = v / 4 (done by the SRA D above, which shifts all of DE)
-       movb @speed_gauge_value,a                           ; LD A,($F814)      ; A = speed
-       socb a,a                                            ; OR A              ; 
+       movb @speed_gauge_value,a                           ; LD A,($F814) / OR A; A = speed
        jeq  _6873                                          ; JR Z,$6873        ; stationary - velocity is just v
        movb a,b                                            ; LD B,A            ; 
 _6870:                                                     ; >6870
@@ -7208,10 +7150,9 @@ _6888:                                                     ; >6888
        .push bc                                            ; PUSH BC           ; 
 _6889:                                                     ; >6889
        bl   @random_byte                                   ; CALL $2176        ; pick a random X...
-       movb a,@l                                           ; LD L,A            ; 
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$6893        ; 
-       b    @scatter_stardust_x                            ;                   
+       movb a,@l                                           ; LD L,A / OR A     ; 
+       jgt  scatter_stardust_x                             ; JP P,$6893        ; 
+       jeq  scatter_stardust_x                             ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; 
@@ -7223,10 +7164,9 @@ scatter_stardust_x:                                        ; >6893
        .ex_af_af_                                          ; EX AF,AF'         ; save |X|
 _689f:                                                     ; >689f
        bl   @random_byte                                   ; CALL $2176        ; pick a random Y...
-       movb a,@l                                           ; LD L,A            ; 
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$68A9        ; 
-       b    @scatter_stardust_y                            ;                   
+       movb a,@l                                           ; LD L,A / OR A     ; 
+       jgt  scatter_stardust_y                             ; JP P,$68A9        ; 
+       jeq  scatter_stardust_y                             ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; 
@@ -7294,19 +7234,15 @@ _68c2:                                                     ; >68c2
 * called (at $6940) without plotting it, so it gets a new position.
 move_and_plot_stardust:                                    ; >68cd
        .proc
-       movb @in_witchspace,a                               ; LD A,($EEC1)      ; no stardust after a drive malfunction (set by #R$894D)
-       socb a,a                                            ; OR A              ; 
-       jeq  !                                              ; RET NZ            ; 
-       .endproc                                            ;                   
+       movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; no stardust after a drive malfunction (set by #R$894D)
+       jne  move_and_plot_stardust_exit                    ; RET NZ            ; 
 !
-       movb @roll_rate,a                                   ; LD A,($F815)      ; A = roll rate
-       socb a,a                                            ; OR A              ; 
+       movb @roll_rate,a                                   ; LD A,($F815) / OR A; A = roll rate
        jeq  _68de                                          ; JR Z,$68DE        ; not rolling - skip the roll
        li   hl,stardust_roll_handlers                      ; LD HL,$6EDD       ; HL -> the per-view roll handlers
        bl   @jump_to_view_handler                          ; CALL $67A8        ; roll the stardust for this view
 _68de:                                                     ; >68de
-       movb @pitch_rate,a                                  ; LD A,($F816)      ; A = pitch rate
-       socb a,a                                            ; OR A              ; 
+       movb @pitch_rate,a                                  ; LD A,($F816) / OR A; A = pitch rate
        jeq  _68ea                                          ; JR Z,$68EA        ; not pitching - skip the pitch
        li   hl,stardust_pitch_handlers                     ; LD HL,$6EE5       ; HL -> the per-view pitch handlers
        bl   @jump_to_view_handler                          ; CALL $67A8        ; pitch the stardust for this view
@@ -7318,11 +7254,8 @@ _68f0:                                                     ; >68f0
        .push bc                                            ; PUSH BC           ; save the particle counter
        movb @>01(ix),@e                                    ; LD E,(IX+$01)     ; E = X pixel offset
        movb @>03(ix),d                                     ; LD D,(IX+$03)     ; D = Y pixel offset
-       movb @e,a                                           ; LD A,E            ; 
-       socb a,a                                            ; OR A              ; 
-       jgt  !                                              ; JP M,$6902        ; X negative - check the left edge instead
-       jeq  !                                              ;                   ; 
-       b    @stardust_check_left_edge                      ;                   
+       movb @e,a                                           ; LD A,E / OR A     ; 
+       jlt  stardust_check_left_edge                       ; JP M,$6902        ; X negative - check the left edge instead
 !
        cb   a,@bytes+>59                                   ; CP $59            ; X > 88?
        jhe  stardust_flag_respawn                          ; JR NC,$6950       ; yes - off the right edge, respawn it
@@ -7331,11 +7264,8 @@ stardust_check_left_edge:                                  ; >6902
        cb   a,@bytes+>a9                                   ; CP $A9            ; X < -87?
        jl   stardust_flag_respawn                          ; JR C,$6950        ; yes - off the left edge, respawn it
 _6906:                                                     ; >6906
-       movb d,a                                            ; LD A,D            ; A = Y pixel offset
-       socb a,a                                            ; OR A              ; 
-       jgt  !                                              ; JP M,$6911        ; Y negative - check the top edge instead
-       jeq  !                                              ;                   ; 
-       b    @stardust_check_top_edge_and_plot              ;                   
+       movb d,a                                            ; LD A,D / OR A     ; A = Y pixel offset
+       jlt  stardust_check_top_edge_and_plot               ; JP M,$6911        ; Y negative - check the top edge instead
 !
        cb   a,@bytes+>41                                   ; CP $41            ; Y > 64?
        jhe  stardust_flag_respawn                          ; JR NC,$6950       ; yes - off the bottom edge, respawn it
@@ -7347,20 +7277,18 @@ _6915:                                                     ; >6915
        movb @current_view,a                                ; LD A,($EB9A)      ; A = current view
        sb   one,a                                          ; DEC A             ; 
        jne  _6931                                          ; JR NZ,$6931       ; not the rear view - go plot it
-       movb @e,a                                           ; LD A,E            ; 
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$6922        ; 
-       b    @stardust_check_centre_x                       ;                   
+       movb @e,a                                           ; LD A,E / OR A     ; 
+       jgt  stardust_check_centre_x                        ; JP P,$6922        ; 
+       jeq  stardust_check_centre_x                        ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = |X|
 stardust_check_centre_x:                                   ; >6922
        cb   a,@bytes+>0a                                   ; CP $0A            ; 
        jhe  _6931                                          ; JR NC,$6931       ; |X| >= 10 - go plot it
-       movb d,a                                            ; LD A,D            ; 
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$692D        ; 
-       b    @stardust_check_centre_y                       ;                   
+       movb d,a                                            ; LD A,D / OR A     ; 
+       jgt  stardust_check_centre_y                        ; JP P,$692D        ; 
+       jeq  stardust_check_centre_y                        ;                   ; 
 !
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; A = |Y|
@@ -7378,8 +7306,7 @@ _6931:                                                     ; >6931
        bl   @plot_single_pixel                             ; CALL $3CFD        ; plot the particle
        .pop ix                                             ; POP IX            ; 
 _6940:                                                     ; >6940
-       movb @>08(ix),a                                     ; LD A,(IX+$08)     ; Z flag = particle doesn't need respawning
-       socb a,a                                            ; OR A              ; 
+       movb @>08(ix),a                                     ; LD A,(IX+$08) / OR A; Z flag = particle doesn't need respawning
 stardust_move_handler:                                     ; >6944
        bl   @stardust_front_view                           ; CALL $64F1        ; move or respawn it (operand patched per view by #R$645B)
        li   de,>000b                                       ; LD DE,$000B       ; 
@@ -7387,6 +7314,7 @@ stardust_move_handler:                                     ; >6944
        .pop bc                                             ; POP BC            ; 
        sb   one,b                                          ; DJNZ $68F0        ; loop for all 15 particles
        jne  _68f0                                          ;                   
+move_and_plot_stardust_exit:
        .endproc                                            ; RET               ; 
 stardust_flag_respawn:                                     ; >6950
        movb @b255,@>08(ix)                                 ; LD (IX+$08),$FF   ; flag the particle for respawning
@@ -7607,8 +7535,7 @@ _6a4a:                                                     ; >6a4a
 * speed (#R$F814, 0-30).
 draw_speed_gauge:                                          ; >6a59
        .proc
-       movb @redraw_speed_gauge,a                          ; LD A,($E92B)      ; 
-       socb a,a                                            ; OR A              ; 
+       movb @redraw_speed_gauge,a                          ; LD A,($E92B) / OR A; 
        jne  !                                              ; RET Z             ; redrawing off (#R$E92B)
        .endproc                                            ;                   
 !
@@ -7768,8 +7695,7 @@ _6b10:                                                     ; >6b10
 draw_ecm_indicator:                                        ; >6b12
        .proc
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; return if the dashboard isn't shown (#R$6C9E)
-       movb @ecm_countdown,a                               ; LD A,($E912)      ; 
-       socb a,a                                            ; OR A              ; ECM on?
+       movb @ecm_countdown,a                               ; LD A,($E912) / OR A; ECM on?
        jeq  continuation_blank_status_lamp_tile_6b3b       ; JR Z,$6B3B        ; no - blank the indicator
 ;      limi 0                                              ; DI                ; 
        movb @bytes+>50,a                                   ; LD A,$50          ; 
@@ -7875,8 +7801,7 @@ draw_missile_indicator_2:                                  ; >6b8f
        movb @bytes+>10,d                                   ; LD D,$10          ; the missile pattern
        cb   h,@l                                           ;                   ; (test again: the load changed the status)
        jne  draw_missile_indicator_3                       ; JR NZ,$6BA3       ; not the next to be fired
-       movb @missile_state,a                               ; LD A,($E910)      ; A = missile state
-       socb a,a                                            ; OR A              ; 
+       movb @missile_state,a                               ; LD A,($E910) / OR A; A = missile state
        jeq  draw_missile_indicator_3                       ; JR Z,$6BA3        ; not armed
        movb @bytes+>09,@e                                  ; LD E,$09          ; armed: light red
        cb   a,@bytes+>02                                   ; CP $02            ; (compared after the load, which changes the status on the TI)
@@ -8024,8 +7949,7 @@ draw_bar_gauge_jmp:
        movb @b255,a                                        ; LD A,$FF          ; all pixels set
        bl   @draw_gauge_tiles                              ; CALL $6CA8        ; draw the full cells (#R$6CA8)
 _6c52:                                                     ; >6c52
-       movb @e,a                                           ; LD A,E            ; 
-       socb a,a                                            ; OR A              ; 
+       movb @e,a                                           ; LD A,E / OR A     ; 
        jeq  _6c66                                          ; JR Z,$6C66        ; no pixels left over
        ab   one,d                                          ; INC D             ; one more cell drawn
        li   ix,gauge_bar_patterns                          ; LD IX,$6DE3       ; IX -> the partial cell patterns (#R$6DE3)
@@ -8103,8 +8027,7 @@ _6c9d:                                                     ; >6c9d
 gate_dashboard_hidden:                                     ; >6c9e
        .proc
        .ex_af_af_                                          ; EX AF,AF'         ; 
-       movb @space_view_showing,a                          ; LD A,($E903)      ; 
-       socb a,a                                            ; OR A              ; 
+       movb @space_view_showing,a                          ; LD A,($E903) / OR A; 
        jne  _6ca6                                          ; JR NZ,$6CA6       ; 
        .pop af                                             ; POP AF            ; 
 _6ca6:                                                     ; >6ca6
@@ -8186,10 +8109,9 @@ _6cde:                                                     ; >6cde
        ab   one,@c                                         ; INC C             ; 
        sb   one,b                                          ; DJNZ $6CDE        ; next ring
        jne  _6cde                                          ;                   
-       movb @message_timer,a                               ; LD A,($E919)      ; 
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$6D0D        ; 
-       b    @tunnel_rings_show                             ;                   
+       movb @message_timer,a                               ; LD A,($E919) / OR A; 
+       jgt  tunnel_rings_show                              ; JP P,$6D0D        ; 
+       jeq  tunnel_rings_show                              ;                   ; 
 !
        movb @b255,a                                        ; LD A,$FF          ; 
        movb a,@message_timer                               ; LD ($E919),A      ; 
@@ -8230,8 +8152,7 @@ tunnel_rings_show:                                         ; >6d0d
 view_laser:                                                ; >6d24
        .proc
        movb @b255,@c                                       ; LD C,$FF          ; no laser yet
-       movb @e940_gate_flag,a                              ; LD A,($E940)      ; 
-       socb a,a                                            ; OR A              ; 
+       movb @e940_gate_flag,a                              ; LD A,($E940) / OR A; 
        jne  _6d6e                                          ; JR NZ,$6D6E       ; the title screen - no laser
        movb @current_view,a                                ; LD A,($EB9A)      ; A = current view
        movb a,b                                            ; LD B,A            ; 
@@ -8295,10 +8216,9 @@ _6d6e:                                                     ; >6d6e
        movb d,a                                            ; LD A,D            ; 
        movb a,@flag_search_result_cache                    ; LD ($EFA0),A      ; 
        movb @c,a                                           ; LD A,C            ; 
-       movb a,@view_laser_type                             ; LD ($F818),A      ; the laser type for this view
-       socb a,a                                            ; OR A              ; 
-       jlt  !                                              ; JP P,$6D82        ; there is one - set it up
-       b    @set_up_laser                                  ;                   
+       movb a,@view_laser_type                             ; LD ($F818),A / OR A; the laser type for this view
+       jgt  set_up_laser                                   ; JP P,$6D82        ; there is one - set it up
+       jeq  set_up_laser                                   ;                   ; 
 !
        li   hl,>1b00                                       ; LD HL,$1B00       ; none: hide the crosshair sprites
        movb @bytes+>04,b                                   ; LD B,$04          ; 
@@ -8365,8 +8285,7 @@ _6dbb:                                                     ; >6dbb
 * (#R$3955, #R$5FFB) and returns to the key handler's caller; otherwise returns normally.
 refuse_if_docked:                                          ; >6dcf
        .proc
-       movb @docked,a                                      ; LD A,($E90A)      ; 
-       socb a,a                                            ; OR A              ; 
+       movb @docked,a                                      ; LD A,($E90A) / OR A; 
        jeq  _6de2                                          ; JR Z,$6DE2        ; in flight
 ;       .call @trigger_sfx_6                                ; CALL $16FE        ; beep
        bl   @clear_message_line                            ; CALL $3955        ; clear the message line
@@ -8663,8 +8582,7 @@ blank_screen_decompress_picture_recolour:                  ; >7139
        movb @cockpit_picture_addr,@l                       ;                   ;
        bl   @decompress_picture                            ; CALL $390E        ; decompress it (#R$390E)
        .restore_bank                                       ;                   ; 
-       movb @in_witchspace,a                               ; LD A,($EEC1)      ; in witchspace?
-       socb a,a                                            ; OR A              ; 
+       movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; in witchspace?
        jeq  _7157                                          ; JR Z,$7157        ; no
        movb @bytes+>51,a                                   ; LD A,$51          ; yes: colour the space view $51
        bl   @colour_space_view                             ; CALL $3A4D        ; (#R$3A4D)
@@ -9482,9 +9400,10 @@ _85f3:                                                     ; >85f3
        swpb a                                              ;                   ; 
        mov  r0,r0                                          ; BIT 7,H           ; v positive?
        jlt  _85f8                                          ; RET Z             ; 
-       .endproc                                            ;                   ; yes - done
+       jmp  compass_coordinate_exit                        ;                   ; yes - done
 _85f8:                                                     ; >85f8
        neg  a                                              ; NEG               ; no: negate the result
+compass_coordinate_exit:
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -9683,7 +9602,7 @@ update_stardust:                                           ; >872e
        movb @jump_in_progress,a                            ; LD A,($E722) / OR A; A = jump-in-progress flag
        jne  _8735                                          ; JP Z,$68CD        ; no jump - move and plot the stardust once
        bl   @move_and_plot_stardust                        ;                   ; 
-       .endproc                                            ;                   ; 
+       jmp  update_stardust_exit                           ;                   ; 
 _8735:                                                     ; >8735
        movb @stardust_passes,b                             ; LD A,($E723) / LD B,A; B = the number of passes per frame
        li   hl,stardust_passes_countdown                   ; LD HL,$E87B       ; HL -> the calls-until-next-increase counter
@@ -9700,6 +9619,7 @@ _874d:                                                     ; >874d
        .pop bc                                             ; POP BC            ; 
        sb   one,b                                          ; DJNZ $874D        ; repeat for each pass
        jne  _874d                                          ;                   ; 
+update_stardust_exit:
        .endproc                                            ; RET               ; 
 
 ********************************************************************************

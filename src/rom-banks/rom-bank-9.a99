@@ -1720,6 +1720,111 @@ msg_colon_separator:                                       ; >5678
 msg_light_years:                                           ; >567b
        text ' Light Years',>00                                    ; 
 
+* Finding a system by name
+
+********************************************************************************
+* Compare two null-terminated byte strings for equality
+* 
+* Used by the routine at #R$55A3.
+* .
+* Returns with the last comparison's flags: Z (and having reached a
+* matching $00 terminator) means equal; NZ means a mismatch was found.
+* 
+* I:DE First string
+* I:HL Second string
+* O:Z Equal (both reached a matching $00 terminator)
+* O:NZ A mismatching byte was found
+compare_null_terminated_strings:                           ; >3a69
+       movb *de+,a                                         ; LD A,(DE) / INC DE; A = the next byte of the first string
+       cb   a,*hl+                                         ; CP (HL) / INC HL  ; matches the second string's?
+       jne  _3a71                                          ; RET NZ            ; no - mismatch, done
+       movb a,a                                            ; OR A              ; yes - continue unless that byte was the $00 terminator
+       jne  compare_null_terminated_strings                ; JR NZ,$3A69       ; 
+_3a71:                                                     ; >3a71
+       rt                                                  ; RET               ; (TI: RT, not .endproc, keeps the zero flag)
+
+********************************************************************************
+* Key 'F': find a system by name
+* 
+* Reached via the key table at #R$419B; only works on the galactic chart
+* (#R$E902 = 4). Turns the chart cursor off (#R$E70B) while asking "Planet
+* name ? " and reading up to 10 capital letters (#R$3631), then lower-cases
+* all but the first letter, as names are shown, and looks for the system
+* ($55D2).
+* .
+* At $55D2, generates the systems' names in turn (#R$5607, #R$4C2B,
+* #R$4CB8) and compares each with the name typed (#R$3A69); if one matches,
+* $55F6 selects it; otherwise shows "<name> not found.". All 256 systems
+* are searched: #R$5607's LDIR leaves B at 0, so the loop runs 256 times.
+* .
+* At $55F6, works out the system's number from the loop counter, selects
+* it, moves the cursor to it (#R$53FD), and shows its distance (#R$52CE,
+* #R$E82D).
+key_find_system:                                           ; >55a3
+       .proc                                               ;                   ; 
+       cb   @current_screen,@bytes+>04                     ; LD A,($E902) / CP $04; the galactic chart?
+       jeq  _55a9                                          ; RET NZ            ; no
+       .endproc                                            ;                   ; 
+_55a9:                                                     ; >55a9
+       sb   @chart_cursor_active_flag,@chart_cursor_active_flag; XOR A / LD ($E70B),A; turn the chart cursor off while typing
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       li   hl,msg_planet_name                             ; LD HL,$56A2       ; "Planet name ? "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   de,>415a                                       ; LD DE,$415A       ; 'A' to 'Z'...
+       movb @bytes+>0a,@c                                  ; LD C,$0A          ; ...up to 10 of them
+       bl   @read_line_keyboard_input                      ; CALL $3631        ; read them into $E8F7
+       seto r0                                             ; LD A,$FF          ; (SETO and MOVB leave the carry alone)
+       movb r0,@chart_cursor_active_flag                   ; LD ($E70B),A      ; turn it back on
+       jnc  _55a3_end                                      ; RET NC            ; ESC
+       movb @keyboard_input_buffer,a                       ; LD HL,$E8F7 / LD A,(HL) / OR A; the typed name
+       jeq  _55a3_end                                      ; RET Z             ; nothing typed
+       li   hl,keyboard_input_buffer+1                     ;                   ; 
+_55c8:                                                     ; >55c8
+       movb *hl,a                                          ; INC HL / LD A,(HL) / OR A; lower-case all but the first letter
+       jeq  key_find_system_2                              ; JR Z,$55D2        ; ...until its terminator
+       ab   @bytes+>20,*hl+                                ; ADD A,$20 / LD (HL),A; 
+       jmp  _55c8                                          ; JR $55C8          ; 
+key_find_system_2:                                         ; >55d2
+       bl   @galaxy_seeds_to_system                        ; CALL $5607        ; start at system 0
+       clr  bc                                             ;                   ; (TI: B = 0 for all 256 systems)
+_55d5:                                                     ; >55d5
+       .push bc                                            ; PUSH BC           ; 
+       bl   @system_data_from_seeds                        ; CALL $4C2B        ; work out its data, and move on to the next
+       li   hl,system_name                                 ; LD HL,$F756       ; 
+       bl   @expand_name                                   ; CALL $4CB8        ; its name
+       li   hl,text_buffer                                 ; LD HL,$E717       ; 
+       li   de,keyboard_input_buffer                       ; LD DE,$E8F7       ; the name typed
+       bl   @compare_null_terminated_strings               ; CALL $3A69        ; the same?
+       jeq  continue_55d2_match_found                      ; JR Z,$55F6        ; yes - select it
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $55D5        ; next system
+       jne  _55d5                                          ;                   ; 
+       li   hl,keyboard_input_buffer                       ; LD HL,$E8F7       ; the name typed
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; 
+       li   hl,msg_not_found                               ; LD HL,$56B1       ; " not found."
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; 
+_55a3_end:                                                 
+       .endproc                                            ; RET               ; 
+continue_55d2_match_found:                                 ; >55f6
+       .pop r0                                             ; POP AF            ; recover the loop counter
+       andi r0,>ff00                                       ; DEC A / CPL       ; 
+       neg  r0                                             ;                   ; A = 256 - B, the system's number
+       movb r0,@selected_system                            ; LD ($E72B),A      ; -> the selected system
+       bl   @galactic_chart_cursor_to_selected             ; CALL $53FD        ; move the cursor there
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@found_by_name                              ; LD ($E82D),A      ; pre-arm the gate
+       bl   @key_distance                                  ; JP $52CE          ; show its distance
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* The message "Planet name ? "
+* 
+* Printed via RST $08 (#R$55A3, at $55B3).
+msg_planet_name:                                           ; >56a2
+       text 'Planet name ? ',>00                                  ; 
+msg_not_found:                                             ; >56b1
+       text ' not found.',>00                                     ; 
+
 rom_bank_9_end:
        equ  $
        bss  >8000-$

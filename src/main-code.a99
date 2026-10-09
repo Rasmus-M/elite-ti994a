@@ -4397,6 +4397,7 @@ key_table:                                                 ; >419b
        data >3500,code_bank_9_select,galactic_chart               ; '5': galactic chart (#R$4D0B)
        data >3600,code_bank_9_select,local_chart                  ; '6': local chart (#R$4F64)
        data >3700,code_bank_8_select,key_data_on_system           ; '7': data on system (#R$6164)
+       data >4600,code_bank_9_select,key_find_system              ; 'F': find a system by name (#R$55A3)
        data >4400,code_bank_9_select,key_distance                 ; 'D': distance to the system nearest the chart cursor (#R$52CE)
        data >3800,code_bank_7_select,key_handler_8                ; '8': market prices (#R$5B99)
        data >3900,code_bank_7_select,status_page                  ; '9': commander status (#R$6276)

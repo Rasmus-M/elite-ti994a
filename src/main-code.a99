@@ -131,27 +131,6 @@ name_letter_pairs:                                         ; >0e41
        text 'on'                                                  ; 31
 
 ********************************************************************************
-* The message "Harmless"
-msg_harmless_0f25:                                         ; >0f25
-       text 'Harmles',>f3                                         ; the combat ranks (#R$EB12), printed with RST $10
-msg_mostly_harmless:                                       ; >0f2d
-       text 'Mostly Harmles',>f3                                  ; 
-msg_poor:                                                  ; >0f3c
-       text 'Poo',>f2                                             ; 
-msg_average:                                               ; >0f40
-       text 'Averag',>e5                                          ; 
-msg_above_average:                                         ; >0f47
-       text 'Above averag',>e5                                    ; 
-msg_competent:                                             ; >0f54
-       text 'Competen',>f4                                        ; 
-msg_dangerous:                                             ; >0f5d
-       text 'Dangerou',>f3                                        ; 
-msg_deadly:                                                ; >0f66
-       text 'Deadl',>f9                                           ; 
-msg_e_l_i_t_e:                                             ; >0f6c
-       text 'E-L-I-T-',>c5                                        ; 
-
-********************************************************************************
 * Equipment-name list: 2 leading empty entries
 * 
 * A separate, independently-addressed RST $10 list head from
@@ -194,11 +173,6 @@ msg_cloaking_device:                                       ; >1134
        text 'Cloaking Devic',>e5                                  ; 
 msg_documents:                                             ; >1143
        text 'Document',>f3                                        ; 
-
-********************************************************************************
-* The message "Naval Energy Unt"
-msg_naval_energy_unt:                                      ; >114c
-       text 'Naval Energy Un',>f4                                 ; 
 
 ********************************************************************************
 * "FRONT VIEW" bitmap
@@ -2248,35 +2222,6 @@ _380a:                                                     ; >380a
        cb   b,@bytes+>47                                   ; JR NZ,$380D       ; 
        jl   _380a                                          ; DJNZ $380A        ; 
        .endproc                                            ; RET               ; 
-
-********************************************************************************
-* Y/N confirmation prompt: print " ? ", wait for Esc/Y/N
-* 
-* Used by the routines at #R$5CEE, #R$909F, #R$9120 and #R$A41B.
-* .
-* Prints " ? " (#R$382C), then loops on #R$35E7 until the key pressed is
-* Esc, 'Y' or 'N'. Esc returns with carry as #R$35E7 leaves it; 'Y' or 'N'
-* (at $3829) is printed, and returns with carry set.
-* 
-* O:A The key pressed ($1B/'Y'/'N')
-* O:carry Set for 'Y'/'N', per #R$35E7 for Esc
-confirm_prompt_yn:                                         ; >3815
-       .proc                                               ;                   ; 
-       li   hl,msg_382c                                    ; LD HL,$382C       ; the " ? " message
-       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
-_3819:                                                     ; >3819
-       bl   @wait_for_keypress_blinking_cursor             ; CALL $35E7        ; A = the next key (blocks until one is available)
-       cb   a,@bytes+>1b                                   ; CP $1B            ; Esc?
-       jeq  _3815_esc                                      ; RET Z             ; yes - return as-is
-       cb   a,@bytes+>59                                   ; CP $59            ; 'Y'?
-       jeq  continue_3815_echo_confirm                     ; JR Z,$3829        ; yes - confirm
-       cb   a,@bytes+>4e                                   ; CP $4E            ; 'N'?
-       jne  _3819                                          ; JR Z,$3829        ; neither - keep waiting
-continue_3815_echo_confirm:                                ; >3829
-       bl   @print_char                                    ; RST $00           ; echo the key just pressed (still in A)
-       .retc                                               ; SCF / RET         ; carry set = confirmed (Y or N, not Esc)
-_3815_esc:                                                 
-       .retnc                                              ;                   ; carry clear = Esc
 
 ********************************************************************************
 * The message " ? "
@@ -5903,33 +5848,13 @@ _5613_twist:
        rt                                                  ; RET               ; 
 
 ********************************************************************************
-* The message "Witchspace"
-msg_witchspace:                                            ; >57c9
-       text 'Witchspac',>e5                                       ; 
-
-********************************************************************************
-* The message "Commander "
-msg_commander:                                             ; >57d3
-       text 'Commander',>a0                                       ; 
-
-********************************************************************************
 msg_query:                                                 ; >57e1
        text ' ?',>a0                                              ; " ? ", also printed on its own (#R$5AC7)
-
-********************************************************************************
-* The message " tonnes."
-msg_tonnes:                                                ; >583d
-       text ' tonnes',>ae                                         ; 
 
 ********************************************************************************
 * The message " Light Years"
 msg_light_years_5845:                                      ; >5845
        text ' Light Year',>f3                                     ; 
-
-********************************************************************************
-* The message " Credits"
-msg_credits_5851:                                          ; >5851
-       text ' Credit',>f3                                         ; 
 
 ********************************************************************************
 * Sizes of units of cargo
@@ -5952,54 +5877,6 @@ hold_capacity_large:                                       ; >5a9b
        byte >C0,>0E,>16,>02                                       ; 35 tonnes, with a large cargo bay
 
 ********************************************************************************
-* Mass-unit suffix "t" (tonnes) - pointed to directly by `LD HL,$5ABF`
-* at $5B40/$5B91
-mass_unit_suffix_t:                                        ; >5abf
-       text >f4                                                   ; "t", the mass units printed with RST $10 by #R$5B4D
-msg_kg:                                                    ; >5ac0
-       text 'k',>e7                                               ; "kg"
-mass_unit_suffix_g:                                        ; >5ac2
-       text >e7                                                   ; "g"
-
-********************************************************************************
-* Ask for a number
-* 
-* Used by the routine at #R$0030.
-* .
-* Called via RST $30 (#R$0030), from #R$5BBD and #R$5DD9. Prints " ? " and
-* reads up to 4 digits (#R$3631), and works out the number.
-* 
-* O:F Carry clear if ESC was pressed; otherwise carry set, with zero set
-* .if nothing or 0 was typed
-* O:HL The number
-ask_for_number:                                            ; >5ac7
-* TI: returns with carry clear for ESC, and set otherwise, with HL = the
-* number: the caller tests HL for 0 (.endproc can't return a zero flag too)
-       .proc                                               ;                   ; 
-       li   hl,msg_query                                   ; LD HL,$57E1       ; " ? "
-       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
-       li   de,>3039                                       ; LD DE,$3039       ; digits only...
-       movb @bytes+>04,@c                                  ; LD C,$04          ; ...up to 4 of them
-       bl   @read_line_keyboard_input                      ; CALL $3631        ; read them into $E8F7
-       jnc  _5ac7_esc                                      ; RET NC            ; ESC
-       li   de,keyboard_input_buffer                       ; LD DE,$E8F7       ; DE -> the buffer
-       clr  hl                                             ; LD HL,$0000       ; HL = the running total
-_5ade:                                                     ; >5ade
-       movb *de,a                                          ; LD A,(DE) / OR A  ; the terminator?
-       jeq  tail_set_carry_zero_reflecting_hl              ; JR Z,$5AF4        ; yes - done
-       movb @bytes+>0a,a                                   ; LD A,$0A          ; 
-       bl   @multiply_a_hl_16bit                           ; CALL $1F73        ; HL *= 10
-       movb *de+,r1                                        ; LD A,(DE) / INC DE; the digit character
-       srl  r1,8                                           ;                   ; 
-       ai   r1,->30                                        ; SUB $30           ; its value (0-9)
-       a    r1,hl                                          ; ADD A,L / INC H   ; HL += the digit's value
-       jmp  _5ade                                          ; JR $5ADE          ; loop for the next character
-tail_set_carry_zero_reflecting_hl:                         ; >5af4
-       .retc                                               ; SCF               ; carry set
-_5ac7_esc:                                                 
-       .retnc                                              ;                   ; 
-
-********************************************************************************
 * Show a message for a while
 * 
 * Used by the routines at #R$1683, #R$5C01, #R$5CEE, #R$5D72, #R$5DBB, #R$5E6B,
@@ -6014,57 +5891,6 @@ show_message:                                              ; >5ffb
        .rst >08                                            ; RST $08           ; 
        bl   @busy_wait_delay                               ; CALL $3808        ; 
        b    @clear_message_line_jmp                        ; JP $3955          ; clear the message line
-
-********************************************************************************
-* Format and print the current cash total
-* 
-* Used by the routines at #R$5C8E, #R$5E6B, #R$6002, #R$612D and #R$6276.
-* .
-* Reassembles the 24-bit cash total from $EB16 (low byte, via A/C),
-* $EB17/$EB18 (the upper 16 bits, loaded together as HL) and prints it
-* via RST $18 with format byte $40.
-format_print_current_cash_total:                           ; >6037
-       movb @player_cash,@c                                ; LD A,($EB16) / LD C,A; C = the cash total's low byte
-       movb @cash_1+1,hl                                   ; LD HL,($EB17)     ; HL = its upper 16 bits
-       movb @cash_1,@l                                     ;                   ; 
-       movb @bytes+>40,a                                   ; LD A,$40          ; control byte: decimal-point handling, no width padding
-       b    @rst_18_target_format_value_print              ; RST $18 / RET     ; format and print the cash total
-
-********************************************************************************
-* Print the fuel level, then a fixed label
-* 
-* Used by the routines at #R$5C8E and #R$6276.
-print_fuel:                                                ; >6042
-       .proc                                               ;                   ; 
-       movb @fuel_level,@c                                 ; LD A,($F775) / LD C,A; C = the fuel level
-       clr  hl                                             ; LD HL,$0000       ; 
-       movb @bytes+>40,a                                   ; LD A,$40          ; control byte: decimal-point handling
-       bl   @rst_18_target_format_value_print              ; RST $18           ; format and print it
-       li   hl,msg_light_years_5845                        ; LD HL,$5845       ; " Light Years"
-       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
-       .endproc                                            ; RET               ; 
-
-********************************************************************************
-* Print the free space in the hold
-* 
-* Used by the routines at #R$5C8E and #R$612D.
-* .
-* Works out the free space in the hold (#R$63BA), and prints it in tonnes
-* to one decimal place (grams / 100000, #R$20E1).
-print_free_space:                                          ; >6051
-       .proc                                               ;                   ; 
-       bl   @work_out_free_space                           ; CALL $63BA        ; work out the free space
-       movb @free_space+1,de                               ; LD DE,($EB61)     ; HL:DE = the free space in grams
-       movb @free_space,@e                                 ;                   ; 
-       movb @free_hold_space_2+1,hl                        ; LD HL,($EB63)     ; 
-       movb @free_hold_space_2,@l                          ;                   ; 
-       bl   @divide_by_100000                              ; CALL $20E1        ; / 100000: tenths of a tonne
-       movb @e,@c                                          ; LD C,E            ; 
-       movb d,@l                                           ; LD L,D            ; 
-       sb   h,h                                            ; LD H,$00          ; 
-       movb @bytes+>40,a                                   ; LD A,$40          ; with a decimal point
-       bl   @rst_18_target_format_value_print              ; RST $18           ; print it
-       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Hide the sprites and clear the page

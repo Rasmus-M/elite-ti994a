@@ -4133,6 +4133,7 @@ key_table:                                                 ; >419b
 * TI: (key in the high byte, the handler's ROM bank, the handler) words,
 * only for the keys whose handlers are converted so far, ending with 0
        data >3000,code_bank_7_select,show_cargo_manifest_screen   ; '0': inventory (#R$5C8E)
+       data >3800,code_bank_7_select,key_handler_8                ; '8': market prices (#R$5B99)
        data >3900,code_bank_7_select,status_page                  ; '9': commander status (#R$6276)
        data >5b00,code_bank_7_select,commander_menu               ; '[' (FCTN-R): load/save commander menu (#R$A30A)
        data 0                                                     ; end of the table

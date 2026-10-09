@@ -1,4 +1,4 @@
-* ROM bank 7: the math tables, and code: the status page, the commander menu and the inventory
+* ROM bank 7: the math tables, and code: the status page, the commander menu, the inventory and the market prices
 * Assembled for real by code-banks.a99, and DORG in elite.a99 for its labels
        .ifdef code_banks
        aorg >6000
@@ -647,6 +647,181 @@ _5cca_next:
        cb   b,@bytes+>12                                   ; LD A,B / CP $12   ; all 18 done?
        jne  _5cca                                          ; JR NZ,$5CCA       ; no - do the next one
        movb @bytes+>05,@current_screen                     ; LD A,$05 / LD ($E902),A; mark the mode
+       .endproc                                            ; RET               ; 
+
+* The market prices screen, with its own data
+
+********************************************************************************
+* The message " Market Prices"
+* 
+* Printed by #R$6066.
+msg_market_prices:                                         ; >56cf
+       text ' Market Price',>f3                                   ; 
+
+********************************************************************************
+* Market screen headings
+* 
+* Printed by #R$6066. A list of (column, row, string) records ending with $FF
+* (see #R$3596).
+market_screen_headings:                                    ; >588f
+       text >05,>02,'Produc',>f4                                  ; 
+       text >15,>02,'Unit    Quantit',>f9                         ; 
+       text >15,>03,'Price   For Sal',>e5                         ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Market screen frame
+* 
+* Drawn by #R$6066. A list of (RST $28) rectangles ending with $FF (see
+* #R$36F1).
+market_screen_frame:                                       ; >58bd
+       byte >05,>01,>20,>01,>91                                   ; 
+       byte >05,>02,>20,>02,>21                                   ; 
+       byte >05,>04,>0C,>11,>D1                                   ; 
+       byte >15,>04,>05,>11,>71                                   ; 
+       byte >1F,>04,>04,>11,>51                                   ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Show the price and quantity for sale of some goods
+* 
+* Used by the routines at #R$5BB4 and #R$5BBD.
+* .
+* Prints the name of goods A on row A + 4, then its price (* 4, in credits
+* to one decimal place) and quantity for sale with its units from the
+* market (#R$F789) - or "-" (at $5B46) if there are none for sale.
+* 
+* I:A Goods (0-16)
+* O:IX Pointer to its entry in the market
+show_market_row:                                           ; >5af8
+       .proc                                               ;                   ; 
+       movb a,@e                                           ; LD E,A            ; E = the item index
+       ab   @bytes+>04,a                                   ; ADD A,$04         ; 
+       movb a,@c                                           ; LD C,A            ; C = the row (index+4)
+       movb @bytes+>05,b                                   ; LD B,$05          ; B = the column (fixed)
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       movb @e,a                                           ; LD A,E            ; 
+       li   hl,msg_food                                    ; LD HL,$0D9F       ; the item-name list
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print this item's name
+       movb @bytes+>15,a                                   ; LD A,$15          ; 
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; position the cursor for the value column
+       movb @e,r1                                          ; LD A,E            ; 
+       srl  r1,8                                           ;                   ; 
+       sla  r1,2                                           ; ADD A,A x 2       ; *4 (4-byte records)
+       li   hl,market                                      ; LD HL,$F789       ; the per-item record table
+       a    r1,hl                                          ; ADD HL,BC         ; HL -> this item's record
+       .push hl                                            ; PUSH HL           ; 
+       .push hl                                            ; PUSH HL           ; 
+       movb *hl,r1                                         ; LD L,(HL) / LD H,B; the record's first byte (the price)
+       srl  r1,8                                           ;                   ; 
+       sla  r1,2                                           ; ADD HL,HL x 2     ; * 4
+       swpb r1                                             ;                   ; 
+       movb r1,@c                                          ; LD C,L            ; H:L:C = the price * 4
+       swpb r1                                             ;                   ; 
+       movb r1,@l                                          ; LD L,H            ; 
+       sb   h,h                                            ; LD H,B            ; 
+       movb @bytes+>c5,a                                   ; LD A,$C5          ; control byte: pad to width 5
+       .push de                                            ; PUSH DE           ; 
+       bl   @rst_18_target_format_value_print              ; RST $18           ; format and print it
+       .pop de                                             ; POP DE            ; 
+       .pop hl                                             ; POP HL            ; 
+       inc  hl                                             ; INC HL            ; 
+       movb @bytes+>1f,a                                   ; LD A,$1F          ; 
+       movb *hl,r0                                         ; LD A,(HL) / OR A  ; the record's second byte (TI: tested after loading A)
+       jne  _5b2c                                          ; JR NZ,$5B2C       ; nonzero - use this cursor position
+       ab   one,a                                          ; INC A             ; zero - use the next column instead
+_5b2c:                                                     ; >5b2c
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; position the cursor
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; A = the record's second byte again
+       jeq  continue_5af8_print_unavailable                ; JR Z,$5B46        ; zero - print "-" (unavailable) instead
+       movb a,@c                                           ; LD C,A            ; C = the second byte's value
+       .push hl                                            ; PUSH HL           ; 
+       clr  hl                                             ; LD HL,$0000       ; 
+       movb @bytes+>82,a                                   ; LD A,$82          ; control byte: pad to width 2
+       .push de                                            ; PUSH DE           ; 
+       bl   @rst_18_target_format_value_print              ; RST $18           ; format and print it
+       .pop de                                             ; POP DE            ; 
+       .pop hl                                             ; POP HL            ; 
+       inc  hl                                             ; INC HL            ; 
+       movb *hl,a                                          ; LD A,(HL)         ; A = the record's third byte
+       li   hl,mass_unit_suffix_t                          ; LD HL,$5ABF       ; a unit-string list
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print this item's unit string
+       jmp  _5b49                                          ; JR $5B49          ; 
+continue_5af8_print_unavailable:                           ; >5b46
+       movb @bytes+>2d,a                                   ; LD A,$2D          ; '-'
+       bl   @print_char                                    ; RST $00           ; print it
+_5b49:                                                     ; >5b49
+       movb @e,a                                           ; LD A,E            ; restore the item index
+       .pop ix                                             ; POP IX            ; IX -> the item's entry in the market
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Key '8': show the market prices
+* 
+* Reached only via #R$419B's (key code, handler) table - not a literal
+* CALL/JP.
+* .
+* Bails if already showing the prices (#R$E902=2) or if #R$EEC1 is set;
+* otherwise hides sprites, draws the frame with the system's name
+* (#R$6066), prints the price of each commodity (#R$5BB4) and marks the
+* mode.
+key_handler_8:                                             ; >5b99
+       .proc                                               ;                   ; 
+       cb   @current_screen,@bytes+>02                     ; LD A,($E902) / CP $02; already showing the market prices?
+       jeq  _5b99_end                                      ; RET Z             ; yes - nothing to do
+       movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; in witchspace?
+       jne  _5b99_end                                      ; RET NZ            ; yes - no market
+       bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide sprites
+       bl   @draw_frame_centred_target_name                ; CALL $6066        ; draw a frame with the current system's name centred
+       sb   a,a                                            ; XOR A             ; start at item 0
+       bl   @print_all_equipment_rows                      ; CALL $5BB4        ; print all 17 rows
+       movb @bytes+>02,@current_screen                     ; LD A,$02 / LD ($E902),A; mark the mode
+_5b99_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Print the market prices of all 17 commodities
+* 
+* Used by the routine at #R$5B99.
+* .
+* I:A The first item index to print (0-based)
+print_all_equipment_rows:                                  ; >5bb4
+       .proc                                               ;                   ; 
+_5bb4:                                                     
+       cb   a,@bytes+>11                                   ; CP $11            ; all 17 done?
+       jeq  _5bb4_end                                      ; RET Z             ; yes - done
+       bl   @show_market_row                               ; CALL $5AF8        ; no - print this row
+       ab   one,a                                          ; INC A             ; next item
+       jmp  _5bb4                                          ; JR $5BB4          ; 
+_5bb4_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Show the market screen's title
+* 
+* Used by the routines at #R$5B99 and #R$5BBD.
+* .
+* Generates the current system's name (#R$4CAF) and prints it followed by
+* " Market Prices" ($56CF), centred on text row 1 (#R$E710, #R$3564), then
+* draws the frame and column headings (RST $28/$20).
+draw_frame_centred_target_name:                            ; >6066
+       .proc                                               ;                   ; 
+       movb one,@cursor_vram_addr_row                      ; LD A,$01 / LD ($E710),A; text row 1
+       movb @current_system,a                              ; LD A,($EB67)      ; the current system
+       bl   @generate_system_name                          ; CALL $4CAF        ; generate and format its name
+       sb   @bytes+>1c,a                                   ; SUB $1C           ; compute a centering column from the character count
+       andi a,>ff00                                        ; NEG               ; 
+       neg  a                                              ;                   ; 
+       srl  a,1                                            ; SRL A             ; 
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; position the cursor there
+       li   hl,text_buffer                                 ; LD HL,$E717       ; the generated name
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   hl,msg_market_prices                           ; LD HL,$56CF       ; a fixed suffix
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   ix,market_screen_frame                         ; LD IX,$58BD       ; 
+       bl   @rst_28_target_draw_list_tile                  ; RST $28           ; draw a frame
+       li   hl,market_screen_headings                      ; LD HL,$588F       ; 
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print the "Price   For Sale" header list
        .endproc                                            ; RET               ; 
 
 rom_bank_7_end:

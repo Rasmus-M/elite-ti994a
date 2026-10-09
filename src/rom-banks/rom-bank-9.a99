@@ -662,14 +662,17 @@ local_chart:                                               ; >4f64
        movb @current_screen,a                              ; LD A,($E902)      ; A = the current screen
        cb   a,@bytes+>06                                   ; CP $06            ; already on the local chart?
        jne  local_chart_from_galactic                      ; JR NZ,$4F78       ; no
-* TI: the MSX centres on the system nearest the cursor (#R$538B); the cursor
-* can't move yet, so there's nothing to do
-       .endproc                                            ;                   ; 
+       movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; yes: in witchspace?
+       jeq  _4f70                                          ; RET NZ            ; 
+       .endproc                                            ;                   ; after a drive malfunction - nothing to do
+_4f70:                                                     ; >4f70
+       bl   @local_chart_select                            ; CALL $538B        ; select the system nearest the cursor
+       movb @selected_system,a                             ; LD A,($E72B)      ; centre on it
+       jmp  _4f87                                          ; JR $4F87          ; 
 local_chart_from_galactic:                                 ; >4f78
        cb   a,@bytes+>04                                   ; CP $04            ; on the galactic chart?
        jne  local_chart_draw                               ; JR NZ,$4F84       ; no - centre on the current system
-* TI: the MSX selects the system nearest the cursor first, with an expanding
-* box (#R$541E); the cursor can't move yet, so it's on the selected system
+       bl   @animate_expanding_selection_box               ; CALL $541E        ; select the system nearest its cursor
        movb @selected_system,a                             ; LD A,($E72B)      ; centre on it
        jmp  _4f87                                          ; JR $4F87          ; 
 local_chart_draw:                                          ; >4f84
@@ -1308,6 +1311,414 @@ label_offset_cosines:                                      ; >56bd
 * (see #R$56BD).
 label_offset_sines:                                        ; >56c6
        byte >00,>11,>22,>32,>40,>4D,>57,>5E,>62                   ; 
+
+* Selecting the system nearest the chart cursor, and the distance to it
+
+********************************************************************************
+* Local chart: convert screen coordinates to galaxy coordinates
+* 
+* Used by the routine at #R$538B.
+* .
+* The reverse of #R$4F09, for the cursor (#R$538B).
+* 
+* I:B y (screen)
+* I:C x (screen)
+* O:B y (galaxy)
+* O:C x (galaxy)
+local_chart_galaxy_coordinates:                            ; >4f37
+       movb b,r0                                           ; LD A,B            ; A = B (the screen Y)
+       sb   @bytes+>59,r0                                  ; SUB $59           ; undo the offset
+       sra  r0,10                                          ; SRA A x 2         ; undo the *4 scale (signed /4)
+       movb @local_chart_centre_y,r1                       ; LD HL,$E831       ; 
+       srl  r1,8                                           ;                   ; 
+       a    r1,r0                                          ; ADD A,(HL)        ; += the cached origin's Y
+       swpb r0                                             ;                   ; 
+       movb r0,b                                           ; POP AF / LD B,A   ; the reconstructed Y (8 bits, as on the MSX)
+       movb @c,r1                                          ; LD A,C            ; A = C (the screen X)
+       sb   @bytes+>81,r1                                  ; SUB $81           ; undo the offset
+       sra  r1,8                                           ;                   ; (TI: signed)
+       .push r1                                            ; PUSH AF           ; stash its sign
+       abs  r1                                             ; NEG               ; the magnitude
+       mov  r1,r2                                          ; LD L,A / LD H,$00 ; 
+       clr  r1                                             ;                   ; 
+       li   r0,3                                           ; LD A,$03          ; 
+       div  r0,r1                                          ; CALL $2079        ; undo the *3 scale (/3) (TI: DIV)
+       .pop r0                                             ; POP AF            ; recover the original sign
+       mov  r0,r0                                          ;                   ; 
+       jgt  local_chart_galaxy_x_add                       ; JP P,$4F5D        ; positive - keep it
+       jeq  local_chart_galaxy_x_add                       ;                   ; 
+       neg  r1                                             ; NEG               ; negative - re-apply the sign
+local_chart_galaxy_x_add:                                  ; >4f5d
+       movb @local_chart_centre,r0                         ; LD HL,$E830       ; 
+       srl  r0,8                                           ;                   ; 
+       a    r0,r1                                          ; ADD A,(HL)        ; += the cached origin's X
+       swpb r1                                             ;                   ; 
+       movb r1,@c                                          ; LD C,A            ; C = the reconstructed X (8 bits)
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Undo #R$4EEC's scaling: screen (B, C) back to chart units
+* 
+* Used by the routine at #R$5314.
+* .
+* The inverse of #R$4EEC (`B := B*$9F/$7F + 8, C := C*$CF/$7F + $18`):
+* C := (C-$18) * (-1/$CF via $FF) * $7F, B := (B-8) similarly via $9F.
+* Converts a screen position (e.g. a cursor) back into the chart's own
+* coordinate units.
+unscale_4eec_coordinate_pair:                              ; >525f
+       movb @c,r1                                          ; LD A,C            ; A = C (the screen X)
+       sb   @bytes+>18,r1                                  ; SUB $18           ; undo the offset
+       srl  r1,8                                           ;                   ; 
+       li   r0,>ff                                         ; LD E,$FF          ; (TI: MPY and DIV)
+       mpy  r0,r1                                          ; CALL $1F60        ; 
+       clr  r1                                             ;                   ; 
+       li   r0,>cf                                         ; LD A,$CF          ; 
+       div  r0,r1                                          ; CALL $2079        ; undo the *$CF scale
+       swpb r1                                             ;                   ; 
+       movb r1,@c                                          ; PUSH HL ... POP BC; C = the x in chart units
+       movb b,r1                                           ; POP AF            ; the screen Y
+       sb   @bytes+>08,r1                                  ; SUB $08           ; undo the offset
+       srl  r1,8                                           ;                   ; 
+       li   r0,>7f                                         ; LD E,$7F          ; 
+       mpy  r0,r1                                          ; CALL $1F60        ; 
+       clr  r1                                             ;                   ; 
+       li   r0,>9f                                         ; LD A,$9F          ; 
+       div  r0,r1                                          ; CALL $2079        ; undo the *$9F scale
+       swpb r1                                             ;                   ; 
+       movb r1,b                                           ; LD A,L / LD B,A   ; B = the y in chart units
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Key 'D': show the distance to the selected system
+* 
+* Used by the routine at #R$55A3.
+* .
+* Reached via the key table at #R$419B, and after finding a system by
+* name (#R$55F6). Does nothing unless a chart is showing (#R$E70B).
+* Selects the system nearest the cursor and moves the cursor to it - on
+* the galactic chart (#R$5314, #R$53FD) unless a system has just been
+* found by name (#R$E82D), or on the local chart (#R$538B, #R$53ED).
+* .
+* At $52F4, clears the message line and prints the selected system's
+* name, ": ", its distance (#R$6141, to one decimal place) and " Light
+* Years".
+key_distance:                                              ; >52ce
+       .proc                                               ;                   ; 
+       movb @chart_cursor_active_flag,a                    ; LD A,($E70B) / OR A; A = chart cursor on?
+       jne  _52d3                                          ; RET Z             ; no chart showing
+       .endproc                                            ;                   ; 
+_52d3:                                                     ; >52d3
+       cb   @current_screen,@bytes+>04                     ; LD A,($E902) / CP $04; the galactic chart?
+       jne  key_distance_3                                 ; JR NZ,$52EE       ; no - the local chart
+       movb @found_by_name,a                               ; LD A,($E82D) / OR A; just found by name?
+       jne  key_distance_2                                 ; JR NZ,$52E8       ; yes
+       bl   @galactic_chart_select                         ; CALL $5314        ; select the system nearest the cursor
+       bl   @galactic_chart_cursor_to_selected             ; CALL $53FD        ; move the cursor to it
+       jmp  _52f4                                          ; JR $52EC          ; show the distance
+key_distance_2:                                            ; >52e8
+       sb   @found_by_name,@found_by_name                  ; XOR A / LD ($E82D),A; clear the found-by-name flag
+       jmp  _52f4                                          ; JR $52F4          ; show the distance
+key_distance_3:                                            ; >52ee
+       bl   @local_chart_select                            ; CALL $538B        ; select the system nearest the cursor
+       bl   @local_chart_cursor_to_selected                ; CALL $53ED        ; move the cursor to it
+_52f4:                                                     ; >52f4
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       movb @selected_system,a                             ; LD A,($E72B)      ; the selected system
+       bl   @generate_system_name                          ; CALL $4CAF        ; generate its name
+       li   hl,text_buffer                                 ; LD HL,$E717       ; 
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   hl,msg_colon_separator                         ; LD HL,$5678       ; ": "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       bl   @distance_to_selected_system                   ; CALL $6141        ; HL = distance (in tenths)
+       movb @l,@c                                          ; LD C,L            ; 
+       movb h,@l                                           ; LD L,H            ; 
+       sb   h,h                                            ; LD H,$00          ; 
+       movb @bytes+>40,a                                   ; LD A,$40          ; with a decimal point
+       bl   @rst_18_target_format_value_print              ; RST $18           ; print it
+       li   hl,msg_light_years                             ; LD HL,$567B       ; " Light Years"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Galactic chart: select the system nearest the cursor
+* 
+* Used by the routines at #R$52CE, #R$541E, #R$6164 and #R$88AC.
+* .
+* Converts the cursor position (#R$E709, plus half a character) to galaxy
+* coordinates (#R$525F), and selects the nearest system (#R$5325).
+galactic_chart_select:                                     ; >5314
+       .proc                                               ;                   ; 
+       movb @chart_cursor_x,@c                             ; LD HL,($E709) / LD A,L; the raw cursor position
+       ab   @bytes+>07,@c                                  ; ADD A,$07 / LD C,A; 
+       movb @chart_cursor_y,b                              ; LD A,H            ; 
+       ab   @bytes+>08,b                                   ; ADD A,$08 / LD B,A; 
+       bl   @unscale_4eec_coordinate_pair                  ; CALL $525F        ; unscale to chart units
+       bl   @nearest_and_furthest_systems                  ; JP $5325          ; find the nearest system to it
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Find the nearest and furthest systems to a point
+* 
+* Used by the routines at #R$5314, #R$894D and #R$9120.
+* .
+* Goes through all 256 systems in the galaxy (#R$4C80), working out the
+* square of each one's distance from the point (#R$205D), and selects the
+* nearest (#R$E72B). Also finds the furthest (#R$E83D), for the missions
+* (#R$9120).
+* 
+* I:BC The point (B y, C x)
+* O:A The furthest system (also in #R$E83D)
+nearest_and_furthest_systems:                              ; >5325
+       .proc                                               ;                   ; 
+       movb @c,@system_search_point                        ; LD ($E61B),BC     ; the point
+       movb b,@system_search_point+1                       ;                   ; 
+       seto r0                                             ; LD HL,$FFFF       ; 
+       movb r0,@nearest_distance                           ; LD ($E613),HL / LD ($E615),HL; the nearest so far: none
+       movb r0,@nearest_distance+1                         ;                   ; 
+       movb r0,@nearest_distance_hi                        ;                   ; 
+       sb   @furthest_distance,@furthest_distance          ; INC HL / LD ($E617),HL / LD ($E619),HL; the furthest so far: none
+       sb   @furthest_distance+1,@furthest_distance+1      ;                   ; 
+       sb   @furthest_distance_hi,@furthest_distance_hi    ;                   ; 
+       bl   @galaxy_seeds_to_system                        ; CALL $5607        ; start at system 0
+       clr  bc                                             ;                   ; (TI: B = 0 for 256 systems)
+_533c:                                                     ; >533c
+       .push bc                                            ; PUSH BC           ; 
+       bl   @next_system_coordinates                       ; CALL $4C80        ; BC = this system's coordinates
+       movb @system_search_point+1,d                       ; LD DE,($E61B)     ; DE = the point
+       movb @system_search_point,@e                        ;                   ; 
+       bl   @squared_distance_2d                           ; CALL $205D        ; AHL = distance squared
+       cb   a,@nearest_distance_hi                         ; LD BC,($E613) / SBC HL,BC / SBC A,C; (TI: compared by byte and word)
+       jl   _5359                                          ;                   ; 
+       jh   _5366                                          ; JR NC,$5366       ; not nearer
+       movb @nearest_distance+1,r0                         ;                   ; 
+       movb @nearest_distance,@r0lb                        ;                   ; 
+       c    hl,r0                                          ;                   ; 
+       jhe  _5366                                          ;                   ; not nearer
+_5359:                                                     ; >5359
+       movb @l,@nearest_distance                           ; LD ($E613),HL     ; the nearest so far
+       movb h,@nearest_distance+1                          ;                   ; 
+       movb a,@nearest_distance_hi                         ; LD ($E615),DE     ; 
+       .peek r0                                            ; LD A,B            ; (the loop counter, on the stack)
+       andi r0,>ff00                                       ;                   ; 
+       neg  r0                                             ; NEG               ; 
+       movb r0,@selected_system                            ; LD ($E72B),A      ; select it
+_5366:                                                     ; >5366
+       cb   a,@furthest_distance_hi                        ; LD BC,($E617) / SBC HL,BC / SBC A,C; 
+       jh   _5378                                          ;                   ; 
+       jl   _5385                                          ; JR C,$5385        ; not further
+       movb @furthest_distance+1,r0                        ;                   ; 
+       movb @furthest_distance,@r0lb                       ;                   ; 
+       c    hl,r0                                          ;                   ; 
+       jl   _5385                                          ;                   ; not further
+_5378:                                                     ; >5378
+       movb @l,@furthest_distance                          ; LD ($E617),HL     ; the furthest so far
+       movb h,@furthest_distance+1                         ;                   ; 
+       movb a,@furthest_distance_hi                        ; LD ($E619),DE     ; 
+       .peek r0                                            ; LD A,B            ; and its system index
+       andi r0,>ff00                                       ;                   ; 
+       neg  r0                                             ; NEG               ; 
+       movb r0,@furthest_system                            ; LD ($E83D),A      ; 
+_5385:                                                     ; >5385
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $533C        ; next system
+       jne  _533c                                          ;                   ; 
+       movb @furthest_system,a                             ; LD A,($E83D)      ; A = the furthest system
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Local chart: select the system nearest the cursor
+* 
+* Used by the routines at #R$4F64, #R$52CE, #R$6164 and #R$88AC.
+* .
+* Converts the cursor position (#R$E709, plus half a character) to galaxy
+* coordinates (#R$4F37), and selects the nearest of the systems on the
+* chart (#R$EFA4, #R$E832, listed by #R$502C) (#R$E72B).
+local_chart_select:                                        ; >538b
+* TI: as on the MSX, which compares its running minimum muddled with IY, only
+* the low 16 bits of the squared distance count, and the first of equals wins.
+       .proc                                               ;                   ; 
+       movb @chart_cursor_x,@c                             ; LD HL,($E709) / LD A,L; the raw cursor position
+       ab   @bytes+>07,@c                                  ; ADD A,$07 / LD C,A; 
+       movb @chart_cursor_y,b                              ; LD A,H            ; 
+       ab   @bytes+>08,b                                   ; ADD A,$08 / LD B,A; 
+       bl   @local_chart_galaxy_coordinates                ; CALL $4F37        ; unscale to chart units
+       movb @c,@system_search_point                        ; LD ($E61B),BC     ; cache the search point
+       movb b,@system_search_point+1                       ;                   ; 
+       seto r0                                             ; LD HL,$FFFF       ; 
+       movb r0,@nearest_distance                           ; LD ($E613),HL / LD ($E615),HL; the running minimum
+       movb r0,@nearest_distance+1                         ;                   ; 
+       li   ix,chart_system_list                           ; LD IX,($EFA4)     ; IX -> #R$502C's list (TI: chart_system_list)
+       movb @nearby_systems_count,b                        ; LD A,($E832) / LD B,A; how many are in it
+       jeq  _53ec                                          ;                   ; 
+_53ae:                                                     ; >53ae
+       .push bc                                            ; PUSH BC           ; 
+       .push ix                                            ; PUSH IX           ; 
+       movb *ix,a                                          ; LD A,(IX+$00)     ; A = this list entry's system index
+       bl   @generate_system                               ; CALL $4C9B        ; generate its coordinates
+       movb @system_y,d                                    ; LD DE,($F751)     ; DE = its (X, Y)
+       movb @system_x,@e                                   ;                   ; 
+       movb @system_search_point+1,b                       ; LD BC,($E61B)     ; BC = the search point
+       movb @system_search_point,@c                        ;                   ; 
+       bl   @squared_distance_2d                           ; CALL $205D        ; HL:A = the squared distance to it
+       .pop ix                                             ; POP IX            ; 
+       .pop bc                                             ; POP BC            ; 
+       movb @nearest_distance+1,r0                         ; LD BC,($E613) / SBC HL,BC ...; compare against the running minimum
+       movb @nearest_distance,@r0lb                        ;                   ; 
+       c    hl,r0                                          ;                   ; 
+       jhe  _53e8                                          ; JR NC,$53E8       ; not closer - next entry
+       movb @l,@nearest_distance                           ; LD ($E613),IY ... ; closer - update the running minimum
+       movb h,@nearest_distance+1                          ;                   ; 
+       movb *ix,@selected_system                           ; LD A,(IX+$00) / LD ($E72B),A; and select this entry
+_53e8:                                                     ; >53e8
+       inc  ix                                             ; INC IX            ; -> the next list entry
+       sb   one,b                                          ; DJNZ $53AE        ; 
+       jne  _53ae                                          ;                   ; 
+_53ec:                                                     
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Animate an expanding box out from the cursor (a list-selection effect)
+* 
+* Used by the routine at #R$4F64.
+* .
+* Picks the nearest system to the cursor and moves it there (#R$5314/
+* #R$53FD), then self-modifies #R$3793's `OR (IX+d)` opcode to XOR ($AE) at
+* $37C0, so #R$372B's lines toggle pixels instead of setting them - letting
+* each side be drawn once to show it and again later to erase it. Sets up a
+* small starting rectangle around the cursor ($F769/$F76B=top-left,
+* $F76F/$F771=bottom-right) and a 4-bit "which sides are still animating"
+* flag at #R$E83E (all 4 set initially).
+* .
+* Each pass (#R$5444): draws whichever of the 4 sides still has its bit set
+* (top #R$372B call at $5465, right at $547F, bottom at $5499, left at
+* $54B3 - each XOR-toggling that edge), waits a short delay, then expands
+* the rectangle by 16 in each direction, clamping each side at the screen
+* edge and clearing its bit once it gets there. Repeats until all 4 sides
+* have stopped (#R$E83E=0). Then, at $551E, changes the XOR back to OR.
+animate_expanding_selection_box:                           ; >541e
+       .proc                                               ;                   ; 
+       bl   @galactic_chart_select                         ; CALL $5314        ; pick the nearest system to the cursor
+       bl   @galactic_chart_cursor_to_selected             ; CALL $53FD        ; move the cursor there
+       seto r0                                             ; LD A,$AE / LD ($37C0),A; XOR the lines (TI: a flag for #R$3793,
+       movb r0,@plot_pixel_xor                             ;                   ; not a patched opcode)
+       movb @chart_cursor_x,a                              ; LD A,($E709)      ; the cursor's X
+       ab   @bytes+>07,a                                   ; ADD A,$07         ; 
+       movb a,@line_end_1_x                                ; LD ($F769),A      ; the box's left edge
+       movb a,@line_end_2_x                                ; LD ($F76F),A      ; and initial right edge
+       movb @chart_cursor_y,a                              ; LD A,($E70A)      ; the cursor's Y
+       ab   @bytes+>10,a                                   ; ADD A,$10         ; 
+       movb a,@line_end_1_y                                ; LD ($F76B),A      ; the box's top edge
+       movb a,@line_end_2_y                                ; LD ($F771),A      ; and initial bottom edge
+       movb @bytes+>0f,@selection_box_sides_animating      ; LD A,$0F / LD ($E83E),A; all 4 sides still animating
+selection_box_pass:                                        ; >5444
+       movb @selection_box_sides_animating,a               ; LD A,($E83E) / OR A; 
+       jne  _544b                                          ; JP Z,$551E        ; all sides finished - done
+       b    @restore_3793_or_opcode                        ;                   ; 
+_544b:                                                     ; >544b
+       movb @bytes+>02,r0                                  ; LD B,$01          ; (TI: twice: draw the sides, wait a frame, and erase them)
+       .push r0                                            ;                   ; 
+selection_box_side:                                        ; >544d
+       movb @selection_box_sides_animating,r0              ; LD HL,$E83E / BIT 0,(HL); top side still animating?
+       andi r0,>0100                                       ;                   ; 
+       jeq  _5468                                          ; JR Z,$5468        ; 
+       movb @line_end_1_x,@c                               ; LD A,($F769) / LD C,A; draw/erase the top edge
+       movb @line_end_1_y,b                                ; LD A,($F76B) / LD B,A; 
+       movb @line_end_2_x,@e                               ; LD A,($F76F) / LD E,A; 
+       movb @line_end_1_y,d                                ; LD A,($F76B) / LD D,A; 
+       bl   @draw_bresenham_line_372b                      ; CALL $372B        ; 
+_5468:                                                     ; >5468
+       movb @selection_box_sides_animating,r0              ; BIT 1,(HL)        ; right side still animating?
+       andi r0,>0200                                       ;                   ; 
+       jeq  _5482                                          ; JR Z,$5482        ; 
+       movb @line_end_2_x,@c                               ; LD A,($F76F) / LD C,A; draw/erase the right edge
+       movb @line_end_1_y,b                                ; LD A,($F76B) / LD B,A; 
+       movb @line_end_2_x,@e                               ; LD A,($F76F) / LD E,A; 
+       movb @line_end_2_y,d                                ; LD A,($F771) / LD D,A; 
+       bl   @draw_bresenham_line_372b                      ; CALL $372B        ; 
+_5482:                                                     ; >5482
+       movb @selection_box_sides_animating,r0              ; BIT 2,(HL)        ; bottom side still animating?
+       andi r0,>0400                                       ;                   ; 
+       jeq  _549c                                          ; JR Z,$549C        ; 
+       movb @line_end_2_x,@c                               ; LD A,($F76F) / LD C,A; draw/erase the bottom edge
+       movb @line_end_2_y,b                                ; LD A,($F771) / LD B,A; 
+       movb @line_end_1_x,@e                               ; LD A,($F769) / LD E,A; 
+       movb @line_end_2_y,d                                ; LD A,($F771) / LD D,A; 
+       bl   @draw_bresenham_line_372b                      ; CALL $372B        ; 
+_549c:                                                     ; >549c
+       movb @selection_box_sides_animating,r0              ; BIT 3,(HL)        ; left side still animating?
+       andi r0,>0800                                       ;                   ; 
+       jeq  _54b6                                          ; JR Z,$54B6        ; 
+       movb @line_end_1_x,@c                               ; LD A,($F769) / LD C,A; draw/erase the left edge
+       movb @line_end_2_y,b                                ; LD A,($F771) / LD B,A; 
+       movb @line_end_1_x,@e                               ; LD A,($F769) / LD E,A; 
+       movb @line_end_1_y,d                                ; LD A,($F76B) / LD D,A; 
+       bl   @draw_bresenham_line_372b                      ; CALL $372B        ; 
+_54b6:                                                     ; >54b6
+       .pop r0                                             ; POP BC / DEC B    ; 
+       sb   one,r0                                         ;                   ; 
+       jeq  _54c7                                          ; JP P,$544D        ; drawn and erased - expand the box
+       .push r0                                            ;                   ; 
+       bl   @ti_wait_frame                                 ; LD DE,$07D0 / DEC DE ...; a short delay (TI: a frame, polling for VBlank)
+       jmp  selection_box_side                             ;                   ; draw them again, erasing them
+_54c7:                                                     ; >54c7
+       movb @line_end_1_y,a                                ; LD A,($F76B)      ; expand the top edge by 16...
+       ai   a,>f000                                        ; ADD A,$F0         ; 
+       jnc  _54d2                                          ; JR NC,$54D2       ; 
+       cb   a,@bytes+>08                                   ; CP $08            ; 
+       jhe  _54d9                                          ; JR NC,$54D9       ; 
+_54d2:                                                     ; >54d2
+       movb @bytes+>07,a                                   ; LD A,$07          ; ...clamping at the screen edge...
+       szcb @bit0,@selection_box_sides_animating           ; LD HL,$E83E / RES 0,(HL); ...and stopping this side once it gets there
+_54d9:                                                     ; >54d9
+       movb a,@line_end_1_y                                ; LD ($F76B),A      ; 
+       movb @line_end_2_x,a                                ; LD A,($F76F)      ; expand the right edge by 16...
+       ab   @bytes+>10,a                                   ; ADD A,$10         ; 
+       joc  _54e7                                          ; JR C,$54E7        ; 
+       cb   a,@bytes+>e8                                   ; CP $E8            ; 
+       jl   _54ee                                          ; JR C,$54EE        ; 
+_54e7:                                                     ; >54e7
+       movb @bytes+>e8,a                                   ; LD A,$E8          ; ...clamping at the screen edge...
+       szcb @bit1,@selection_box_sides_animating           ; RES 1,(HL)        ; ...and stopping this side once it gets there
+_54ee:                                                     ; >54ee
+       movb a,@line_end_2_x                                ; LD ($F76F),A      ; 
+       movb @line_end_2_y,a                                ; LD A,($F771)      ; expand the bottom edge by 16...
+       ab   @bytes+>10,a                                   ; ADD A,$10         ; 
+       joc  _54fc                                          ; JR C,$54FC        ; 
+       cb   a,@bytes+>a8                                   ; CP $A8            ; 
+       jl   _5503                                          ; JR C,$5503        ; 
+_54fc:                                                     ; >54fc
+       movb @bytes+>a8,a                                   ; LD A,$A8          ; ...clamping at the screen edge...
+       szcb @bit2,@selection_box_sides_animating           ; RES 2,(HL)        ; ...and stopping this side once it gets there
+_5503:                                                     ; >5503
+       movb a,@line_end_2_y                                ; LD ($F771),A      ; 
+       movb @line_end_1_x,a                                ; LD A,($F769)      ; expand the left edge by 16...
+       ai   a,>f000                                        ; ADD A,$F0         ; 
+       jnc  _5511                                          ; JR NC,$5511       ; 
+       cb   a,@bytes+>18                                   ; CP $18            ; 
+       jhe  _5518                                          ; JR NC,$5518       ; 
+_5511:                                                     ; >5511
+       movb @bytes+>17,a                                   ; LD A,$17          ; ...clamping at the screen edge...
+       szcb @bit3,@selection_box_sides_animating           ; RES 3,(HL)        ; ...and stopping this side once it gets there
+_5518:                                                     ; >5518
+       movb a,@line_end_1_x                                ; LD ($F769),A      ; 
+       b    @selection_box_pass                            ; JP $5444          ; next pass
+restore_3793_or_opcode:                                    ; >551e
+       sb   @plot_pixel_xor,@plot_pixel_xor                ; LD A,$B6 / LD ($37C0),A; OR the lines again
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* The message ": "
+* 
+* #R$52CE loads this
+* directly (`LD HL,$5678`) and prints it via RST $08 between the
+* selected system's name and its distance - a separator, not
+* "Distance:" (that word isn't present in these bytes). No character
+* here has bit 7 set, so the trailing $00 is its own terminator (the
+* same convention #R$56A2/#R$56B1 use).
+msg_colon_separator:                                       ; >5678
+       text ': ',>00                                              ; 
+msg_light_years:                                           ; >567b
+       text ' Light Years',>00                                    ; 
 
 rom_bank_9_end:
        equ  $

@@ -19,6 +19,12 @@ ram_stack:
 chart_system_list:
        bss  >80
 
+* Nonzero while #R$3793 XORs pixels rather than ORing them in (TI-specific: the
+* MSX patches the OR opcode there, #R$541E).
+plot_pixel_xor:
+       byte 0
+       even
+
 * Space view bitmap buffer
 *
 * 128 rows of 32 bytes (256 pixels), one bit per pixel, of which the first

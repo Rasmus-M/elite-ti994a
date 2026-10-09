@@ -236,10 +236,17 @@ key_data_on_system:                                        ; >6164
 * TI: the mission 1 checks (states $11 and $13, #R$9190, #R$91AA) aren't
 * converted yet; neither can happen before the missions are.
        cb   @current_screen,one                            ; LD A,($E902) / CP $01; Data on System showing?
-       jne  show_system_data_screen                        ; RET Z             ; yes - nothing to do
+       jne  _617b                                          ; RET Z             ; yes - nothing to do
        .endproc                                            ;                   ; 
-* TI: selecting the system nearest the cursor on a chart (#R$5314, #R$538B)
-* isn't converted yet, as the charts aren't.
+_617b:                                                     ; >617b
+       cb   @current_screen,@bytes+>04                     ; LD A,($E902) / CP $04; the galactic chart?
+       jne  key_data_on_system_3                           ; JR NZ,$6184       ; no
+       .far_call code_bank_9_select,galactic_chart_select  ; CALL $5314        ; select the system nearest the cursor (in ROM bank 9)
+       jmp  show_system_data_screen                        ; JR $6189          ; 
+key_data_on_system_3:                                      ; >6184
+       cb   @current_screen,@bytes+>06                     ; CP $06            ; the local chart?
+       jne  show_system_data_screen                        ; CALL Z,$538B      ; 
+       .far_call code_bank_9_select,local_chart_select     ;                   ; yes - select the system nearest the cursor (in ROM bank 9)
 show_system_data_screen:                                   ; >6189
        bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide sprites
        li   ix,data_on_system_frame                        ; LD IX,$59B7       ; 

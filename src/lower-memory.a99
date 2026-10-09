@@ -1,6 +1,7 @@
        limi 0
        lwpi wrksp
        bl   @ti_setup_environment
+       .select_bank code_bank_10_select ; the title screen is in ROM bank 10
        b    @title_screen
 
        copy "ti-routines.a99"

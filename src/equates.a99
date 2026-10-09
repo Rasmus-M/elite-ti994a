@@ -150,3 +150,5 @@ code_bank_8_select:                    ; Code (rom-bank-8.a99)
        equ  >6010
 code_bank_9_select:                    ; Code (rom-bank-9.a99)
        equ  >6012
+code_bank_10_select:                   ; Code (rom-bank-10.a99)
+       equ  >6014

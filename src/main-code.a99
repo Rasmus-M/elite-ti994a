@@ -6,8 +6,8 @@
 * (#R$F748), and reads the controls and keys (#R$401C).
 * .
 * TI: polls for VBlank first (interrupts are off). In flight it would run the
-* per-frame pass (#R$13FD), and when the game is over (#R$F749) go back to
-* the title screen; neither is converted yet, so this only runs docked.
+* per-frame pass (#R$13FD) in flight; going back to the title screen when the
+* game is over (#R$F749) isn't converted yet.
 main_loop_wait_tick:                                       ; >010f
        movb @main_loop_tick_counter+1,hl                   ; LD HL,($F746)     ; 
        movb @main_loop_tick_counter,@l                     ;                   ; 
@@ -17,8 +17,10 @@ main_loop_wait_tick:                                       ; >010f
        sb   @vblank_subtick_counter,@vblank_subtick_counter; XOR A / LD ($F748),A; 
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
        bl   @read_controls                                 ; CALL $401C        ; 
-* TI: LD A,($E90A) / OR A / CALL Z,$13FD - the per-frame pass in flight - and
-* the game over check ($0124) aren't converted yet.
+       movb @docked,a                                      ; LD A,($E90A)      ; docked?
+       jne  main_loop_wait_tick                            ; OR A              ; 
+       bl   @process_frame                                 ; CALL Z,$13FD      ; no - run the per-frame pass
+* TI: the game over check ($0124) isn't converted yet.
        jmp  main_loop_wait_tick                            ; JR Z,$010F        ; loop
 
 ********************************************************************************
@@ -204,6 +206,96 @@ select_blueprint_bank:
 !
        .select_bank blueprints_2_bank_select
        rt
+
+********************************************************************************
+* Main loop: move and draw everything for one frame
+* 
+* Used by the routine at #R$0106.
+* .
+* Called by the main loop (#R$0106) once per frame, both in flight and
+* while docked (the space view steps are skipped while docked). Moves and
+* plots the stardust, then runs each active object in the 20-slot object
+* table at $EBA0 through the per-object pipeline, working on a copy of
+* its 40-byte record in the workspace at $F7CD. After that come the
+* per-frame checks: laser beams, the Torus Jump Drive countdown, the
+* dashboard gauges and alerts, hyperspace and docking. Finally copies
+* the space view to the screen and waits until 5 VBlank interrupts have
+* passed since the previous frame, which caps the frame rate.
+process_frame:                                             ; >13fd
+       .proc                                               ;                   ; 
+       movb @space_view_showing,a                          ; LD A,($E903) / OR A; A = space view showing?
+       jeq _1409                                           ; JR Z,$1409        ; no - don't draw it
+       bl   @clear_space_view                              ; CALL $388F        ; clear the space view's bitmap buffer
+       bl   @update_stardust                               ; CALL $872E        ; move and plot the stardust
+_1409:                                                     ; >1409
+* TI: not converted yet: the countdown (#R$1651), stopping the roll and pitch
+* (#R$6BE1), the cloaking device and the jammer ($140F-$1434), and the
+* scanner queue ($1437-$144D: on the MSX the VBlank handler draws the scanner,
+* and this waits for it to finish).
+       li   hl,ship_object_table                           ; LD HL,$EBA0       ; HL -> the object table
+       movb @bytes+>14,b                                   ; LD B,$14          ; B = 20 slots
+process_frame_object:                                      ; >1455
+       movb *hl,r0                                         ; BIT 0,(HL)        ; is this slot in use?
+       andi r0,>0100                                       ;                   ; 
+       jeq  process_frame_next_object                      ; JP Z,$14AD        ; no - skip it
+       movb @bytes+>14,a                                   ; LD A,$14          ; 
+       sb   b,a                                            ; SUB B             ; 
+       movb a,@current_slot                                ; LD ($E911),A      ; save the slot number (0-19)
+       .push bc                                            ; PUSH BC           ; save the slot counter
+       .push hl                                            ; PUSH HL           ; save the slot address
+       li   de,object_status_byte                          ; LD DE,$F7CD       ; DE -> the object workspace
+       li   bc,>0028                                       ; LD BC,$0028       ; 
+       .ldir                                               ; LDIR              ; copy the object's 40-byte record into the workspace
+       bl   @get_blueprint_data                            ; CALL $16E3        ; set the object up for its type
+       sb   @ship_fired,@ship_fired                        ; XOR A / LD ($E92D),A; the ship hasn't fired
+       bl   @work_out_distance                             ; CALL $883D        ; work out its distance
+* TI: not converted yet: collisions and docking (#R$8755), the scanner
+* (#R$8205) and the compass (#R$85FB).
+       bl   @move_past_player                              ; CALL $8B00        ; move it by the player's speed
+       bl   @move_object                                   ; CALL $866D        ; move it forward by its own speed
+       bl   @draw_object                                   ; CALL $422E        ; draw it
+* TI: not converted yet: the object's handler (#R$2528), the laser
+* (#R$28F6) and the ship's laser beam (#R$43C2).
+       movb @roll_rate,a                                   ; LD A,($F815) / OR A; A = roll rate
+       jeq  _1496                                          ; CALL NZ,$22C0     ; rolling - rotate the object's position and axes
+       bl   @step_roll_rotation                            ;                   ; 
+_1496:                                                     ; >1496
+       movb @pitch_rate,a                                  ; LD A,($F816) / OR A; A = pitch rate
+       jeq  _149d                                          ; CALL NZ,$221B     ; pitching - rotate the object's position and axes
+       bl   @step_pitch_rotation                           ;                   ; 
+_149d:                                                     ; >149d
+       bl   @straighten_orientation                        ; CALL $4503        ; re-orthogonalise the object's axes now and then
+       .pop de                                             ; POP DE            ; DE = the slot address
+       li   hl,object_status_byte                          ; LD HL,$F7CD       ; HL -> the object workspace
+       li   bc,>0028                                       ; LD BC,$0028       ; 
+       .ldir                                               ; LDIR              ; copy the updated record back into its slot
+       mov  de,hl                                          ; EX DE,HL          ; HL -> the next slot
+       .pop bc                                             ; POP BC            ; restore the slot counter
+       jmp  _14b1                                          ; JR $14B1          ; 
+process_frame_next_object:                                 ; >14ad
+       ai   hl,>0028                                       ; LD DE,$0028 / ADD HL,DE; HL -> the next slot
+_14b1:                                                     ; >14b1
+       sb   one,b                                          ; DEC B             ; 
+       jne  process_frame_object                           ; JP NZ,$1455       ; loop for all 20 slots
+* TI: not converted yet: the scanner ($14B5), the laser beams (#R$2DC8) and
+* the Torus jump ($14BE-$1500).
+       li   hl,current_turn                                ; LD HL,$E92E       ; cycle the counter at $E92E: 3, 2, 1, 3...
+       sb   one,*hl                                        ; DEC (HL)          ; 
+       jne  _150b                                          ; JR NZ,$150B       ; 
+       movb @bytes+>03,*hl                                 ; LD (HL),$03       ; 
+_150b:                                                     ; >150b
+* TI: not converted yet: the safe zone, altitude and cabin temperature
+* (#R$1549, #R$1577), spawning ships (#R$2B05), the alert level (#R$15E7),
+* death (#R$16BA), hyperspace (#R$894D), the ECM (#R$323C), docking
+* (#R$1873) and recharging (#R$18E6).
+       movb @space_view_showing,a                          ; LD A,($E903) / OR A; 
+       jeq  _1540                                          ; JR Z,$1540        ; no space view showing
+       bl   @copy_space_view                               ; CALL $3846        ; copy the space view's bitmap buffer to VRAM
+_1540:                                                     ; >1540
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, as interrupts are off)
+       cb   @vblank_subtick_counter,@bytes+>05             ; LD HL,$F748 / LD A,(HL) / CP $05; 5 VBlanks since the last frame?
+       jl   _1540                                          ; JR C,$1543        ; no - wait
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Get the object's blueprint data
@@ -892,6 +984,122 @@ _21f6:                                                     ; >21f6
        rt                                                  ; RET               ; 
 
 ********************************************************************************
+* Refresh the live "cos"-role rotation table from the roll rate at $F815
+* 
+* Used by the routines at #R$1837 and #R$6BE1.
+refresh_roll_table:                                        ; >2209
+       movb @roll_rate,a                                   ; LD A,($F815)      ; 
+       li   de,live_roll_coeff_table                       ; LD DE,$EB76       ; #R$22C0's table
+       b    @lookup_rotation_coeffs                        ; JP $21DA          ; 
+
+********************************************************************************
+* Refresh the live "cos"-role rotation table from the pitch rate at $F816
+* 
+* Used by the routine at #R$6BE1.
+refresh_pitch_table:                                       ; >2212
+       movb @pitch_rate,a                                  ; LD A,($F816)      ; 
+       li   de,live_pitch_coeff_table                      ; LD DE,$EB7C       ; #R$221B's table
+       b    @lookup_rotation_coeffs                        ; JP $21DA          ; 
+
+********************************************************************************
+* Apply the player's pitch to the object (its position, side and nose vectors)
+* 
+* Used by the routine at #R$13FD.
+* .
+* Uses the live coefficient table at $EB7C (refreshed from the pitch
+* rate at $F816 by #R$2212) to apply one #R$2450-style rotation step to
+* three separate 2D coordinate pairs:
+* .
+* - ($F7D0,$F7D2) always, via a plain call to #R$2450;
+* - ($F7D6,$F7D8) and ($F7DC,$F7DE) as well, but only when bit 3 of
+* the object status byte at $F7CD is clear - done inline here
+* (repeating #R$2450's rotate-then-normalize pattern by hand,
+* calling #R$24D1/#R$24A7 directly, rather than calling #R$2450
+* itself) so there is no inline counterpart to #R$2450's own
+* $7FFF/$8000/$7F92 overflow saturation.
+* .
+* #R$22C0 rotates the same three pairs' *other* halves ($F7CE, $F7D4,
+* $F7DA) around a different axis, using its own table at $EB76. Since
+* $F7D0 is written by both this routine and #R$22C0, (F7CE,F7D0,F7D2) is
+* really one 3D vector being rotated first around one axis then the
+* other - likewise (F7D4,F7D6,F7D8) and (F7DA,F7DC,F7DE). The first is the
+* object's position, which is always rotated; the other two are its side
+* and nose vectors (#R$F7D4, #R$F7DA). Each
+* inline half is written back in sign-magnitude form (magnitude in
+* the low 15 bits, sign in the high byte's bit 7) - the same
+* representation #R$2450 normalizes its own BC/DE inputs into at
+* entry, and #R$24D1/#R$24A7 expect throughout.
+* 
+* I:$F7D0/$F7D2/$F7D6/$F7D8/$F7DC/$F7DE The three vectors' second halves
+* I:$F7CD Object status byte (bit 3 gates the two orientation vectors)
+step_pitch_rotation:                                       ; >221b
+       .proc                                               ;                   ; 
+       li   ix,live_pitch_coeff_table                      ; LD IX,$EB7C       ; IX -> the live pitch-rotation coefficient table
+       movb @object_position_y+1,bc                        ; LD BC,($F7D0)     ; BC = y
+       movb @object_position_y,@c                          ;                   ; 
+       movb @object_position_z_lo+1,de                     ; LD DE,($F7D2)     ; DE = z
+       movb @object_position_z_lo,@e                       ;                   ; 
+       bl   @rotate_pair                                   ; CALL $2450        ; rotate (y, z) by one pitch step
+       movb hl,@object_position_y+1                        ; LD ($F7D0),HL     ; store y'
+       movb @l,@object_position_y                          ;                   ; 
+       movb de,@object_position_z_lo+1                     ; LD ($F7D2),DE     ; store z'
+       movb @e,@object_position_z_lo                       ;                   ; 
+       li   hl,object_status_byte                          ; LD HL,$F7CD       ; 
+       movb *hl,r0                                         ; BIT 3,(HL)        ; the planet, the sun or an explosion?
+       andi r0,>0800                                       ;                   ; 
+       jne  _221b_end                                      ; RET NZ            ; yes - only its position turns
+       szcb @bit7,*hl                                      ; RES 7,(HL)        ; the roof vector needs working out again (#R$4599)
+       ab   one,@rotation_count                            ; LD HL,$F7E8 / INC (HL); count the rotation (see #R$4503)
+       li   r1,side_vector_y                               ; LD HL,($F7D6) ... ; rotate (side.y, side.z)...
+       bl   @rotate_axis_pair                              ; ... LD ($F7D6),HL ; (TI: in a shared routine)
+       li   r1,nose_vector_y                               ; LD HL,($F7DC) ... ; ...and (nose.y, nose.z)
+       bl   @rotate_axis_pair                              ; ... LD ($F7DC),HL ; 
+_221b_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Apply the player's roll to the object (its position, side and nose vectors)
+* 
+* Used by the routine at #R$13FD.
+* .
+* The companion to #R$221B: uses the live coefficient table at $EB76
+* (refreshed from the roll rate at $F815 by #R$2209) to rotate the
+* *other* half of the same three vectors #R$221B rotates - ($F7CE,
+* $F7D0) always via #R$2450, plus ($F7D4,$F7D6) and ($F7DA,$F7DC) when
+* bit 3 of $F7CD is clear, applied inline the same way #R$221B does.
+* See that routine for the full picture: together the two calls rotate
+* three 3D vectors: the object's position (always updated) and its side
+* and nose vectors (#R$F7D4, #R$F7DA), unless it's the planet, the sun
+* or an explosion (bit 3 of #R$F7CD).
+* 
+* I:$F7CE/$F7D0/$F7D4/$F7D6/$F7DA/$F7DC The three vectors' first halves
+* I:$F7CD Object status byte (bit 3 gates the two orientation vectors)
+step_roll_rotation:                                        ; >22c0
+       .proc                                               ;                   ; 
+       li   ix,live_roll_coeff_table                       ; LD IX,$EB76       ; IX -> the live roll-rotation coefficient table
+       movb @object_position_x+1,bc                        ; LD BC,($F7CE)     ; BC = x
+       movb @object_position_x,@c                          ;                   ; 
+       movb @object_position_y+1,de                        ; LD DE,($F7D0)     ; DE = y
+       movb @object_position_y,@e                          ;                   ; 
+       bl   @rotate_pair                                   ; CALL $2450        ; rotate (x, y) by one roll step
+       movb hl,@object_position_x+1                        ; LD ($F7CE),HL     ; store x'
+       movb @l,@object_position_x                          ;                   ; 
+       movb de,@object_position_y+1                        ; LD ($F7D0),DE     ; store y'
+       movb @e,@object_position_y                          ;                   ; 
+       li   hl,object_status_byte                          ; LD HL,$F7CD       ; 
+       movb *hl,r0                                         ; BIT 3,(HL)        ; the planet, the sun or an explosion?
+       andi r0,>0800                                       ;                   ; 
+       jne  _22c0_end                                      ; RET NZ            ; yes - only its position turns
+       szcb @bit7,*hl                                      ; RES 7,(HL)        ; the roof vector needs working out again (#R$4599)
+       ab   one,@rotation_count                            ; LD HL,$F7E8 / INC (HL); count the rotation (see #R$4503)
+       li   r1,side_vector                                 ; LD HL,($F7D4) ... ; rotate (side.x, side.y)...
+       bl   @rotate_axis_pair                              ; ... LD ($F7D4),HL ; (TI: in a shared routine)
+       li   r1,nose_vector                                 ; LD HL,($F7DA) ... ; ...and (nose.x, nose.y)
+       bl   @rotate_axis_pair                              ; ... LD ($F7DA),HL ; 
+_22c0_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
 * Pitch the object by angle A
 * 
 * Used by the routines at #R$1C5C, #R$1E5A, #R$2758 and #R$2EB2.
@@ -1046,6 +1254,120 @@ roll_object_side_z:                                        ; >2448
        movb @l,@side_vector_z                              ;                   ;
        li   hl,rotation_count                              ; LD HL,$F7E8       ; 
        ab   one,*hl                                        ; INC (HL)          ; count the rotation
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Rotate a pair of coordinates
+* 
+* Used by the routines at #R$221B and #R$22C0.
+* .
+* Used by #R$221B and #R$22C0. Returns X' = X.cos - Y.sin and Y' = X.sin +
+* Y.cos, with the rotation's cos (IX+0 to IX+2, #R$24D1) and sin (IX+3 to
+* IX+5, #R$24A7), converting the coordinates to sign-magnitude first.
+* Results out of range are saturated to -32768 or +32767 - except that, by
+* a bug, a Y' below -32768 becomes $7F92 (at $249F), a large positive
+* number: an overflow of the addition with carry set is a negative one,
+* so it should be -32768.
+* 
+* I:BC Signed X coordinate
+* I:DE Signed Y coordinate
+* I:IX Pointer to the 6-byte rotation-coefficient table
+* O:HL Rotated X'
+* O:DE Rotated Y'
+rotate_pair:                                               ; >2450
+       .proc                                               ;                   ; 
+       abs  bc                                             ; BIT 7,B           ; X to sign-magnitude...
+       jgt  _245c                                          ; JR Z,$245C        ; (ABS sets the status from the value before)
+       jeq  _245c                                          ;                   ; 
+       ori  bc,>8000                                       ; XOR A / SUB C / ... / OR $80; 
+_245c:                                                     ; >245c
+       abs  de                                             ; BIT 7,D           ; ...and Y
+       jgt  _2468                                          ; JR Z,$2468        ; 
+       jeq  _2468                                          ;                   ; 
+       ori  de,>8000                                       ; XOR A / SUB E / ... / OR $80; 
+_2468:                                                     ; >2468
+       .push bc                                            ; PUSH BC           ; save X (at -6(SP) below)
+       .push de                                            ; PUSH DE           ; save Y (at -4(SP))
+       mov  bc,hl                                          ; LD H,B / LD L,C   ; 
+       bl   @multiply_by_cos                               ; CALL $24D1        ; X.cos
+       .push hl                                            ; EX (SP),HL        ; save it (at -2(SP))
+       mov  @-4(sp),hl                                     ;                   ; HL = Y
+       bl   @multiply_by_sin                               ; CALL $24A7        ; Y.sin
+       mov  @-2(sp),r0                                     ; POP DE / EX DE,HL ; R0 = X.cos
+       s    hl,r0                                          ; OR A / SBC HL,DE  ; X' = X.cos - Y.sin
+       jno  _2486                                          ; JP PO,$2486       ; no overflow - use it as-is
+       jlt  _2483                                          ; JR C,$2483        ; overflow, with the true X' positive?
+       li   r0,>8000                                       ; LD HL,$8000       ; no: -32768
+       jmp  _2486                                          ; JR $2486          ; 
+_2483:                                                     ; >2483
+       li   r0,>7fff                                       ; LD HL,$7FFF       ; yes: +32767
+_2486:                                                     ; >2486
+       mov  r0,@-2(sp)                                     ; LD ($E802),HL     ; stash X' (TI: on the stack)
+       mov  @-6(sp),hl                                     ; POP HL            ; HL = X
+       bl   @multiply_by_sin                               ; CALL $24A7        ; X.sin
+       mov  hl,@-6(sp)                                     ; EX (SP),HL        ; save it
+       mov  @-4(sp),hl                                     ;                   ; HL = Y
+       bl   @multiply_by_cos                               ; CALL $24D1        ; Y.cos
+       a    @-6(sp),hl                                     ; POP DE / OR A / ADC HL,DE; Y' = X.sin + Y.cos
+       jno  _24a2                                          ; JP PO,$24A2       ; no overflow - use it as-is
+       jlt  rotate_pair_y_positive                         ; JR C,$249F        ; overflow, with the true Y' positive?
+       li   hl,>7f92                                       ; LD HL,$7F92       ; no: a bug - should be $8000 (-32768)
+       jmp  _24a2                                          ;                   ; 
+rotate_pair_y_positive:                                    
+       li   hl,>7fff                                       ; LD HL,$7FFF       ; yes: +32767
+_24a2:                                                     ; >24a2
+       mov  hl,de                                          ; EX DE,HL          ; DE = Y'
+       mov  @-2(sp),hl                                     ; LD HL,($E802)     ; HL = X'
+       ai   sp,-6                                          ;                   ; drop the saved values
+       .endproc                                            ; RET               ; 
+* TI: rotate a pair of the object's axis vector components (sign-magnitude
+* words, little-endian, the second 2 bytes after the first) by the rotation
+* record at IX, as #R$221B and #R$22C0 do inline: X' = X.cos - Y.sin and
+* Y' = X.sin + Y.cos, stored back in sign-magnitude form.
+*
+* I:R1 -> X
+* I:IX -> the rotation record
+rotate_axis_pair:                                          
+       .proc                                               ;                   ; 
+       mov  r1,*sp+                                        ;                   ; save the pointer (at -6(SP) below)
+       movb @1(r1),hl                                      ; LD HL,(X)         ; HL = X
+       movb *r1,@l                                         ;                   ; 
+       bl   @multiply_by_cos                               ; CALL $24D1        ; X.cos
+       .push hl                                            ; PUSH HL           ; 
+       mov  @-4(sp),r1                                     ;                   ; 
+       movb @3(r1),hl                                      ; LD HL,(Y)         ; HL = Y
+       movb @2(r1),@l                                      ;                   ; 
+       bl   @multiply_by_sin                               ; CALL $24A7        ; Y.sin
+       mov  @-2(sp),r0                                     ; POP DE / EX DE,HL ; R0 = X.cos
+       s    hl,r0                                          ; OR A / SBC HL,DE  ; X' = X.cos - Y.sin
+       abs  r0                                             ; JP P,... / XOR A / SUB L ...; in sign-magnitude form
+       jgt  rotate_axis_pair_1                             ;                   ; (ABS sets the status from the value before)
+       jeq  rotate_axis_pair_1                             ;                   ; 
+       ori  r0,>8000                                       ; SET 7,H           ; 
+rotate_axis_pair_1:                                        
+       mov  r0,@-2(sp)                                     ; PUSH HL           ; save X'
+       mov  @-4(sp),r1                                     ;                   ; 
+       movb @1(r1),hl                                      ; LD HL,(X)         ; HL = X again
+       movb *r1,@l                                         ;                   ; 
+       bl   @multiply_by_sin                               ; CALL $24A7        ; X.sin
+       .push hl                                            ; PUSH HL           ; 
+       mov  @-6(sp),r1                                     ;                   ; 
+       movb @3(r1),hl                                      ; LD HL,(Y)         ; HL = Y again
+       movb @2(r1),@l                                      ;                   ; 
+       bl   @multiply_by_cos                               ; CALL $24D1        ; Y.cos
+       a    @-2(sp),hl                                     ; POP DE / OR A / ADC HL,DE; Y' = Y.cos + X.sin
+       abs  hl                                             ; JP P,... / XOR A / SUB L ...; in sign-magnitude form
+       jgt  rotate_axis_pair_2                             ;                   ; 
+       jeq  rotate_axis_pair_2                             ;                   ; 
+       ori  hl,>8000                                       ; SET 7,H           ; 
+rotate_axis_pair_2:                                        
+       mov  @-6(sp),r1                                     ;                   ; R1 -> X
+       movb hl,@3(r1)                                      ; LD (Y),HL         ; store Y'
+       movb @l,@2(r1)                                      ;                   ; 
+       mov  @-4(sp),r0                                     ; POP HL            ; R0 = X'
+       movb r0,@1(r1)                                      ; LD (X),HL         ; store it
+       movb @r0lb,*r1                                      ;                   ; 
+       ai   sp,-6                                          ;                   ; drop the saved values
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -2918,9 +3240,7 @@ bisect_test_which_endpoint_to_replace:                     ; >3ba9
        szcb r0,a                                           ;                   ; 
        jeq  bisect_replace_point2_with_midpoint            ; JR Z,$3BC7        ; no shared bits either - default to replacing point 2
 clip_abandon:                                              ; >3bb2
-       li   hl,>0008                                       ; LD HL,$0008       ; discard this call's own stack frame (4 saved words)...
-       a    sp,hl                                          ; ADD HL,SP         ; 
-       mov  hl,sp                                          ; LD SP,HL          ; ...abandoning the clip
+       ai   sp,-8                                          ; LD HL,$0008 / ADD HL,SP / LD SP,HL; discard this call's 4 saved words, abandoning the clip (TI: the stack grows up)
        .endproc                                            ; RET               ; give up without drawing
 bisect_replace_point1_with_midpoint:                       ; >3bb8
        movb @e,a                                           ; LD A,E            ; A = the midpoint's masked outcode
@@ -3355,51 +3675,46 @@ _3d85:                                                     ; >3d85
 * I:HL The slot
 * O:HL The next slot
 draw_circle_point:                                         ; >3d8c
-       .proc
-;      limi 0                                              ; DI                ; repurposing SP - no interrupts while it's not a real stack pointer
-       movb sp,@circle_saved_sp+1                          ; LD ($E81D),SP     ; stash the real SP
-       movb @splb,@circle_saved_sp                         ;                   ;
-       mov  hl,sp                                          ; LD SP,HL          ; SP = this call's slot cursor
+* TI: the slots are read and written through HL, rather than by pointing SP at
+* them (the stack grows up on the TI); a slot holds X at +2 and Y at +0.
+       .proc                                               ;                   ; 
        movb @circle_first_step,a                           ; LD A,($E80C)      ; still the first step (nothing in the slot to connect to yet)?
-       socb a,a                                            ; OR A              ; 
-       jeq  write_vertex_and_draw_edge                     ; JR Z,$3DAC        ; no - read the slot and draw the line
-       movb @circle_centre_x+1,hl                          ; LD HL,($E81F)     ; HL = the cached centre X
-       movb @circle_centre_x,@l                            ;                   ;
-       a    de,hl                                          ; ADD HL,DE         ; + this step's cos-scaled offset
-       .push hl                                            ; PUSH HL           ; write the vertex's X, 2 bytes below the cursor
-       movb @circle_centre_y+1,hl                          ; LD HL,($E821)     ; HL = the cached centre Y
-       movb @circle_centre_y,@l                            ;                   ;
-       a    bc,hl                                          ; ADD HL,BC         ; + this step's sin-scaled offset
-       .push hl                                            ; PUSH HL           ; write the vertex's Y, 4 bytes below the cursor
-       li   hl,>0000                                       ; LD HL,$0000       ; 
-       a    sp,hl                                          ; ADD HL,SP         ; HL = the new cursor (old cursor - 4), for next step's call to this slot
-       movb @circle_saved_sp+1,sp                          ; LD SP,($E81D)     ; restore the real SP
-       movb @circle_saved_sp,@splb                         ;                   ;
-       ; EI                                                ; EI                ;
+       jeq  write_vertex_and_draw_edge                     ; OR A / JR Z,$3DAC ; no - read the slot and draw the line
+       movb @circle_centre_x+1,r0                          ; LD HL,($E81F)     ; R0 = the centre X...
+       movb @circle_centre_x,@r0lb                         ;                   ; 
+       a    de,r0                                          ; ADD HL,DE         ; ...+ this step's cos-scaled offset
+       movb r0,@-2(hl)                                     ; PUSH HL           ; the vertex's X, 2 bytes below the cursor
+       movb @r0lb,@-1(hl)                                  ;                   ; 
+       movb @circle_centre_y+1,r0                          ; LD HL,($E821)     ; R0 = the centre Y...
+       movb @circle_centre_y,@r0lb                         ;                   ; 
+       a    bc,r0                                          ; ADD HL,BC         ; ...+ this step's sin-scaled offset
+       movb r0,@-4(hl)                                     ; PUSH HL           ; the vertex's Y, 4 bytes below the cursor
+       movb @r0lb,@-3(hl)                                  ;                   ; 
+       ai   hl,-4                                          ; LD HL,$0000 / ADD HL,SP; HL = the new cursor (old cursor - 4)
        .endproc                                            ; RET               ; 
 write_vertex_and_draw_edge:                                ; >3dac
-       .pop hl                                             ; POP HL            ; HL = the slot's old Y (this call's vertex from last step)
-       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; -> point 2's Y
-       .pop hl                                             ; POP HL            ; HL = the slot's old X (this call's vertex from last step)
-       mov  hl,@clip_point2_x                              ; LD ($EB96),HL     ; -> point 2's X
-       movb @circle_centre_x+1,hl                          ; LD HL,($E81F)     ; HL = the cached centre X
-       movb @circle_centre_x,@l                            ;                   ;
-       a    de,hl                                          ; ADD HL,DE         ; + this step's cos-scaled offset
-       mov  hl,@clip_point1_x                              ; LD ($EB92),HL     ; -> point 1's X
-       .push hl                                            ; PUSH HL           ; also overwrite the slot with it, for next step's call to this slot
-       movb @circle_centre_y+1,hl                          ; LD HL,($E821)     ; HL = the cached centre Y
-       movb @circle_centre_y,@l                            ;                   ;
-       a    bc,hl                                          ; ADD HL,BC         ; + this step's sin-scaled offset
-       mov  hl,@clip_point1_y                              ; LD ($EB94),HL     ; -> point 1's Y
-       .push hl                                            ; PUSH HL           ; also overwrite the slot with it, for next step's call to this slot
-       li   hl,>fffc                                       ; LD HL,$FFFC       ; 
-       a    sp,hl                                          ; ADD HL,SP         ; HL = the new cursor (old cursor - 4)
-       movb @circle_saved_sp+1,sp                          ; LD SP,($E81D)     ; restore the real SP
-       movb @circle_saved_sp,@splb                         ;                   ;
-       ; EI                                                ; EI                ;
+       movb *hl,r0                                         ; POP HL            ; R0 = the slot's old Y (this quadrant's vertex from the last step)
+       movb @1(hl),@r0lb                                   ;                   ; 
+       mov  r0,@clip_point2_y                              ; LD ($EB98),HL     ; -> point 2's Y
+       movb @2(hl),r0                                      ; POP HL            ; R0 = the slot's old X
+       movb @3(hl),@r0lb                                   ;                   ; 
+       mov  r0,@clip_point2_x                              ; LD ($EB96),HL     ; -> point 2's X
+       movb @circle_centre_x+1,r0                          ; LD HL,($E81F)     ; R0 = the centre X...
+       movb @circle_centre_x,@r0lb                         ;                   ; 
+       a    de,r0                                          ; ADD HL,DE         ; ...+ this step's cos-scaled offset
+       mov  r0,@clip_point1_x                              ; LD ($EB92),HL     ; -> point 1's X
+       movb r0,@2(hl)                                      ; PUSH HL           ; and the slot's, for the next step
+       movb @r0lb,@3(hl)                                   ;                   ; 
+       movb @circle_centre_y+1,r0                          ; LD HL,($E821)     ; R0 = the centre Y...
+       movb @circle_centre_y,@r0lb                         ;                   ; 
+       a    bc,r0                                          ; ADD HL,BC         ; ...+ this step's sin-scaled offset
+       mov  r0,@clip_point1_y                              ; LD ($EB94),HL     ; -> point 1's Y
+       movb r0,*hl                                         ; PUSH HL           ; and the slot's, for the next step
+       movb @r0lb,@1(hl)                                   ;                   ; 
+       ai   hl,-4                                          ; LD HL,$FFFC / ADD HL,SP; HL = the new cursor (old cursor - 4)
        .push bc                                            ; PUSH BC           ; 
        .push de                                            ; PUSH DE           ; 
-       .push hl                                            ; PUSH HL           ; save this call's live registers across the line-draw call
+       .push hl                                            ; PUSH HL           ; save the registers across the line-draw call
        bl   @clip_and_draw_line                            ; CALL $3AC2        ; clip and draw the edge from point 1 to point 2
        .pop hl                                             ; POP HL            ; 
        .pop de                                             ; POP DE            ; 
@@ -3830,6 +4145,7 @@ key_table:                                                 ; >419b
 * TI: (key in the high byte, the handler's ROM bank, the handler) words,
 * only for the keys whose handlers are converted so far, ending with 0
        data >3000,code_bank_7_select,show_cargo_manifest_screen   ; '0': inventory (#R$5C8E)
+       data >3100,code_bank_10_select,key_handler_1               ; '1': launch, or the front view in flight (#R$4173)
        data >3200,code_bank_7_select,buy_cargo                    ; '2': buy cargo when docked (#R$417D, #R$5BBD) (TI: no rear view yet)
        data >3300,code_bank_7_select,sell_cargo                   ; '3': sell cargo when docked (#R$4187, #R$5CEE) (TI: no left view yet)
        data >3400,code_bank_7_select,equip_ship                   ; '4': equip ship when docked (#R$4191, #R$5DBB) (TI: no right view yet)
@@ -6887,10 +7203,11 @@ _68c2:                                                     ; >68c2
 * reached the centre) is flagged for respawning, and the move handler is
 * called (at $6940) without plotting it, so it gets a new position.
 move_and_plot_stardust:                                    ; >68cd
+       .proc
        movb @in_witchspace,a                               ; LD A,($EEC1)      ; no stardust after a drive malfunction (set by #R$894D)
        socb a,a                                            ; OR A              ; 
        jeq  !                                              ; RET NZ            ; 
-       .ret                                                ;                   
+       .endproc                                            ;                   
 !
        movb @roll_rate,a                                   ; LD A,($F815)      ; A = roll rate
        socb a,a                                            ; OR A              ; 
@@ -6980,7 +7297,7 @@ stardust_move_handler:                                     ; >6944
        .pop bc                                             ; POP BC            ; 
        sb   one,b                                          ; DJNZ $68F0        ; loop for all 15 particles
        jne  _68f0                                          ;                   
-       .ret                                                ; RET               ; 
+       .endproc                                            ; RET               ; 
 stardust_flag_respawn:                                     ; >6950
        movb @b255,@>08(ix)                                 ; LD (IX+$08),$FF   ; flag the particle for respawning
        jmp  _6940                                          ; JR $6940          ; go call the move handler
@@ -8045,6 +8362,429 @@ move_chart_cursor_sprite:                                  ; >73a6
        movb @chart_cursor_x+1,@vdpwd                       ; LD HL,($E709) / LD A,H / OUT ($98),A; sprite 4's Y
        movb @chart_cursor_x,@vdpwd                         ; LD A,L / OUT ($98),A; sprite 4's X
        rt                                                  ; RET               ; 
+
+********************************************************************************
+* Length of a vector
+* 
+* Used by the routines at #R$2DF1, #R$3113 and #R$883D.
+* .
+* Returns roughly sqrt(X^2 + Y^2 + Z^2) for the vector at $EB82/$EB84/$EB86
+* (an object's distances from a reference point along each axis), to
+* within about 2% (slightly low) - the distance to the object. Works
+* with logarithms: shifts the components down together so that the
+* biggest fits in a byte (the shift count, from the bit-length table at
+* #R$0200, goes in ($EB9B)), squares each (#R$8515) and adds the squares;
+* then takes the log of the sum (#R$0800), halves it - a square root -
+* adds back the shift, and converts it back (#R$21A3). The shifted-down
+* components are also left in $EF92-$EF94.
+* 
+* I:$EB82-$EB87 The vector's components (magnitudes)
+* O:HL Its length
+vector_length:                                             ; >84a6
+       .proc                                               ;                   ; 
+       clr  r0                                             ;                   ; 
+       movb @delta_x_hi,r0                                 ; LD A,($EB83)      ; combine the three components' high bytes
+       socb @delta_y_hi,r0                                 ; LD HL,$EB85 / OR (HL); 
+       socb @delta_z_hi,r0                                 ; LD HL,$EB87 / OR (HL); 
+       jeq  _84b7                                          ; JR Z,$84B7        ; all under 256 - no shift
+       mov  r0,r1                                          ; LD L,A / LD H,$02 ; 
+       srl  r1,8                                           ;                   ; 
+       movb @bit_length_table(r1),r0                       ; LD A,(HL)         ; A = shift needed to fit the biggest in a byte
+_84b7:                                                     ; >84b7
+       movb r0,@depth_shift                                ; LD ($EB9B),A      ; 
+       movb @delta_x_hi,hl                                 ; LD HL,($EB82)     ; HL = X
+       movb @abs_delta_x,@l                                ;                   ; 
+       bl   @vector_length_square                          ; CALL $8515        ; square X (shifted down)
+       movb a,@ef92_scaled_magnitude_1                     ; LD ($EF92),A      ; 
+       mov  hl,de                                          ; PUSH HL           ; BC:DE = the sum of the squares (TI: in registers)
+       clr  bc                                             ;                   ; 
+       movb @delta_y_hi,hl                                 ; LD HL,($EB84)     ; HL = Y
+       movb @abs_delta_y,@l                                ;                   ; 
+       bl   @vector_length_square                          ; CALL $8515        ; square Y
+       movb a,@ef93_scaled_magnitude_2                     ; LD ($EF93),A      ; 
+       a    hl,de                                          ; ADD HL,DE / ADC A,B; add it
+       jnc  vector_length_1                                ;                   ; 
+       inc  bc                                             ;                   ; 
+vector_length_1:                                           
+       movb @delta_z_hi,hl                                 ; LD HL,($EB86)     ; HL = Z
+       movb @abs_delta_z,@l                                ;                   ; 
+       bl   @vector_length_square                          ; CALL $8515        ; square Z
+       movb a,@ef94_scaled_magnitude_3                     ; LD ($EF94),A      ; 
+       a    hl,de                                          ; ADD HL,DE / ADC A,B; add it
+       jnc  vector_length_2                                ;                   ; 
+       inc  bc                                             ;                   ; 
+vector_length_2:                                           
+       clr  r2                                             ;                   ; R2 = the shift so far
+       mov  bc,bc                                          ;                   ; under 65536?
+       jeq  _84e6                                          ; JR Z,$84E6        ; yes
+       srl  de,8                                           ; LD E,D / LD D,A   ; no: divide it by 256...
+       swpb bc                                             ;                   ; 
+       soc  bc,de                                          ;                   ; 
+       li   r2,8                                           ; LD A,$08          ; ...remembering the 8-bit shift
+_84e6:                                                     ; >84e6
+       clr  r1                                             ;                   ; 
+       movb de,r1                                          ; LD A,D / OR A     ; under 256?
+       jeq  _84f5                                          ; JR Z,$84F5        ; yes
+       swpb r1                                             ; LD L,A / LD H,$02 ; 
+       movb @bit_length_table(r1),r1                       ; LD B,(HL)         ; B = shift to fit the sum in a byte
+       swpb r1                                             ;                   ; 
+       a    r1,r2                                          ; LD A,(HL) / ADD A,C; add it to the shift
+       mov  r1,r0                                          ;                   ; 
+       srl  de,0                                           ; RRA / RR E / DJNZ $84EF; shift the sum down (by R0)
+_84f5:                                                     ; >84f5
+       sla  r2,10                                          ; ADD A,A / ADD A,A / EX AF,AF'; the shift * 4 (1024 per bit in the log), in the high byte
+       sla  de,1                                           ; SLA E / ADC A,$08 / LD L,E / LD H,A; 
+       mov  @log_table(de),hl                              ; LD A,(HL) / INC L / LD H,(HL) / LD L,A; HL = log of the shifted-down sum
+       a    r2,hl                                          ; EX AF,AF' / ADD A,H / LD H,A; add the shifts back
+       srl  hl,1                                           ; SRL H / RR L      ; halve the log: a square root
+       clr  r0                                             ;                   ; 
+       movb @depth_shift,r0                                ; LD A,($EB9B)      ; A = the components' shift
+       sla  r0,2                                           ; ADD A,A / ADD A,A ; times 4
+       a    r0,hl                                          ; ADD A,H / LD H,A  ; add it back
+       .pop r11                                            ;                   ; 
+       b    @antilog16                                     ; JP $21A3          ; convert back: HL = the length
+
+********************************************************************************
+* Vector length: square one component
+* 
+* Used by the routine at #R$84A6.
+* .
+* Shifts the component in HL right by the shared exponent in ($EB9B)
+* (set by #R$84A6 so that the biggest component fits in a byte) and
+* squares it (#R$2191).
+* 
+* I:HL Vector component
+* O:A The component, shifted down
+* O:HL Its square
+vector_length_square:                                      ; >8515
+       clr  r0                                             ;                   ; 
+       movb @depth_shift,r0                                ; LD A,($EB9B) / OR A; 
+       jeq  _8522                                          ; JR Z,$8522        ; no shift needed
+       swpb r0                                             ; LD B,A            ; 
+       srl  hl,0                                           ; LD A,H / RRA / RR L / DJNZ $851D; shift the component down (by R0)
+_8522:                                                     ; >8522
+       movb @l,a                                           ; LD E,L / ... / LD A,E; A = the component, shifted down
+* TI: the square (#R$2191) is worked out here, the same way: L's log, doubled
+* and converted back (#R$21A3, inline, as it changes A).
+       sla  hl,1                                           ; SLA L / ADC A,$08 / LD H,A; 
+       mov  @log_table(hl),hl                              ; LD A,(HL) / INC L / LD H,(HL) / LD L,A; HL = log(L)
+       a    hl,hl                                          ; ADD HL,HL         ; HL = log(L * L)
+       joc  vector_length_square_0                         ; JP NC,$21A3       ; 
+       mov  hl,r1                                          ; LD A,H            ; 
+       andi r1,>4000                                       ; BIT 6,A           ; HL >= $4000?
+       jne  vector_length_square_max                       ; JR NZ,$21C0       ; too big - return $FFFF
+       mov  hl,r1                                          ;                   ; 
+       srl  r1,4                                           ;                   ; 
+       andi r1,>03fe                                       ;                   ; 
+       mov  @antilog_table(r1),hl                          ;                   ; HL = 2^(log / 1024)
+       rt                                                  ; RET               ; 
+vector_length_square_max:                                  
+       seto hl                                             ; LD HL,$FFFF       ; 
+       rt                                                  ; RET               ; 
+vector_length_square_0:                                    
+       clr  hl                                             ; LD HL,$0000       ; L = 0: return 0
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Move the object forward
+* 
+* Used by the routines at #R$13FD and #R$1703.
+* .
+* Called for each object by the main loop (#R$13FD) and the death scene
+* (#R$1703). Clears bit 4 of #R$F7CD. Does nothing if the object's speed
+* (#R$F7E6) is 0; otherwise moves it along its nose vector (#R$8685) by
+* its speed, halved once for each distance band (#R$8B66).
+move_object:                                               ; >866d
+       szcb @bit4,@object_status_byte                      ; LD HL,$F7CD / RES 4,(HL); 
+       movb @object_speed,a                                ; LD A,($F7E6) / OR A; A = speed
+       jne  _8677                                          ; RET Z             ; not moving
+       rt                                                  ;                   ; 
+_8677:                                                     ; >8677
+       .proc                                               ;                   ; 
+       bl   @distance_band                                 ; CALL $8B66        ; A = distance band
+       movb a,b                                            ; LD B,A            ; 
+       movb @object_speed,a                                ; LD A,($F7E6)      ; 
+_867e:                                                     ; >867e
+       srl  a,1                                            ; SRL A             ; halve the speed...
+       sb   one,b                                          ; DJNZ $867E        ; ...once per band
+       jne  _867e                                          ;                   ; 
+       .pop r11                                            ;                   ; 
+       b    @move_along_axis                               ; JP $8685          ; move it
+
+********************************************************************************
+* Move the object along its axis vector
+* 
+* Used by the routines at #R$3187 and #R$866D.
+* .
+* Adds speed * the object's axis vector ($F7DA/$F7DC/$F7DE) to its
+* position ($F7CE/$F7D0/$F7D2), multiplying by adding logarithms: the log
+* of the speed (from the log table at #R$0800) goes in $E874 and the logs
+* of the vector's components (#R$1FCF) in $EB68-$EB6D, and #R$86DC does
+* each coordinate. Also sets bit 4 of the status byte ($F7CD).
+* 
+* I:A Speed
+move_along_axis:                                           ; >8685
+       .proc                                               ;                   ; 
+       clr  r1                                             ;                   ; 
+       movb a,r1                                           ; LD L,A / LD H,$00 ; 
+       srl  r1,7                                           ; ADD HL,HL         ; R1 = speed * 2
+       mov  @log_table(r1),@type_entry_cache               ; LD BC,$0800 / ADD HL,BC / LD DE,$E874 / LDI / LDI; $E874 = log(speed) (TI: a big-endian word)
+       movb @nose_vector+1,hl                              ; LD HL,($F7DA)     ; HL = nose.x
+       movb @nose_vector,@l                                ;                   ; 
+       bl   @log_sign_tagged                               ; CALL $1FCF        ; its log
+       mov  hl,@nose_vector_logs                           ; LD ($EB68),HL     ; 
+       movb @nose_vector_y+1,hl                            ; LD HL,($F7DC)     ; HL = nose.y
+       movb @nose_vector_y,@l                              ;                   ; 
+       bl   @log_sign_tagged                               ; CALL $1FCF        ; its log
+       mov  hl,@nose_vector_log_y                          ; LD ($EB6A),HL     ; 
+       movb @nose_vector_z+1,hl                            ; LD HL,($F7DE)     ; HL = nose.z
+       movb @nose_vector_z,@l                              ;                   ; 
+       bl   @log_sign_tagged                               ; CALL $1FCF        ; its log
+       mov  hl,@nose_vector_log_z                          ; LD ($EB6C),HL     ; 
+       socb @bit4,@object_status_byte                      ; LD HL,$F7CD / SET 4,(HL); set bit 4
+       li   de,object_position_x                           ; LD HL,($F7CE)     ; x...
+       mov  @nose_vector_logs,bc                           ; LD BC,($EB68)     ; 
+       bl   @move_one_coordinate                           ; CALL $86DC / LD ($F7CE),HL; ...+= speed * nose.x
+       li   de,object_position_y                           ; LD HL,($F7D0)     ; y...
+       mov  @nose_vector_log_y,bc                          ; LD BC,($EB6A)     ; 
+       bl   @move_one_coordinate                           ; CALL $86DC / LD ($F7D0),HL; ...+= speed * nose.y
+       li   de,object_position_z_lo                        ; LD HL,($F7D2)     ; z...
+       mov  @nose_vector_log_z,bc                          ; LD BC,($EB6C)     ; 
+       bl   @move_one_coordinate                           ; CALL $86DC / LD ($F7D2),HL; ...+= speed * nose.z
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Add speed * one component of the axis vector to a coordinate
+* 
+* Used by the routine at #R$8685.
+* .
+* 
+* I:BC Log of the axis vector component
+* I:HL The coordinate
+* I:($E874) Log of the speed
+* O:HL The new coordinate
+* TI: the coordinate is read and written here, through DE, rather than
+* passed in HL.
+*
+* I:BC Log of the axis vector component
+* I:DE -> The coordinate
+* I:($E874) Log of the speed
+move_one_coordinate:                                       ; >86dc
+       .proc                                               ;                   ; 
+       mov  @type_entry_cache,hl                           ; PUSH HL / LD HL,($E874); HL = log(speed)
+       bl   @multiply_logs                                 ; CALL $2160        ; HL = speed * component
+       movb @1(de),r0                                      ; POP DE            ; R0 = the coordinate
+       movb *de,@r0lb                                      ;                   ; 
+       a    r0,hl                                          ; ADD HL,DE         ; add it
+       movb hl,@1(de)                                      ;                   ; (TI: store it)
+       movb @l,*de                                         ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Update the stardust (several times per frame during a jump)
+* 
+* Used by the routines at #R$13FD and #R$894D.
+* .
+* Normally just moves and plots the stardust once (#R$68CD). While a jump
+* is in progress (($E722) set by #R$86E6's in-system jump or #R$894D's
+* hyperspace sequence) it runs #R$68CD ($E723) times instead, and every
+* ($E87C) calls ($E723) goes up by one, to a maximum of 7. Every pass
+* moves each particle on and plots it again into the same frame's buffer,
+* so the dots turn into streaks that lengthen as the jump builds up.
+update_stardust:                                           ; >872e
+       .proc                                               ;                   ; 
+       movb @jump_in_progress,a                            ; LD A,($E722) / OR A; A = jump-in-progress flag
+       jne  _8735                                          ; JP Z,$68CD        ; no jump - move and plot the stardust once
+       bl   @move_and_plot_stardust                        ;                   ; 
+       .endproc                                            ;                   ; 
+_8735:                                                     ; >8735
+       movb @stardust_passes,b                             ; LD A,($E723) / LD B,A; B = the number of passes per frame
+       li   hl,stardust_passes_countdown                   ; LD HL,$E87B       ; HL -> the calls-until-next-increase counter
+       sb   one,*hl                                        ; DEC (HL)          ; count this call
+       jne  _874d                                          ; JR NZ,$874D       ; not time to lengthen the streaks yet
+       movb @stardust_passes_interval,*hl                  ; LD A,($E87C) / LD (HL),A; reload the counter
+       cb   b,@bytes+>07                                   ; LD A,$07 / CP B   ; already at the maximum of 7 passes?
+       jeq  _874d                                          ; JR Z,$874D        ; yes - leave it
+       ab   one,b                                          ; INC B             ; no - one more pass per frame from now on
+       movb b,@stardust_passes                             ; LD A,B / LD ($E723),A; 
+_874d:                                                     ; >874d
+       .push bc                                            ; PUSH BC           ; save the pass counter
+       bl   @move_and_plot_stardust                        ; CALL $68CD        ; move and plot the stardust
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $874D        ; repeat for each pass
+       jne  _874d                                          ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Work out the object's distance
+* 
+* Used by the routines at #R$13FD, #R$1703 and #R$8C94.
+* .
+* Stores the size of each of the object's coordinates (#R$F7CE) at $EB82,
+* $EB84 and $EB86 (z also at $E941), works out its distance (#R$84A6) and
+* stores it in #R$EB8E - and for the planet (ship type $64) in #R$E727, for
+* the sun ($65, at $887F) in #R$E725, and for the space station (1, at
+* $88A1) in #R$E729. In mission states $32 and $33 (the sun about to go
+* supernova, see #R$909F), the sun's distance is first reduced by an amount
+* (#R$E93E) that grows by 100 every frame, so the sun gets closer and the
+* cabin temperature rises (#R$15CB).
+* 
+* O:HL The distance
+work_out_distance:                                         ; >883d
+       .proc                                               ;                   ; 
+       movb @object_position_x+1,hl                        ; LD HL,($F7CE)     ; HL = x
+       movb @object_position_x,@l                          ;                   ; 
+       abs  hl                                             ; BIT 7,H / ...     ; its size
+       movb hl,@delta_x_hi                                 ; LD ($EB82),HL     ; X for #R$84A6
+       movb @l,@abs_delta_x                                ;                   ; 
+       movb @object_position_y+1,hl                        ; LD HL,($F7D0)     ; HL = y
+       movb @object_position_y,@l                          ;                   ; 
+       abs  hl                                             ; BIT 7,H / ...     ; its size
+       movb hl,@delta_y_hi                                 ; LD ($EB84),HL     ; Y for #R$84A6
+       movb @l,@abs_delta_y                                ;                   ; 
+       movb @object_position_z_lo+1,hl                     ; LD HL,($F7D2)     ; HL = z
+       movb @object_position_z_lo,@l                       ;                   ; 
+       abs  hl                                             ; BIT 7,H / ...     ; its size
+       movb hl,@delta_z_hi                                 ; LD ($EB86),HL     ; Z for #R$84A6
+       movb @l,@abs_delta_z                                ;                   ; 
+       movb hl,@object_depth+1                             ; LD ($E941),HL     ; and the depth
+       movb @l,@object_depth                               ;                   ; 
+       bl   @vector_length                                 ; CALL $84A6        ; HL = the object's distance
+       movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
+       cb   a,@bytes+>64                                   ; CP $64            ; the planet?
+       jne  sun_distance_supernova                         ; JR NZ,$887F       ; no
+       movb hl,@planet_distance+1                          ; LD ($E727),HL     ; yes: the planet's distance
+       movb @l,@planet_distance                            ;                   ; 
+       jmp  _88a8                                          ; JR $88A8          ; 
+sun_distance_supernova:                                    ; >887f
+       cb   a,@bytes+>65                                   ; CP $65            ; the sun?
+       jne  ship_type_1_case_else_join                     ; JR NZ,$88A1       ; no
+       movb @mission_state,a                               ; LD A,($E93D)      ; A = mission state
+       cb   a,@bytes+>32                                   ; CP $32            ; 
+       jeq  _888e                                          ; JR Z,$888E        ; 
+       cb   a,@bytes+>33                                   ; CP $33            ; 
+       jne  _889c                                          ; JR NZ,$889C       ; no supernova
+_888e:                                                     ; >888e
+       movb @supernova_offset+1,de                         ; LD DE,($E93E)     ; DE = the offset
+       movb @supernova_offset,@e                           ;                   ; 
+       a    de,hl                                          ; ADD HL,DE         ; add it (it's negative)
+       li   r0,-100                                        ; LD HL,$FF9C       ; the offset grows by 100 every frame
+       a    de,r0                                          ; ADD HL,DE         ; 
+       movb r0,@supernova_offset+1                         ; LD ($E93E),HL     ; 
+       movb @r0lb,@supernova_offset                        ;                   ; 
+_889c:                                                     ; >889c
+       movb hl,@sun_distance+1                             ; LD ($E725),HL     ; the sun's distance
+       movb @l,@sun_distance                               ;                   ; 
+       jmp  _88a8                                          ; JR $88A8          ; 
+ship_type_1_case_else_join:                                ; >88a1
+       cb   a,one                                          ; CP $01            ; the space station?
+       jne  _88a8                                          ; JR NZ,$88A8       ; no
+       movb hl,@station_distance+1                         ; LD ($E729),HL     ; yes: the station's distance
+       movb @l,@station_distance                           ;                   ; 
+_88a8:                                                     ; >88a8
+       movb hl,@object_distance+1                          ; LD ($EB8E),HL     ; the object's distance
+       movb @l,@object_distance                            ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Move the object past the player
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called for each object by the main loop (#R$13FD). The player's
+* movement is done by taking an amount off each object's z (at $8B58),
+* remembering it (#R$E876). The space station (ship type 1) moves by the
+* same amount as the planet before it, so that they stay together.
+* .
+* Normally (at $8B4F) the amount is the player's speed (#R$F814), halved
+* once for each distance band (#R$8B66).
+* .
+* During a Torus jump (#R$E918), an object behind the player in distance
+* band 5 doesn't move; anything else moves by the jump's speed (at $8B27,
+* #R$E878, set to 200 by #R$86E6). The planet (ship type $64) never comes
+* closer than 10000: if it would, it moves only as far as that, which
+* sets the jump's speed for the rest of the objects, and the jump is cut
+* short ($E933, see #R$13FD).
+move_past_player:                                          ; >8b00
+       .proc                                               ;                   ; 
+       movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
+       cb   a,one                                          ; CP $01            ; the space station?
+       jne  move_past_player_2                             ; JR NZ,$8B0D       ; no
+       movb @last_move+1,de                                ; LD DE,($E876)     ; yes: the same as the planet
+       movb @last_move,@e                                  ;                   ; 
+       jmp  _8b58                                          ; JR $8B58          ; move it
+move_past_player_2:                                        ; >8b0d
+       bl   @distance_band                                 ; CALL $8B66        ; A = distance band
+       movb a,b                                            ; LD B,A            ; 
+       movb @torus_jump_countdown,a                        ; LD A,($E918) / OR A; 
+       jeq  move_past_player_normal                        ; JR Z,$8B4F        ; no Torus jump
+       movb @object_z_sign,a                               ; LD A,($F7D3) / OR A; 
+       jgt  move_past_player_jump                          ; JP P,$8B27        ; in front of the player
+       jeq  move_past_player_jump                          ;                   ; 
+       cb   b,@bytes+>05                                   ; LD A,B / SUB $05  ; 
+       jne  move_past_player_jump                          ; JR NZ,$8B27       ; not band 5
+       clr  de                                             ; LD D,A / LD E,A   ; behind, in band 5: don't move
+       jmp  _8b58                                          ; JR $8B4D / JR $8B58; 
+move_past_player_jump:                                     ; >8b27
+       movb @jump_speed+1,de                               ; LD DE,($E878)     ; DE = the jump's speed
+       movb @jump_speed,@e                                 ;                   ; 
+       movb @ship_type,a                                   ; LD A,($F7E7)      ; 
+       cb   a,@bytes+>64                                   ; CP $64            ; the planet?
+       jne  _8b58                                          ; JR NZ,$8B4D       ; no
+       movb @object_distance+1,hl                          ; LD HL,($EB8E)     ; HL = its distance
+       movb @object_distance,@l                            ;                   ; 
+       s    de,hl                                          ; OR A / SBC HL,DE  ; after the move...
+       ci   hl,>2710                                       ; LD BC,$2710 / OR A / SBC HL,BC; ...10000 or more?
+       jhe  _8b58                                          ; JR NC,$8B4D       ; yes - still far enough away
+       movb @object_distance+1,hl                          ; LD HL,($EB8E)     ; too close:
+       movb @object_distance,@l                            ;                   ; 
+       ai   hl,-10000                                      ; OR A / SBC HL,BC  ; HL = distance - 10000
+       movb hl,@jump_speed+1                               ; LD ($E878),HL     ; the jump's new speed
+       movb @l,@jump_speed                                 ;                   ; 
+       mov  hl,de                                          ; EX DE,HL          ; DE = it
+       movb a,@secondary_flag_counter_pair                 ; LD ($E933),A      ; cut the jump short
+       jmp  _8b58                                          ; JR $8B58          ; move it
+move_past_player_normal:                                   ; >8b4f
+       movb @speed_gauge_value,a                           ; LD A,($F814)      ; A = the player's speed
+_8b52:                                                     ; >8b52
+       srl  a,1                                            ; SRL A             ; halve it...
+       sb   one,b                                          ; DJNZ $8B52        ; ...once per band
+       jne  _8b52                                          ;                   ; 
+       clr  de                                             ; LD E,A / LD D,B   ; DE = the amount
+       movb a,@e                                           ;                   ; 
+_8b58:                                                     ; >8b58
+       movb de,@last_move+1                                ; LD ($E876),DE     ; remember the amount
+       movb @e,@last_move                                  ;                   ; 
+       movb @object_position_z_lo+1,hl                     ; LD HL,($F7D2)     ; HL = z
+       movb @object_position_z_lo,@l                       ;                   ; 
+       s    de,hl                                          ; OR A / SBC HL,DE  ; take the amount off
+       movb hl,@object_position_z_lo+1                     ; LD ($F7D2),HL     ; 
+       movb @l,@object_position_z_lo                       ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Get the object's distance band
+* 
+* Used by the routines at #R$866D and #R$8B00.
+* .
+* Returns 1 if the object's depth (#R$E941) is up to 10000, and one more
+* for each further 5750. Movement is halved for each band (#R$866D,
+* #R$8B00), so distant objects move less.
+* 
+* O:A Distance band (1 upwards)
+distance_band:                                             ; >8b66
+       movb @object_depth+1,r1                             ; LD BC,($E941)     ; R1 = depth
+       movb @object_depth,@r1lb                            ;                   ; 
+       movb one,a                                          ; LD A,$01          ; band 1
+       li   r0,>2710                                       ; LD HL,$2710       ; up to 10000
+_8b6f:                                                     ; >8b6f
+       c    r0,r1                                          ; LD D,H / LD E,L / SBC HL,BC; (TI: as if the carry is clear)
+       jhe  _8b66_end                                      ; RET NC            ; within this band
+       ai   r0,>1676                                       ; LD HL,$1676 / ADD HL,DE; 5750 more
+       ab   one,a                                          ; INC A             ; next band
+       jmp  _8b6f                                          ; JR $8B6F          ; 
+_8b66_end:                                                 
+       rt                                                  ;                   ; 
 
 ********************************************************************************
 * Unpack the commander file
@@ -9459,7 +10199,7 @@ laser_shot_used:                                           ; >e873
 * $0800+type*2 here (`LD DE,$E874 / LDI / LDI`); #R$86DC reads it back
 * via #R$2160 to combine with each rotated vector component.
 type_entry_cache:                                          ; >e874
-       byte >00,>00
+       data 0                                                        ; (TI: a big-endian word)
 
 ********************************************************************************
 * Last amount moved

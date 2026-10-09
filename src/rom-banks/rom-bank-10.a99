@@ -525,6 +525,383 @@ mission_briefing_ship:                                     ; >1f4f
        byte >1F,>00
 
 
+* Launching (TI: in this bank, as it is run once per launch)
+
+********************************************************************************
+* Key '1' when docked: launch
+* 
+* Used by the routine at #R$4173.
+* .
+* Reached from #R$4173. Refuses in flight (#R$6393). Places the planet, the
+* space station and the sun (#R$8D2A), resets the flight variables
+* (#R$707D), and starts the ship rolling with the station (roll rate 4,
+* #R$F815, #R$2209). Suppresses the police check on entering the safe zone
+* ($EF9C, see #R$1549), since the ship starts in it. Switches to the front
+* view (#R$64A1), showing the tunnel rings (#R$E8F6). In mission state $16
+* (#R$E93D) moves on to $17, so the Constrictor appears (#R$2B24);
+* otherwise goes on to $1868.
+* .
+* At $1868, during mission 3 (#R$E93D = $3x), resets how far the sun has
+* come (#R$E93E), so the supernova's approach starts again on each launch.
+launch:                                                    ; >1837
+       .proc                                               ;                   ; 
+* TI: no CALL $6393 (refuse in flight): #R$4173 only calls this when docked
+       bl   @launch_place_planet_station_and_sun           ; CALL $8D2A        ; place the planet, station and sun
+       bl   @reset_flight                                  ; CALL $707D        ; reset the flight variables
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@launch_roll                                ; LD ($E929),A      ; the ship starts rolling
+       movb r0,@safe_zone_entry_latch                      ; LD ($EF9C),A      ; no police check on entering the safe zone
+       movb @bytes+>04,@roll_rate                          ; LD A,$04 / LD ($F815),A; roll rate 4
+       bl   @refresh_roll_table                            ; CALL $2209        ; set up the roll
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@show_tunnel                                ; LD ($E8F6),A      ; show the tunnel rings
+       bl   @switch_to_front_view                          ; CALL $64A1        ; switch to the front view
+       sb   @show_tunnel,@show_tunnel                      ; XOR A / LD ($E8F6),A; 
+       movb @mission_state,a                               ; LD A,($E93D)      ; A = mission state
+       cb   a,@bytes+>16                                   ; CP $16            ; 
+       jne  continue_1837_clear_e93e                       ; JR NZ,$1868       ; not that state
+       ab   one,@mission_state                             ; INC A / LD ($E93D),A; advance the state machine
+       .endproc                                            ; RET               ; 
+continue_1837_clear_e93e:                                  ; >1868
+       andi a,>f000                                        ; AND $F0           ; keep the high nibble
+       cb   a,@bytes+>30                                   ; CP $30            ; state $30-$3F?
+       jne  _1872                                          ; RET NZ            ; no - nothing to do
+       sb   @supernova_offset,@supernova_offset            ; SBC HL,HL / LD ($E93E),HL; yes - reset the running total
+       sb   @supernova_offset+1,@supernova_offset+1        ;                   ; 
+_1872:                                                     ; >1872
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Key '1': launch, or switch to the front view
+* 
+* Reached via the key table at #R$419B.
+key_handler_1:                                             ; >4173
+       movb @docked,a                                      ; LD A,($E90A) / OR A; 
+       jeq  _417a                                          ; JP NZ,$1837       ; 
+       b    @launch                                        ;                   ; docked - launch
+_417a:                                                     ; >417a
+       b    @switch_to_front_view                          ; JP $64A1          ; in flight - front view
+
+********************************************************************************
+* Reset the flight variables
+* 
+* Used by the routines at #R$1837 and #R$894D.
+* .
+* Called on launching (#R$1837) and on arriving in a system (#R$894D).
+* Clears the flags and countdowns of the last flight: the station
+* destroyed (#R$EFA9), the ECM jammer (#R$EFA8), the cloaking device
+* (#R$EF9F), identify (#R$EF9D), shooting at the station ($EF97), the
+* Torus jump ($EF8E, #R$E918), the police (#R$E934), the hyperspace
+* countdown (#R$E91B, #R$E920), docking (#R$E917), docked (#R$E90A),
+* the missile (#R$E910), the laser temperature (#R$F813), the roll and
+* pitch (#R$F815, #R$F816), and more. Starts the shuttle, asteroid and
+* trader countdowns (#R$EF8F-#R$EF91) at random values from 128 to 255,
+* and the pirate countdown (#R$EF9A) at (government + 2) * 256. Sets the
+* speed to 22 (#R$F814), the energy to 96 (#R$F817) and the shields to
+* 24 (#R$F80F, #R$F810), and scatters new stardust (#R$6882).
+reset_flight:                                              ; >707d
+       .proc                                               ;                   ; 
+       sb   a,a                                            ; XOR A             ; 
+       movb a,@station_destroyed                           ; LD ($EFA9),A      ; the station is back
+       movb a,@jammer_active_flag                          ; LD ($EFA8),A      ; ECM jammer off
+       movb a,@cloaking_active_flag                        ; LD ($EF9F),A      ; cloaking device off
+       movb a,@identify_target                             ; LD ($EF9D),A      ; 
+       movb a,@legal_status_copy                           ; LD ($EF97),A      ; the player hasn't shot at the station
+       movb a,@flight_controls_off                         ; LD ($EF8E),A      ; 
+       movb a,@police_to_launch                            ; LD ($E934),A      ; no police to launch
+       movb a,@message_timer                               ; LD ($E919),A      ; 
+       movb a,@jump_in_progress                            ; LD ($E722),A      ; 
+       movb a,@torus_jump_countdown                        ; LD ($E918),A      ; 
+       movb a,@hyperspace_countdown_inner                  ; LD ($E91B),A      ; no hyperspace countdown
+       movb a,@unused_flag_e91f                            ; LD ($E91F),A      ; 
+       movb a,@hyperspace_trigger                          ; LD ($E920),A      ; 
+       movb a,@docking                                     ; LD ($E917),A      ; not docking
+       movb a,@docked                                      ; LD ($E90A),A      ; not docked
+       movb a,@missile_state                               ; LD ($E910),A      ; missile unarmed
+       movb a,@laser_temp_gauge                            ; LD ($F813),A      ; laser cool
+       movb a,@roll_rate                                   ; LD ($F815),A      ; roll rate = 0
+       movb a,@pitch_rate                                  ; LD ($F816),A      ; pitch rate = 0
+       movb a,@launch_roll                                 ; LD ($E929),A      ; not rolling after launching
+       movb a,@safe_zone_entry_latch                       ; LD ($EF9C),A      ; 
+       li   de,shuttle_countdown                           ; LD DE,$EF8F       ; the shuttle, asteroid and trader countdowns
+       movb @bytes+>03,b                                   ; LD B,$03          ; 3 bytes
+_70c2:                                                     ; >70c2
+       bl   @random_byte                                   ; CALL $2176        ; 
+       socb @bytes+>80,a                                   ; OR $80            ; 128-255
+       movb a,*de+                                         ; LD (DE),A / INC DE; 
+       sb   one,b                                          ; DJNZ $70C2        ; 
+       jne  _70c2                                          ;                   ; 
+       movb @current_system_government,a                   ; LD A,($F762)      ; A = government
+       ab   @bytes+>02,a                                   ; ADD A,$02         ; 
+       movb a,@pirate_countdown_hi                         ; LD ($EF9B),A      ; the pirate countdown
+       movb @bytes+>16,@speed_gauge_value                  ; LD A,$16 / LD ($F814),A; speed 22
+       movb @bytes+>60,@energy_gauge                       ; LD A,$60 / LD ($F817),A; energy 96
+       movb @bytes+>18,a                                   ; LD A,$18          ; 
+       movb a,@fore_shield                                 ; LD ($F80F),A      ; shields 24
+       movb a,@aft_shield                                  ; LD ($F810),A      ; 
+       .pop r11                                            ;                   ; 
+       b    @scatter_stardust                              ; JP $6882          ; scatter the stardust
+
+********************************************************************************
+* Launch from the station: place the planet, station and sun
+* 
+* Used by the routine at #R$1837.
+* .
+* Called when launching (#R$1837). Clears the object table (#R$28D4) and
+* adds (#R$3037), at speed 0 and with handler types 0, 2 and 0:
+* .
+* #LIST
+* { the planet (ship type $64) in slot 0, 7000 straight ahead }
+* { the space station (ship type 1) in slot 1, 500 behind the player, 7500
+* from the planet as on arriving in a system (#R$8CB1), facing forward
+* (#R$9080), so the player has just come out of its slot }
+* { the sun (ship type $65) in slot 2, 24500 away, somewhere beside, above
+* or below the player (#R$8F25 with carry clear) }
+* LIST#
+* .
+* The planet and sun can't be shot and don't collide (status $0D, see
+* #R$F7CD); the station can (status 1).
+launch_place_planet_station_and_sun:                       ; >8d2a
+       .proc                                               ;                   ; 
+       bl   @clear_all_ship_slots                          ; CALL $28D4        ; clear the object table
+       movb @bytes+>0d,@object_status_byte                 ; LD A,$0D / LD ($F7CD),A; status: in use, can't be shot, no collisions
+       clr  r0                                             ; LD HL,$0000       ; x = 0, y = 0...
+       movb r0,@object_position_x                          ; LD ($F7CE),HL     ; 
+       movb r0,@object_position_x+1                        ;                   ; 
+       movb r0,@object_position_y                          ; LD ($F7D0),HL     ; 
+       movb r0,@object_position_y+1                        ;                   ; 
+       li   r0,>581b                                       ; LD HL,$1B58       ; ...z = 7000: straight ahead
+       movb r0,@object_position_z_lo                       ; LD ($F7D2),HL     ; (TI: R0 holds it byte-swapped)
+       movb @r0lb,@object_position_z_lo+1                  ;                   ; 
+       sb   @handler_type,@handler_type                    ; LD A,$00 / LD ($F7EE),A; handler type 0
+       movb @bytes+>64,@ship_type                          ; LD A,$64 / LD ($F7E7),A; ship type $64: the planet
+       sb   @object_speed,@object_speed                    ; XOR A / LD ($F7E6),A; speed 0
+       bl   @add_object                                    ; CALL $3037        ; add the planet (slot 0)
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+       li   r0,>0cfe                                       ; LD HL,$FE0C       ; z = -500: just behind the player
+       movb r0,@object_position_z_lo                       ; LD ($F7D2),HL     ; (TI: R0 holds it byte-swapped)
+       movb @r0lb,@object_position_z_lo+1                  ;                   ; 
+       li   hl,station_launch_orientation                  ; LD HL,$9080       ; the station's orientation at launch...
+       li   de,side_vector                                 ; LD DE,$F7D4       ; ...into its side and nose vectors
+       li   bc,>000c                                       ; LD BC,$000C       ; 
+       .ldir                                               ; LDIR              ; 
+       movb one,@ship_type                                 ; LD A,$01 / LD ($F7E7),A; ship type 1: the station
+       movb @bytes+>02,@handler_type                       ; LD A,$02 / LD ($F7EE),A; handler type 2: space station
+       bl   @add_object                                    ; CALL $3037        ; add the station (slot 1)
+       movb @bytes+>0d,@object_status_byte                 ; LD A,$0D / LD ($F7CD),A; status: in use, can't be shot, no collisions
+       li   hl,>5fb4                                       ; LD HL,$5FB4       ; 24500 away...
+       bl   @random_point_beside                           ; OR A / CALL $8F25 ; ...beside, above or below the player
+       sb   @handler_type,@handler_type                    ; LD A,$00 / LD ($F7EE),A; handler type 0
+       movb @bytes+>65,@ship_type                          ; LD A,$65 / LD ($F7E7),A; ship type $65: the sun
+       .pop r11                                            ;                   ; 
+       b    @add_object                                    ; JP $3037          ; add the sun (slot 2)
+
+********************************************************************************
+* Pick a random point at a given distance
+* 
+* Used by the routines at #R$2B05, #R$2C3C, #R$2D3B, #R$8C94 and #R$8D2A.
+* .
+* Sets the object's position (#R$F7CE, #R$F7D0, #R$F7D2) to a point at
+* distance r from the player, in a direction given by two angles in degrees
+* (0-360): a1 (the longitude) and a2 (the latitude), with x = r * cos(a1) *
+* cos(a2), y = r * sin(a2) and z = r * sin(a1) * cos(a2) (#R$8FBB,
+* #R$8F94). With carry set both angles are random, so the point is anywhere
+* around the player (for ships, asteroids, the planet and the station,
+* #R$2B24, #R$2C3C, #R$2D3B, #R$8C94, #R$8CB1). With carry clear a1 is 0,
+* so the point is on the circle z = 0, beside, above or below the player
+* (for the sun on launching, #R$8D2A).
+* .
+* At $8F3C, sets a1 to 0; at $8F3F, picks a random a2 (0-360) and works out
+* the point.
+* 
+* I:HL Distance (r)
+* I:F Carry set for any direction
+* TI: two entry points rather than the carry: random_point for any direction,
+* random_point_beside (at $8F3C) for a1 = 0. The distance is kept on the
+* stack rather than at $E600.
+random_point:                                              ; >8f25
+       .proc                                               ;                   ; 
+       .push hl                                            ; LD ($E600),HL     ; r
+       bl   @random_angle                                  ; CALL $2176 ...    ; DE = a1
+       jmp  _8f3f                                          ; JR $8F3F          ; 
+random_point_beside:                                       ; >8f3c
+       .proc                                               ;                   ; 
+       .push hl                                            ; LD ($E600),HL     ; r
+       clr  de                                             ; LD DE,$0000       ; a1 = 0
+_8f3f:                                                     ; >8f3f
+       bl   @sin_cos                                       ; CALL $8FBB        ; A = sin(a1), B = cos(a1)
+       movb a,@circle_connector_no_prev_point_gate         ; LD ($E602),A      ; 
+       movb b,@lineplot_scratch_vars_e603                  ; LD A,E / LD ($E603),A; 
+       bl   @random_angle                                  ; CALL $2176 ...    ; DE = a2
+       bl   @sin_cos                                       ; CALL $8FBB        ; A = sin(a2), B = cos(a2)
+       movb a,@scratch_buffer_4                            ; LD ($E604),A      ; 
+       movb b,@scratch_buffer_5                            ; LD A,E / LD ($E605),A; 
+       mov  @-2(sp),hl                                     ; LD HL,($E600)     ; HL = r
+       movb @lineplot_scratch_vars_e603,a                  ; LD A,($E603)      ; A = cos(a1)
+       bl   @multiply_by_sine                              ; CALL $8F94        ; r * cos(a1)
+       movb @scratch_buffer_5,a                            ; LD A,($E605)      ; A = cos(a2)
+       bl   @multiply_by_sine                              ; CALL $8F94        ; * cos(a2)
+       movb hl,@object_position_x+1                        ; LD ($F7CE),HL     ; x
+       movb @l,@object_position_x                          ;                   ; 
+       mov  @-2(sp),hl                                     ; LD HL,($E600)     ; HL = r
+       movb @scratch_buffer_4,a                            ; LD A,($E604)      ; A = sin(a2)
+       bl   @multiply_by_sine                              ; CALL $8F94        ; r * sin(a2)
+       movb hl,@object_position_y+1                        ; LD ($F7D0),HL     ; y
+       movb @l,@object_position_y                          ;                   ; 
+       mov  @-2(sp),hl                                     ; LD HL,($E600)     ; HL = r
+       movb @circle_connector_no_prev_point_gate,a         ; LD A,($E602)      ; A = sin(a1)
+       bl   @multiply_by_sine                              ; CALL $8F94        ; r * sin(a1)
+       movb @scratch_buffer_5,a                            ; LD A,($E605)      ; A = cos(a2)
+       bl   @multiply_by_sine                              ; CALL $8F94        ; * cos(a2)
+       movb hl,@object_position_z_lo+1                     ; LD ($F7D2),HL     ; z
+       movb @l,@object_position_z_lo                       ;                   ; 
+       dect sp                                             ;                   ; drop r
+       .endproc                                            ; RET               ; 
+* TI: pick a random angle, 0-360 degrees (#R$8F25, at $8F2A and $8F49)
+*
+* O:DE The angle
+random_angle:                                              
+       .proc                                               ;                   ; 
+random_angle_1:                                            
+       bl   @random_byte                                   ; CALL $2176        ; 
+       movb a,r2                                           ; LD E,A            ; 
+       bl   @random_byte                                   ; CALL $2176        ; A = another random byte
+       swpb r2                                             ;                   ; 
+       andi a,>0100                                        ; AND $01           ; 
+       movb a,r2                                           ; LD D,A            ; a random 0-511
+       ci   r2,361                                         ; LD HL,$FE97 / ADD HL,DE; 
+       jhe  random_angle_1                                 ; JR C,$8F2A        ; over 360 - try again
+       mov  r2,de                                          ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Multiply by a sine or cosine
+* 
+* Used by the routine at #R$8F25.
+* .
+* Returns HL * A / 128, with A a sine or cosine from #R$8FBB (1.0 = 127,
+* so this is very slightly short). Both are two's complement; the result
+* is truncated.
+* 
+* I:A Sine or cosine
+* I:HL Value
+* O:HL The product
+multiply_by_sine:                                          ; >8f94
+       clr  r0                                             ; LD C,A            ; 
+       movb a,r0                                           ;                   ; 
+       sra  r0,8                                           ;                   ; R0 = the sine
+       mov  hl,a                                           ; XOR H / EX AF,AF' ; A bit 15 = the product's sign
+       xor  r0,a                                           ;                   ; 
+       abs  r0                                             ; NEG               ; the size of the sine
+       mov  hl,r1                                          ;                   ; 
+       abs  r1                                             ; XOR A / SUB L ... ; the size of HL
+       mpy  r0,r1                                          ; CALL $1F86        ; R1:R2 = the product
+       sla  r1,9                                           ; RL L / RL H / RLA ; HL = the product >> 7
+       srl  r2,7                                           ; LD L,H / LD H,A   ; 
+       soc  r2,r1                                          ;                   ; 
+       mov  r1,hl                                          ;                   ; 
+       mov  a,a                                            ; EX AF,AF'         ; the product's sign
+       jlt  multiply_by_sine_negative                      ; RET P             ; positive - done
+       rt                                                  ;                   ; 
+multiply_by_sine_negative:                                 
+       neg  hl                                             ; XOR A / SUB L ... ; negate it
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Get the sine and cosine of an angle
+* 
+* Used by the routine at #R$8F25.
+* .
+* Works out which quadrant the angle is in, and gets the sine and cosine
+* from the sine table (#R$901C) using these identities:
+* .
+* #LIST
+* { 0-90 degrees: sin(x), and cos(x) = sin(90 - x) }
+* { 91-180 (at $8FCE): sin(x) = sin(180 - x), and cos(x) = -sin(x - 90) }
+* { 181-270 (at $8FE5): sin(x) = -sin(x - 180), and cos(x) = -sin(270 - x) }
+* { 271-360 (at $9004): sin(x) = -sin(360 - x), and cos(x) = sin(x - 270) }
+* LIST#
+* .
+* Each part saves the sine in A' while it works out the cosine; the exit
+* at $9019 returns them. The results are 127 times the sine and cosine,
+* in two's complement.
+* 
+* I:DE Angle in degrees (0-360)
+* O:A Sine
+* O:E Cosine
+* TI: returns the cosine in B, not E.
+sin_cos:                                                   ; >8fbb
+       mov  de,r1                                          ;                   ; 
+       ci   r1,91                                          ; LD HL,$FFA5 / ADD HL,DE; 
+       jhe  _8fce                                          ; JR C,$8FCE        ; 91 or more
+       movb @sine_table(r1),a                              ; LD A,E / CALL $901C; A = sin(x)
+       li   r2,90                                          ; LD A,$5A          ; 
+       s    r1,r2                                          ; SUB E             ; 90 - x
+       movb @sine_table(r2),b                              ; CALL $901C        ; B = sin(90 - x) = cos(x)
+       rt                                                  ; RET               ; 
+_8fce:                                                     ; >8fce
+       ci   r1,181                                         ; LD HL,$FF4B / ADD HL,DE; 
+       jhe  _8fe5                                          ; JR C,$8FE5        ; 181 or more
+       li   r2,180                                         ; LD A,$B4          ; 
+       s    r1,r2                                          ; SUB E             ; 180 - x
+       movb @sine_table(r2),a                              ; CALL $901C        ; A = sin(180 - x) = sin(x)
+       clr  r0                                             ;                   ; 
+       movb @sine_table-90(r1),r0                          ; LD A,E / SUB $5A / CALL $901C; sin(x - 90)
+       neg  r0                                             ; NEG               ; 
+       movb r0,b                                           ;                   ; B = -sin(x - 90) = cos(x)
+       rt                                                  ; RET               ; 
+_8fe5:                                                     ; >8fe5
+       ci   r1,271                                         ; LD HL,$FEF1 / ADD HL,DE; 
+       jhe  _9004                                          ; JR C,$9004        ; 271 or more
+       clr  r0                                             ;                   ; 
+       movb @sine_table-180(r1),r0                         ; LD HL,$FF4C / ADD HL,DE / LD A,L / CALL $901C; sin(x - 180)
+       neg  r0                                             ; NEG               ; 
+       movb r0,a                                           ;                   ; A = -sin(x - 180) = sin(x)
+       li   r2,270                                         ; LD HL,$010E       ; 
+       s    r1,r2                                          ; OR A / SBC HL,DE  ; 270 - x
+       clr  r0                                             ;                   ; 
+       movb @sine_table(r2),r0                             ; CALL $901C        ; sin(270 - x)
+       neg  r0                                             ; NEG               ; 
+       movb r0,b                                           ;                   ; B = -sin(270 - x) = cos(x)
+       rt                                                  ; RET               ; 
+_9004:                                                     ; >9004
+       li   r2,360                                         ; LD HL,$0168       ; 
+       s    r1,r2                                          ; OR A / SBC HL,DE  ; 360 - x
+       clr  r0                                             ;                   ; 
+       movb @sine_table(r2),r0                             ; CALL $901C        ; sin(360 - x)
+       neg  r0                                             ; NEG               ; 
+       movb r0,a                                           ;                   ; A = -sin(360 - x) = sin(x)
+       movb @sine_table-270(r1),b                          ; LD HL,$FEF2 / ADD HL,DE / LD A,L / CALL $901C; B = sin(x - 270) = cos(x)
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Sine table
+* 
+* sin(n) * 127 for n = 0-90 degrees (#R$901C).
+sine_table:                                                ; >9025
+       byte >00,>02,>04,>07,>09,>0B,>0D,>0F                       ; 
+       byte >12,>14,>16,>18,>1A,>1D,>1F,>21                       ; 
+       byte >23,>25,>27,>29,>2B,>2E,>30,>32                       ; 
+       byte >34,>36,>38,>3A,>3C,>3E,>40,>41                       ; 
+       byte >43,>45,>47,>49,>4B,>4C,>4E,>50                       ; 
+       byte >52,>53,>55,>57,>58,>5A,>5B,>5D                       ; 
+       byte >5E,>60,>61,>63,>64,>65,>67,>68                       ; 
+       byte >69,>6B,>6C,>6D,>6E,>6F,>70,>71                       ; 
+       byte >72,>73,>74,>75,>76,>77,>77,>78                       ; 
+       byte >79,>79,>7A,>7B,>7B,>7C,>7C,>7D                       ; 
+       byte >7D,>7D,>7E,>7E,>7E,>7F,>7F,>7F                       ; 
+       byte >7F,>7F,>7F                                           ; 
+
+********************************************************************************
+* The space station's orientation at launch
+* 
+* Copied into the station's side and nose vectors by #R$8D2A: side (1, 0,
+* 0) and nose (0, 0, 1), so its slot faces forward.
+station_launch_orientation:                                ; >9080
+       byte >00,>40,>00,>00,>00,>00                               ; side vector
+       byte >00,>00,>00,>00,>00,>40                               ; nose vector
+
+
 rom_bank_10_end:
        equ  $
        bss  >8000-$

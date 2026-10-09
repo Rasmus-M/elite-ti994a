@@ -99,11 +99,11 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
 - **Code in ROM banks**: `program.a99` holds the whole program and is assembled once per output: by `elite.a99` with
   RAM real (`aorg`) and the code banks `dorg`, and by `code-bank-N.a99` with only bank N real, so RAM and the banks
   can use each other's labels. Banks 7-10 (`code_bank_N_select`, at >6000 + 2N) hold code - 7 the docked screens, 8 the data on system screen,
-  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns); call into it with `.far_call`. Code in a bank may
+  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`); call into it with `.far_call`. Code in a bank may
   read RAM, the math tables and its own bank only. As a pilot, bank 7 holds the status page (`status_page`,
   `print_commander_name` and their own text and data); the routines and text other screens share (printing,
   number formatting, system names, clearing the page) are in RAM. 'N' on the title screen shows it, and 'Y' the
-  commander menu (also in bank 7); then the docked main loop (`main_loop_wait_tick`) runs, dispatching keys
+  commander menu (also in bank 7); then the main loop (`main_loop_wait_tick`) runs - in flight it calls `process_frame` (RAM; so far only the stardust, moving, rotating and drawing the objects) - dispatching keys
   through a TI `key_table` of `data key*256,bank select,handler` entries (only the converted handlers, called
   with `far_call_r0_r1`). Add a screen's key there when it's converted.
 - **ROM banks** (`src/rom-banks/`): every data bank starts with the math tables (`math-tables.a99`) at `>6040`,

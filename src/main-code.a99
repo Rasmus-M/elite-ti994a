@@ -230,9 +230,16 @@ process_frame:                                             ; >13fd
 _1409:                                                     ; >1409
 * TI: not converted yet: the countdown (#R$1651).
        bl   @settle_roll_pitch                             ; CALL $6BE1        ; stop the roll and pitch if their keys are released
-* TI: not converted yet: the cloaking device and the jammer ($140F-$1434), and the
-* scanner queue ($1437-$144D: on the MSX the VBlank handler draws the scanner,
-* and this waits for it to finish).
+* TI: not converted yet: the cloaking device and the jammer ($140F-$1434).
+* TI: no waiting for the VBlank handler to draw the scanner ($1437-$143C), as
+* it is drawn at the end of this pass (#R$8380).
+       sb   @scanner_queue_count,@scanner_queue_count      ; LD ($E948),A      ; empty the scanner queue: no records...
+       sb   @hostile_about,@hostile_about                  ; LD ($E943),A      ; (and clear the HUD warning trigger, see #R$E943)
+       li   r0,scanner_queue                               ; LD HL,$E94A       ; 
+       mov  r0,@scanner_queue_ptr                          ; LD ($E946),HL     ; ...write pointer back at the start (TI: a big-endian word)...
+       li   r0,>2c01                                       ; LD HL,$012C       ; (R0 holds it byte-swapped)
+       movb r0,@scanner_background_space                   ; LD ($EB03),HL     ; ...and 300 bytes free for saving the background
+       movb @r0lb,@scanner_background_space+1              ;                   ; 
        li   hl,ship_object_table                           ; LD HL,$EBA0       ; HL -> the object table
        movb @bytes+>14,b                                   ; LD B,$14          ; B = 20 slots
 process_frame_object:                                      ; >1455
@@ -250,8 +257,9 @@ process_frame_object:                                      ; >1455
        bl   @get_blueprint_data                            ; CALL $16E3        ; set the object up for its type
        sb   @ship_fired,@ship_fired                        ; XOR A / LD ($E92D),A; the ship hasn't fired
        bl   @work_out_distance                             ; CALL $883D        ; work out its distance
-* TI: not converted yet: collisions and docking (#R$8755), the scanner
-* (#R$8205) and the compass (#R$85FB).
+* TI: not converted yet: collisions and docking (#R$8755).
+       bl   @scanner_add_object                            ; CALL $8205        ; add the object to the scanner
+       bl   @compass                                       ; CALL $85FB        ; position the compass dot, if this is its target
        bl   @move_past_player                              ; CALL $8B00        ; move it by the player's speed
        bl   @move_object                                   ; CALL $866D        ; move it forward by its own speed
        bl   @draw_object                                   ; CALL $422E        ; draw it
@@ -278,7 +286,11 @@ process_frame_next_object:                                 ; >14ad
 _14b1:                                                     ; >14b1
        sb   one,b                                          ; DEC B             ; 
        jne  process_frame_object                           ; JP NZ,$1455       ; loop for all 20 slots
-* TI: not converted yet: the scanner ($14B5), the laser beams (#R$2DC8) and
+       movb @space_view_showing,a                          ; LD A,($E903)      ; if the space view is showing, draw this frame's
+       jeq  _14bb                                          ; LD ($EB02),A      ; scanner queue
+       bl   @scanner_draw                                  ;                   ; (TI: now, rather than in the VBlank handler, #R$7202)
+_14bb:                                                     ; >14bb
+* TI: not converted yet: the laser beams (#R$2DC8) and
 * the Torus jump ($14BE-$1500).
        li   hl,current_turn                                ; LD HL,$E92E       ; cycle the counter at $E92E: 3, 2, 1, 3...
        sb   one,*hl                                        ; DEC (HL)          ; 
@@ -8697,6 +8709,498 @@ move_chart_cursor_sprite:                                  ; >73a6
        rt                                                  ; RET               ; 
 
 ********************************************************************************
+* Add an object to the 3D scanner
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called for each object by the main loop (#R$13FD). Works out where the
+* object's blip and stick go on the scanner and adds a 7-byte record for
+* them to the scanner queue at #R$E94A, which #R$8380 draws during the next
+* VBlank. Objects are skipped (no record) on alternate frames if bit 5 of
+* ($E914) is set, if bit 3 of their status byte ($F7CD) is set, when not in
+* flight, in ship types $1E and $1F, and when they are $1000 or more away
+* on any axis.
+* .
+* The object's distances ($EB82 X, $EB84 Y, $EB86 Z, sign-magnitude with
+* the signs at $F7CF/$F7D1/$F7D3) are scaled (#R$848D) to scanner units: X
+* to +/-35 columns, Z (depth) to +/-15 rows and Y (height) to +/-28 rows.
+* For an object above the ship (Y >= 0) the blip is drawn Y+Z rows above
+* the scanner's centre line, with a stick Y rows long running down from it
+* to the depth-plane point at Z; the blip is cut off (and the stick
+* shortened) if that would be above the top of the scanner. An object below
+* is handled by $8288.
+* .
+* At $8283, when the blip fits below the top row, the blip is 2 rows tall
+* (E=2), and the stick takes the rest of the Y rows (D=Y-1).
+* .
+* At $8288, for an object below the ship (Y negative), the run starts at
+* the depth-plane point (row $A5 - Z) and goes down: stick first, blip at
+* the bottom. If Y + Z is -15 or more, the blip fits above the bottom of
+* the scanner and (at $82A0) there's a 2-row blip with a stick |Y|-1 rows
+* long. Otherwise there is no blip (E=0) and the stick runs to the bottom
+* row (D = Z + 16). The `INC E` at $8298 is never reached, since the result
+* tested at $8296 is always nonzero.
+* .
+* At $82A7, converts the scanner position to a screen position - column $7A
+* + X and row $A5 - B, the scanner's centre being at column 122, row 165 -
+* and then to a VRAM address (#R$37D1), and writes the record at the queue
+* write pointer (#R$E946):
+* .
+* Bytes 0-1: VRAM address of the top of the run; bit 7 of byte 1 is set if
+* the object is below the ship (stick first, blip at the bottom).
+* .
+* Byte 2: bits 0-4 the stick length, bits 5-6 the blip height, and bit 7
+* set if the blip and stick straddle two character columns.
+* .
+* Bytes 3-6: pixel masks. Byte 4 (blip) and byte 6 (stick) are for the
+* first column, bytes 3 (blip) and 5 (stick) for the second. The blip is 3
+* pixels wide and the stick 2, both ending at the object's pixel column;
+* #R$8654 and $865C hold the masks for each pixel position. If the pixel is
+* 2-7 in its byte, both fit in one column and bytes 3 and 5 are left
+* unwritten. If it's 0 or 1, $82F3 moves the address one column left and
+* fills in both columns.
+* .
+* At $82F3, when the object's pixel is 0 or 1 in its byte, the 3-pixel blip
+* (and, for pixel 0, the 2-pixel stick) spills into the character column to
+* the left. Moves the record's VRAM address one column left and writes the
+* masks for both columns: left-hand blip and stick masks in bytes 4 and 6
+* (%11 and %1 for pixel 0, %1 and none for pixel 1), right-hand ones from
+* #R$8654 and $865C in bytes 3 and 5. Doubles ($E602), since the background
+* under two columns will be saved.
+* .
+* The tail at #R$8332 (also used by $82A0) adds the record to the queue,
+* provided the list of saved background bytes at #R$E9D6 has room for it
+* (#R$EB03, 300 bytes a frame): ($E602)+5 bytes. Otherwise the object just
+* isn't shown this frame.
+* TI: the queue pointer ($E946) is a big-endian word (only the TI scanner
+* code reads it).
+scanner_add_object:                                        ; >8205
+       .proc                                               ;                   ; 
+       movb @options,r0                                    ; LD A,($E914) / AND $20; skip on alternate frames if bit 5
+       czc  @bit5,r0                                       ;                   ; 
+       jeq  _8212                                          ; JR Z,$8212        ; 
+       movb @current_turn,r0                               ; LD A,($E92E) / AND $01; of ($E914) is set
+       czc  @bit0,r0                                       ;                   ; 
+       jne  _8205_exit                                     ; RET NZ            ; 
+_8212:                                                     ; >8212
+       movb @object_status_byte,r0                         ; LD A,($F7CD) / BIT 3,A; A = object status byte
+       czc  @bit3,r0                                       ;                   ; 
+       jne  _8205_exit                                     ; RET NZ            ; bit 3 set - not shown on the scanner
+       movb @space_view_showing,r0                         ; LD A,($E903) / OR A; 
+       jeq  _8205_exit                                     ; RET Z             ; not in flight
+       movb @ship_type,r0                                  ; LD A,($F7E7)      ; A = ship type
+       cb   r0,@bytes+>1e                                  ; CP $1E            ; 
+       jeq  _8205_exit                                     ; RET Z             ; $1E - not shown
+       cb   r0,@bytes+>1f                                  ; CP $1F            ; 
+       jeq  _8205_exit                                     ; RET Z             ; $1F - not shown
+       movb @delta_x_hi,r0                                 ; LD A,($EB83) / AND $F0 / RET NZ; X, Y or Z 4096 or more?
+       socb @delta_y_hi,r0                                 ; LD A,($EB85) / AND $F0 / RET NZ; 
+       socb @delta_z_hi,r0                                 ; LD A,($EB87) / AND $F0 / RET NZ; 
+       andi r0,>f000                                       ;                   ; 
+       jeq  scanner_add_object_1                           ;                   ; yes - out of scanner range
+_8205_exit:
+       .endproc                                            ; RET               ; 
+scanner_add_object_1:
+       movb @object_z_sign,r0                              ; LD A,($F7D3)      ; A = sign of Z
+       movb @delta_z_hi,hl                                 ; LD HL,($EB86)     ; HL = the size of Z
+       movb @abs_delta_z,@l                                ;                   ; 
+       li   r1,>0f                                         ; LD C,$0F          ; 
+       bl   @scale_signed_coordinate                       ; CALL $848D        ; A = Z * 15 / 4096 (depth, +/-15 rows)
+       movb a,@scratch_buffer_1                            ; LD ($E601),A      ; 
+       movb @position_x_hi,r0                              ; LD A,($F7CF)      ; A = sign of X
+       movb @delta_x_hi,hl                                 ; LD HL,($EB82)     ; HL = the size of X
+       movb @abs_delta_x,@l                                ;                   ; 
+       li   r1,>23                                         ; LD C,$23          ; 
+       bl   @scale_signed_coordinate                       ; CALL $848D        ; A = X * 35 / 4096 (+/-35 columns)
+       movb a,@scratch_buffer                              ; LD ($E600),A      ; 
+       movb @position_y_hi,r0                              ; LD A,($F7D1)      ; A = sign of Y
+       movb @delta_y_hi,hl                                 ; LD HL,($EB84)     ; HL = the size of Y
+       movb @abs_delta_y,@l                                ;                   ; 
+       li   r1,>1c                                         ; LD C,$1C          ; 
+       bl   @scale_signed_coordinate                       ; CALL $848D        ; A = Y * 28 / 4096 (height, +/-28 rows)
+       movb @scratch_buffer,@c                             ; LD BC,($E600)     ; C = X...
+       movb @scratch_buffer_1,b                            ;                   ; ...B = Z
+       .push a                                             ; PUSH AF           ; save Y; its sign goes in the record
+       movb a,a                                            ; OR A              ; 
+       jlt  scanner_object_below                           ; JP M,$8288        ; object below the ship
+       jne  _826b                                          ; JR NZ,$826B       ; 
+       ab   one,a                                          ; INC A             ; treat Y = 0 as 1
+_826b:                                                     ; >826b
+       movb a,d                                            ; LD D,A            ; D = stick length (Y)
+       ab   b,a                                            ; ADD A,B           ; 
+       movb a,b                                            ; LD B,A            ; B = Y + Z (blip's height above the centre line)
+       sb   @bytes+>1d,a                                   ; SUB $1D           ; 
+       jlt  scanner_object_above                           ; JP M,$8283        ; blip below the top row
+       jeq  _8277                                          ; JR Z,$8277        ; 
+       movb @b255,a                                        ; LD A,$FF          ; 
+_8277:                                                     ; >8277
+       ab   one,a                                          ; INC A             ; E = blip height: 1 if Y + Z = 29, else 0
+       movb a,@e                                           ; LD E,A            ; 
+       movb @bytes+>1d,a                                   ; LD A,$1D          ; 
+       sb   b,a                                            ; SUB B             ; 
+       ab   d,a                                            ; ADD A,D           ; 
+       sb   @e,a                                           ; SUB E             ; D = stick length, from the top row down to Z
+       movb a,d                                            ; LD D,A            ; 
+       movb @bytes+>1c,b                                   ; LD B,$1C          ; B = 28 (blip at the top row)
+       jmp  _82a7                                          ; JR $8286 / JR $82A7; 
+scanner_object_above:                                      ; >8283
+       movb @bytes+>02,@e                                  ; LD E,$02          ; E = blip height (2 rows)
+       sb   one,d                                          ; DEC D             ; D = stick length (Y - 1)
+       jmp  _82a7                                          ; JR $82A7          ; 
+scanner_object_below:                                      ; >8288
+       cb   a,@b255                                        ; CP $FF            ; treat Y = -1 as -2
+       jne  _828d                                          ; JR NZ,$828D       ; 
+       sb   one,a                                          ; DEC A             ; 
+_828d:                                                     ; >828d
+       movb a,d                                            ; LD D,A            ; D = Y
+       ab   b,a                                            ; ADD A,B           ; 
+       sb   @bytes+>f1,a                                   ; SUB $F1           ; A = Y + Z + 15
+       jlt  _8294                                          ; JP P,$82A0        ; blip fits?
+scanner_queue_object:                                      ; >82a0
+       movb @bytes+>02,@e                                  ; LD E,$02          ; yes: blip height 2
+       movb d,r0                                           ; LD A,D / NEG / DEC A; D = stick length (-Y - 1)
+       inv  r0                                             ;                   ; 
+       movb r0,d                                           ; LD D,A            ; 
+       jmp  _82a7                                          ;                   ; 
+_8294:                                                     ; >8294
+       sb   @e,@e                                          ; LD E,$00          ; no: no blip
+       movb b,a                                            ; LD A,B            ; 
+       sb   @bytes+>f0,a                                   ; SUB $F0           ; 
+       movb a,d                                            ; SUB E / LD D,A    ; D = stick length, to the bottom row (Z + 16)
+_82a7:                                                     ; >82a7
+       movb d,a                                            ; LD A,D            ; 
+       ab   @e,a                                           ; ADD A,E           ; 
+       movb a,@circle_connector_no_prev_point_gate         ; LD ($E602),A      ; $E602 = stick + blip height
+       movb @c,a                                           ; LD A,C            ; 
+       ab   @bytes+>7a,a                                   ; ADD A,$7A         ; column = $7A + X
+       movb a,@c                                           ; LD C,A            ; 
+       movb @bytes+>a5,a                                   ; LD A,$A5          ; 
+       sb   b,a                                            ; SUB B             ; row = $A5 - B
+       movb a,b                                            ; LD B,A            ; 
+       bl   @pixel_address                                 ; CALL $37D1        ; HL = VRAM address
+       mov  @scanner_queue_ptr,ix                          ; LD HL,($E946)     ; IX -> the queue record
+       movb @l,*ix                                         ; LD (HL),E         ; byte 0: address low byte
+       .pop r0                                             ; POP AF            ; R0 = Y
+       andi r0,>8000                                       ; AND $80           ; 
+       socb h,r0                                           ; OR B              ; 
+       movb r0,@1(ix)                                      ; LD (HL),A         ; byte 1: address high byte, bit 7 = object below
+       movb @e,r0                                          ; LD A,E / RRCA x 3 ; 
+       sla  r0,5                                           ;                   ; 
+       socb d,r0                                           ; OR D              ; R0 = blip height << 5 / stick length
+       movb @c,r1                                          ; LD A,C            ; 
+       srl  r1,8                                           ;                   ; 
+       andi r1,>0007                                       ; AND $07           ; R1 = pixel within the byte (0-7)
+       ci   r1,2                                           ; CP $02            ; 
+       jl   scanner_queue_object_two_columns               ; JR C,$82F3        ; 0-1 - the run straddles two columns
+       movb r0,@2(ix)                                      ; LD (HL),E         ; byte 2: heights, one column
+       movb @scanner_blip_masks(r1),@4(ix)                 ; LD A,(IX+$00) / LD (HL),A; byte 4: 3-pixel blip mask
+       movb @scanner_stick_masks(r1),@6(ix)                ; LD A,(IX+$00) / LD (HL),A; byte 6: 2-pixel stick mask
+       jmp  _8332                                          ; JR $8332          ; add the record to the queue
+scanner_queue_object_two_columns:                          ; >82f3
+       ab   @circle_connector_no_prev_point_gate,@circle_connector_no_prev_point_gate; LD A,($E602) / ADD A,A / LD ($E602),A; two columns of background to save
+       sb   @bytes+>08,*ix                                 ; LD A,(HL) / SUB $08 / LD (HL),A; move the address one column left
+       socb @bytes+>80,r0                                  ; SET 7,E           ; 
+       movb r0,@2(ix)                                      ; LD (HL),E         ; byte 2: heights, bit 7 = two columns
+       movb @scanner_blip_masks(r1),@3(ix)                 ; LD A,(IX+$00) / LD (HL),A; byte 3: right-hand blip mask
+       movb @scanner_stick_masks(r1),@5(ix)                ; LD A,(IX+$00) / LD (HL),A; byte 5: right-hand stick mask
+       mov  r1,r1                                          ; LD A,D / OR A     ; pixel 0?
+       jne  _82f3_pixel_1                                  ;                   ; 
+       movb @bytes+>03,@4(ix)                              ; LD A,$03 / LD (HL),A; yes: byte 4: left-hand blip mask %11...
+       movb one,@6(ix)                                     ; LD A,$01 / LD (HL),A; ...byte 6: left-hand stick mask %1
+       jmp  _8332                                          ;                   ; 
+_82f3_pixel_1:                                             
+       movb one,@4(ix)                                     ; RRA / LD (HL),A   ; no: byte 4: %1...
+       sb   @6(ix),@6(ix)                                  ; XOR A / LD (HL),A ; ...byte 6: none
+_8332:                                                     ; >8332
+       clr  r0                                             ; LD A,($E602)      ; 
+       movb @circle_connector_no_prev_point_gate,r0        ;                   ; 
+       swpb r0                                             ;                   ; 
+       ai   r0,5                                           ; ADD A,$05 / LD C,A / XOR A / LD B,A; R0 = size of the saved-background record
+       movb @scanner_background_space+1,r1                 ; LD HL,($EB03)     ; R1 = space left in the saved-background list
+       movb @scanner_background_space,@r1lb                ;                   ; 
+       c    r0,r1                                          ; SBC HL,BC         ; 
+       jh   _8205_end                                      ; RET C             ; no room - don't show this object
+       s    r0,r1                                          ;                   ; 
+       movb r1,@scanner_background_space+1                 ; LD ($EB03),HL     ; 
+       movb @r1lb,@scanner_background_space                ;                   ; 
+       ai   ix,7                                           ; LD ($E946),DE     ; advance the queue write pointer
+       mov  ix,@scanner_queue_ptr                          ;                   ; 
+       ab   one,@scanner_queue_count                       ; LD HL,$E948 / INC (HL); one more object in the queue
+_8205_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Scanner: erase last frame's blips and sticks
+* 
+* Used by the routine at #R$8380.
+* .
+* Walks the list of saved-background records that #R$8380 built on the
+* previous frame (at #R$E9D6, newest first, chained through their first
+* two bytes) and writes the saved bytes back to VRAM (#R$854B with no
+* mask), restoring the scanner background under each blip and stick. Each
+* record is: link to the previous record (0 at the end), VRAM address,
+* run height (bit 7 set for two columns), then the saved bytes (for two
+* columns, the second column's follow the first's).
+* 
+* I:$E949 Nonzero if there are records to restore
+* I:$E75C Pointer to the newest record
+* TI: the records' words are big-endian, and the head pointer ($E75C) is a
+* big-endian word (only the TI scanner code reads them).
+scanner_erase:                                             ; >834d
+       .proc                                               ;                   ; 
+       movb @scanner_drawn_count,r0                        ; LD A,($E949) / OR A; any blips drawn last frame?
+       jeq  _834d_end                                      ; RET Z             ; 
+       mov  @scanner_saved_first,iy                        ; LD HL,($E75C)     ; IY -> the newest record
+_8355:                                                     ; >8355
+       movb *iy,r0                                         ; LD E,(HL) / INC HL / LD D,(HL) / INC HL; the link to the previous record
+       movb @1(iy),@r0lb                                   ;                   ; 
+       .push r0                                            ; PUSH DE           ; save it for the end of this pass
+       movb @2(iy),r1                                      ; LD E,(HL) / INC HL / LD D,(HL) / INC HL; R1 = VRAM address
+       movb @3(iy),@r1lb                                   ;                   ; 
+       movb @4(iy),r2                                      ; LD A,(HL) / INC HL / PUSH AF; R2 = run height, bit 7 = two columns
+       mov  iy,de                                          ;                   ; DE -> the saved bytes
+       ai   de,5                                           ;                   ; 
+       mov  r1,hl                                          ; EX DE,HL          ; HL = VRAM address
+       movb r2,b                                           ; AND $7F / LD B,A  ; B = run height
+       andi b,>7f00                                        ;                   ; 
+       clr  a                                              ; XOR A             ; no mask
+       bl   @or_vram_block                                 ; CALL $854B        ; restore the first column
+       movb r2,r2                                          ; POP AF / OR A     ; 
+       jgt  scanner_erase_one_column                       ; JP P,$837A        ; one column only
+       jeq  scanner_erase_one_column                       ;                   ; 
+       mov  r1,hl                                          ; LD A,L / ADD A,$08 / LD L,A; next column to the right
+       ab   @bytes+>08,@l                                  ;                   ; 
+       movb r2,b                                           ;                   ; 
+       andi b,>7f00                                        ;                   ; 
+       clr  a                                              ; XOR A             ; 
+       bl   @or_vram_block                                 ; CALL $854B        ; restore the second column
+scanner_erase_one_column:                                  ; >837a
+       .pop iy                                             ; POP HL            ; IY = link
+       mov  iy,iy                                          ; LD A,H / OR L     ; 
+       jne  _8355                                          ; JR NZ,$8355       ; loop until the end of the list
+_834d_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Scanner: draw this frame's blips and sticks
+* 
+* Used by the routine at #R$7202.
+* .
+* Called by the VBlank interrupt handler (#R$7202, at $727D) once #R$13FD
+* has set ($EB02) to say the frame's scanner queue is complete. First
+* erases last frame's blips (#R$834D). Then, for each record in the scanner
+* queue at #R$E94A (see #R$82A0 for the format): unpacks it into
+* $E760-$E769, saves the VRAM bytes about to be drawn over (#R$8528; one or
+* two columns, blip height + stick length rows) in a new record in the list
+* at #R$E9D6 for #R$834D to restore next frame, and then ORs the blip and
+* stick into VRAM: blip first then stick for an object above the ship,
+* stick first then blip ($843C) for one below.
+* 
+* I:$E948 Number of records in the queue
+* TI: called at the end of #R$13FD rather than by the VBlank handler. The
+* pointers at $E75C, $E75E, $E760 and $E76A, and the records' words, are
+* big-endian (only the TI scanner code reads them).
+scanner_draw:                                              ; >8380
+       .proc                                               ;                   ; 
+       bl   @scanner_erase                                 ; CALL $834D        ; erase last frame's blips
+       movb @scanner_queue_count,b                         ; LD A,($E948)      ; 
+       movb b,@scanner_drawn_count                         ; LD ($E949),A      ; remember how many are drawn, for #R$834D
+       jne  scanner_draw_1                                 ; OR A / JP Z,$845C ; 
+       .endproc                                            ;                   ; nothing to draw
+scanner_draw_1:
+       clr  @scanner_saved_last                            ; LD HL,$0000 / LD ($E75E),HL; first saved-background record's link = 0
+       li   ix,scanner_queue                               ; LD HL,$E94A       ; IX -> the scanner queue
+       li   iy,shared_blit_or_goatsoup_buffer              ; LD DE,$E9D6       ; IY -> the saved-background list
+scanner_draw_record:                                       ; >839a
+       .push bc                                            ; PUSH BC           ; 
+       mov  iy,@scanner_saved_first                        ; LD ($E75C),DE     ; this record becomes the head of the list
+       mov  @scanner_saved_last,r0                         ; LD HL,$E75E / LDI / LDI; link to the previous record
+       movb r0,*iy+                                        ;                   ; 
+       movb @r0lb,*iy+                                     ;                   ; 
+       mov  @scanner_saved_first,@scanner_saved_last       ; LD ($E75E),BC     ; remember this record for the next one's link
+       movb @1(ix),r0                                      ; LD A,(HL) ...     ; R0 = the VRAM address, bit 15 = object below
+       movb *ix,@r0lb                                      ;                   ; 
+       mov  r0,r1                                          ;                   ; 
+       andi r1,>7fff                                       ; AND $7F           ; 
+       mov  r1,@scanner_vram_addr                          ; LD ($E760),A / LD ($E761),A; 
+       movb r1,*iy+                                        ; LD (DE),A         ; copy the address without bit 15
+       movb @r1lb,*iy+                                     ;                   ; 
+       andi r0,>8000                                       ;                   ; 
+       movb r0,@scanner_below_flag                         ; LD ($E762),A      ; $E762 = bit 7: object below
+       movb @2(ix),r0                                      ; LD A,(HL) / LD C,A; 
+       mov  r0,r1                                          ;                   ; 
+       andi r1,>8000                                       ; AND $80           ; 
+       movb r1,@scanner_two_columns                        ; LD ($E763),A      ; $E763 = bit 7: two columns
+       mov  r0,r1                                          ; RLCA x 3 / AND $03; 
+       srl  r1,5                                           ;                   ; 
+       andi r1,>0300                                       ;                   ; 
+       movb r1,@scanner_heights                            ; LD ($E764),A      ; $E764 = blip height
+       andi r0,>1f00                                       ; AND $1F           ; 
+       movb r0,@scanner_stick_length                       ; LD ($E765),A      ; $E765 = stick length
+       ab   r1,r0                                          ; ADD A,B / LD B,A  ; R0 = run height
+       movb r0,r1                                          ;                   ; 
+       socb @scanner_two_columns,r1                        ; LD A,($E763) / OR B; 
+       movb r1,*iy+                                        ; LD (DE),A / INC DE; save the height and two-column flag
+       mov  iy,@scanner_background_save_address            ; LD ($E76A),DE     ; where to save the background
+       movb @3(ix),@scanner_masks_copy                     ; LD DE,$E766 / LDI x 4; copy the 4 masks to $E766-$E769
+       movb @4(ix),@scanner_masks_copy+1                   ;                   ; 
+       movb @5(ix),@scanner_masks_copy+2                   ;                   ; 
+       movb @6(ix),@scanner_masks_copy+3                   ;                   ; 
+       mov  @scanner_vram_addr,hl                          ; LD HL,($E760)     ; 
+       mov  iy,de                                          ; LD DE,($E76A)     ; 
+       movb r0,b                                           ; EX AF,AF' / LD B,A; 
+       bl   @read_vram_block                               ; CALL $8528        ; save the first column's background
+       movb @scanner_two_columns,r0                        ; LD A,($E763) / OR A; 
+       jgt  scanner_draw_one_column                        ; JP P,$8412        ; one column
+       jeq  scanner_draw_one_column                        ;                   ; 
+       mov  @scanner_vram_addr,hl                          ; LD HL,($E760) / LD A,L / ADD A,$08 / LD L,A; 
+       ab   @bytes+>08,@l                                  ;                   ; 
+       movb @scanner_heights,b                             ; EX AF,AF' / LD B,A; 
+       ab   @scanner_stick_length,b                        ;                   ; 
+       bl   @read_vram_block                               ; CALL $8528        ; save the second column's background
+scanner_draw_one_column:                                   ; >8412
+       mov  @scanner_vram_addr,hl                          ; LD HL,($E760)     ; 
+       mov  @scanner_background_save_address,de            ; LD DE,($E76A)     ; 
+       movb @scanner_below_flag,r0                         ; LD A,($E762) / OR A; 
+       jne  scanner_draw_below                             ; JP M,$843C        ; object below - stick first
+       bl   @scanner_or_blip_1                             ; CALL $845D        ; OR the blip into the first column
+       bl   @scanner_or_stick_1                            ; CALL $8469        ; then the stick
+       movb @scanner_two_columns,r0                        ; LD A,($E763) / OR A; 
+       jeq  scanner_draw_next                              ; JP P,$843A        ; one column
+       mov  @scanner_vram_addr,hl                          ; LD HL,($E760) / LD A,L / ADD A,$08 / LD L,A; 
+       ab   @bytes+>08,@l                                  ;                   ; 
+       bl   @scanner_or_blip_2                             ; CALL $8475        ; OR the blip into the second column
+       bl   @scanner_or_stick_2                            ; CALL $8481        ; then the stick
+       jmp  scanner_draw_next                              ; JR $8456          ; 
+scanner_draw_below:                                        ; >843c
+       bl   @scanner_or_stick_1                            ; CALL $8469        ; OR the stick into the first column
+       bl   @scanner_or_blip_1                             ; CALL $845D        ; then the blip
+       movb @scanner_two_columns,r0                        ; LD A,($E763) / OR A; 
+       jeq  scanner_draw_next                              ; JP P,$8456        ; 
+       mov  @scanner_vram_addr,hl                          ; LD HL,($E760) / LD A,L / ADD A,$08 / LD L,A; 
+       ab   @bytes+>08,@l                                  ;                   ; 
+       bl   @scanner_or_stick_2                            ; CALL $8481        ; stick, second column
+       bl   @scanner_or_blip_2                             ; CALL $8475        ; then the blip
+scanner_draw_next:                                         ; >8456
+       mov  de,iy                                          ;                   ; IY -> the next saved-background record
+       ai   ix,7                                           ; POP HL            ; IX -> the next queue record
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DEC B             ; 
+       jeq  _845c                                          ; JP NZ,$839A       ; 
+       b    @scanner_draw_record                           ;                   ; next record
+_845c:                                                     ; >845c
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Scanner: OR a blip into VRAM (first column)
+* 
+* Used by the routine at #R$8380.
+* .
+* Writes ($E764) rows downwards from HL, each the saved background byte
+* at DE ORed with the mask at $E767 (#R$854B). Does nothing if the
+* blip height is 0.
+* 
+* I:DE Pointer to the saved background bytes
+* I:HL VRAM address
+scanner_or_blip_1:                                         ; >845d
+       movb @scanner_heights,b                             ; LD A,($E764) / OR A / LD B,A; 
+       jne  _8463                                          ; RET Z             ; 
+       rt                                                  ;                   ; 
+_8463:                                                     ; >8463
+       movb @scanner_masks_copy+1,a                        ; LD A,($E767)      ; 
+       b    @or_vram_block                                 ; JP $854B          ; 
+
+********************************************************************************
+* Scanner: OR a stick into VRAM (first column)
+* 
+* Used by the routine at #R$8380.
+* .
+* Writes ($E765) rows downwards from HL, each the saved background byte
+* at DE ORed with the mask at $E769 (#R$854B). Does nothing if the
+* stick length is 0.
+* 
+* I:DE Pointer to the saved background bytes
+* I:HL VRAM address
+scanner_or_stick_1:                                        ; >8469
+       movb @scanner_stick_length,b                        ; LD A,($E765) / OR A / LD B,A; 
+       jne  _846f                                          ; RET Z             ; 
+       rt                                                  ;                   ; 
+_846f:                                                     ; >846f
+       movb @scanner_masks_copy+3,a                        ; LD A,($E769)      ; 
+       b    @or_vram_block                                 ; JP $854B          ; 
+
+********************************************************************************
+* Scanner: OR a blip into VRAM (second column)
+* 
+* Used by the routine at #R$8380.
+* .
+* Writes ($E764) rows downwards from HL, each the saved background byte
+* at DE ORed with the mask at $E766 (#R$854B). Does nothing if the
+* blip height is 0.
+* 
+* I:DE Pointer to the saved background bytes
+* I:HL VRAM address
+scanner_or_blip_2:                                         ; >8475
+       movb @scanner_heights,b                             ; LD A,($E764) / OR A / LD B,A; 
+       jne  _847b                                          ; RET Z             ; 
+       rt                                                  ;                   ; 
+_847b:                                                     ; >847b
+       movb @scanner_masks_copy,a                          ; LD A,($E766)      ; 
+       b    @or_vram_block                                 ; JP $854B          ; 
+
+********************************************************************************
+* Scanner: OR a stick into VRAM (second column)
+* 
+* Used by the routine at #R$8380.
+* .
+* Writes ($E765) rows downwards from HL, each the saved background byte
+* at DE ORed with the mask at $E768 (#R$854B). Does nothing if the
+* stick length is 0.
+* 
+* I:DE Pointer to the saved background bytes
+* I:HL VRAM address
+scanner_or_stick_2:                                        ; >8481
+       movb @scanner_stick_length,b                        ; LD A,($E765) / OR A / LD B,A; 
+       jne  _8487                                          ; RET Z             ; 
+       rt                                                  ;                   ; 
+_8487:                                                     ; >8487
+       movb @scanner_masks_copy+2,a                        ; LD A,($E768)      ; 
+       b    @or_vram_block                                 ; JP $854B          ; 
+
+********************************************************************************
+* Scale an unsigned magnitude by a fixed-point factor, then apply a sign
+* 
+* Used by the routine at #R$8205.
+* .
+* Computes a signed 8-bit result = +/-((HL * C) >> 12), where the sign
+* comes from the caller's A rather than from HL or C, which are both
+* treated as unsigned. Multiplies via #R$1F86 to get a 24-bit product in
+* A:HL, then rotates the top two bytes (A:H) left by 4 bits at a time
+* (through L, which is otherwise untouched) to bring product bits 12-19
+* down into A - equivalent to product >> 12, keeping only the low 8 bits
+* of that shifted result. C is therefore a scale factor out of 4096.
+* 
+* I:A Sign of the result (only the sign bit matters)
+* I:HL Unsigned 16-bit magnitude to scale
+* I:C Fixed-point scale factor, numerator over 4096
+* O:A Signed result; not clamped if the shifted magnitude exceeds 127
+* TI: the sign is in R0 and the factor in R1.
+scale_signed_coordinate:                                   ; >848d
+       mpy  hl,r1                                          ; LD A,C / CALL $1F86; R1:R2 = HL * C
+       sla  r1,4                                           ; RL H / RLA x 4    ; (product >> 12) and $FF...
+       srl  r2,12                                          ;                   ; 
+       soc  r2,r1                                          ;                   ; 
+       swpb r1                                             ;                   ; 
+       movb r1,a                                           ; LD L,A            ; ...in A
+       movb r0,r0                                          ; EX AF,AF' / OR A  ; 
+       jlt  _84a3                                          ; LD A,L / RET P    ; positive sign - return the magnitude as-is
+       rt                                                  ;                   ; 
+_84a3:                                                     ; >84a3
+       andi a,>ff00                                        ;                   ; 
+       neg  a                                              ; NEG               ; negative sign - negate it
+       rt                                                  ; RET               ; 
+
+********************************************************************************
 * Length of a vector
 * 
 * Used by the routines at #R$2DF1, #R$3113 and #R$883D.
@@ -8817,6 +9321,256 @@ vector_length_square_max:
 vector_length_square_0:                                    
        clr  hl                                             ; LD HL,$0000       ; L = 0: return 0
        rt                                                  ; RET               ; 
+
+********************************************************************************
+* Read a block of VRAM into a Z80 RAM buffer
+* 
+* Used by the routine at #R$8380.
+* .
+* Sets the VDP address for reading (no $40 on the high byte - that bit
+* selects write mode), then copies B bytes from VRAM to (DE). Uses the same
+* one-name-table-row-per-8-bytes addressing as #R$35B8/#R$854B: every 8th
+* byte the VRAM address drops to the same column one row down (+256 bytes)
+* instead of continuing into the next character.
+* 
+* I:HL VRAM address to start reading from
+* I:DE Destination buffer in Z80 RAM
+* I:B Number of bytes to read
+* O:DE Advanced past the last byte written
+read_vram_block:                                           ; >8528
+       movb @l,@vdpwa                                      ; LD A,L / OUT ($99),A; 
+       movb h,@vdpwa                                       ; LD A,H / OUT ($99),A; point the VDP at the address, for reading
+_8532:                                                     ; >8532
+       movb @vdprd,*de+                                    ; IN A,($98) / LD (DE),A / INC DE; read a byte
+       ab   one,@l                                         ; INC L             ; 
+       movb @l,r0                                          ; LD A,L / AND C    ; 
+       andi r0,>0700                                       ;                   ; 
+       jne  _8548                                          ; JR NZ,$8548       ; still within the character
+       movb @l,r0                                          ; LD A,L            ; 
+       sb   one,r0                                         ; DEC A             ; 
+       andi r0,>f800                                       ; AND $F8           ; back to the character's first row...
+       movb r0,@l                                          ; LD L,A            ; 
+       movb r0,@vdpwa                                      ; OUT ($99),A       ; 
+       ab   one,h                                          ; INC H             ; ...one character row down
+       movb h,@vdpwa                                       ; LD A,H / OUT ($99),A; 
+_8548:                                                     ; >8548
+       sb   one,b                                          ; DJNZ $8532        ; 
+       jne  _8532                                          ;                   ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* OR a Z80 RAM buffer into VRAM
+* 
+* Used by the routines at #R$834D, #R$845D, #R$8469, #R$8475 and #R$8481.
+* .
+* The mirror of #R$8528: sets the VDP address for writing, then for B bytes
+* reads a byte from (DE), ORs it with C, and writes the result to VRAM -
+* merging new pixels into whatever was already there rather than
+* overwriting it. Same one-row-per-8-bytes addressing as #R$8528/#R$35B8.
+* 
+* I:A Byte to OR into every byte written (becomes C)
+* I:HL VRAM address to start writing to
+* I:DE Source buffer in Z80 RAM
+* I:B Number of bytes to write
+* O:DE Advanced past the last byte read
+* TI: the byte to OR in is in A rather than C.
+or_vram_block:                                             ; >854b
+       movb @l,@vdpwa                                      ; LD C,A / LD A,L / OUT ($99),A; 
+       movb h,r0                                           ; LD A,H            ; 
+       socb @bytes+>40,r0                                  ; OR $40            ; 
+       movb r0,@vdpwa                                      ; OUT ($99),A       ; point the VDP at the address, for writing
+_8554:                                                     ; >8554
+       movb *de+,r0                                        ; LD A,(DE) / INC DE; 
+       socb a,r0                                           ; OR C              ; OR in A
+       movb r0,@vdpwd                                      ; OUT ($98),A       ; write the byte
+       ab   one,@l                                         ; INC L             ; 
+       movb @l,r0                                          ; LD A,L / AND $07  ; 
+       andi r0,>0700                                       ;                   ; 
+       jne  or_vram_next_byte                              ; JP NZ,$856D       ; still within the character
+       movb @l,r0                                          ; LD A,L            ; 
+       sb   one,r0                                         ; DEC A             ; 
+       andi r0,>f800                                       ; AND $F8           ; back to the character's first row...
+       movb r0,@l                                          ; LD L,A            ; 
+       movb r0,@vdpwa                                      ; OUT ($99),A       ; 
+       ab   one,h                                          ; INC H             ; ...one character row down
+       movb h,r0                                           ; LD A,H            ; 
+       socb @bytes+>40,r0                                  ; OR $40            ; 
+       movb r0,@vdpwa                                      ; OUT ($99),A       ; 
+or_vram_next_byte:                                         ; >856d
+       sb   one,b                                          ; DJNZ $8554        ; 
+       jne  _8554                                          ;                   ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Compass: work out one coordinate of the compass dot
+* 
+* Used by the routine at #R$85FB.
+* .
+* Returns k * |v| / sqrt(v^2 + Z^2), with the sign of v, where v is HL (the
+* target's X or Y) and Z is ($EB86) (|Z|, the target's depth). v and Z are
+* first shifted right together until both fit in a byte (using the
+* bit-length table at #R$0200), then squared (#R$1F5E), and the square root
+* of the sum (#R$1F9C) scaled back up. |v| * k ($85CC; *8 is done with
+* shifts) is then divided by that root. The result is at most k in size.
+* .
+* At $85CC, for k other than 8, multiplies |v| (HL) by k. The tail at $85DA
+* (shared with #R$8570's k=8 path) divides the product by the distance
+* sqrt(v^2 + Z^2) in DE, and gives the result the sign of v.
+* 
+* I:A Scale k (8 for Y, 1-6 for X)
+* I:HL v (two's complement)
+* O:A The signed result
+* O:L Its magnitude
+* TI: k is in R0, and the magnitude is returned in R1; the square, square
+* root and division are done with MPY and DIV.
+compass_coordinate:                                        ; >8570
+       .proc                                               ;                   ; 
+       .push hl                                            ; PUSH HL           ; save v
+       .push r0                                            ; PUSH AF           ; save k
+       abs  hl                                             ; BIT 7,H / ...     ; HL = the size of v
+       .push hl                                            ; PUSH HL           ; save its size
+       clr  r1                                             ;                   ; 
+       movb @delta_z_hi,r1                                 ; LD A,($EB87)      ; A = the high byte of Z...
+       socb hl,r1                                          ; OR H              ; ...ORed with v's
+       jeq  _8587                                          ; JR Z,$8587        ; both under 256 - no shift needed
+       swpb r1                                             ; LD C,A / LD B,$02 ; 
+       movb @bit_length_table(r1),r1                       ; LD A,(BC)         ; the shift needed
+_8587:                                                     ; >8587
+       movb r1,@depth_shift                                ; LD ($EB9B),A      ; save the shift count
+       jeq  _8594                                          ; OR A / JR Z,$8594 ; no shift
+       mov  r1,r0                                          ; LD B,A            ; 
+       srl  r0,8                                           ;                   ; 
+       srl  hl,0                                           ; RRA / RR L / DJNZ $858F; shift the size of v right to fit in a byte
+_8594:                                                     ; >8594
+       bl   @square_l                                      ; CALL $1F5E        ; HL = its square
+       .push hl                                            ; PUSH HL           ; save it
+       movb @delta_z_hi,hl                                 ; LD HL,($EB86)     ; HL = the size of Z
+       movb @abs_delta_z,@l                                ;                   ; 
+       clr  r0                                             ;                   ; 
+       movb @depth_shift,r0                                ; LD A,($EB9B) / OR A; 
+       jeq  _85a8                                          ; JR Z,$85A8        ; no shift
+       swpb r0                                             ; LD B,A            ; 
+       srl  hl,0                                           ; RRA / RR L / DJNZ $85A3; shift the size of Z right by the same amount
+_85a8:                                                     ; >85a8
+       bl   @square_l                                      ; CALL $1F5E        ; HL = Z squared
+       .pop de                                             ; POP DE            ; DE = v squared
+       clr  a                                              ; XOR A             ; 
+       a    de,hl                                          ; ADD HL,DE         ; 
+       jnc  _85af                                          ; ADC A,A           ; A:HL = v^2 + Z^2
+       movb one,a                                          ;                   ; 
+_85af:                                                     ; >85af
+       bl   @square_root                                   ; CALL $1F9C        ; HL = sqrt(v^2 + Z^2)
+       clr  r0                                             ;                   ; 
+       movb @depth_shift,r0                                ; LD A,($EB9B) / OR A; 
+       jeq  _85bc                                          ; JR Z,$85BC        ; no shift
+       swpb r0                                             ; LD B,A            ; 
+       sla  hl,0                                           ; ADD HL,HL / DJNZ $85B9; shift the root back up
+_85bc:                                                     ; >85bc
+       mov  hl,de                                          ; EX DE,HL          ; DE = the distance sqrt(v^2 + Z^2)
+       .pop r1                                             ; POP HL            ; R1 = the size of v
+       .pop r0                                             ; POP AF            ; R0 = k
+       mpy  r0,r1                                          ; CP $08 / ...      ; R1:R2 = the size of v * k
+       c    r1,de                                          ;                   ; does the quotient fit?
+       jl   compass_divide                                 ;                   ; yes
+       clr  r1                                             ;                   ; no (a distance of 0): 0
+       jmp  _85f3                                          ;                   ; 
+compass_divide:                                            
+       div  de,r1                                          ; LD B,$08 / ... / DJNZ $85E0; R1 = the size of v * k / the distance
+_85f3:                                                     ; >85f3
+       .pop r0                                             ; POP HL            ; R0 = v (for its sign)
+       mov  r1,a                                           ; LD L,A            ; A = the magnitude...
+       swpb a                                              ;                   ; 
+       mov  r0,r0                                          ; BIT 7,H           ; v positive?
+       jlt  _85f8                                          ; RET Z             ; 
+       .endproc                                            ;                   ; yes - done
+_85f8:                                                     ; >85f8
+       neg  a                                              ; NEG               ; no: negate the result
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Compass: position the compass dot
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called for each object by the main loop, but only acts for the object
+* the compass is tracking: the one whose slot number (#R$E911) matches
+* ($EB05) - slot 0, the planet, or slot 1, the space station, once the
+* ship is inside the station's safe zone (see #R$1549). Does nothing
+* after a drive malfunction (($EEC1) set) or when the dashboard isn't
+* shown (#R$6C9E).
+* .
+* The compass dot is sprite 8 (pattern $18). From the target's position
+* relative to the ship (X, Y, Z at $F7CE/$F7D0/$F7D2) it is placed
+* 8*Y/sqrt(Y^2+Z^2) pixels above the compass centre and k*X/sqrt(X^2+Z^2)
+* pixels to the right of it (#R$8570), where k comes from the table at
+* #R$8664 and narrows the horizontal range the further the dot is from
+* the centre line, keeping it inside the compass circle. The dot is
+* green (colour 2) if the target is in front of the ship and light blue
+* (colour 5) if it is behind.
+compass:                                                   ; >85fb
+       .proc                                               ;                   ; 
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; no compass after a drive malfunction
+       jne  _85fb_end                                      ; RET NZ            ; 
+       cb   @current_slot,@station_in_range                ; LD A,($E911) / LD HL,$EB05 / CP (HL); the compass target?
+       jne  _85fb_end                                      ; RET NZ            ; no
+       bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; return if the dashboard isn't shown
+       movb @object_position_z_lo+1,hl                     ; LD HL,($F7D2)     ; HL = Z
+       movb @object_position_z_lo,@l                       ;                   ; 
+       abs  hl                                             ; BIT 7,H / ...     ; HL = the size of Z
+       movb hl,@delta_z_hi                                 ; LD ($EB86),HL     ; $EB86 = the size of Z
+       movb @l,@abs_delta_z                                ;                   ; 
+       movb @object_position_y+1,hl                        ; LD HL,($F7D0)     ; HL = Y
+       movb @object_position_y,@l                          ;                   ; 
+       li   r0,8                                           ; LD A,$08          ; 8 (vertical range)
+       bl   @compass_coordinate                            ; CALL $8570        ; A = 8 * Y / sqrt(Y^2 + Z^2), R1 = its magnitude
+       .push a                                             ; PUSH AF           ; save it
+       movb @compass_range_table(r1),r0                    ; LD H,$00 / LD BC,$8664 / ADD HL,BC / LD A,(HL); the horizontal range for that height
+       srl  r0,8                                           ;                   ; 
+       movb @object_position_x+1,hl                        ; LD HL,($F7CE)     ; HL = X
+       movb @object_position_x,@l                          ;                   ; 
+       bl   @compass_coordinate                            ; CALL $8570        ; A = k * X / sqrt(X^2 + Z^2)
+       .pop r2                                             ; POP BC            ; R2 = vertical offset
+       ab   @bytes+>a5,a                                   ; ADD A,$A5         ; C = sprite X ($A5 = compass centre)
+       movb a,@c                                           ; LD C,A            ; 
+       movb @bytes+>91,a                                   ; LD A,$91          ; 
+       sb   r2,a                                           ; SUB B             ; 
+       movb a,b                                            ; LD B,A            ; B = sprite Y ($91 = compass centre)
+       movb @bytes+>02,@e                                  ; LD E,$02          ; colour 2 (green)...
+       movb @object_z_sign,r0                              ; LD A,($F7D3) / OR A; A = sign of Z
+       jgt  compass_set_dot                                ; JP P,$8644        ; target in front
+       jeq  compass_set_dot                                ;                   ; 
+       movb @bytes+>05,@e                                  ; LD E,$05          ; behind: colour 5 (light blue)
+compass_set_dot:                                           ; >8644
+       movb @bytes+>18,d                                   ; LD D,$18          ; pattern $18
+       movb @bytes+>20,@vdpwa                              ; LD A,$20 / OUT ($99),A; 
+       movb @bytes+>5b,@vdpwa                              ; LD A,$5B / OUT ($99),A; VRAM address $1B20: sprite 8's attributes
+       bl   @set_sprite                                    ; CALL $39A4        ; write Y, X, pattern and colour
+_85fb_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Scanner blip and stick masks
+* 
+* Two 8-entry tables indexed by the object's pixel position within its
+* screen byte (0-7), used by #R$82A7 (positions 2-7) and #R$82F3 (positions
+* 0 and 1). $8654 is the 3-pixel blip mask ending at that pixel, $865C the
+* 2-pixel stick mask; at positions 0 and 1 the rest spills into the byte to
+* the left (see #R$82F3).
+scanner_blip_masks:                                        ; >8654
+       byte >80,>C0,>E0,>70,>38,>1C,>0E,>07                       ; 
+scanner_stick_masks:                                       ; >865c
+       byte >80,>C0,>60,>30,>18,>0C,>06,>03                       ; 
+
+********************************************************************************
+* Compass dot horizontal range table
+* 
+* Entry n (0-8) is how far (in pixels) the compass dot may be placed left
+* or right of the compass centre when it is n pixels above or below it -
+* roughly the half-width of the compass circle at that height. Used by
+* #R$85FB as the scale for the dot's horizontal offset.
+compass_range_table:                                       ; >8664
+       byte >06,>06,>06,>05,>05,>04,>04,>03,>01                   ; 
+       even                                                       ; 
 
 ********************************************************************************
 * Move the object forward

@@ -643,6 +643,182 @@ ti_read_keyboard_column:
        rt
 *// ti_read_keyboard_column
 
+*********************************************************************
+*
+* Read the joysticks
+*
+* TI-specific replacement for #R$7312, called once per (MSX) frame by
+* ti_poll_vblank with BLWP @joystick_vector. Builds the control bits in
+* #R$E8F4 from both joysticks, as the MSX does (0 = pressed): bit 0 up,
+* 1 down, 2 left, 3 right, 4 fire. The MSX also reads the cursor keys and
+* the classic Elite keys there; those aren't read yet.
+*
+joystick_vector:
+       data keyboard_ws,ti_read_joysticks
+
+ti_read_joysticks:
+       clr  r1                         ; R1 = the directions pressed on either joystick
+       li   r2,>0600                   ; joystick 1 (column 6)
+       bl   @ti_read_joystick_column
+       li   r2,>0700                   ; joystick 2 (column 7)
+       bl   @ti_read_joystick_column
+       clr  r0                         ; R0 = the control bits, 1 = pressed
+       coc  @joystick_up,r1
+       jne  ti_read_joysticks_1
+       ori  r0,>0100                   ; bit 0: up
+ti_read_joysticks_1:
+       coc  @joystick_down,r1
+       jne  ti_read_joysticks_2
+       ori  r0,>0200                   ; bit 1: down
+ti_read_joysticks_2:
+       coc  @joystick_left,r1
+       jne  ti_read_joysticks_3
+       ori  r0,>0400                   ; bit 2: left
+ti_read_joysticks_3:
+       coc  @joystick_right,r1
+       jne  ti_read_joysticks_4
+       ori  r0,>0800                   ; bit 3: right
+ti_read_joysticks_4:
+       coc  @joystick_fire,r1
+       jne  ti_read_joysticks_5
+       ori  r0,>1000                   ; bit 4: fire
+ti_read_joysticks_5:
+       inv  r0                         ; 0 = pressed, as on the MSX
+       movb r0,@control_bits
+       rtwp
+*// ti_read_joysticks
+
+*
+* Read a joystick column into R1 (a bit set in the high byte for each
+* direction pressed: >0100 fire, >0200 left, >0400 right, >0800 down,
+* >1000 up)
+*
+* I:R2 The column (high byte)
+*
+ti_read_joystick_column:
+       li   r12,>0024                  ; CRU address of the column decoder
+       ldcr r2,3                       ; select the column
+       li   r12,>0006                  ; CRU address of the rows
+       clr  r0
+       stcr r0,5                       ; read them (0 = pressed)
+       inv  r0
+       andi r0,>1f00
+       soc  r0,r1
+       rt
+*// ti_read_joystick_column
+
+joystick_fire:
+       data >0100
+joystick_left:
+       data >0200
+joystick_right:
+       data >0400
+joystick_down:
+       data >0800
+joystick_up:
+       data >1000
+
+*********************************************************************
+*
+* Move the chart cursor with the joystick
+*
+* TI-specific replacement for #R$73BA and #R$7373, called once per (MSX)
+* frame by ti_poll_vblank with BLWP @chart_cursor_vector, before the
+* controls are read (as on the MSX). Does nothing unless the chart cursor
+* is on (#R$E70B) or while the VRAM is busy (#R$EF9E). If no direction is
+* held (#R$E8F4), resets the cursor's speed (#R$E708) to 1; otherwise moves
+* the cursor for each direction held, by the speed, up to the edge of the
+* chart, and every 7 frames speeds it up, up to 8.
+*
+chart_cursor_vector:
+       data keyboard_ws,ti_move_chart_cursor
+
+ti_move_chart_cursor:
+       movb @chart_cursor_active_flag,r0
+       jeq  ti_move_chart_cursor_end   ; the cursor is off
+       movb @vram_busy_flag,r0
+       jne  ti_move_chart_cursor_end   ; the VRAM is busy
+       movb @control_bits,r1
+       andi r1,>0f00
+       ci   r1,>0f00
+       jne  ti_move_chart_cursor_1     ; a direction is held
+       movb @bytes+>01,@chart_cursor_step_tier
+       rtwp                            ; none: back to speed 1
+ti_move_chart_cursor_1:
+       li   r4,chart_cursor_nudge_table
+       li   r5,>0100                   ; the first direction's bit
+ti_move_chart_cursor_2:
+       coc  r5,r1
+       jeq  ti_move_chart_cursor_3     ; not held
+       bl   @ti_step_chart_cursor      ; held - move that axis
+ti_move_chart_cursor_3:
+       ai   r4,4                       ; the next direction
+       sla  r5,1
+       ci   r5,>1000
+       jne  ti_move_chart_cursor_2
+       sb   @bytes+>01,@chart_cursor_countdown
+       jne  ti_move_chart_cursor_end
+       movb @bytes+>07,@chart_cursor_countdown
+       cb   @chart_cursor_step_tier,@bytes+>08
+       jhe  ti_move_chart_cursor_end
+       ab   @bytes+>01,@chart_cursor_step_tier ; faster
+ti_move_chart_cursor_end:
+       rtwp
+*// ti_move_chart_cursor
+
+*
+* Move the cursor along one axis by its speed, towards a limit (#R$7373)
+*
+* I:R4 -> the direction's record in chart_cursor_nudge_table
+*
+ti_step_chart_cursor:
+       mov  r11,r10
+       mov  *r4,r6                     ; R6 -> the coordinate
+       clr  r7
+       movb *r6,r7
+       cb   r7,@2(r4)
+       jeq  ti_step_chart_cursor_end   ; already at the limit
+       srl  r7,8                       ; R7 = the coordinate
+       clr  r8
+       movb @chart_cursor_step_tier,r8
+       srl  r8,8                       ; R8 = the speed
+       clr  r9
+       movb @2(r4),r9
+       srl  r9,8                       ; R9 = the limit
+       movb @3(r4),r0
+       jlt  ti_step_chart_cursor_1     ; towards a lower limit
+       a    r8,r7                      ; towards a higher one
+       c    r7,r9
+       jl   ti_step_chart_cursor_2
+       mov  r9,r7                      ; past it - clamp
+       jmp  ti_step_chart_cursor_2
+ti_step_chart_cursor_1:
+       s    r8,r7
+       jlt  ti_step_chart_cursor_clamp
+       c    r7,r9
+       jhe  ti_step_chart_cursor_2
+ti_step_chart_cursor_clamp:
+       mov  r9,r7                      ; past it - clamp
+ti_step_chart_cursor_2:
+       swpb r7
+       movb r7,*r6                     ; the new coordinate
+       bl   @move_chart_cursor_sprite  ; move the sprite there (#R$73A6)
+ti_step_chart_cursor_end:
+       b    *r10
+*// ti_step_chart_cursor
+
+* For each direction (up, down, left, right): the coordinate it moves,
+* its limit, and whether it moves down (>FF) or up (>01) to it (#R$73FC)
+chart_cursor_nudge_table:
+       data chart_cursor_y
+       byte >00,>ff
+       data chart_cursor_y
+       byte >9f,>01
+       data chart_cursor_x
+       byte >11,>ff
+       data chart_cursor_x
+       byte >e0,>01
+
 key_held_column:                       ; The column of the key held (high byte), or -1
        data -1
 key_held_row:                          ; Its row's bit (as from ti_read_keyboard_column)

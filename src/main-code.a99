@@ -4275,6 +4275,7 @@ key_table:                                                 ; >419b
        data >3000,code_bank_7_select,show_cargo_manifest_screen   ; '0': inventory (#R$5C8E)
        data >3200,code_bank_7_select,buy_cargo                    ; '2': buy cargo when docked (#R$417D, #R$5BBD) (TI: no rear view yet)
        data >3300,code_bank_7_select,sell_cargo                   ; '3': sell cargo when docked (#R$4187, #R$5CEE) (TI: no left view yet)
+       data >3400,code_bank_7_select,equip_ship                   ; '4': equip ship when docked (#R$4191, #R$5DBB) (TI: no right view yet)
        data >3800,code_bank_7_select,key_handler_8                ; '8': market prices (#R$5B99)
        data >3900,code_bank_7_select,status_page                  ; '9': commander status (#R$6276)
        data >5b00,code_bank_7_select,commander_menu               ; '[' (FCTN-R): load/save commander menu (#R$A30A)

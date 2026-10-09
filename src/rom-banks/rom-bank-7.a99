@@ -1,4 +1,4 @@
-* ROM bank 7: the math tables, and code: the status page, the commander menu, the inventory, the market prices and buying and selling cargo
+* ROM bank 7: the math tables, and code: the status page, the commander menu, the inventory, the market prices, buying and selling cargo and equipping the ship
 * Assembled for real by code-banks.a99, and DORG in elite.a99 for its labels
        .ifdef code_banks
        aorg >6000
@@ -1175,6 +1175,656 @@ show_cash_and_space:                                       ; >612d
        bl   @print_free_space                              ; CALL $6051        ; print the free space
        li   hl,msg_tonnes                                  ; LD HL,$583D       ; " tonnes." (the caller prints it)
        .endproc                                            ; RET               ; 
+
+* The equip ship screen, with its own data
+
+********************************************************************************
+* The message "Fuel"
+msg_fuel:                                                  ; >0ffc
+       text 'Fue',>ec                                             ; 
+msg_missiles:                                              ; >1000
+       text 'Missile',>f3                                         ; 
+msg_large_cargo_bay:                                       ; >1008
+       text 'Large Cargo Ba',>f9                                  ; 
+msg_ecm_system:                                            ; >1017
+       text 'ECM syste',>ed                                       ; 
+msg_pulse_laser:                                           ; >1021
+       text 'Pulse Lase',>f2                                      ; 
+msg_beam_laser:                                            ; >102c
+       text 'Beam Lase',>f2                                       ; 
+msg_fuel_scoop:                                            ; >1036
+       text 'Fuel Scoo',>f0                                       ; 
+msg_escape_capsule:                                        ; >1040
+       text 'Escape Capsul',>e5                                   ; 
+msg_energy_bomb:                                           ; >104e
+       text 'Energy Bom',>e2                                      ; 
+msg_extra_energy_unit:                                     ; >1059
+       text 'Extra Energy Uni',>f4                                ; 
+msg_docking_computer:                                      ; >106a
+       text 'Docking Compute',>f2                                 ; 
+msg_galactic_hyperdrive:                                   ; >107a
+       text 'Galactic Hyperdriv',>e5                              ; 
+msg_mining_laser:                                          ; >108d
+       text 'Mining lase',>f2                                     ; 
+msg_military_laser:                                        ; >1099
+       text 'Military lase',>f2                                   ; 
+
+********************************************************************************
+* Equipment minimum tech levels
+* 
+* One byte per item of equipment, in the order of the Equip Ship list
+* (#R$0FFC): the lowest tech level at which it's on sale. Fuel, Missiles
+* and the Large Cargo Bay are always available, then one more item per
+* tech level from 2 up, and the last three at 10. #R$5DBB counts the
+* entries up to the system's tech level to decide how many items to
+* list; the $FF at $116A ends the table.
+equipment_tech_levels:                                     ; >115c
+       byte >00,>00,>00,>02,>03,>04,>05,>06                       ; 
+       byte >07,>08,>09,>0A,>0A,>0A,>FF                           ; 
+
+********************************************************************************
+* Equipment prices
+* 
+* One word per item of equipment, in the order of the Equip Ship list
+* (#R$0FFC), in tenths of a credit. Fuel's entry is 0: #R$5DD9 shows the
+* fuel price from ($E724) instead. Read by #R$5DD9, #R$5FAB and #R$6003.
+equipment_prices:                                          ; >116b
+       byte >00,>00                                               ; Fuel (priced per light year elsewhere): 0.0 Cr
+       byte >2c,>01                                               ; Missile: 30.0 Cr
+       byte >a0,>0f                                               ; Large Cargo Bay: 400.0 Cr
+       byte >70,>17                                               ; E.C.M. System: 600.0 Cr
+       byte >a0,>0f                                               ; Pulse Laser: 400.0 Cr
+       byte >10,>27                                               ; Beam Laser: 1000.0 Cr
+       byte >82,>14                                               ; Fuel Scoops: 525.0 Cr
+       byte >10,>27                                               ; Escape Capsule: 1000.0 Cr
+       byte >28,>23                                               ; Energy Bomb: 900.0 Cr
+       byte >98,>3a                                               ; Extra Energy Unit: 1500.0 Cr
+       byte >98,>3a                                               ; Docking Computer: 1500.0 Cr
+       byte >50,>c3                                               ; Galactic Hyperdrive: 5000.0 Cr
+       byte >40,>1f                                               ; Mining Laser: 800.0 Cr
+       byte >60,>ea                                               ; Military Laser: 6000.0 Cr
+
+********************************************************************************
+* The message ". "
+* 
+* Printed after each item's number in the Equip Ship list, before its
+* name (#R$5DBB, at $5DF5).
+msg_decimal_point:                                         ; >5723
+       text '.',>a0                                               ; 
+
+********************************************************************************
+* The message "Tank Already Full."
+msg_tank_already_full:                                     ; >5725
+       text 'Tank Already Full',>ae                               ; 
+
+********************************************************************************
+* The message "Missile launcher full."
+msg_missile_launcher_full:                                 ; >5737
+       text 'Missile launcher full',>ae                           ; 
+
+********************************************************************************
+* The message "Only 1 "
+msg_only_1:                                                ; >574d
+       text 'Only 1',>a0                                          ; 
+
+********************************************************************************
+* The message " allowed"
+msg_allowed:                                               ; >5754
+       text ' allowe',>e4                                         ; 
+
+********************************************************************************
+* Equip Ship screen: "Item to purchase"
+* 
+* Printed by #R$5DBB. A list of (column, row, string) records ending with $FF
+* (see #R$3596).
+msg_item_to_purchase:                                      ; >575c
+       text >05,>16,'Item to purchas',>e5                         ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* The message "All lasers mounted."
+msg_all_lasers_mounted:                                    ; >576f
+       text 'All lasers mounted',>ae                              ; 
+
+********************************************************************************
+* The message "Position ("
+msg_position:                                              ; >5782
+       text 'Position ',>a8                                       ; 
+
+********************************************************************************
+* The message "Invalid position."
+msg_invalid_position:                                      ; >578c
+       text 'Invalid position',>ae                                ; 
+
+********************************************************************************
+* The message "Invalid item."
+msg_invalid_item:                                          ; >579d
+       text 'Invalid item',>ae                                    ; 
+
+********************************************************************************
+* Equip Ship screen title
+* 
+* Printed by #R$5DBB. A list of (column, row, string) records ending with $FF
+* (see #R$3596).
+equip_ship_title:                                          ; >57aa
+       text >10,>01,'Equip Shi',>f0                               ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* The message "No fuel available!"
+msg_no_fuel_available:                                     ; >57b7
+       text 'No fuel available',>a1                               ; 
+
+********************************************************************************
+* The message " credits left."
+msg_credits_left:                                          ; >5803
+       text ' credits left',>ae                                   ; 
+
+********************************************************************************
+* Equip Ship screen frame
+* 
+* Drawn by #R$5DBB. A list of (RST $28) rectangles ending with $FF (see
+* #R$36F1).
+equip_ship_screen_frame:                                   ; >5a76
+       byte >05,>01,>20,>01,>91                                   ; 
+       byte >05,>03,>02,>0E,>D1                                   ; 
+       byte >08,>03,>13,>0E,>21                                   ; 
+       byte >1E,>03,>06,>0E,>71                                   ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Equipment item numbers of the four lasers
+* 
+* Each is also the offset of the laser's entry in the equipment (#R$F775),
+* which has a bit for each mount it's fitted to. They're in the order of
+* the laser types 0-3 (#R$F818). When a laser is bought, #R$5EFE checks
+* the other three for one fitted to the same mount, and removes it.
+laser_items:                                               ; >5ac3
+       byte >04                                                   ; pulse laser (#R$F779)
+       byte >0C                                                   ; mining laser (#R$F781)
+       byte >05                                                   ; beam laser (#R$F77A)
+       byte >0D                                                   ; military laser (#R$F782)
+
+********************************************************************************
+* Equip Ship screen
+* 
+* Used by the routine at #R$4191.
+* .
+* Reached from #R$4191 (the '4' key) while docked ($E90A set). Hides the
+* sprites (#R$608C) and draws the screen's frame (RST $28, from $5A76) and
+* headings (RST $20, from $57AA). Then works out how many items of
+* equipment are on sale: the number of entries in #R$115C (each item's
+* minimum tech level) that are no higher than the system's tech level
+* ($F764) - 3 for tech level 0 or 1, then one more per level, up to all 14.
+* Falls into $5DD9 with that count.
+* .
+* At $5DD9, saves the number of items on sale (B) at $E744, then prints one
+* line per item from row 3 down: its number, the item's name from #R$0FFC,
+* and its price from #R$116B (for fuel, whose table entry is 0, the price
+* per light year at ($E724)).
+* .
+* Then, at $5E1F, prints the prompt (#R$575C) and reads a number (RST $30,
+* see #R$5AC7). ESC or an empty or zero entry leaves the screen (#R$6276);
+* a number outside 1 to the number of items on sale shows "Invalid item."
+* (at $5E63) and asks again. Otherwise it's dispatched by item: 1 (fuel) to
+* #R$5E6B, 2 (missiles, at $5E43) to #R$5ED1, and the rest (at $5E4C) to
+* #R$5EFE for a laser (its entry in the equipment array at #R$F775 is
+* negative) or #R$5EE4 for anything else (at $5E5E). Then it asks again (at
+* $5E69).
+equip_ship:                                                ; >5dbb
+       .proc                                               ;                   ; 
+       movb @docked,a                                      ; CALL $6393        ; refuse in flight
+       jne  _5dbb_docked                                   ;                   ; 
+       .endproc                                            ;                   ; (TI: back to the caller, without the beep, as no sound effects yet)
+_5dbb_docked:                                              
+       bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide sprites
+       li   ix,equip_ship_screen_frame                     ; LD IX,$5A76       ; IX -> the screen's frame
+       bl   @rst_28_target_draw_list_tile                  ; RST $28           ; draw it
+       li   hl,equip_ship_title                            ; LD HL,$57AA       ; HL -> the screen's headings
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print them
+       sb   b,b                                            ; LD B,$00          ; B = items on sale
+       li   hl,equipment_tech_levels                       ; LD HL,$115C       ; HL -> the minimum tech levels
+       movb @tech_level,a                                  ; LD A,($F764)      ; A = the system's tech level
+_5dd2:                                                     ; >5dd2
+       cb   a,*hl+                                         ; CP (HL) / INC HL  ; is the next item's minimum tech level higher?
+       jl   equip_ship_list                                ; JR C,$5DD9        ; yes - B items are on sale
+       ab   one,b                                          ; INC B             ; no - one more item
+       jmp  _5dd2                                          ; JR $5DD2          ; 
+equip_ship_list:                                           ; >5dd9
+       movb b,@equip_items_on_sale                         ; LD A,B / LD ($E744),A; save the number of items on sale
+       li   ix,equipment_prices                            ; LD IX,$116B       ; IX -> the equipment prices
+       movb @bytes+>03,@c                                  ; LD C,$03          ; C = row 3 for the first item
+_5de3:                                                     ; >5de3
+       .push bc                                            ; PUSH BC           ; save the item count and row
+       movb @bytes+>05,b                                   ; LD B,$05          ; B = column 5
+       bl   @set_cursor_position                           ; CALL $3548        ; move the cursor to (row C, column 5)
+       sb   @bytes+>02,@c                                  ; DEC C x 2         ; C = item number (row - 2)
+       movb @c,a                                           ; LD A,C            ; 
+       .push af                                            ; PUSH AF           ; save it for the RST $10 index below
+       clr  hl                                             ; LD HL,$0000       ; the number is in C
+       movb @bytes+>82,a                                   ; LD A,$82          ; control byte: pad to width 2
+       bl   @rst_18_target_format_value_print              ; RST $18           ; print the item number
+       li   hl,msg_decimal_point                           ; LD HL,$5723       ; ". "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       .pop af                                             ; POP AF            ; A = item number
+       sb   one,a                                          ; DEC A             ; A = item index (0-13)
+       li   hl,msg_fuel                                    ; LD HL,$0FFC       ; HL -> the equipment names
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print this item's name
+       movb @bytes+>1e,a                                   ; LD A,$1E          ; 
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; move the cursor to the price column
+       movb *ix,@c                                         ; LD C,(IX+$00)     ; price, low byte
+       movb @1(ix),@l                                      ; LD L,(IX+$01)     ; price, high byte
+       movb @c,a                                           ; LD A,C            ; 
+       socb @l,a                                           ; OR L              ; is it 0 (fuel)?
+       jne  _5e12                                          ; JR NZ,$5E12       ; no - use it as read
+       movb @fuel_price,@c                                 ; LD A,($E724) / LD C,A; yes - use the price of fuel instead
+_5e12:                                                     ; >5e12
+       sb   h,h                                            ; LD H,$00          ; HL = the (possibly substituted) value
+       movb @bytes+>c6,a                                   ; LD A,$C6          ; control byte: pad to width 6, decimal-point handling
+       bl   @rst_18_target_format_value_print              ; RST $18           ; print the price
+       .pop bc                                             ; POP BC            ; restore the item count and row
+       inct ix                                             ; INC IX x 2        ; IX -> the next price
+       ab   one,@c                                         ; INC C             ; next row
+       sb   one,b                                          ; DJNZ $5DE3        ; loop for each item on sale
+       jne  _5de3                                          ;                   ; 
+_5e1f:                                                     ; >5e1f
+       li   hl,msg_item_to_purchase                        ; LD HL,$575C       ; HL -> a positioned-string list
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print it
+       bl   @ask_for_number                                ; RST $30           ; prompt and read a number (see #R$5AC7)
+       jnc  _5e1f_leave                                    ; JP NC,$6276       ; ESC - leave the screen
+       mov  hl,hl                                          ; JP Z,$6276        ; (TI: test the number for 0 here)
+       jeq  _5e1f_leave                                    ;                   ; empty input or a typed 0 - the same
+       movb h,a                                            ; LD A,H / OR A     ; value >= 256?
+       jne  selector_out_range_cancelled_case_redraw       ; JR NZ,$5E63       ; yes - out of range, redraw and try again
+       movb @l,a                                           ; LD A,L            ; 
+       cb   a,@equip_items_on_sale                         ; LD HL,$E744 / CP (HL); more than the number of items on sale?
+       jh   selector_out_range_cancelled_case_redraw       ; JR Z,$5E3A / JR NC,$5E63; yes - ask again (TI: JH straight after the CB)
+       sb   one,a                                          ; DEC A             ; A = selection - 1
+       jne  selector_item_2_case_else_fall                 ; JR NZ,$5E43       ; not item 1 - continue down the chain
+       bl   @equip_buy_fuel                                ; CALL $5E6B        ; item 1 (fuel)
+       jmp  _5e1f                                          ; JP $5E69          ; then loop back to $5E1F
+selector_item_2_case_else_fall:                            ; >5e43
+       sb   one,a                                          ; DEC A             ; A = selection - 2
+       jne  selector_items_3_case_split_n                  ; JR NZ,$5E4C       ; not item 2
+       bl   @buy_missile                                   ; CALL $5ED1        ; item 2 (missiles)
+       jmp  _5e1f                                          ; JP $5E69          ; then loop back to $5E1F
+selector_items_3_case_split_n:                             ; >5e4c
+       ab   one,a                                          ; INC A             ; A = selection - 1 (0-based item index)
+       movb a,@c                                           ; LD C,A            ; 
+       movb a,r1                                           ; LD B,$00          ; 
+       srl  r1,8                                           ;                   ; 
+       li   hl,fuel_level                                  ; LD HL,$F775       ; HL -> the equipment
+       a    r1,hl                                          ; ADD HL,BC         ; HL -> this item's entry
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; a laser (bit 7)?
+       jgt  non_negative_case_call_rejoin_selector         ; JP P,$5E5E        ; no
+       jeq  non_negative_case_call_rejoin_selector         ;                   ; 
+       bl   @buy_laser                                     ; CALL $5EFE        ; yes - buy a laser
+       jmp  _5e1f                                          ; JR $5E61          ; then loop back to $5E1F
+non_negative_case_call_rejoin_selector:                    ; >5e5e
+       bl   @buy_other_item                                ; CALL $5EE4        ; buy it
+       jmp  _5e1f                                          ; JR $5E69          ; loop back to $5E1F
+selector_out_range_cancelled_case_redraw:                  ; >5e63
+       li   hl,msg_invalid_item                            ; LD HL,$579D       ; HL -> a fixed string
+       bl   @show_message                                  ; CALL $5FFB        ; show it for a while
+       jmp  _5e1f                                          ; JR $5E1F          ; loop back to $5E1F
+_5e1f_leave:                                               
+       bl   @status_page                                   ; JP $6276          ; (TI: the status page returns here)
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Equip Ship: buy fuel
+* 
+* Used by the routine at #R$5DBB.
+* .
+* During mission 3 (#R$E93D = $3x), when the sun is going supernova,
+* there's "No fuel available!". Otherwise (at $5E7D), the fuel wanted is
+* what it takes to fill the tank to 70 (7.0 light years, #R$F775) - or if
+* that's none, "Tank Already Full.".
+* .
+* At $5E8B, the cost of A tenths of a light year of fuel is A * the fuel
+* price (#R$E724) / 10 credits. If the player can pay for it, buys it (at
+* $5EBB): takes the cost off the cash, adds the fuel to the tank, and shows
+* the cash (#R$6037) and " credits left". Otherwise works out how much the
+* cash will buy - (low byte of the cash, #R$EB16) * 10 / fuel price - and
+* tries again, which always succeeds (though if that comes to more than
+* 255, only the low byte of it is bought).
+equip_buy_fuel:                                            ; >5e6b
+       .proc                                               ;                   ; 
+       movb @mission_state,a                               ; LD A,($E93D)      ; A = the state byte
+       andi a,>f000                                        ; AND $F0           ; 
+       cb   a,@bytes+>30                                   ; CP $30            ; mission 3?
+       jne  buy_fuel                                       ; JR NZ,$5E7D       ; no - buy fuel
+* TI: no beep (#R$16FE), as the sound effects aren't converted yet
+       li   hl,msg_no_fuel_available                       ; LD HL,$57B7       ; "No fuel available!"
+       jmp  _5ecd                                          ; JP $5FFB          ; show it for a while
+buy_fuel:                                                  ; >5e7d
+       movb @bytes+>46,a                                   ; LD A,($F775) / SUB $46 / NEG; A = 70 - the current fuel level
+       sb   @fuel_level,a                                  ;                   ; 
+       jne  buy_fuel_2                                     ; JR NZ,$5E8B       ; nonzero - go buy fuel
+       li   hl,msg_tank_already_full                       ; LD HL,$5725       ; zero - "Tank Already Full."
+       jmp  _5ecd                                          ; JR $5ECD          ; print it and return
+buy_fuel_2:                                                ; >5e8b
+       .push af                                            ; PUSH AF           ; save the units wanted this pass
+       movb a,r1                                           ;                   ; (TI: MPY and DIV instead of #R$1F60 and #R$20C6)
+       srl  r1,8                                           ;                   ; 
+       movb @fuel_price,r0                                 ; LD DE,($E724)     ; 
+       srl  r0,8                                           ;                   ; 
+       mpy  r0,r1                                          ; CALL $1F60        ; R2 = units * price
+       clr  r1                                             ;                   ; 
+       li   r0,10                                          ; CALL $20C6        ; 
+       div  r0,r1                                          ;                   ; R1 = that / 10: the whole-credit cost
+       movb @player_cash+1,hl                              ; LD HL,($EB16)     ; 
+       movb @player_cash,@l                                ;                   ; 
+       movb @cash_2,a                                      ; LD A,($EB18)      ; HL:A = the cash total
+       s    r1,hl                                          ; OR A / SBC HL,DE  ; cash -= cost
+       joc  continuation_commit_fuel_purchase              ; SBC A,$00 / JR NC,$5EBB; affordable - go commit the purchase
+       movb a,a                                            ;                   ; (TI: a borrow out of A means too little cash)
+       jeq  _5e8b_cannot_afford                            ;                   ; 
+       sb   one,a                                          ;                   ; 
+       jmp  continuation_commit_fuel_purchase              ;                   ; 
+_5e8b_cannot_afford:                                       
+       .pop af                                             ; POP AF            ; not affordable - discard the units wanted
+       movb @player_cash,r1                                ; LD A,($EB16)      ; the cash total's low byte alone
+       srl  r1,8                                           ;                   ; 
+       li   r0,10                                          ; LD E,$0A          ; 
+       mpy  r0,r1                                          ; CALL $1F60        ; R2 = that * 10
+       clr  r1                                             ;                   ; 
+       movb @fuel_price,r0                                 ; LD A,($E724)      ; 
+       srl  r0,8                                           ;                   ; 
+       div  r0,r1                                          ; CALL $2079        ; R1 = that / price: what the cash will buy
+       swpb r1                                             ; LD A,L            ; A = its low byte, as on the MSX
+       movb r1,a                                           ;                   ; 
+       jmp  buy_fuel_2                                     ; JR $5E8B          ; re-price it
+continuation_commit_fuel_purchase:                         ; >5ebb
+       movb hl,@player_cash+1                              ; LD ($EB16),HL     ; commit the new cash total
+       movb @l,@player_cash                                ;                   ; 
+       movb a,@cash_2                                      ; LD ($EB18),A      ; 
+       .pop af                                             ; POP AF            ; A = the unit count that was actually affordable
+       ab   a,@fuel_level                                  ; LD HL,$F775 / ADD A,(HL) / LD (HL),A; add it to the fuel level
+       bl   @format_print_current_cash_total               ; CALL $6037        ; refresh the cash readout
+       li   hl,msg_credits_left                            ; LD HL,$5803       ; " credits left"
+_5ecd:                                                     ; >5ecd
+       bl   @show_message                                  ; CALL $5FFB        ; show it for a while
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Equip Ship: buy a missile
+* 
+* Used by the routine at #R$5DBB.
+* .
+* Shows "Missile launcher full." if there are 4 missiles already (#R$F776);
+* otherwise (at $5EDF) buys one (#R$6002).
+buy_missile:                                               ; >5ed1
+       li   hl,missile_count                               ; LD HL,$F776       ; HL -> the number of missiles
+       cb   *hl,@bytes+>04                                 ; LD A,(HL) / CP $04; 
+       jne  fallback_buy_item_1_missiles_flat              ; JR NZ,$5EDF       ; not 4
+       li   hl,msg_missile_launcher_full                   ; LD HL,$5737       ; 4 - "Missile launcher full."
+       b    @show_message                                  ; JP $5FFB          ; show it for a while
+fallback_buy_item_1_missiles_flat:                         ; >5edf
+       movb one,a                                          ; LD A,$01          ; A = item index 1 - Missiles
+       b    @buy_equipment                                 ; JP $6002          ; 
+
+********************************************************************************
+* Equip Ship: buy an item other than fuel, missiles or a laser
+* 
+* Used by the routine at #R$5DBB.
+* .
+* Buys item C (#R$6002), unless it's fitted already, when it shows "Only 1
+* <item> allowed" (at $5EEF, with the name from #R$0FFC).
+* 
+* I:C Item
+* I:HL Pointer to its entry in the equipment (#R$F775)
+buy_other_item:                                            ; >5ee4
+       .proc                                               ;                   ; 
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; A = the item's entry
+       jne  confirm_special_item_purchase                  ; JR NZ,$5EEF       ; fitted already
+       .push bc                                            ; PUSH BC           ; 
+       movb @c,a                                           ; LD A,C            ; A = the 0-based item index
+       bl   @buy_equipment                                 ; CALL $6002        ; 
+       .pop bc                                             ; POP BC            ; 
+       .endproc                                            ; RET               ; 
+confirm_special_item_purchase:                             ; >5eef
+       li   hl,msg_only_1                                  ; LD HL,$574D       ; "Only 1 "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       movb @c,a                                           ; LD A,C            ; 
+       li   hl,msg_fuel                                    ; LD HL,$0FFC       ; the equipment names
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print this item's name
+       li   hl,msg_allowed                                 ; LD HL,$5754       ; " allowed"
+       bl   @show_message                                  ; JP $5FFB          ; show it for a while
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Equip Ship: buy a laser
+* 
+* Used by the routine at #R$5DBB.
+* .
+* A laser's entry in the equipment (#R$F775) has bit 7 set, and bits 0-3
+* for the mounts it's fitted to (front, back, left and right). Shows "All
+* lasers mounted." if it's fitted to all four already. Otherwise counts the
+* mounts it's fitted to (at $5F0D); if there's only one left (at $5F18),
+* that's the one. If not (at $5F28), asks "Position (" with the letters of
+* the free mounts from "FBLR" ($57DD) and ") ? " (at $5F3F), and reads a
+* letter (#R$3631): ESC or nothing cancels, and a letter that isn't offered
+* shows "Invalid position." and asks again.
+* .
+* At $5F85, a mount can only have one laser: if another type of laser
+* (items 4, 12, 5 and 13, from $5AC3) is fitted to it, that one is removed
+* and its price refunded (keeping the old values in #R$E74D, #R$E74E and
+* #R$E750 in case they need putting back). Then (at $5FD0) buys the laser
+* (#R$6002, the item number kept in $F818) and fits it to the mount; if the
+* player can't pay for it (at $5FE4), puts back any laser that was removed,
+* and the cash.
+* 
+* I:C Item
+* I:HL Pointer to its entry in the equipment (#R$F775)
+buy_laser:                                                 ; >5efe
+       .proc                                               ;                   ; 
+       movb hl,@equipment_install_flags_ptr+1              ; LD ($E749),HL     ; keep the entry's address
+       movb @l,@equipment_install_flags_ptr                ;                   ; 
+       andi a,>0f00                                        ; AND $0F           ; 
+       cb   a,@bytes+>0f                                   ; CP $0F            ; 
+       jne  popcount_a_kernighan                           ; JR NZ,$5F0D       ; not all set
+       li   hl,msg_all_lasers_mounted                      ; LD HL,$576F       ; "All lasers mounted."
+       bl   @show_message                                  ; JP $5FFB          ; show it for a while
+       .endproc                                            ;                   ; 
+popcount_a_kernighan:                                      ; >5f0d
+       sb   b,b                                            ; LD B,$00          ; B = 0 (mounts counted so far)
+_5f0f:                                                     ; >5f0f
+       movb a,a                                            ; OR A              ; 
+       jeq  single_remaining_slot_or_menu                  ; JR Z,$5F18        ; no bits left - B is the count
+       ab   one,b                                          ; INC B             ; one more set bit
+       movb a,r0                                           ; LD E,A / DEC A / AND E; clear the lowest set bit
+       sb   one,a                                          ;                   ; 
+       inv  r0                                             ;                   ; 
+       szcb r0,a                                           ;                   ; 
+       jmp  _5f0f                                          ; JR $5F0F          ; 
+single_remaining_slot_or_menu:                             ; >5f18
+       movb @c,@view_laser_type                            ; LD A,C / LD ($F818),A; keep the item number of the laser being bought
+       cb   b,@bytes+>03                                   ; LD A,B / CP $03   ; fitted to 3 mounts?
+       jne  offer_free_slots_menu                          ; JR NZ,$5F28       ; no - offer the free mounts
+       movb *hl,a                                          ; LD A,(HL)         ; yes: the one bit that's still clear
+       inv  a                                              ; CPL               ; 
+       andi a,>0f00                                        ; AND $0F           ; 
+       movb a,@c                                           ; LD C,A            ; 
+       jmp  auto_sell_conflict_buy_install                 ; JR $5F85          ; fit it there
+offer_free_slots_menu:                                     ; >5f28
+       movb *hl,@c                                         ; LD C,(HL)         ; C = the mounts it's fitted to
+       movb @bytes+>04,a                                   ; LD A,$04          ; 
+       sb   b,a                                            ; SUB B             ; B = the number of free mounts
+       movb a,b                                            ; LD B,A            ; 
+_5f2d:                                                     ; >5f2d
+       .push bc                                            ; PUSH BC           ; stash the mounts and the free count
+       li   hl,msg_position                                ; LD HL,$5782       ; "Position ("
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   hl,msg_fblr                                    ; LD HL,$57DD       ; the mounts' letters
+       li   de,offered_mount_letters                       ; LD DE,$E745       ; the buffer of offered letters
+_5f38:                                                     ; >5f38
+       movb @c,r0                                          ; RR C              ; test the next mount
+       srl  r0,9                                           ;                   ; (TI: the bit shifted out is C's bit 0, in the carry)
+       swpb r0                                             ;                   ; 
+       movb r0,@c                                          ;                   ; (SWPB and MOVB leave the carry alone)
+       jnc  continue_5f28_offer_letter_read_choice         ; JR NC,$5F3F       ; free - offer it
+       inc  hl                                             ; INC HL            ; fitted - skip its letter
+       jmp  _5f38                                          ; JR $5F38          ; 
+continue_5f28_offer_letter_read_choice:                    ; >5f3f
+       movb *hl+,a                                         ; LD A,(HL) / INC HL; A = this mount's letter
+       movb a,*de+                                         ; LD (DE),A / INC DE; record it as offered
+       bl   @print_char                                    ; RST $00           ; print it
+       movb @bytes+>2c,a                                   ; LD A,$2C          ; ','
+       cb   b,one                                          ; LD A,B / DEC A    ; the last one to offer? (TI: tested after the load)
+       jne  _5f4c                                          ; JR NZ,$5F4C       ; no - separate with a comma
+       movb @bytes+>29,a                                   ; LD A,$29          ; ')' - yes, close the list
+_5f4c:                                                     ; >5f4c
+       bl   @print_char                                    ; RST $00           ; print the separator
+       sb   one,b                                          ; DJNZ $5F38        ; more free mounts to offer
+       jne  _5f38                                          ;                   ; 
+       li   hl,msg_query                                   ; LD HL,$57E1       ; " ? "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   de,>415a                                       ; LD DE,$415A       ; the letters A-Z
+       movb @bytes+>05,@c                                  ; LD C,$05          ; up to 5 characters
+       bl   @read_line_keyboard_input                      ; CALL $3631        ; read a line of keyboard input
+       jnc  _5f2d_cancel                                   ; POP BC / RET NC   ; ESC - cancel (TI: tested before the POP)
+       .pop bc                                             ;                   ; recover the mounts and the free count
+       movb @keyboard_input_buffer,a                       ; LD A,($E8F7) / OR A; A = the typed letter
+       jeq  _5f2d_end                                      ; RET Z             ; empty - cancel
+       li   hl,offered_mount_letters                       ; LD HL,$E745       ; the offered letters
+       movb b,r1                                           ; LD C,B / LD B,$00 ; R1 = how many were offered
+       srl  r1,8                                           ;                   ; 
+_5f6d_search:                                              
+       cb   a,*hl+                                         ; CPIR              ; (TI: a loop) the typed letter?
+       jeq  _5f75                                          ; JR Z,$5F75        ; found - use it
+       dec  r1                                             ;                   ; 
+       jne  _5f6d_search                                   ;                   ; 
+       .push bc                                            ;                   ; not found - say so and offer them again
+       li   hl,msg_invalid_position                        ; LD HL,$578C       ; "Invalid position."
+       bl   @show_message                                  ; CALL $5FFB        ; show it for a while
+       .pop bc                                             ;                   ; 
+       jmp  _5f2d                                          ; JR NZ,$5F2D       ; offer them again
+_5f2d_cancel:                                              
+       .pop bc                                             ;                   ; 
+_5f2d_end:                                                 
+       .endproc                                            ;                   ; 
+_5f75:                                                     ; >5f75
+       li   hl,msg_fblr                                    ; LD HL,$57DD       ; find which mount this letter is
+       movb one,@c                                         ; LD C,$01          ; C = the mount's bit, starting at bit 0
+_5f7d:                                                     ; >5f7d
+       cb   a,*hl+                                         ; CP (HL) / INC HL  ; this mount's letter?
+       jeq  auto_sell_conflict_buy_install                 ; JR Z,$5F85        ; yes - C is the mount's bit
+       ab   @c,@c                                          ; SLA C             ; no - try the next mount
+       jmp  _5f7d                                          ; JR $5F7D          ; 
+auto_sell_conflict_buy_install:                            ; >5f85
+       li   hl,laser_items                                 ; LD HL,$5AC3       ; the four lasers' item numbers
+       sb   @equipment_prerefund_flag,@equipment_prerefund_flag; XOR A / LD ($E74D),A; no laser removed yet
+       movb @bytes+>04,b                                   ; LD B,$04          ; 4 lasers
+_5f8e:                                                     ; >5f8e
+       cb   @view_laser_type,*hl                           ; LD A,($F818) / CP (HL); is it the laser being bought?
+       jeq  _5fcd                                          ; JR Z,$5FCD        ; yes - skip it
+       movb *hl,r1                                         ; LD E,(HL) / LD D,$00; R1 = the other laser's item number
+       srl  r1,8                                           ;                   ; 
+       movb @fuel_level(r1),a                              ; LD HL,$F775 / ADD HL,DE / LD A,(HL); its entry in the equipment
+       movb @c,r0                                          ; AND C             ; is it fitted to this mount?
+       inv  r0                                             ;                   ; 
+       szcb r0,a                                           ;                   ; 
+       jeq  _5fcd                                          ; JR Z,$5FCC        ; no - try the next laser
+       mov  r1,r0                                          ;                   ; yes: remember the entry's address...
+       ai   r0,fuel_level                                  ;                   ; 
+       movb r0,@equipment_conflict_flags_ptr+1             ; LD ($E74E),HL     ; 
+       movb @r0lb,@equipment_conflict_flags_ptr            ;                   ; 
+       movb @fuel_level(r1),@equipment_prerefund_flag      ; LD A,(HL) / LD ($E74D),A; ...and its old value, in case they need putting back
+       szcb @c,@fuel_level(r1)                             ; LD A,C / CPL / AND (HL) / LD (HL),A; take it off the mount
+_5fab:                                                     ; >5fab
+       sla  r1,1                                           ; LD HL,$116B / ADD HL,DE x 2; its price
+       movb @equipment_prices+1(r1),r0                     ; LD E,(HL) / INC HL / LD D,(HL); 
+       movb @equipment_prices(r1),@r0lb                    ;                   ; 
+       movb @player_cash+1,r1                              ; LD HL,($EB16)     ; keep the cash, in case it needs putting back
+       movb @player_cash,@r1lb                             ;                   ; 
+       movb r1,@equipment_prerefund_cash_lo+1              ; LD ($E750),HL     ; 
+       movb @r1lb,@equipment_prerefund_cash_lo             ;                   ; 
+       movb @cash_2,@equipment_prerefund_cash_hi_or_qty    ; LD A,($EB18) / LD ($E752),A; 
+       a    r0,r1                                          ; ADD HL,DE         ; refund the removed laser's price
+       movb @r1lb,@player_cash                             ; LD ($EB16),HL     ; (MOVB leaves the carry alone)
+       movb r1,@player_cash+1                              ;                   ; 
+       jnc  buy_laser_install                              ; ADC A,$00 / LD ($EB18),A; 
+       ab   one,@cash_2                                    ;                   ; 
+       jmp  buy_laser_install                              ; JP $5FD0          ; buy and fit the new laser
+_5fcd:                                                     ; >5fcd
+       inc  hl                                             ; INC HL            ; the next laser
+       sb   one,b                                          ; DJNZ $5F8E        ; 
+       jne  _5f8e                                          ;                   ; 
+buy_laser_install:                                         ; >5fd0
+       movb @equipment_install_flags_ptr+1,hl              ; LD HL,($E749)     ; HL -> the new laser's entry in the equipment
+       movb @equipment_install_flags_ptr,@l                ;                   ; 
+       .push bc                                            ; PUSH BC           ; 
+       .push hl                                            ; PUSH HL           ; 
+       movb @view_laser_type,a                             ; LD A,($F818)      ; A = its item number
+       bl   @buy_equipment                                 ; CALL $6002        ; buy it
+       joc  _5fd0_failed                                   ; POP HL / POP BC / JR C,$5FE4; can't pay for it (TI: tested before the POPs)
+       .pop hl                                             ;                   ; 
+       .pop bc                                             ;                   ; 
+       socb @c,*hl                                         ; LD A,(HL) / OR C / LD (HL),A; fit it to the mount
+       jmp  _5ffa                                          ; JR $5FFA          ; 
+_5fd0_failed:                                              
+       .pop hl                                             ;                   ; 
+       .pop bc                                             ;                   ; 
+rollback_conflict_refund_on_failure:                       ; >5fe4
+       movb @equipment_prerefund_flag,a                    ; LD A,($E74D) / OR A; A = the removed laser's old entry
+       jeq  _5ffa                                          ; JR Z,$5FFA        ; no laser was removed
+       movb @equipment_conflict_flags_ptr+1,hl             ; LD HL,($E74E)     ; put the removed laser back
+       movb @equipment_conflict_flags_ptr,@l               ;                   ; 
+       movb a,*hl                                          ; LD (HL),A         ; 
+       movb @equipment_prerefund_cash_lo+1,@player_cash+1  ; LD HL,($E750) / LD ($EB16),HL; and the cash
+       movb @equipment_prerefund_cash_lo,@player_cash      ;                   ; 
+       movb @equipment_prerefund_cash_hi_or_qty,@cash_2    ; LD A,($E752) / LD ($EB18),A; 
+_5ffa:                                                     ; >5ffa
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Equip Ship: buy an item
+* 
+* Used by the routines at #R$5ED1, #R$5EE4 and #R$5EFE.
+* .
+* Buys item A for its price (#R$116B): "Insufficient credits!" if the
+* player can't pay for it, otherwise $601E.
+* .
+* At $601E, pays for the item, adds 1 to its entry in the equipment (fitting
+* it, or adding a missile) unless it's a laser, whose mount the caller fits,
+* and shows the cash left. The entry at
+* $6031 shows the message at HL for a while (#R$5FFB), keeping the carry
+* flag.
+* 
+* I:A Item (see #R$0FFC)
+* I:HL Pointer to the item's entry in the equipment (#R$F775)
+* O:F Carry clear if it was bought
+buy_equipment:                                             ; >6002
+       .proc                                               ;                   ; (TI: no EXX - HL is left alone, BC and DE are changed)
+       clr  r1                                             ; LD HL,$116B / ADD A,A; 
+       movb a,r1                                           ;                   ; 
+       srl  r1,7                                           ; LD C,A / LD B,$00 / ADD HL,BC; R1 = the item * 2
+       movb @equipment_prices+1(r1),r0                     ; LD E,(HL) / INC HL / LD D,(HL); R0 = the price
+       movb @equipment_prices(r1),@r0lb                    ;                   ; 
+       movb @player_cash+1,r1                              ; LD HL,($EB16)     ; R1 = the cash's low word
+       movb @player_cash,@r1lb                             ;                   ; 
+       s    r0,r1                                          ; SBC HL,DE / SBC A,B; cash -= price
+       joc  buy_equipment_2                                ; JR NC,$601E       ; enough cash
+       movb @cash_2,r0                                     ;                   ; (TI: a borrow out of the top byte means too little cash)
+       jeq  _6002_short                                    ;                   ; 
+       sb   one,@cash_2                                    ;                   ; 
+       jmp  buy_equipment_2                                ;                   ; 
+_6002_short:                                               
+       li   hl,msg_insufficient_credits                    ; LD HL,$57E4       ; "Insufficient credits!"
+       bl   @show_message                                  ; JR $6031          ; show it for a while
+       .retc                                               ;                   ; carry set - not bought
+buy_equipment_2:                                           ; >601e
+       movb @r1lb,@player_cash                             ; LD ($EB16),HL     ; commit the new cash total
+       movb r1,@player_cash+1                              ;                   ; 
+       movb *hl,r0                                         ; BIT 7,(HL)        ; a laser?
+       jlt  _602a                                          ; JR NZ,$602A       ; yes - the caller fits it
+       ab   one,*hl                                        ; INC (HL)          ; no - fit it, or add a missile
+_602a:                                                     ; >602a
+       bl   @format_print_current_cash_total               ; CALL $6037        ; refresh the cash readout
+       li   hl,msg_credits_left                            ; LD HL,$5803       ; " credits left"
+       bl   @show_message                                  ; CALL $5FFB        ; show it for a while
+       .retnc                                              ; OR A / RET        ; carry clear - bought
 
 rom_bank_7_end:
        equ  $

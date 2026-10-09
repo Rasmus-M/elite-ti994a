@@ -24,3 +24,4 @@
 
        copy "rom-banks/rom-bank-7.a99"
        copy "rom-banks/rom-bank-8.a99"
+       copy "rom-banks/rom-bank-9.a99"

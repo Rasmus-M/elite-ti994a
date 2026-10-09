@@ -13,6 +13,12 @@
 ram_stack:
        bss  >100
 
+* The list of systems the chart routines (#R$502C) build (TI-specific: on the
+* MSX it goes at ($EFA4), in memory freed by the startup code, which is not
+* free on the TI): the systems, then 25 bytes on, their marker sizes.
+chart_system_list:
+       bss  >80
+
 * Space view bitmap buffer
 *
 * 128 rows of 32 bytes (256 pixels), one bit per pixel, of which the first

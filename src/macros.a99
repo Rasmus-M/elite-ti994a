@@ -131,9 +131,9 @@
        mov  r0,@-2(sp)
        .endm
 
-       .defm daa
-       bl   @daa_routine
-       .endm
+;       .defm daa
+;       bl   @daa_routine
+;       .endm
 
        .defm halt
        nop
@@ -162,6 +162,6 @@
        bl   @ask_for_number                        ; JP $5AC7          ; ask for a number
        .endif
        .ifeq #1,>38
-       .call @vblank_handler                       ; JP $7202          ; VBlank interrupt handler
+;       .call @vblank_handler                       ; JP $7202          ; VBlank interrupt handler
        .endif
        .endm

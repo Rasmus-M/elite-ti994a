@@ -49,10 +49,8 @@ bit6:
        equ  bit5+2
 bit7:
        equ  bit6+2
-pad_stack:
-       equ  bit7+2
 b255:
-       equ  pad_stack+>30
+       equ  bit7+2
 b254:
        equ  b255+1
 pad_vars:
@@ -65,15 +63,6 @@ line_loops_pad:
        equ  clear_space_view_rows_pad+>20 ; the size of clear_space_view_rows
 pad_max:
        equ  line_loops_pad+>50   ; the size of line_loops
-kscan_device:
-       equ  >8374
-kscan_key:
-       equ  >8375
-kscan_status:
-       equ  >837c
-gplws:
-       equ  >83e0
-
 
 **
 * Z80 register mapping

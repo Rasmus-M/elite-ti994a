@@ -846,14 +846,14 @@ key_fctn_chars:
        byte 0,0,0,0,>80,0,0,0          ; 1 F1
        even
 
-ti_read_joystick:
-       li   r12,>0024                  ; CRU address of the column decoder
-       ldcr r0,3                       ; Select column
-       andi r0,>00ff
-       mov  r0,r12                     ; Select row
-       stcr r0,8                       ; Read 8 bits
-       rt
-*// ti_read_joystick
+;ti_read_joystick:
+;       li   r12,>0024                  ; CRU address of the column decoder
+;       ldcr r0,3                       ; Select column
+;       andi r0,>00ff
+;       mov  r0,r12                     ; Select row
+;       stcr r0,8                       ; Read 8 bits
+;       rt
+;*// ti_read_joystick
 
 ***************************************************************************
 *
@@ -878,26 +878,26 @@ ti_read_joystick:
 ;       .endproc
 ;*// ti_wait_fire
 
-***************************************************************************
-*
-* Check quit
-*
-ti_check_quit:
-       clr  r1                         ; Test column 0
-       li   r12,>0024                  ; Address for column selection
-       ldcr r1,3                       ; Select column
-       li   r12,>0006                  ; Address to read rows
-       stcr r1,8
-       andi r1,>1100
-       jeq  ti_quit
-*      Return
-       rt
-*      Quit
-ti_quit:
-       clr  @>83c4                     ; Reset user ISR address
-       seto @>6000                     ; Select first ROM bank
-       blwp @>0000
-*// ti_check_quit
+;***************************************************************************
+;*
+;* Check quit
+;*
+;ti_check_quit:
+;       clr  r1                         ; Test column 0
+;       li   r12,>0024                  ; Address for column selection
+;       ldcr r1,3                       ; Select column
+;       li   r12,>0006                  ; Address to read rows
+;       stcr r1,8
+;       andi r1,>1100
+;       jeq  ti_quit
+;*      Return
+;       rt
+;*      Quit
+;ti_quit:
+;       clr  @>83c4                     ; Reset user ISR address
+;       seto @>6000                     ; Select first ROM bank
+;       blwp @>0000
+;*// ti_check_quit
 
 ;***************************************************************************
 ;*
@@ -1165,29 +1165,29 @@ far_call_r0_r1:
 ;       .endproc
 ;*// ti_delay
 
-*********************************************************************
-*
-* For routines that set or reset the carry flag on return
-*
-return_with_eq:
-       .pop  r11
-return_with_eq_1:
-       c    r0,r0
-       rt
-
-return_with_carry:
-       .pop  r11
-return_with_carry_1:
-       seto r0
-       inc  r0
-       rt
-
-return_without_carry:
-       .pop  r11
-return_without_carry_1:
-       clr  r0
-       inc  r0
-       rt
+;*********************************************************************
+;*
+;* For routines that set or reset the carry flag on return
+;*
+;return_with_eq:
+;       .pop  r11
+;return_with_eq_1:
+;       c    r0,r0
+;       rt
+;
+;return_with_carry:
+;       .pop  r11
+;return_with_carry_1:
+;       seto r0
+;       inc  r0
+;       rt
+;
+;return_without_carry:
+;       .pop  r11
+;return_without_carry_1:
+;       clr  r0
+;       inc  r0
+;       rt
 
 *********************************************************************
 *
@@ -1206,21 +1206,21 @@ exx_routine:
        rt
 *// exx_routine
 
-*********************************************************************
-*
-* DAA
-*
-daa_routine:
-       mov  a,r0
-       andi r0,>0f00
-       cb   r0,@bytes+>09
-       jle  !
-       ab   @bytes+>06,a
-!      mov  a,r0
-       andi r0,>f000                   ; Ensure carry is cleared by shift
-       srl  r0,4
-       cb   r0,@bytes+>09
-       jle  !
-       ab   @bytes+>60,a
-!      rt
-*// daa_routine
+;*********************************************************************
+;*
+;* DAA
+;*
+;daa_routine:
+;       mov  a,r0
+;       andi r0,>0f00
+;       cb   r0,@bytes+>09
+;       jle  !
+;       ab   @bytes+>06,a
+;!      mov  a,r0
+;       andi r0,>f000                   ; Ensure carry is cleared by shift
+;       srl  r0,4
+;       cb   r0,@bytes+>09
+;       jle  !
+;       ab   @bytes+>60,a
+;!      rt
+;*// daa_routine

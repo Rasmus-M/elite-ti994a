@@ -1,4 +1,4 @@
-* ROM bank 7: the math tables, and code: the status page, the commander menu, the inventory and the market prices
+* ROM bank 7: the math tables, and code: the status page, the commander menu, the inventory, the market prices and buying and selling cargo
 * Assembled for real by code-banks.a99, and DORG in elite.a99 for its labels
        .ifdef code_banks
        aorg >6000
@@ -822,6 +822,358 @@ draw_frame_centred_target_name:                            ; >6066
        bl   @rst_28_target_draw_list_tile                  ; RST $28           ; draw a frame
        li   hl,market_screen_headings                      ; LD HL,$588F       ; 
        bl   @rst_20_target_print_list_positioned           ; RST $20           ; print the "Price   For Sale" header list
+       .endproc                                            ; RET               ; 
+
+* The buy and sell cargo screens, with their own data
+
+********************************************************************************
+* The message "Quantity of "
+msg_quantity:                                              ; >56dd
+       text 'Quantity of',>a0                                     ; 
+
+********************************************************************************
+* The message "* No Cargo To Sell *"
+msg_no_cargo_sell:                                         ; >570f
+       text '* No Cargo To Sell ',>aa                             ; 
+
+********************************************************************************
+* The message "Insufficient credits!"
+msg_insufficient_credits:                                  ; >57e4
+       text 'Insufficient credits',>a1                            ; 
+
+********************************************************************************
+* The message " credits, "
+msg_credits_57f9:                                          ; >57f9
+       text ' credits,',>a0                                       ; 
+
+********************************************************************************
+* The message "Insufficient cargo space!"
+msg_insufficient_cargo_space:                              ; >5811
+       text 'Insufficient cargo space',>a1                        ; 
+
+********************************************************************************
+* The message "Insufficient stock!"
+msg_insufficient_stock:                                    ; >582a
+       text 'Insufficient stock',>a1                              ; 
+
+********************************************************************************
+* The message "Sell"
+msg_sell:                                                  ; >5859
+       text 'Sel',>ec                                             ; 
+
+********************************************************************************
+* Sell Cargo screen headings
+* 
+* Printed by #R$5CEE. A list of (column, row, string) records ending with $FF
+* (see #R$3596).
+sell_cargo_screen_headings:                                ; >5912
+       text >10,>01,'Sell Carg',>ef                               ; 
+       text >05,>03,'Product      Cargo Pric',>e5                 ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Sell Cargo screen frame
+* 
+* Drawn by #R$5CEE. A list of (RST $28) rectangles ending with $FF (see
+* #R$36F1).
+sell_cargo_screen_frame:                                   ; >5939
+       byte >10,>01,>0A,>01,>91                                   ; 
+       byte >05,>03,>18,>01,>21                                   ; 
+       byte >05,>05,>0C,>10,>D1                                   ; 
+       byte >12,>05,>05,>10,>71                                   ; 
+       byte >19,>05,>04,>10,>51                                   ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* Key '2' when docked: buy cargo
+* 
+* Used by the routine at #R$417D.
+* .
+* Reached from #R$417D. Refuses in flight (#R$6393). Goes through the 17
+* goods in turn (#R$E73C), showing each one's price and quantity for
+* sale (#R$5AF8), and for those on sale asks "Quantity of <goods>" and
+* reads a number: ESC stops, 0 or nothing moves on to the next, and
+* anything else is bought if possible (#R$5C01) or asked again. Ends on
+* the cargo screen (#R$5C8E).
+buy_cargo:                                                 ; >5bbd
+       .proc                                               ;                   ; 
+       movb @docked,a                                      ; CALL $6393        ; refuse in flight
+       jne  _5bbd_docked                                   ;                   ; 
+       .endproc                                            ;                   ; (TI: back to the caller, without the beep, as no sound effects yet)
+_5bbd_docked:                                              
+       bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide the sprites
+       bl   @draw_frame_centred_target_name                ; CALL $6066        ; draw a frame with the current system's name centred
+       sb   @equipment_buying_item_index,@equipment_buying_item_index; XOR A / LD ($E73C),A; start with food
+_5bca:                                                     ; >5bca
+       movb @equipment_buying_item_index,a                 ; LD A,($E73C)      ; A = the current item index
+       bl   @show_market_row                               ; CALL $5AF8        ; show its price and quantity (IX -> its entry in the market)
+       movb @1(ix),a                                       ; LD A,(IX+$01) / OR A; A = quantity for sale
+       jeq  _5bf5                                          ; JR Z,$5BF5        ; none - next
+_5bd6:                                                     ; >5bd6
+       li   bc,>0516                                       ; LD BC,$0516       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       li   hl,msg_quantity                                ; LD HL,$56DD       ; "Quantity of "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       movb @equipment_buying_item_index,a                 ; LD A,($E73C)      ; 
+       li   hl,msg_food                                    ; LD HL,$0D9F       ; the item-name list
+       bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print the goods' name
+       bl   @ask_for_number                                ; RST $30           ; read a number
+       jnc  _5bbd_end                                      ; JP NC,$5C8E       ; ESC - the cargo screen
+       mov  hl,hl                                          ; JR NZ,$5BF0       ; (TI: test the number for 0 here)
+       jeq  _5bf5                                          ;                   ; none - next
+       bl   @buy_goods                                     ; CALL $5C01        ; try to buy that many
+       jnc  _5bd6                                          ; JR NC,$5BD6       ; not bought - ask again
+_5bf5:                                                     ; >5bf5
+       ab   one,@equipment_buying_item_index               ; LD HL,$E73C / INC (HL); next
+       cb   @equipment_buying_item_index,@bytes+>11        ; LD A,(HL) / CP $11; 
+       jne  _5bca                                          ; JR NZ,$5BCA       ; no - do the next one
+_5bbd_end:                                                 
+       bl   @show_cargo_manifest_screen                    ; JP $5C8E          ; the cargo screen
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Buy goods
+* 
+* Used by the routine at #R$5BBD.
+* .
+* Buys the quantity of the current goods (#R$E73C) entered at #R$5BBD, if
+* there are that many for sale ("Insufficient stock!"), the player can
+* pay for them ("Insufficient credits!") and there's room for them in
+* the hold ("Insufficient cargo space!"). The cost is the price * 4 (in
+* tenths of a credit) * the quantity; the room is the quantity * the size
+* of a unit (tonne, kilogram or gram, #R$639C) out of the free space
+* (#R$63BA).
+* .
+* At $5C55, takes the quantity off the quantity for sale, adds it to the
+* hold (#R$EB19), worsens the legal status if the goods are illegal
+* (#R$63AA), takes the cost off the cash and shows the cash and free
+* space (#R$612D). At $5C88, shows the message at HL for a while
+* (#R$5FFB), keeping the carry flag.
+* 
+* I:HL Quantity
+* I:IX Pointer to the goods' entry in the market (#R$F789)
+* O:F Carry set if they were bought
+buy_goods:                                                 ; >5c01
+       .proc                                               ;                   ; 
+       movb h,a                                            ; LD A,H / OR A     ; 256 or more?
+       jne  _5c0b                                          ; JR NZ,$5C0B       ; too many
+       cb   @1(ix),@l                                      ; LD A,(IX+$01) / CP L; the quantity for sale against it
+       jhe  buy_cargo_check_cash                           ; JR NC,$5C12       ; enough
+_5c0b:                                                     ; >5c0b
+       li   hl,msg_insufficient_stock                      ; LD HL,$582A       ; "Insufficient stock!"
+       jmp  buy_goods_fail                                 ; OR A / JP $5C88   ; show it
+buy_cargo_check_cash:                                      ; >5c12
+       movb @l,@equipment_prerefund_cash_hi_or_qty         ; LD A,L / LD ($E752),A; the quantity
+       movb *ix,r1                                         ; LD L,(IX+$00)     ; the price
+       srl  r1,8                                           ;                   ; 
+       sla  r1,2                                           ; ADD HL,HL x 2     ; * 4
+       movb @l,r0                                          ;                   ; 
+       srl  r0,8                                           ;                   ; 
+       mpy  r0,r1                                          ; CALL $1F73        ; R2 = price * 4 * quantity (16 bits, as on the MSX)
+       movb @player_cash+1,hl                              ; LD HL,($EB16)     ; AHL = cash
+       movb @player_cash,@l                                ;                   ; 
+       movb @cash_2,a                                      ; LD A,($EB18)      ; 
+       s    r2,hl                                          ; OR A / SBC HL,DE  ; cash -= cost
+       joc  buy_cargo_check_space                          ;                   ; no borrow from the low word
+       movb a,a                                            ; SBC A,$00         ; (TI: a borrow out of A means too little cash)
+       jeq  _5c2a                                          ;                   ; 
+       sb   one,a                                          ;                   ; 
+       jmp  buy_cargo_check_space                          ; JR NC,$5C33       ; enough
+_5c2a:                                                     
+       li   hl,msg_insufficient_credits                    ; LD HL,$57E4       ; "Insufficient credits!"
+       jmp  buy_goods_fail                                 ; OR A / JP $5C88   ; show it
+buy_cargo_check_space:                                     ; >5c33
+       .push af                                            ; PUSH AF           ; save the cash left
+       .push hl                                            ; PUSH HL           ; 
+       bl   @work_out_free_space                           ; CALL $63BA        ; work out the free space
+       movb @2(ix),a                                       ; LD A,(IX+$02)     ; A = units
+       bl   @unit_size                                     ; CALL $639C        ; HL -> the size of a unit
+       clr  bc                                             ; LD BC,($E752)     ; BC = quantity (TI: with B = 0)
+       movb @equipment_prerefund_cash_hi_or_qty,@c         ;                   ; 
+       bl   @take_off_free_space                           ; CALL $63E0        ; take their size off the free space
+       movb @free_hold_space_2+1,a                         ; LD A,($EB64) / OR A; A = high byte of what's left
+       jgt  buy_cargo_done                                 ; JP P,$5C55        ; room for them
+       jeq  buy_cargo_done                                 ;                   ; 
+       .pop hl                                             ; POP HL            ; no room
+       .pop af                                             ; POP AF            ; 
+       li   hl,msg_insufficient_cargo_space                ; LD HL,$5811       ; "Insufficient cargo space!"
+       jmp  buy_goods_fail                                 ; OR A / JP $5C88   ; show it
+buy_cargo_done:                                            ; >5c55
+       movb @equipment_buying_item_index,r1                ; LD A,($E73C)      ; 
+       srl  r1,8                                           ;                   ; 
+       sla  r1,2                                           ; ADD A,A x 2       ; *4
+       li   de,cargo_hold                                  ; LD HL,$EB19       ; 
+       a    r1,de                                          ; ADD HL,BC / EX DE,HL; DE -> the goods in the hold, HL -> the size of a unit
+       movb @equipment_prerefund_cash_hi_or_qty,@c         ; LD A,($E752) / LD C,A; C = quantity
+       sb   @c,@1(ix)                                      ; LD A,(IX+$01) / SUB C / LD (IX+$01),A; take it off the quantity for sale
+_5c6c:                                                     ; >5c6c
+       bl   @add_4byte_de_hl                               ; CALL $21C4        ; add a unit to the hold
+       sb   one,@c                                         ; DEC C             ; 
+       jne  _5c6c                                          ; JR NZ,$5C6C       ; 
+       movb @equipment_prerefund_cash_hi_or_qty,a          ; LD A,($E752)      ; A = the quantity bought
+       bl   @illegal_goods                                 ; CALL $63AA        ; illegal goods worsen the legal status
+       .pop hl                                             ; POP HL            ; recover the remaining cash
+       .pop af                                             ; POP AF            ; AHL = cash left
+       movb hl,@player_cash+1                              ; LD ($EB16),HL     ; update the cash total
+       movb @l,@player_cash                                ;                   ; 
+       movb a,@cash_2                                      ; LD ($EB18),A      ; 
+       bl   @show_cash_and_space                           ; CALL $612D        ; show the cash and free space
+       bl   @show_message                                  ; CALL $5FFB        ; show the message for a while
+       .retc                                               ; SCF / RET         ; bought
+buy_goods_fail:                                            
+       bl   @show_message                                  ; CALL $5FFB        ; show the message for a while
+       .retnc                                              ;                   ; not bought
+
+********************************************************************************
+* Key '3' when docked: sell cargo
+* 
+* Used by the routine at #R$4187.
+* .
+* Reached from #R$4187. Refuses in flight (#R$6393). Shows "* No Cargo To
+* Sell *" if the hold is empty, otherwise $5D07.
+* .
+* At $5D07, for each of the goods in the hold, shows how much there is
+* (#R$5B4D) and the price it sells for (#R$F789, * 4), and asks "Sell": ESC
+* stops, 'Y' sells all of it (#R$5D72). Ends on the cargo screen (#R$5C8E).
+sell_cargo:                                                ; >5cee
+       .proc                                               ;                   ; 
+       movb @docked,a                                      ; CALL $6393        ; refuse in flight
+       jne  _5cee_docked                                   ;                   ; 
+       .endproc                                            ;                   ; (TI: back to the caller, without the beep, as no sound effects yet)
+_5cee_docked:                                              
+       li   hl,cargo_hold                                  ; LD HL,$EB19       ; the cargo hold
+       sb   a,a                                            ; XOR A             ; 
+       movb @bytes+>44,b                                   ; LD B,$44          ; 
+_5cf7:                                                     ; >5cf7
+       socb *hl+,a                                         ; OR (HL) / INC HL  ; 
+       sb   one,b                                          ; DJNZ $5CF7        ; 
+       jne  _5cf7                                          ;                   ; 
+       movb a,a                                            ; OR A              ; 
+       jne  sell_cargo_2                                   ; JR NZ,$5D07       ; not empty
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       li   hl,msg_no_cargo_sell                           ; LD HL,$570F       ; "* No Cargo To Sell *"
+       bl   @show_message                                  ; JP $5FFB          ; show it for a while
+       .endproc                                            ;                   ; 
+sell_cargo_2:                                              ; >5d07
+       bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide sprites
+       li   ix,sell_cargo_screen_frame                     ; LD IX,$5939       ; 
+       bl   @rst_28_target_draw_list_tile                  ; RST $28           ; draw a frame
+       li   hl,sell_cargo_screen_headings                  ; LD HL,$5912       ; 
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print the "Product"/"Cargo Price" header list
+       li   ix,cargo_hold                                  ; LD IX,$EB19       ; the cargo-hold table
+       li   bc,>0005                                       ; LD BC,$0005       ; B = item index (0), C = the print row (5)
+_5d1a:                                                     ; >5d1a
+       movb *ix,@e                                         ; LD E,(IX+$00)     ; HL:DE = this item's 4-byte record
+       movb @1(ix),d                                       ; LD D,(IX+$01)     ; 
+       movb @2(ix),@l                                      ; LD L,(IX+$02)     ; 
+       movb @3(ix),h                                       ; LD H,(IX+$03)     ; 
+       mov  de,de                                          ; LD A,E / OR D / OR L / OR H; 
+       jne  _5d1a_some                                     ;                   ; 
+       mov  hl,hl                                          ;                   ; 
+       jeq  _5d64                                          ; JR Z,$5D64        ; none - next
+_5d1a_some:                                                
+       bl   @print_cargo_quantity                          ; CALL $5B4D        ; show how much there is
+       .push bc                                            ; PUSH BC           ; 
+       movb @bytes+>18,a                                   ; LD A,$18          ; 
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; position the cursor for the sell value
+       movb b,r1                                           ; LD A,B            ; 
+       srl  r1,8                                           ;                   ; 
+       sla  r1,2                                           ; ADD A,A x 2       ; *4 (4-byte records)
+       movb @market(r1),r1                                 ; LD HL,$F789 / ADD HL,DE / LD A,(HL); the price
+       srl  r1,8                                           ;                   ; 
+       sla  r1,2                                           ; ADD HL,HL x 2     ; *4
+       movb r1,@cached_cargo_sell_value+1                  ; LD ($E740),HL     ; the price
+       movb @r1lb,@cached_cargo_sell_value                 ;                   ; 
+       movb @r1lb,@c                                       ; LD C,L            ; 
+       movb r1,@l                                          ; LD L,H            ; 
+       sb   h,h                                            ; LD H,D            ; 
+       movb @bytes+>c5,a                                   ; LD A,$C5          ; control byte: pad to width 5
+       bl   @rst_18_target_format_value_print              ; RST $18           ; format and print it
+       movb @bytes+>1e,a                                   ; LD A,$1E          ; 
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; position the cursor for the prompt
+       li   hl,msg_sell                                    ; LD HL,$5859       ; "Sell"
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       bl   @confirm_prompt_yn                             ; CALL $3815        ; wait for Y, N or ESC
+       jnc  _5d1a_esc                                      ; POP BC / JP NC,$5C8E; ESC - the cargo screen (TI: tested before the POP)
+       cb   a,@bytes+>59                                   ; CP $59            ; 'Y'?
+       jne  _5d1a_no                                       ; CALL Z,$5D72      ; 
+       bl   @sell_all                                      ;                   ; 'Y' - sell it all
+_5d1a_no:                                                  
+       .pop bc                                             ; POP BC            ; 
+_5d64:                                                     ; >5d64
+       ai   ix,4                                           ; LD DE,$0004 / ADD IX,DE; -> the next record
+       ab   one,b                                          ; INC B             ; -> the next item index
+       cb   b,@bytes+>11                                   ; LD A,B / CP $11   ; all 17 done?
+       jne  _5d1a                                          ; JR NZ,$5D1A       ; no - do the next one
+       bl   @show_cargo_manifest_screen                    ; JP $5C8E          ; all done - the cargo screen
+       .endproc                                            ;                   ; 
+_5d1a_esc:                                                 
+       .pop bc                                             ;                   ; 
+       bl   @show_cargo_manifest_screen                    ;                   ; the cargo screen
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Sell cargo: sell it all
+* 
+* Used by the routine at #R$5CEE.
+* .
+* Pays 19/20 of the price (#R$E740) for each unit held (#R$E73E), and
+* takes the units (#R$E73D, #R$639C) out of the hold.
+* 
+* I:IX Pointer to the goods in the hold (#R$EB19)
+sell_all:                                                  ; >5d72
+       .proc                                               ;                   ; 
+       movb @cached_cargo_sell_value+1,r1                  ; LD HL,($E740)     ; the price
+       movb @cached_cargo_sell_value,@r1lb                 ;                   ; 
+       li   r0,19                                          ; LD A,$13          ; 
+       mpy  r0,r1                                          ; CALL $1F73        ; * 19 (TI: MPY and DIV)
+       li   r0,20                                          ; LD A,$14          ; 
+       div  r0,r1                                          ; CALL $2079        ; / 20
+       movb r1,@per_unit_cargo_payout+1                    ; LD ($E742),HL     ; 
+       movb @r1lb,@per_unit_cargo_payout                   ;                   ; 
+       movb @scaled_cargo_value+1,bc                       ; LD BC,($E73E)     ; BC = quantity
+       movb @scaled_cargo_value,@c                         ;                   ; 
+       mpy  bc,r1                                          ;                   ; (TI: R1:R2 = the payout * the quantity, added to the cash once)
+       movb @player_cash+1,r0                              ; LD HL,($EB16)     ; 
+       movb @player_cash,@r0lb                             ;                   ; 
+       a    r2,r0                                          ; ADD HL,DE         ; 
+       movb @r0lb,@player_cash                             ; LD ($EB16),HL     ; (MOVB leaves the carry alone)
+       movb r0,@player_cash+1                              ;                   ; 
+       jnc  _5d8b_no_carry                                 ; ADC A,$00         ; 
+       inc  r1                                             ;                   ; 
+_5d8b_no_carry:                                            
+       swpb r1                                             ;                   ; 
+       ab   r1,@cash_2                                     ; LD ($EB18),A      ; 
+       movb @remaining_divisions_count,a                   ; LD A,($E73D)      ; A = units
+       bl   @unit_size                                     ; CALL $639C        ; HL -> the size of a unit
+       mov  ix,de                                          ; PUSH IX / POP DE  ; DE -> the goods in the hold
+_5da6:                                                     ; >5da6
+       bl   @subtract_4byte_de_hl                          ; CALL $21CF        ; take a unit out of the hold
+       dec  bc                                             ; DEC BC / LD A,B / OR C; 
+       jne  _5da6                                          ; JR NZ,$5DA6       ; for each unit
+       bl   @show_cash_and_space                           ; CALL $612D        ; show the cash and free space
+       bl   @show_message                                  ; JP $5FFB          ; show it for a while
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Show the cash and the free space in the hold
+* 
+* Used by the routines at #R$5C01 and #R$5D72.
+* .
+* Prints "<cash> credits, <free space>" on the message line, and returns
+* with HL pointing at " tonnes." for the caller to finish the message with
+* (#R$5FFB).
+* 
+* O:HL " tonnes." (#R$583D)
+show_cash_and_space:                                       ; >612d
+       .proc                                               ;                   ; 
+       li   bc,>0516                                       ; LD BC,$0516       ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor on the message line
+       bl   @format_print_current_cash_total               ; CALL $6037        ; print the cash total
+       li   hl,msg_credits_57f9                            ; LD HL,$57F9       ; " credits, "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       bl   @print_free_space                              ; CALL $6051        ; print the free space
+       li   hl,msg_tonnes                                  ; LD HL,$583D       ; " tonnes." (the caller prints it)
        .endproc                                            ; RET               ; 
 
 rom_bank_7_end:

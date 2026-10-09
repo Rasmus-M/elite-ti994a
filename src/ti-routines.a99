@@ -565,7 +565,7 @@ ti_check_key:
 * is pressed, remembers it and stores its character in #R$E8F5, as on the
 * MSX (#R$0A57): upper case letters, digits, space, Enter (>0D). With FCTN,
 * 1-5 give F1-F5 (>80->84), 6 STOP (>86), 7 TAB (>09), 8 HOME (>87),
-* 9 (BACK) Esc (>1B) and R "[".
+* 9 (BACK) Esc (>1B), S (left arrow) backspace (>7F) and R "[".
 *
 * Workspace registers: R1 the column's rows (a bit set for each key
 * pressed), R2 the column (high byte), R3 the row's bit, R4 the row,
@@ -663,7 +663,7 @@ key_chars:
 * The same with FCTN (0 = as without)
 key_fctn_chars:
        byte 0,0,0,0,0,0,0,0
-       byte 0,0,0,>1b,>81,0,0,0        ; 9 (BACK) Esc, 2 F2
+       byte 0,0,0,>1b,>81,>7f,0,0      ; 9 (BACK) Esc, 2 F2, S (left) backspace
        byte 0,0,0,>87,>82,0,0,0        ; 8 HOME, 3 F3
        byte 0,0,0,>09,>83,0,'[',0      ; 7 TAB, 4 F4, R [
        byte 0,0,0,>86,>84,0,0,0        ; 6 STOP, 5 F5

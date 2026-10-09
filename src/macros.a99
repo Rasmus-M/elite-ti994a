@@ -159,7 +159,7 @@
        bl   @rst_28_target_draw_list_tile         ; JP $36F1          ; colour a list of rectangles
        .endif
        .ifeq #1,>30
-       .call @ask_for_number                       ; JP $5AC7          ; ask for a number
+       bl   @ask_for_number                        ; JP $5AC7          ; ask for a number
        .endif
        .ifeq #1,>38
        .call @vblank_handler                       ; JP $7202          ; VBlank interrupt handler

@@ -841,6 +841,21 @@ multiply_a_e_16bit:                                        ; >1f60
        rt                                                  ; RET               ; 
 
 ********************************************************************************
+* Multiply: 8-bit x 16-bit -> 16-bit, unsigned
+* 
+* Used by the routines at #R$5AC7, #R$5C01 and #R$5D72.
+* .
+* Same algorithm as #R$1F60 (same $0200 bit-length table, same RRA-driven
+* double-and-add), but the multiplicand is the caller's HL rather than a
+* second 8-bit value in E.
+multiply_a_hl_16bit:                                       ; >1f73
+       movb a,r0                                           ;                   ; (TI: with MPY)
+       srl  r0,8                                           ;                   ; 
+       mpy  hl,r0                                          ;                   ; R0:R1 = A * HL
+       mov  r1,hl                                          ;                   ; HL = the low word, as on the MSX
+       rt                                                  ; RET               ; 
+
+********************************************************************************
 * Multiply: 16-bit x 8-bit -> 24-bit, unsigned
 * 
 * Used by the routines at #R$24A7, #R$24D1, #R$4B76, #R$848D and #R$8F94.
@@ -1182,6 +1197,69 @@ antilog16:                                                 ; >21a3
        rt                                                  ; RET               ; 
 antilog16_overflow:                                        ; >21c0
        seto hl                                             ; LD HL,$FFFF       ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Add a 4-byte number at (HL) to one at (DE)
+* 
+* Used by the routines at #R$5C01 and #R$8BA6.
+* .
+* A 32-bit add, low byte first. Used to add a unit of cargo to the hold
+* (#R$5C01, #R$8BF9).
+* 
+* I:DE Pointer to the number to add to
+* I:HL Pointer to the number to add
+add_4byte_de_hl:                                           ; >21c4
+* TI: a native 32-bit add, leaving HL and DE unchanged (on the MSX they
+* end up 4 bytes on; every caller saves them)
+       movb @1(de),r0                                      ;                   ; R0 = the low word at DE
+       movb *de,@r0lb                                      ;                   ; 
+       movb @1(hl),r1                                      ;                   ; R1 = the low word at HL
+       movb *hl,@r1lb                                      ;                   ; 
+       a    r1,r0                                          ;                   ; 
+       movb @r0lb,*de                                      ;                   ; (MOVB leaves the carry alone)
+       movb r0,@1(de)                                      ;                   ; 
+       movb @3(de),r0                                      ;                   ; R0 = the high word at DE
+       movb @2(de),@r0lb                                   ;                   ; 
+       jnc  _21c4_no_carry                                 ;                   ; 
+       inc  r0                                             ;                   ; 
+_21c4_no_carry:                                            
+       movb @3(hl),r1                                      ;                   ; R1 = the high word at HL
+       movb @2(hl),@r1lb                                   ;                   ; 
+       a    r1,r0                                          ;                   ; 
+       movb @r0lb,@2(de)                                   ;                   ; 
+       movb r0,@3(de)                                      ;                   ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Subtract a 4-byte value at (HL) from the 4-byte value at (DE)
+* 
+* Used by the routines at #R$5D72 and #R$63E0.
+* .
+* #R$21C4's subtract counterpart: DE -= HL, byte by byte with borrow
+* propagation.
+* 
+* I:DE -> The 4-byte accumulator (updated in place)
+* I:HL -> The 4-byte value to subtract
+subtract_4byte_de_hl:                                      ; >21cf
+* TI: a native 32-bit subtraction, leaving HL and DE unchanged
+       movb @1(de),r0                                      ;                   ; R0 = the low word at DE
+       movb *de,@r0lb                                      ;                   ; 
+       movb @1(hl),r1                                      ;                   ; R1 = the low word at HL
+       movb *hl,@r1lb                                      ;                   ; 
+       s    r1,r0                                          ;                   ; (carry clear = a borrow)
+       movb @r0lb,*de                                      ;                   ; 
+       movb r0,@1(de)                                      ;                   ; 
+       movb @3(de),r0                                      ;                   ; R0 = the high word at DE
+       movb @2(de),@r0lb                                   ;                   ; 
+       joc  _21cf_no_borrow                                ;                   ; 
+       dec  r0                                             ;                   ; 
+_21cf_no_borrow:                                           
+       movb @3(hl),r1                                      ;                   ; R1 = the high word at HL
+       movb @2(hl),@r1lb                                   ;                   ; 
+       s    r1,r0                                          ;                   ; 
+       movb @r0lb,@2(de)                                   ;                   ; 
+       movb r0,@3(de)                                      ;                   ; 
        rt                                                  ; RET               ; 
 
 ********************************************************************************
@@ -2111,6 +2189,68 @@ step_cursor_blink:                                         ; >3619
        movb r0,@cursor_blink_phase_flag                    ; LD (HL),A         ; 
 _3619_end:                                                 
        .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Read a line of keyboard input into $E8F7
+* 
+* Used by the routines at #R$55A3, #R$5AC7, #R$5EFE and #R$A36B.
+* .
+* Reads keys (#R$35E7) into the buffer at $E8F7, printing them, until Enter
+* or ESC is pressed, and clears the message line (#R$3955). Enter
+* terminates the buffer with 0 and returns with carry set; ESC (at $3643)
+* returns with carry clear. Backspace ($7F) rubs out the last character, if
+* there is one. Any other character (at $3662) is only accepted if it's in
+* the range D-E and the buffer holds fewer than C characters.
+* 
+* I:C Maximum number of characters
+* I:D Lowest character code accepted
+* I:E Highest character code accepted
+* O:F Carry set if Enter was pressed, clear for ESC
+read_line_keyboard_input:                                  ; >3631
+       .proc                                               ;                   ; 
+       li   hl,keyboard_input_buffer                       ; LD HL,$E8F7       ; HL -> the input buffer
+       sb   b,b                                            ; LD B,$00          ; B = characters read so far
+_3636:                                                     ; >3636
+       bl   @wait_for_keypress_blinking_cursor             ; CALL $35E7        ; A = the next key (blocks until one is available)
+       cb   a,@bytes+>0d                                   ; CP $0D            ; Enter?
+       jne  continue_3631_esc_or_backspace                 ; JR NZ,$3643       ; no
+       sb   *hl,*hl                                        ; LD (HL),$00       ; yes - null-terminate the buffer
+       bl   @clear_message_line                            ; JP $3955          ; clear the message line
+       .retc                                               ; SCF               ; carry set = Enter
+continue_3631_esc_or_backspace:                            ; >3643
+       cb   a,@bytes+>1b                                   ; CP $1B            ; ESC?
+       jne  _3643_backspace                                ; JP Z,$3955        ; 
+       bl   @clear_message_line                            ;                   ; clear the message line
+       .retnc                                              ;                   ; carry clear = ESC
+_3643_backspace:                                           
+       cb   a,@bytes+>7f                                   ; CP $7F            ; backspace (TI: FCTN-S)?
+       jne  continue_3643_accept_reject_character          ; JR NZ,$3662       ; no - an ordinary character
+       movb b,b                                            ; INC B / DEC B     ; buffer already empty?
+       jeq  _3673                                          ; JR Z,$3660        ; yes - nothing to delete
+       movb @cursor_column,a                               ; LD A,($E72C)      ; step the cursor back one column...
+       sb   one,a                                          ; DEC A             ; 
+       .push af                                            ; PUSH AF           ; ...stashing that column for the re-set below
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; 
+       dec  hl                                             ; DEC HL            ; buffer -> the character being deleted
+       movb *hl,a                                          ; LD A,(HL)         ; 
+       bl   @print_char                                    ; RST $00           ; XOR-plot it away
+       .pop af                                             ; POP AF            ; force the cursor position back to that column...
+       bl   @set_cursor_position_combined                  ; CALL $3564        ; ...undoing the advance the plot just caused
+       sb   one,b                                          ; DEC B             ; one fewer character in the buffer
+       jmp  _3673                                          ; JR $3673          ; 
+continue_3643_accept_reject_character:                     ; >3662
+       movb a,*hl                                          ; LD (HL),A         ; provisionally store the character
+       cb   a,d                                            ; CP D              ; below the lowest acceptable code?
+       jl   _3673                                          ; JR C,$3673        ; yes - reject
+       cb   a,@e                                           ; CP E              ; above the highest?
+       jh   _3673                                          ; JR Z,$366B / JR NC,$3673; yes - reject (TI: JH straight after the CB)
+       cb   @c,b                                           ; LD A,C / CP B     ; buffer already full?
+       jeq  _3673                                          ; JR Z,$3673        ; yes - reject
+       movb *hl+,a                                         ; LD A,(HL) / INC HL; accepted - plot the character
+       bl   @print_char                                    ; RST $00           ; 
+       ab   one,b                                          ; INC B             ; one more character
+_3673:                                                     ; >3673
+       jmp  _3636                                          ; JR $3636          ; next key
 
 ********************************************************************************
 * Format a number
@@ -4133,6 +4273,8 @@ key_table:                                                 ; >419b
 * TI: (key in the high byte, the handler's ROM bank, the handler) words,
 * only for the keys whose handlers are converted so far, ending with 0
        data >3000,code_bank_7_select,show_cargo_manifest_screen   ; '0': inventory (#R$5C8E)
+       data >3200,code_bank_7_select,buy_cargo                    ; '2': buy cargo when docked (#R$417D, #R$5BBD) (TI: no rear view yet)
+       data >3300,code_bank_7_select,sell_cargo                   ; '3': sell cargo when docked (#R$4187, #R$5CEE) (TI: no left view yet)
        data >3800,code_bank_7_select,key_handler_8                ; '8': market prices (#R$5B99)
        data >3900,code_bank_7_select,status_page                  ; '9': commander status (#R$6276)
        data >5b00,code_bank_7_select,commander_menu               ; '[' (FCTN-R): load/save commander menu (#R$A30A)
@@ -6153,6 +6295,10 @@ msg_commander:                                             ; >57d3
        text 'Commander',>a0                                       ; 
 
 ********************************************************************************
+msg_query:                                                 ; >57e1
+       text ' ?',>a0                                              ; " ? ", also printed on its own (#R$5AC7)
+
+********************************************************************************
 * The message " tonnes."
 msg_tonnes:                                                ; >583d
        text ' tonnes',>ae                                         ; 
@@ -6166,6 +6312,17 @@ msg_light_years_5845:                                      ; >5845
 * The message " Credits"
 msg_credits_5851:                                          ; >5851
        text ' Credit',>f3                                         ; 
+
+********************************************************************************
+* Sizes of units of cargo
+* 
+* In grams, 4 bytes each (#R$639C).
+cargo_unit_sizes:                                          ; >5a8b
+       byte >40,>42,>0F,>00                                       ; tonne: 1000000
+unit_size_kilogram:                                        ; >5a8f
+       byte >E8,>03,>00,>00                                       ; kilogram: 1000
+unit_size_gram:                                            ; >5a93
+       byte >01,>00,>00,>00                                       ; gram: 1
 
 ********************************************************************************
 * Cargo hold capacities
@@ -6185,6 +6342,44 @@ msg_kg:                                                    ; >5ac0
        text 'k',>e7                                               ; "kg"
 mass_unit_suffix_g:                                        ; >5ac2
        text >e7                                                   ; "g"
+
+********************************************************************************
+* Ask for a number
+* 
+* Used by the routine at #R$0030.
+* .
+* Called via RST $30 (#R$0030), from #R$5BBD and #R$5DD9. Prints " ? " and
+* reads up to 4 digits (#R$3631), and works out the number.
+* 
+* O:F Carry clear if ESC was pressed; otherwise carry set, with zero set
+* .if nothing or 0 was typed
+* O:HL The number
+ask_for_number:                                            ; >5ac7
+* TI: returns with carry clear for ESC, and set otherwise, with HL = the
+* number: the caller tests HL for 0 (.endproc can't return a zero flag too)
+       .proc                                               ;                   ; 
+       li   hl,msg_query                                   ; LD HL,$57E1       ; " ? "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   de,>3039                                       ; LD DE,$3039       ; digits only...
+       movb @bytes+>04,@c                                  ; LD C,$04          ; ...up to 4 of them
+       bl   @read_line_keyboard_input                      ; CALL $3631        ; read them into $E8F7
+       jnc  _5ac7_esc                                      ; RET NC            ; ESC
+       li   de,keyboard_input_buffer                       ; LD DE,$E8F7       ; DE -> the buffer
+       clr  hl                                             ; LD HL,$0000       ; HL = the running total
+_5ade:                                                     ; >5ade
+       movb *de,a                                          ; LD A,(DE) / OR A  ; the terminator?
+       jeq  tail_set_carry_zero_reflecting_hl              ; JR Z,$5AF4        ; yes - done
+       movb @bytes+>0a,a                                   ; LD A,$0A          ; 
+       bl   @multiply_a_hl_16bit                           ; CALL $1F73        ; HL *= 10
+       movb *de+,r1                                        ; LD A,(DE) / INC DE; the digit character
+       srl  r1,8                                           ;                   ; 
+       ai   r1,->30                                        ; SUB $30           ; its value (0-9)
+       a    r1,hl                                          ; ADD A,L / INC H   ; HL += the digit's value
+       jmp  _5ade                                          ; JR $5ADE          ; loop for the next character
+tail_set_carry_zero_reflecting_hl:                         ; >5af4
+       .retc                                               ; SCF               ; carry set
+_5ac7_esc:                                                 
+       .retnc                                              ;                   ; 
 
 ********************************************************************************
 * Show a message for a while
@@ -6325,6 +6520,51 @@ clear_page:                                                ; >60ca
        movb @bytes+>f1,a                                   ; LD A,$F1          ; white on black
        bl   @fill_vram_rect                                ; JP $35B8          ; 
        .endproc                                            ;                   ; 
+
+********************************************************************************
+* Get the size of a unit of cargo
+* 
+* Used by the routines at #R$5C01, #R$5D72 and #R$8BA6.
+* .
+* Points HL at the size in grams (#R$5A8B) of a tonne, a kilogram or a
+* gram.
+* 
+* I:A Units (0 tonnes, 1 kilograms, 2 grams)
+* O:HL Pointer to the size (4 bytes)
+unit_size:                                                 ; >639c
+       li   hl,cargo_unit_sizes                            ; LD HL,$5A8B       ; tonnes
+       movb a,a                                            ; OR A              ; 
+       jeq  _639c_end                                      ; RET Z             ; 
+       li   hl,unit_size_kilogram                          ; LD HL,$5A8F       ; kilograms
+       cb   a,one                                          ; DEC A             ; (TI: A is left alone)
+       jeq  _639c_end                                      ; RET Z             ; 
+       li   hl,unit_size_gram                              ; LD HL,$5A93       ; grams
+_639c_end:                                                 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Illegal goods: worsen the legal status
+* 
+* Used by the routines at #R$5C01 and #R$8BA6.
+* .
+* Adds the quantity * how illegal the goods are (byte 3 of their entry in
+* the market, see #R$0A02) to the legal status (#R$EB65), up to $FF.
+* Called when buying or scooping cargo.
+* 
+* I:A Quantity
+* I:IX Pointer to the goods' entry in the market (#R$F789)
+illegal_goods:                                             ; >63aa
+       movb a,r1                                           ; LD D,A            ; the quantity
+       srl  r1,8                                           ;                   ; 
+       movb @3(ix),r0                                      ; LD E,(IX+$03)     ; how illegal
+       srl  r0,8                                           ;                   ; 
+       mpy  r0,r1                                          ; CALL $1F51        ; (TI: MPY instead of #R$1F51)
+       swpb r2                                             ;                   ; the product's low byte (8 bits, as on the MSX)
+       ab   r2,@legal_status                               ; LD HL,$EB65 / ADD A,(HL); add it to the legal status
+       jnc  _63b8                                          ; JR NC,$63B8       ; no overflow - keep it
+       movb @b255,@legal_status                            ; SBC A,A / LD (HL),A; up to $FF
+_63b8:                                                     ; >63b8
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Work out the free space in the hold

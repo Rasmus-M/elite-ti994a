@@ -24,6 +24,11 @@ chart_system_list:
 * MSX patches the OR opcode there, #R$541E).
 plot_pixel_xor:
        byte 0
+
+* The speed keys held (TI-specific: the MSX reads them in #R$401C), set by
+* ti_read_joysticks: bit 0 SPACE (speed up), bit 1 '/' (slow down).
+speed_keys:
+       byte 0
        even
 
 * Space view bitmap buffer

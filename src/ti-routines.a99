@@ -494,6 +494,7 @@ KEY_DN EQU  >060C
 KEY_UP EQU  >060E
 KEY_CM EQU  >0206
 KEY_FS EQU  >0106
+KEY_SL EQU  >0506
 KEY_0  EQU  >050C
 KEY_1  EQU  >050E
 KEY_2  EQU  >010E
@@ -650,8 +651,10 @@ ti_read_keyboard_column:
 * TI-specific replacement for #R$7312, called once per (MSX) frame by
 * ti_poll_vblank with BLWP @joystick_vector. Builds the control bits in
 * #R$E8F4 from both joysticks, as the MSX does (0 = pressed): bit 0 up,
-* 1 down, 2 left, 3 right, 4 fire. The MSX also reads the cursor keys and
-* the classic Elite keys there; those aren't read yet.
+* 1 down, 2 left, 3 right, 4 fire; and the classic Elite keys, as the MSX
+* does (#R$73F2): S up, X down, ',' left, '.' right, and A or SHIFT fire
+* (the MSX's cursor keys aren't read). Also sets speed_keys from SPACE and
+* '/', which the MSX reads in #R$401C.
 *
 joystick_vector:
        data keyboard_ws,ti_read_joysticks
@@ -683,6 +686,31 @@ ti_read_joysticks_4:
        jne  ti_read_joysticks_5
        ori  r0,>1000                   ; bit 4: fire
 ti_read_joysticks_5:
+       mov  r0,r5                      ; R5 = the control bits so far
+       li   r6,ti_control_keys
+ti_read_joysticks_6:
+       mov  *r6+,r0                    ; the next key
+       jeq  ti_read_joysticks_8
+       bl   @ti_check_key
+       jeq  ti_read_joysticks_7        ; not pressed
+       soc  *r6,r5                     ; pressed - its bit
+ti_read_joysticks_7:
+       inct r6
+       jmp  ti_read_joysticks_6
+ti_read_joysticks_8:
+       clr  r6                         ; R6 = the speed keys
+       li   r0,KEY_SP
+       bl   @ti_check_key
+       jeq  ti_read_joysticks_9
+       ori  r6,>0100                   ; bit 0: SPACE
+ti_read_joysticks_9:
+       li   r0,KEY_SL
+       bl   @ti_check_key
+       jeq  ti_read_joysticks_10
+       ori  r6,>0200                   ; bit 1: '/'
+ti_read_joysticks_10:
+       movb r6,@speed_keys
+       mov  r5,r0
        inv  r0                         ; 0 = pressed, as on the MSX
        movb r0,@control_bits
        rtwp
@@ -706,6 +734,16 @@ ti_read_joystick_column:
        soc  r0,r1
        rt
 *// ti_read_joystick_column
+
+* The classic Elite keys (#R$73F2) and their control bits
+ti_control_keys:
+       data KEY_S,>0100                ; up
+       data KEY_X,>0200                ; down
+       data KEY_CM,>0400               ; left
+       data KEY_FS,>0800               ; right
+       data KEY_A,>1000                ; fire
+       data KEY_SH,>1000               ; fire
+       data 0
 
 joystick_fire:
        data >0100

@@ -228,8 +228,9 @@ process_frame:                                             ; >13fd
        bl   @clear_space_view                              ; CALL $388F        ; clear the space view's bitmap buffer
        bl   @update_stardust                               ; CALL $872E        ; move and plot the stardust
 _1409:                                                     ; >1409
-* TI: not converted yet: the countdown (#R$1651), stopping the roll and pitch
-* (#R$6BE1), the cloaking device and the jammer ($140F-$1434), and the
+* TI: not converted yet: the countdown (#R$1651).
+       bl   @settle_roll_pitch                             ; CALL $6BE1        ; stop the roll and pitch if their keys are released
+* TI: not converted yet: the cloaking device and the jammer ($140F-$1434), and the
 * scanner queue ($1437-$144D: on the MSX the VBlank handler draws the scanner,
 * and this waits for it to finish).
        li   hl,ship_object_table                           ; LD HL,$EBA0       ; HL -> the object table
@@ -4103,8 +4104,42 @@ partial_byte_right_mask_table_8:                           ; >4014
 * At $409B, with HL pointing at the matching entry in the key table, plays
 * a click (#R$7468, event 0) and jumps to the handler address in the entry.
 read_controls:                                             ; >401c
-* TI: the flight controls ($401C-$4074: speed, roll, pitch, fire and 'J')
-* aren't converted yet; only the keys typed are dispatched.
+       movb @flight_controls_off,a                         ; LD A,($EF8E) / OR A; flight controls off?
+       jne  _4077                                          ; JR NZ,$4077       ; yes - skip them
+       movb @space_view_showing,a                          ; LD A,($E903) / OR A; 
+       jeq  _4077                                          ; JR Z,$4077        ; not in flight - skip them too
+       .proc                                               ;                   ; 
+* TI: SPACE and '/' are read by ti_read_joysticks, into speed_keys
+       movb @speed_keys,r0                                 ; IN A,($A9) / AND $01; SPACE?
+       czc  @bit0,r0                                       ;                   ; 
+       jeq  _4039                                          ;                   ; 
+       bl   @speed_up                                      ; CALL Z,$6956      ; yes - speed up
+_4039:                                                     ; >4039
+       movb @speed_keys,r0                                 ; IN A,($A9) / AND $10; '/'?
+       czc  @bit1,r0                                       ;                   ; 
+       jeq  _404a                                          ;                   ; 
+       bl   @speed_down                                    ; CALL Z,$699C      ; yes - slow down
+_404a:                                                     ; >404a
+       bl   @get_control_bits                              ; CALL $40A6        ; A = control bits (#R$40A6)
+       czc  @bit2,a                                        ; BIT 2,A           ; 
+       jne  _4052                                          ;                   ; 
+       bl   @roll_left                                     ; CALL Z,$69E5      ; left: roll left
+_4052:                                                     ; >4052
+       czc  @bit3,a                                        ; BIT 3,A           ; 
+       jne  _4057                                          ;                   ; 
+       bl   @roll_right                                    ; CALL Z,$69F8      ; right: roll right
+_4057:                                                     ; >4057
+       czc  @bit1,a                                        ; BIT 1,A           ; 
+       jne  _405c                                          ;                   ; 
+       bl   @pitch_climb                                   ; CALL Z,$69FD      ; down: climb
+_405c:                                                     ; >405c
+       czc  @bit0,a                                        ; BIT 0,A           ; 
+       jne  _4061                                          ;                   ; 
+       bl   @pitch_dive                                    ; CALL Z,$6A10      ; up: dive
+_4061:                                                     ; >4061
+* TI: firing the laser (#R$2AD0) and 'J' (#R$86E6) aren't converted yet.
+       .pop r11                                            ;                   ; 
+_4077:                                                     ; >4077
        movb @pending_debounced_keypress_byte_status,a      ; LD A,($E8F5) / OR A; A = key typed, if any
        jne  _407c                                          ; RET Z             ; none
        rt                                                  ;                   ; 
@@ -4131,6 +4166,49 @@ run_key_handler:                                           ; >409b
        mov  @2(r1),r0                                      ; INC HL / LD A,(HL) ...; R0 = the handler's ROM bank
        mov  @4(r1),r1                                      ;                   ; R1 = the handler
        b    @far_call_r0_r1                                ; JP (HL)           ; run the handler (in its ROM bank), which returns to the caller
+
+********************************************************************************
+* Get the control bits, applying the reverse-controls options
+* 
+* Used by the routine at #R$401C.
+* .
+* Returns the control bits from ($E8F4) (see #R$7312): bit 0 up, 1 down,
+* 2 left, 3 right, 4 fire, each 0 while pressed. If bit 3 of ($E914) is
+* set (pause menu option 'B'), up/down and left/right are swapped; if
+* bit 4 is set (option 'Y'), up/down are swapped again - so 'Y' reverses
+* pitch, and 'B' reverses both pitch and roll (both together reverse just
+* roll).
+* 
+* O:A The control bits
+* TI: swaps the bits directly.
+get_control_bits:                                          ; >40a6
+       movb @control_bits,a                                ; LD A,($E8F4)      ; A = control bits
+       movb @options,r0                                    ; LD HL,$E914       ; 
+       czc  @bit3,r0                                       ; BIT 3,(HL)        ; option 'B' on?
+       jeq  _40ca                                          ; JR Z,$40CA        ; no
+       movb a,r1                                           ;                   ; swap up/down and left/right
+       andi r1,>0500                                       ;                   ; 
+       sla  r1,1                                           ;                   ; 
+       movb a,r2                                           ;                   ; 
+       andi r2,>0a00                                       ;                   ; 
+       srl  r2,1                                           ;                   ; 
+       andi a,>f000                                        ;                   ; 
+       soc  r1,a                                           ;                   ; 
+       soc  r2,a                                           ;                   ; 
+_40ca:                                                     ; >40ca
+       czc  @bit4,r0                                       ; BIT 4,(HL)        ; option 'Y' on?
+       jeq  _40dc                                          ; JR Z,$40DC        ; no
+       movb a,r1                                           ;                   ; swap up and down
+       andi r1,>0100                                       ;                   ; 
+       sla  r1,1                                           ;                   ; 
+       movb a,r2                                           ;                   ; 
+       andi r2,>0200                                       ;                   ; 
+       srl  r2,1                                           ;                   ; 
+       andi a,>fc00                                        ;                   ; 
+       soc  r1,a                                           ;                   ; 
+       soc  r2,a                                           ;                   ; 
+_40dc:                                                     ; >40dc
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Key table
@@ -7303,6 +7381,210 @@ stardust_flag_respawn:                                     ; >6950
        jmp  _6940                                          ; JR $6940          ; go call the move handler
 
 ********************************************************************************
+* Increase the speed by one
+* 
+* Used by the routines at #R$401C and #R$8B8F.
+* .
+* Increments the speed at $F814 (up to a maximum of 30) and updates the
+* speed gauge (#R$6A59), then adds each stardust particle's per-unit-speed
+* velocity increment (+9/+10, see #R$6805) to its velocity. See #R$699C
+* for the downward counterpart.
+speed_up:                                                  ; >6956
+       .proc                                               ; PUSH AF           ; 
+       cb   @speed_gauge_value,@bytes+>1e                  ; LD HL,$F814 / LD A,(HL) / CP $1E; 
+       jhe  _699a                                          ; JR NC,$699A       ; already 30 - done
+       ab   one,@speed_gauge_value                         ; INC (HL)          ; speed up
+       bl   @draw_speed_gauge                              ; CALL $6A59        ; update the speed gauge
+       movb @reclaimed_range_start+1,r1                    ; LD IX,($EFA6)     ; R1 -> the stardust table
+       movb @reclaimed_range_start,@r1lb                   ;                   ; 
+       li   r2,15                                          ; LD DE,$000B / LD B,$0F; 15 particles
+_696c:                                                     ; >696c
+       movb @9(r1),r0                                      ; LD A,(IX+$09) / LD C,A; 
+       sra  r0,8                                           ; RLA / SBC A,A / LD B,A; R0 = the X velocity's increment (sign-extended)
+       movb @5(r1),hl                                      ; LD L,(IX+$04) / LD H,(IX+$05); 
+       movb @4(r1),@l                                      ;                   ; 
+       a    r0,hl                                          ; ADD HL,BC         ; 
+       movb hl,@5(r1)                                      ; LD (IX+$04),L / LD (IX+$05),H; add it to the X velocity
+       movb @l,@4(r1)                                      ;                   ; 
+       movb @10(r1),r0                                     ; LD A,(IX+$0A) / LD C,A; 
+       sra  r0,8                                           ; RLA / SBC A,A / LD B,A; R0 = the Y velocity's increment
+       movb @7(r1),hl                                      ; LD L,(IX+$06) / LD H,(IX+$07); 
+       movb @6(r1),@l                                      ;                   ; 
+       a    r0,hl                                          ; ADD HL,BC         ; 
+       movb hl,@7(r1)                                      ; LD (IX+$06),L / LD (IX+$07),H; add it to the Y velocity
+       movb @l,@6(r1)                                      ;                   ; 
+       ai   r1,11                                          ; ADD IX,DE         ; next particle
+       dec  r2                                             ; DJNZ $696C        ; 
+       jne  _696c                                          ;                   ; 
+_699a:                                                     ; >699a
+       .endproc                                            ; POP AF / RET      ; 
+
+********************************************************************************
+* Decrease the speed by one
+* 
+* Used by the routines at #R$401C and #R$8B7B.
+* .
+* The downward counterpart to #R$6956: decrements the speed (down to a
+* minimum of 0) and subtracts each stardust particle's per-unit-speed
+* velocity increment from its velocity.
+speed_down:                                                ; >699c
+       .proc                                               ; PUSH AF           ; 
+       movb @speed_gauge_value,r0                          ; LD HL,$F814 / LD A,(HL) / OR A; 
+       jeq  _69e3                                          ; JR Z,$69E3        ; already 0 - done
+       sb   one,@speed_gauge_value                         ; DEC (HL)          ; slow down
+       bl   @draw_speed_gauge                              ; CALL $6A59        ; update the speed gauge
+       movb @reclaimed_range_start+1,r1                    ; LD IX,($EFA6)     ; R1 -> the stardust table
+       movb @reclaimed_range_start,@r1lb                   ;                   ; 
+       li   r2,15                                          ; LD DE,$000B / LD B,$0F; 15 particles
+_69b1:                                                     ; >69b1
+       movb @9(r1),r0                                      ; LD A,(IX+$09) / LD C,A; 
+       sra  r0,8                                           ; RLA / SBC A,A / LD B,A; R0 = the X velocity's increment (sign-extended)
+       movb @5(r1),hl                                      ; LD L,(IX+$04) / LD H,(IX+$05); 
+       movb @4(r1),@l                                      ;                   ; 
+       s    r0,hl                                          ; OR A / SBC HL,BC  ; 
+       movb hl,@5(r1)                                      ; LD (IX+$04),L / LD (IX+$05),H; subtract it from the X velocity
+       movb @l,@4(r1)                                      ;                   ; 
+       movb @10(r1),r0                                     ; LD A,(IX+$0A) / LD C,A; 
+       sra  r0,8                                           ; RLA / SBC A,A / LD B,A; R0 = the Y velocity's increment
+       movb @7(r1),hl                                      ; LD L,(IX+$06) / LD H,(IX+$07); 
+       movb @6(r1),@l                                      ;                   ; 
+       s    r0,hl                                          ; OR A / SBC HL,BC  ; 
+       movb hl,@7(r1)                                      ; LD (IX+$06),L / LD (IX+$07),H; subtract it from the Y velocity
+       movb @l,@6(r1)                                      ;                   ; 
+       ai   r1,11                                          ; ADD IX,DE         ; next particle
+       dec  r2                                             ; DJNZ $69B1        ; 
+       jne  _69b1                                          ;                   ; 
+_69e3:                                                     ; >69e3
+       .endproc                                            ; POP AF / RET      ; 
+
+********************************************************************************
+* Key held: roll left
+* 
+* Used by the routine at #R$401C.
+* .
+* Ramps the roll rate (#R$F815) towards -16 (#R$6A15). The entry at $69E7
+* ramps it towards the target in E.
+* 
+* I:E The target (at $69E7)
+roll_left:                                                 ; >69e5
+       li   r0,>f000                                       ; LD E,$F0          ; -16
+* This entry point is used by the routine at #R$69F8.
+roll_key:                                                  ; >69e7
+       .proc                                               ;                   ; 
+       .push a                                             ; PUSH AF           ; (TI: saved here rather than in #R$6A15)
+       li   r1,roll_rate                                   ; LD HL,$F815       ; the roll rate
+       li   r2,roll_key_held                               ; LD BC,$E774       ; the roll key is held
+       bl   @ramp_rate                                     ; JP $6A15          ; ramp it
+       jeq  roll_key_end                                   ;                   ; unchanged
+       bl   @draw_roll_dial                                ; LD IX,$6BB3       ; draw the roll dial
+       bl   @refresh_roll_table                            ; LD IY,$2209       ; set up the roll
+roll_key_end:                                              
+       .pop a                                              ; POP AF            ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Key held: roll right
+* 
+* Used by the routine at #R$401C.
+* .
+* Ramps the roll rate (#R$F815) towards +16 (#R$69E7).
+roll_right:                                                ; >69f8
+       li   r0,>1000                                       ; LD E,$10          ; +16
+       jmp  roll_key                                       ; JP $69E7          ; 
+
+********************************************************************************
+* Key held: climb
+* 
+* Used by the routine at #R$401C.
+* .
+* Ramps the pitch rate (#R$F816) towards +16 (#R$6A15). The entry at
+* $69FF ramps it towards the target in E.
+* 
+* I:E The target (at $69FF)
+pitch_climb:                                               ; >69fd
+       li   r0,>1000                                       ; LD E,$10          ; +16
+* This entry point is used by the routine at #R$6A10.
+pitch_key:                                                 ; >69ff
+       .proc                                               ;                   ; 
+       .push a                                             ; PUSH AF           ; (TI: saved here rather than in #R$6A15)
+       li   r1,pitch_rate                                  ; LD HL,$F816       ; the pitch rate
+       li   r2,pitch_key_held                              ; LD BC,$E775       ; the pitch key is held
+       bl   @ramp_rate                                     ; JP $6A15          ; ramp it
+       jeq  pitch_key_end                                  ;                   ; unchanged
+       bl   @draw_pitch_dial                               ; LD IX,$6BCA       ; draw the pitch dial
+       bl   @refresh_pitch_table                           ; LD IY,$2212       ; set up the pitch
+pitch_key_end:                                             
+       .pop a                                              ; POP AF            ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Key held: dive
+* 
+* Used by the routine at #R$401C.
+* .
+* Ramps the pitch rate (#R$F816) towards -16 (#R$69FF).
+pitch_dive:                                                ; >6a10
+       li   r0,>f000                                       ; LD E,$F0          ; -16
+       jmp  pitch_key                                      ; JP $69FF          ; 
+
+********************************************************************************
+* Ramp the roll or pitch rate towards a key's target
+* 
+* Used by the routines at #R$69E5 and #R$69FD.
+* .
+* While a roll or pitch key is held: marks the key as held, and moves the
+* rate 2 towards the target (+16 or -16).
+* With option R (bit 2 of #R$E914), a rate on the other side of 0 is
+* stopped (set to 0) first. If the rate has changed, redraws its dial and
+* sets up the rotation from it (via #R$6A58).
+* 
+* I:BC The key-held flag (#R$E774 or #R$E775)
+* I:E The target
+* I:HL The rate (#R$F815 or #R$F816)
+* I:IX The routine that draws the dial (#R$6BB3 or #R$6BCA)
+* I:IY The routine that sets up the rotation (#R$2209 or #R$2212)
+* TI: the caller draws the dial and sets up the rotation, if this returns
+* with NE (the rate has changed).
+*
+* I:R0 The target (high byte)
+* I:R1 -> The rate (#R$F815 or #R$F816)
+* I:R2 -> The key-held flag (#R$E774 or #R$E775)
+* O:F EQ if the rate is unchanged
+ramp_rate:                                                 ; >6a15
+       movb @b255,*r2                                      ; LD A,$FF / LD (BC),A; the key is held
+       cb   *r1,r0                                         ; LD A,(HL) / CP E  ; at the target?
+       jne  _6a1d                                          ; JR Z,$6A56        ; 
+       rt                                                  ;                   ; yes - done (EQ)
+_6a1d:                                                     ; >6a1d
+       mov  r0,r0                                          ; BIT 7,E           ; going down?
+       jlt  ramp_step_down_check                           ; JR NZ,$6A36       ; yes
+       movb *r1,r0                                         ; OR A              ; going up: is the rate negative?
+       jgt  ramp_step_up                                   ; JP P,$6A30        ; no - speed up
+       jeq  ramp_step_up                                   ;                   ; 
+       movb @options,r0                                    ; LD A,($E914)      ; option R?
+       czc  @bit2,r0                                       ; AND $04           ; 
+       jeq  ramp_step_up                                   ; JR Z,$6A30        ; no - speed up
+       sb   *r1,*r1                                        ; LD (HL),$00       ; yes - stop first
+       jmp  _6a4a                                          ; JR $6A34 / JR $6A4A; 
+ramp_step_up:                                              ; >6a30
+       ab   @bytes+>02,*r1                                 ; LD A,(HL) / ADD A,$02 / LD (HL),A; rate + 2
+       jmp  _6a4a                                          ; JR $6A4A          ; 
+ramp_step_down_check:                                      ; >6a36
+       movb *r1,r0                                         ; CP $01            ; going down: is the rate positive?
+       jlt  ramp_step_down                                 ; JP M,$6A46        ; no - slow down
+       jeq  ramp_step_down                                 ;                   ; 
+       movb @options,r0                                    ; LD A,($E914)      ; option R?
+       czc  @bit2,r0                                       ; AND $04           ; 
+       jeq  ramp_step_down                                 ; JR Z,$6A46        ; no - slow down
+       sb   *r1,*r1                                        ; LD (HL),$00       ; yes - stop first
+       jmp  _6a4a                                          ; JR $6A4A          ; 
+ramp_step_down:                                            ; >6a46
+       sb   @bytes+>02,*r1                                 ; LD A,(HL) / ADD A,$FE / LD (HL),A; rate - 2
+_6a4a:                                                     ; >6a4a
+       movb one,r0                                         ; CALL $6A58 ...    ; changed (NE): the caller redraws the dial and sets up the rotation
+       rt                                                  ; POP AF / RET      ; 
+
+********************************************************************************
 * Draw the speed gauge
 * 
 * Used by the routines at #R$6433, #R$6956 and #R$699C.
@@ -7642,6 +7924,57 @@ draw_pitch_dial:                                           ; >6bca
        ab   one,a                                          ; INC A             ; 
        li   hl,>13b3                                       ; LD HL,$13B3       ; the pitch dial
        b    @draw_dial_gauge                               ; JP $6C71          ; draw it (#R$6C71)
+
+********************************************************************************
+* Roll and pitch: stop them when the keys are released
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called every frame by the main loop (#R$13FD). After launching, the
+* ship is rolling ($E929, #R$1837): this slows the roll down by 1 a frame
+* (redrawing its dial and setting up the rotation) until it's stopped or
+* reversed.
+* .
+* Otherwise (at $6BFE), with option D (bit 1 of #R$E914), stops the roll
+* and pitch if their keys weren't held this frame (#R$E774, #R$E775),
+* redrawing the dial and setting up the rotation. Then clears the
+* key-held flags for the next frame.
+settle_roll_pitch:                                         ; >6be1
+       .proc                                               ;                   ; 
+       movb @launch_roll,a                                 ; LD A,($E929) / OR A; still rolling after launching?
+       jeq  _6bfe                                          ; JR Z,$6BFE        ; no
+       movb @roll_rate,a                                   ; LD A,($F815) / OR A; A = the roll rate
+       jeq  settle_roll_pitch_dials                        ; JR Z,$6BFA        ; stopped
+       jlt  settle_roll_pitch_dials                        ; JP M,$6BFA        ; or reversed
+       sb   one,@roll_rate                                 ; DEC A / LD ($F815),A; slow it down
+       bl   @draw_roll_dial                                ; CALL $6BB3        ; draw the roll dial
+       .pop r11                                            ;                   ; 
+       b    @refresh_roll_table                            ; JP $2209          ; set up the roll
+settle_roll_pitch_dials:                                   ; >6bfa
+       sb   @launch_roll,@launch_roll                      ; XOR A / LD ($E929),A; done rolling after launching
+_6bfe:                                                     ; >6bfe
+       movb @options,r0                                    ; LD A,($E914)      ; 
+       czc  @bit1,r0                                       ; BIT 1,A           ; option D?
+       jeq  _6c2f                                          ; JR Z,$6C2F        ; no
+       movb @roll_key_held,a                               ; LD A,($E774) / OR A; roll key held?
+       jne  _6c1a                                          ; JR NZ,$6C1A       ; yes
+       movb @roll_rate,a                                   ; LD HL,$F815 / LD A,(HL) / OR A; A = the roll rate
+       jeq  _6c1a                                          ; JR Z,$6C1A        ; already stopped
+       sb   @roll_rate,@roll_rate                          ; LD (HL),$00       ; stop the roll
+       bl   @draw_roll_dial                                ; CALL $6BB3        ; draw the roll dial
+       bl   @refresh_roll_table                            ; CALL $2209        ; set up the roll
+_6c1a:                                                     ; >6c1a
+       movb @pitch_key_held,a                              ; LD A,($E775) / OR A; pitch key held?
+       jne  _6c2f                                          ; JR NZ,$6C2F       ; yes
+       movb @pitch_rate,a                                  ; LD HL,$F816 / LD A,(HL) / OR A; A = the pitch rate
+       jeq  _6c2f                                          ; JR Z,$6C2F        ; already stopped
+       sb   @pitch_rate,@pitch_rate                        ; LD (HL),$00       ; stop the pitch
+       bl   @draw_pitch_dial                               ; CALL $6BCA        ; draw the pitch dial
+       bl   @refresh_pitch_table                           ; CALL $2212        ; set up the pitch
+_6c2f:                                                     ; >6c2f
+       sb   @roll_key_held,@roll_key_held                  ; XOR A / LD ($E774),A; clear the key-held flags
+       sb   @pitch_key_held,@pitch_key_held                ; LD ($E775),A      ; 
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Draw a bar gauge [dashboard]

@@ -20,11 +20,11 @@ data from extra 8K cartridge ROM banks into `>6000` while main code runs in 32K 
 
 1. `xas99.py -i -q -R -L elite.lst -E symbols.txt src/elite.a99 -o bin/elite` — assemble to EA5 program
    image(s) (`bin/elite`, `bin/elitf`, ... when larger than one file).
-2. `xas99.py src/math-tables-bin.a99 -b ...` and `xas99.py src/code-bank-N.a99 -B ...` — assemble the code banks 7-10
+2. `xas99.py src/math-tables-bin.a99 -b ...` and `xas99.py src/code-bank-N.a99 -B ...` — assemble the code banks 7-11
    (`bin/bankN.bin`), which include the math tables (`bin/math-tables.bin`) with `bcopy`.
 3. `xas99.py src/rom-banks/rom-bank-N.a99 -B ...` — assemble the data banks 4-6 (`bin/bankN.bin`).
 4. `java -jar tools/ea5tocart.jar bin\elite "elite"` — pack the program (lower and upper RAM only) with a loader
-   into a 32K cartridge image (banks 0-3), then append banks 4-10 and 5 empty banks: a 128K image (`elite8.bin`).
+   into a 32K cartridge image (banks 0-3), then append banks 4-11 and 4 empty banks: a 128K image (`elite8.bin`).
 5. Package `elite8.bin` + `layout.xml` into `elite.rpk` (MAME cartridge, PCB type `paged378`).
 
 There are no tests; verification is running the cartridge in an emulator.
@@ -103,8 +103,8 @@ words. A single-byte access to
   are constants; update them if those routines change. Code there runs without wait states.
 - **Code in ROM banks**: `program.a99` holds the whole program and is assembled once per output: by `elite.a99` with
   RAM real (`aorg`) and the code banks `dorg`, and by `code-bank-N.a99` with only bank N real, so RAM and the banks
-  can use each other's labels. Banks 7-10 (`code_bank_N_select`, at >6000 + 2N) hold code - 7 the docked screens, 8 the data on system screen,
-  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`); call into it with `.far_call`. Code in a bank may
+  can use each other's labels. Banks 7-11 (`code_bank_N_select`, at >6000 + 2N) hold code - 7 the docked screens, 8 the data on system screen,
+  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`), 11 the flight logic `process_frame` calls with `.far_call` (collisions, docking, the safe zone, the object handlers); call into it with `.far_call`. Code in a bank may
   read RAM, the math tables and its own bank only. As a pilot, bank 7 holds the status page (`status_page`,
   `print_commander_name` and their own text and data); the routines and text other screens share (printing,
   number formatting, system names, clearing the page) are in RAM. 'N' on the title screen shows it, and 'Y' the

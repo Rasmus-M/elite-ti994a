@@ -1,0 +1,444 @@
+* ROM bank 11: the math tables, and code: the flight logic
+* Assembled for real by code-bank-11.a99, and DORG in the other builds for its labels
+       .ifdef code_bank_11
+       aorg >6000
+       .else
+       dorg >6000
+       .endif
+       bss  >40
+       .ifdef code_bank_11
+       bcopy "../../bin/math-tables.bin" ; the math tables, as in the other banks
+       .else
+       bss  math_tables_end-math_tables
+       .endif
+
+* The flight logic run by #R$13FD (TI: called with .far_call)
+
+********************************************************************************
+* Check for entering the space station's safe zone
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called every frame by the main loop (#R$13FD). The ship is in the safe
+* zone when it's less than 9000 from the planet ($E727); otherwise $156D
+* handles leaving it. On entering, sets #R$EB05 - lighting the "S" on the
+* console (#R$6ADC) and turning the compass to the station (#R$85FB) - and
+* the first time after arriving in a system ($EF9C, set on launching),
+* maybe calls the police (#R$2C21).
+* .
+* At $156D, the ship is outside the safe zone: if #R$EB05 is set, clears it
+* - the compass goes back to the planet (slot 0) - and turns off the "S"
+* indicator (#R$6ADC).
+check_safe_zone:                                           ; >1549
+       .proc                                               ;                   ; 
+       movb @planet_distance+1,r0                          ; LD HL,($E727)     ; R0 = distance from the planet
+       movb @planet_distance,@r0lb                         ;                   ; 
+       ci   r0,9000                                        ; LD DE,$2328 / OR A / SBC HL,DE; 9000 or more?
+       jhe  station_safe_zone_leave                        ; JR NC,$156D       ; yes - outside
+       movb @station_in_range,r0                           ; LD HL,$EB05 / LD A,(HL) / OR A; 
+       jne  _1576                                          ; JR NZ,$156B       ; already in the safe zone
+       movb one,@station_in_range                          ; LD (HL),$01       ; in the safe zone
+       bl   @draw_station_indicator                        ; CALL $6ADC        ; light the "S"
+       movb @safe_zone_entry_latch,r0                      ; LD HL,$EF9C / LD A,(HL) / OR A; 
+       jne  _1576                                          ; JR NZ,$156B       ; not just arrived
+       sb   one,@safe_zone_entry_latch                     ; DEC (HL)          ; 
+* TI: calling the police (#R$2C21) isn't converted yet.
+       jmp  _1576                                          ; JR $1576          ; done
+station_safe_zone_leave:                                   ; >156d
+       movb @station_in_range,r0                           ; LD A,(HL) / OR A  ; A = station-in-range flag
+       jeq  _1576                                          ; JR Z,$1576        ; already clear
+       sb   @station_in_range,@station_in_range            ; LD (HL),$00       ; clear it: compass tracks the planet (slot 0)
+       bl   @draw_station_indicator                        ; CALL $6ADC        ; turn off the "S" indicator
+_1576:                                                     ; >1576
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Dock
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called by the main loop (#R$13FD) once the ship has docked (#R$E917).
+* Switches to the front view unless a space view is showing (#R$E903),
+* flashes the dashboard (#R$6CB2), clears the alert level (#R$E90C), sets
+* the docked flag (#R$E90A), checks for mission events (#R$1896), and
+* shows the status page (#R$6276).
+dock:                                                      ; >1873
+       .proc                                               ;                   ; 
+       sb   @hyperspace_countdown_inner,@hyperspace_countdown_inner; XOR A / LD ($E91B),A; 
+       sb   @hyperspace_trigger,@hyperspace_trigger        ; LD ($E920),A      ; 
+       movb @space_view_showing,r0                         ; LD A,($E903) / OR A; A = space view showing?
+       jne  _1881                                          ;                   ; 
+       bl   @switch_to_front_view                          ; CALL Z,$64A1      ; switch to the front view
+_1881:                                                     ; >1881
+       bl   @tunnel_rings                                  ; CALL $6CB2        ; flash the dashboard
+       sb   @docking,@docking                              ; XOR A / LD ($E917),A; docking done
+       sb   @alert_level,@alert_level                      ; LD ($E90C),A      ; alert level 0
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@docked                                     ; LD ($E90A),A      ; docked
+* TI: the mission events (#R$1896) aren't converted yet.
+       .far_call code_bank_7_select,status_page            ; JP $6276          ; show the status page
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Damage the player's shields by B
+* 
+* Used by the routines at #R$2618, #R$26A9 and #R$8755.
+* .
+* Plays sound effect 4 (#R$7468) unless it's already playing (#R$E915).
+* Then takes the damage off the fore shield ($F80F) if the attacker is in
+* front of the ship (($F7D3), the sign of its Z coordinate, positive), or
+* the aft shield ($F810) if it's behind, and redraws both (#R$6B48,
+* #R$6B54). Damage the shield can't absorb is taken from the energy banks
+* (#R$19EC); if that leaves them low (under $48), there's a 15/256 chance
+* of losing the cargo ("Cargo lost", 1 in 13) or a piece of equipment
+* ($19A1).
+* .
+* The cargo is only lost (at $1990) if there's something in the hold
+* (#R$EB19).
+* .
+* At $19A1, the piece of equipment is the first one fitted, going through
+* the equipment array (#R$F775) from a random item (3-13) and round again,
+* that doesn't have bit 7 set. It's never the fuel, the missiles or the
+* large cargo bay (items 0-2). It's removed, and "<item> lost" shown (the
+* name from #R$10A7 and " lost" from #R$1BC3, put together at $E8DC).
+* 
+* I:A Amount of damage
+damage_shields:                                            ; >193f
+       .proc                                               ; PUSH AF           ; save the damage
+* TI: no sound effect 4 (#R$7468), as the sound effects aren't converted yet
+       li   hl,fore_shield                                 ; LD HL,$F80F       ; HL -> fore shield
+       movb @object_z_sign,r0                              ; LD A,($F7D3) / OR A; 
+       jgt  damage_shields_hit                             ; JP P,$1958        ; attacker in front
+       jeq  damage_shields_hit                             ;                   ; 
+       li   hl,aft_shield                                  ; LD HL,$F810       ; behind: HL -> aft shield
+damage_shields_hit:                                        ; >1958
+       movb a,b                                            ; POP BC            ; B = damage
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; 
+       jeq  _196f                                          ; JR Z,$196F        ; shield already down
+       cb   a,b                                            ; SUB B             ; 
+       jl   damage_shields_over                            ; JR NC,$1966       ; absorbed it all?
+       sb   b,a                                            ;                   ; yes
+       sb   b,b                                            ; LD B,$00          ; 
+       jmp  _1966                                          ;                   ; 
+damage_shields_over:                                       
+       sb   a,b                                            ; NEG / LD B,A      ; no: B = what's left over
+       sb   a,a                                            ; XOR A             ; 
+_1966:                                                     ; >1966
+       movb a,*hl                                          ; LD (HL),A         ; store the shield
+       .push bc                                            ; PUSH BC           ; 
+       bl   @draw_gauge_dashboard_6b48                     ; CALL $6B48        ; 
+       bl   @draw_gauge_dashboard_6b54                     ; CALL $6B54        ; redraw the shields
+       .pop bc                                             ; POP BC            ; 
+_196f:                                                     ; >196f
+       movb b,b                                            ; LD A,B / OR A     ; 
+       jeq  _193f_end                                      ; RET Z             ; nothing left over
+       bl   @decay_counter_f817                            ; CALL $19EC        ; take the rest off the energy banks
+       cb   a,@bytes+>48                                   ; CP $48            ; 
+       jhe  _193f_end                                      ; RET NC            ; energy not low
+       bl   @random_byte                                   ; CALL $2176        ; 
+       cb   a,@bytes+>0f                                   ; CP $0F            ; 
+       jhe  _193f_end                                      ; RET NC            ; otherwise a 15/256 chance of losing something
+_197e:                                                     ; >197e
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>0f00                                        ; AND $0F           ; 
+       cb   a,@bytes+>0d                                   ; CP $0D            ; 
+       jhe  _197e                                          ; JR NC,$197E       ; pick 0-12
+       cb   a,@bytes+>0c                                   ; CP $0C            ; 
+       jne  strip_random_equipment_item                    ; JR NZ,$19A1       ; 0-11: lose a piece of equipment
+       li   hl,cargo_hold                                  ; LD HL,$EB19       ; 12: lose the cargo
+       li   r1,>48                                         ; LD B,$48          ; 
+_1990:                                                     ; >1990
+       movb *hl+,r0                                        ; LD A,(HL) / OR A / INC HL; 
+       jne  _1994                                          ; JR Z,$199D        ; 
+       dec  r1                                             ; DJNZ $1990        ; 
+       jne  _1990                                          ;                   ; 
+       jmp  _193f_end                                      ; RET               ; none found
+_1994:                                                     ; >1994
+       bl   @clear_cargo_hold                              ; CALL $9237        ; empty the hold
+       li   hl,msg_cargo_lost                              ; LD HL,$1BB9       ; "Cargo lost"
+       bl   @show_view_message                             ; JP $39C8          ; show it
+       jmp  _193f_end                                      ;                   ; 
+strip_random_equipment_item:                               ; >19a1
+       ab   @bytes+>02,a                                   ; ADD A,$02         ; A = the starting item index (2-13)
+       movb a,@e                                           ; LD E,A            ; 
+       sb   d,d                                            ; LD D,$00          ; 
+       li   hl,fuel_level                                  ; LD HL,$F775       ; HL -> the equipment array base
+       a    de,hl                                          ; ADD HL,DE         ; HL -> the starting item's byte
+       li   r1,>0c                                         ; LD B,$0C          ; check up to 12 items
+_19ac:                                                     ; >19ac
+       movb *hl,a                                          ; LD A,(HL) / OR A  ; A = this item's current value
+       jlt  advance_equipment_index_wrapping               ; JP M,$19DD        ; bit 7 set (unstealable) - skip it
+       jeq  advance_equipment_index_wrapping               ; JR Z,$19DD        ; zero (not owned) - skip it
+       cb   @e,@bytes+>02                                  ; LD A,E / CP $02   ; the specifically-protected index 2?
+       jeq  advance_equipment_index_wrapping               ; JR Z,$19DD        ; yes - skip it too
+       sb   *hl,*hl                                        ; LD (HL),$00       ; no - strip it (the item is lost)
+       movb @e,a                                           ; LD A,E            ; A = the item's index, for the name lookup
+       li   hl,equipment_name_list2_empty_slots            ; LD HL,$10A7       ; HL -> the item-name table
+       bl   @skip_tokenised_strings_advancing_hl_past      ; CALL $358D        ; HL -> this item's name string
+       li   de,equipment_item_name_text_buffer_text        ; LD DE,$E8DC       ; DE -> the scratch print buffer
+damage_shields_copy_name:                                  ; >19c4
+       movb *hl+,r0                                        ; LD A,(HL) / INC HL; copy the name, byte by byte...
+       movb r0,r2                                          ;                   ; 
+       andi r0,>7f00                                       ; AND $7F           ; ...stripping the high-bit terminator flag
+       movb r0,*de+                                        ; LD (DE),A / INC DE; 
+       movb r2,r2                                          ; BIT 7,(HL)        ; was this the terminator byte?
+       jgt  damage_shields_copy_name                       ; JP P,$19C4        ; no - copy the next byte
+       jeq  damage_shields_copy_name                       ;                   ; 
+       li   hl,msg_lost                                    ; LD HL,$1BC3       ; yes - append the shared " lost" suffix
+       li   bc,>0005                                       ; LD BC,$0005       ; 
+       .ldir                                               ; LDIR              ; 
+       li   hl,equipment_item_name_text_buffer_text        ; LD HL,$E8DC       ; HL -> the assembled "<item> lost" message
+       bl   @show_view_message                             ; JP $39C8          ; print it
+       jmp  _193f_end                                      ;                   ; 
+advance_equipment_index_wrapping:                          ; >19dd
+       ab   one,@e                                         ; INC E             ; advance the item cursor
+       inc  hl                                             ; INC HL            ; 
+       cb   @e,@bytes+>0e                                  ; LD A,E / CP $0E   ; wrapped past the last index (14)?
+       jne  _19e9                                          ; JR NZ,$19E9       ; no - keep going
+       movb @bytes+>02,@e                                  ; LD E,$02          ; yes - wrap the cursor back to index 2...
+       li   hl,item_large_cargo_bay                        ; LD HL,$F777       ; ...and HL back to that slot
+_19e9:                                                     ; >19e9
+       dec  r1                                             ; DJNZ $19AC        ; more items to check
+       jne  _19ac                                          ;                   ; 
+_193f_end:                                                 
+       .endproc                                            ; RET               ; 
+* The message " lost" (#R$1BC3, TI: here, as it is copied while this bank
+* is selected)
+msg_lost:                                                  ; >1bc3
+       text ' los',>f4                                            ; 
+
+********************************************************************************
+* Decay the counter at $F817 by B, clamped to 0
+* 
+* Used by the routines at #R$13FD, #R$193F and #R$323C.
+* TI: returns the counter in A.
+decay_counter_f817:                                        ; >19ec
+       .proc                                               ;                   ; 
+       movb @energy_gauge,a                                ; LD A,($F817)      ; A = the counter
+       sb   b,a                                            ; SUB B             ; subtract B
+       joc  _19f3                                          ; JR NC,$19F3       ; still non-negative - keep it
+       sb   a,a                                            ; XOR A             ; underflowed - clamp to 0
+_19f3:                                                     ; >19f3
+       movb a,@energy_gauge                                ; LD ($F817),A      ; store the decayed counter
+       .push a                                             ; PUSH AF           ; 
+       bl   @draw_energy_banks                             ; CALL $6A88        ; redraw the energy gauge
+       .pop a                                              ; POP AF            ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Run the object's handler
+* 
+* Used by the routines at #R$13FD and #R$1703.
+* .
+* Called for each object by the main loop (#R$13FD) and the death scene
+* (#R$1703). If bit 5 of the object's status byte is set, stores the
+* status byte in #R$E943, which makes #R$15E7 raise the alert level.
+* Then jumps to the handler for the object's handler type ($F7EE) from
+* the table at #R$288D.
+run_object_handler:                                        ; >2528
+       movb @object_status_byte,r0                         ; LD A,($F7CD)      ; 
+       andi r0,>2000                                       ; AND $20           ; test bit 5
+       jeq  _2532                                          ; JR Z,$2532        ; bit 5 clear
+       movb r0,@hostile_about                              ; LD ($E943),A      ; bit 5 set: note it for the alert level (#R$E943)
+_2532:                                                     ; >2532
+       clr  r1                                             ;                   ; 
+       movb @handler_type,r1                               ; LD A,($F7EE)      ; R1 = handler type
+       srl  r1,7                                           ; ADD A,A / LD L,A / LD H,$00; (word index)
+       mov  @object_handler_table(r1),r1                   ; LD BC,$288D / ADD HL,BC / LD A,(HL) ...; R1 = this type's handler
+       b    *r1                                            ; JP (HL)           ; jump to the handler
+
+********************************************************************************
+* Continue the handler only on this object's turn
+* 
+* Used by the routines at #R$2641, #R$265E, #R$26A9, #R$27C0 and #R$27F4.
+* .
+* Called by several object handlers before work that only needs doing
+* every third frame. Returns normally (so the handler carries on) if the
+* object's turn number ($F7ED) matches the 3-2-1 counter at #R$E92E;
+* otherwise returns from the handler as well. Its final RET is also the
+* handler for types 0 and 13 (see #R$288D).
+every_third_frame:                                         ; >2542
+       movb @turn_number,a                                 ; LD A,($F7ED)      ; A = this object's turn number
+       li   hl,current_turn                                ; LD HL,$E92E       ; HL -> the live cycling counter
+       cb   a,*hl                                          ; CP (HL)           ; this object's frame to do extra work?
+       jne  !                                              ; RET Z             ; yes - nothing more for this (no-op) handler anyway
+       .ret                                                ;                   
+!
+       .pop hl                                             ; POP HL            ; no - skip an extra return level too
+handler_none:                                              ; >254b
+       rt                                                  ; RET               ; handler types 0 and 13: nothing to do
+
+********************************************************************************
+* Handler type 2: space station
+* 
+* Rolls the station (#R$23D9, rate 4) while it's on screen (($EF98) set by
+* #R$4255).
+handler_space_station:                                     ; >254c
+       movb @ef98_per_object_flag,r0                       ; LD A,($EF98) / OR A; 
+       jne  _2551                                          ; RET Z             ; not on screen
+       rt                                                  ;                   ; 
+_2551:                                                     ; >2551
+       movb @bytes+>04,a                                   ; LD A,$04          ; 
+       b    @roll_object                                   ; JP $23D9          ; roll
+
+********************************************************************************
+* Object handler table
+* 
+* The handler #R$2528 runs each frame for each handler type ($F7EE,
+* 0-15). Types 0 and 13 do nothing (the planet, the sun, debris and the
+* title screen's objects are type 0); 1 is an explosion, 2 the space
+* station, 3 the player's missile and 14 a missile fired at the player;
+* 15 is the Cobra left behind by the escape capsule (#R$19FC); the rest
+* are ships' tactics, from attacking to turning away and leaving.
+* TI: only the handlers converted so far; the others do nothing yet.
+object_handler_table:                                      ; >288d
+       data handler_none                                          ; 0: none
+       data handler_none                                          ; 1: explosion (#R$2556, not converted yet)
+       data handler_space_station                                 ; 2: space station
+       data handler_none                                          ; 3: the player's missile (#R$25B9, not converted yet)
+       data handler_none                                          ; 4: turn away, then leave (#R$265E, not converted yet)
+       data handler_none                                          ; 5: turn away, then attack (#R$2641, not converted yet)
+       data handler_none                                          ; 6: attack (#R$26A9, not converted yet)
+       data handler_none                                          ; 7: turn away (#R$2758, not converted yet)
+       data handler_none                                          ; 8: fly on, then attack (#R$27A1, not converted yet)
+       data handler_none                                          ; 9: spin, fly on and leave (#R$27B3, not converted yet)
+       data handler_none                                          ; 10: head for the planet (#R$27C0, not converted yet)
+       data handler_none                                          ; 11: break off (#R$27DF, not converted yet)
+       data handler_none                                          ; 12: fly on and leave (#R$27F4, not converted yet)
+       data handler_none                                          ; 13: none
+       data handler_none                                          ; 14: missile homing in on the player (#R$2618, not converted yet)
+       data handler_none                                          ; 15: the escape capsule's countdown (#R$2810, not converted yet)
+
+********************************************************************************
+* Check for a collision with the object
+* 
+* Used by the routine at #R$13FD.
+* .
+* Does nothing for missiles, the Cougar, explosions, objects that are
+* already exploding (bit 3 of #R$F7CD), while the flight controls are off
+* (#R$EF8E), or if the object is further away (#R$EB8E) than its size
+* ($F805, byte $10 of its blueprint, see #R$A817). Otherwise:
+* .
+* The space station goes on to the docking check ($87DD), unless the player
+* has shot at it ($EF97) or the Thargoids have taken it over (mission state
+* $52, #R$E93D), when it's a collision.
+* .
+* A cargo canister, escape capsule or Thargon may be scooped (#R$8BA6).
+* .
+* Anything else - and the station, and objects not scooped - is a
+* collision: the object loses 50 energy (#R$F7E9), and is destroyed if that
+* uses it all up (without affecting the player's legal status, #R$EFA1);
+* and the player's shields take 20 damage - or $FF from the Constrictor
+* (#R$193F).
+* .
+* At $87DD, if the station is in front (($F7D3), the sign of its Z
+* coordinate) and more than 110 away (#R$EB8E), nothing happens. The player
+* docks (#R$E917) if the ship is lined up with the slot - X distance under
+* 30 and Y under 20 ($EB82/$EB84, see #R$883D) - the station is facing the
+* player (its $F7DE and $F7D6 orientation components, see #R$4503, both at
+* least $3DD1 with the right signs), and it's no more than 79 in front
+* (($F7D2)). Missing the slot is a collision ($8838).
+* .
+* At $8838, the player's shields take 10 damage (#R$193F).
+check_collision:                                           ; >8755
+       .proc                                               ;                   ; 
+       movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
+       cb   a,@bytes+>02                                   ; CP $02            ; 
+       jeq  _8755_end                                      ; RET Z             ; a missile
+       cb   a,@bytes+>1e                                   ; CP $1E            ; 
+       jeq  _8755_end                                      ; RET Z             ; the Cougar
+       cb   @handler_type,one                              ; LD A,($F7EE) / CP $01; 
+       jeq  _8755_end                                      ; RET Z             ; an explosion
+       movb @object_status_byte,r0                         ; LD A,($F7CD) / AND $08; 
+       czc  @bit3,r0                                       ;                   ; 
+       jne  _8755_end                                      ; RET NZ            ; already exploding
+       movb @flight_controls_off,r0                        ; LD A,($EF8E) / OR A; flight controls off?
+       jne  _8755_end                                      ; RET NZ            ; yes - no collisions
+       movb @object_distance+1,r1                          ; LD DE,($EB8E)     ; R1 = the object's distance
+       movb @object_distance,@r1lb                         ;                   ; 
+       clr  r0                                             ; LD HL,($F805) / LD H,$00; R0 = its size
+       movb @bp_size,r0                                    ;                   ; 
+       swpb r0                                             ;                   ; 
+       c    r0,r1                                          ; SBC HL,DE         ; 
+       jl   _8755_end                                      ; RET C             ; too far away - no collision
+       movb @legal_status_copy,r0                          ; LD A,($EF97) / OR A; nonzero if the player has shot the station
+       jne  _878f                                          ; JR NZ,$878F       ; yes - no docking
+       cb   @mission_state,@bytes+>52                      ; LD A,($E93D) / CP $52; 
+       jeq  _878f                                          ; JR Z,$878F        ; the Thargoids' station
+       cb   @ship_type,one                                 ; LD A,($F7E7) / CP $01; 
+       jeq  check_docking                                  ; JR Z,$87DD        ; the station: check for docking
+_878f:                                                     ; >878f
+* TI: scooping (#R$8BA6) and colliding with anything but the station aren't
+* converted yet.
+       cb   @ship_type,one                                 ; LD A,($F7E7) / CP $01; 
+       jne  _8755_end                                      ; JR Z,$87CF        ; the station itself doesn't lose energy
+_87cf:                                                     ; >87cf
+       movb @bytes+>14,a                                   ; LD A,$14          ; damage 20
+       .pop r11                                            ;                   ; 
+       b    @damage_shields                                ; JP $193F          ; damage the player's shields
+check_docking:                                             ; >87dd
+       movb @object_z_sign,r0                              ; LD A,($F7D3) / OR A; A = the position's Z sign byte
+       jlt  check_collision_in_front                       ; JP M,$87EA        ; behind the player
+       ci   r1,110                                         ; LD HL,$006E / SBC HL,DE; 
+       jh   _8755_end                                      ; RET C             ; too far away
+check_collision_in_front:                                  ; >87ea
+       movb @delta_x_hi,r0                                 ; LD HL,($EB82)     ; R0 = X distance
+       movb @abs_delta_x,@r0lb                             ;                   ; 
+       ci   r0,30                                          ; LD DE,$001E / OR A / SBC HL,DE; 
+       jhe  crash_into_station                             ; JR NC,$8838       ; not lined up - crash
+       movb @delta_y_hi,r0                                 ; LD HL,($EB84)     ; R0 = Y distance
+       movb @abs_delta_y,@r0lb                             ;                   ; 
+       ci   r0,20                                          ; LD DE,$0014 / OR A / SBC HL,DE; 
+       jhe  crash_into_station                             ; JR NC,$8838       ; not lined up - crash
+       mov  @nose_vector_z,r0                              ; LD HL,($F7DE)     ; 
+       movb @object_z_sign,r2                              ; LD A,($F7D3) / OR A; A = the position's Z sign byte again
+       jgt  check_docking_2                                ; JP P,$8810        ; 
+       jeq  check_docking_2                                ;                   ; 
+       mov  r0,r0                                          ; BIT 7,H           ; negative: test $F7DE's own sign
+       jlt  crash_into_station                             ; JR NZ,$8838       ; not facing - crash
+       jmp  _8816                                          ; JR $8816          ; 
+check_docking_2:                                           ; >8810
+       mov  r0,r0                                          ; BIT 7,H           ; test $F7DE's sign
+       jgt  crash_into_station                             ; JR Z,$8838        ; not facing - crash
+       jeq  crash_into_station                             ;                   ; 
+       andi r0,>7fff                                       ; RES 7,H           ; 
+_8816:                                                     ; >8816
+       ci   r0,>3dd1                                       ; LD DE,$3DD1 / SBC HL,DE; 
+       jl   crash_into_station                             ; JR C,$8838        ; not facing - crash
+       mov  @side_vector_y,r0                              ; LD HL,($F7D6)     ; 
+       andi r0,>7fff                                       ; RES 7,H           ; force it positive - unlike $F7DE above, its sign isn't tested first
+       ci   r0,>3dd1                                       ; LD DE,$3DD1 / SBC HL,DE; 
+       jl   crash_into_station                             ; JP C,$8838        ; not facing - crash
+       mov  @object_position_z,r0                          ; LD HL,($F7D2)     ; R0 = Z distance
+       ci   r0,80                                          ; LD DE,$FFB0 / ADD HL,DE; 
+       jhe  _8755_end                                      ; RET C             ; more than 79 away - not docked yet
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@docking                                    ; LD ($E917),A      ; docked
+_8755_end:                                                 
+       .endproc                                            ; RET               ; done
+crash_into_station:                                        ; >8838
+       movb @bytes+>0a,a                                   ; LD A,$0A          ; damage 10
+       .pop r11                                            ;                   ; 
+       b    @damage_shields                                ; JP $193F          ; damage the player's shields
+
+********************************************************************************
+* Clear the cargo hold
+* 
+* Used by the routines at #R$193F, #R$19FC and #R$909F.
+* .
+* Empties the cargo hold (#R$EB19): used when the player dies (#R$193F),
+* ejects in the escape capsule (#R$19FC), or takes on the supernova
+* refugees (#R$909F).
+clear_cargo_hold:                                          ; >9237
+       .proc                                               ;                   ; 
+       li   hl,cargo_hold                                  ; LD HL,$EB19       ; 
+       sb   *hl,*hl                                        ; LD (HL),$00       ; 
+       li   de,cargo_hold+>0001                            ; LD DE,$EB1A       ; 
+       li   bc,>0047                                       ; LD BC,$0047       ; 18 entries of 4 bytes
+       .ldir                                               ; LDIR              ; 
+       .endproc                                            ; RET               ; 
+
+
+rom_bank_11_end:
+       equ  $
+       bss  >8000-$

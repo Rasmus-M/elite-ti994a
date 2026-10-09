@@ -257,14 +257,14 @@ process_frame_object:                                      ; >1455
        bl   @get_blueprint_data                            ; CALL $16E3        ; set the object up for its type
        sb   @ship_fired,@ship_fired                        ; XOR A / LD ($E92D),A; the ship hasn't fired
        bl   @work_out_distance                             ; CALL $883D        ; work out its distance
-* TI: not converted yet: collisions and docking (#R$8755).
+       .far_call code_bank_11_select,check_collision       ; CALL $8755        ; ship-type gates and range checks (incl. docking, #R$87DD)
        bl   @scanner_add_object                            ; CALL $8205        ; add the object to the scanner
        bl   @compass                                       ; CALL $85FB        ; position the compass dot, if this is its target
        bl   @move_past_player                              ; CALL $8B00        ; move it by the player's speed
        bl   @move_object                                   ; CALL $866D        ; move it forward by its own speed
        bl   @draw_object                                   ; CALL $422E        ; draw it
-* TI: not converted yet: the object's handler (#R$2528), the laser
-* (#R$28F6) and the ship's laser beam (#R$43C2).
+       .far_call code_bank_11_select,run_object_handler    ; CALL $2528        ; run the object's handler
+* TI: not converted yet: the laser (#R$28F6) and the ship's laser beam (#R$43C2).
        movb @roll_rate,a                                   ; LD A,($F815) / OR A; A = roll rate
        jeq  _1496                                          ; CALL NZ,$22C0     ; rolling - rotate the object's position and axes
        bl   @step_roll_rotation                            ;                   ; 
@@ -297,10 +297,19 @@ _14bb:                                                     ; >14bb
        jne  _150b                                          ; JR NZ,$150B       ; 
        movb @bytes+>03,*hl                                 ; LD (HL),$03       ; 
 _150b:                                                     ; >150b
-* TI: not converted yet: the safe zone, altitude and cabin temperature
-* (#R$1549, #R$1577), spawning ships (#R$2B05), the alert level (#R$15E7),
-* death (#R$16BA), hyperspace (#R$894D), the ECM (#R$323C), docking
-* (#R$1873) and recharging (#R$18E6).
+       movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; 
+       jne  _1517                                          ; JR NZ,$1517       ; drive malfunction - skip the two gauge updates
+       .far_call code_bank_11_select,check_safe_zone       ; CALL $1549        ; update the space station safe-zone flag
+* TI: not converted yet: the altitude and cabin temperature (#R$1577).
+_1517:                                                     ; >1517
+* TI: not converted yet: spawning ships (#R$2B05), the alert level (#R$15E7),
+* death (#R$16BA), hyperspace (#R$894D) and the ECM (#R$323C).
+       movb @docking,a                                     ; LD A,($E917) / OR A; docking?
+       jeq  _1531                                          ; JR Z,$1531        ; no
+       .far_call code_bank_11_select,dock                  ; CALL $1873        ; yes - dock
+       jmp  _1548                                          ; JR $1548          ; 
+_1531:                                                     ; >1531
+* TI: not converted yet: recharging (#R$18E6).
        movb @space_view_showing,a                          ; LD A,($E903) / OR A; 
        jeq  _1540                                          ; JR Z,$1540        ; no space view showing
        bl   @copy_space_view                               ; CALL $3846        ; copy the space view's bitmap buffer to VRAM
@@ -308,6 +317,7 @@ _1540:                                                     ; >1540
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, as interrupts are off)
        cb   @vblank_subtick_counter,@bytes+>05             ; LD HL,$F748 / LD A,(HL) / CP $05; 5 VBlanks since the last frame?
        jl   _1540                                          ; JR C,$1543        ; no - wait
+_1548:                                                     ; >1548
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -362,6 +372,11 @@ get_blueprint_data_exit:
 bp_name_buffer:
        bss  20
        even
+
+********************************************************************************
+* The message "Cargo lost"
+msg_cargo_lost:                                            ; >1bb9
+       text 'Cargo los',>f4                                       ; 
 
 ********************************************************************************
 * The message "Load New Commander ?"

@@ -84,7 +84,12 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   swaps the bytes of each word) and the orientation logs `side_vector_logs`, `roof_vector_logs` and
   `nose_vector_logs` (also used by the MSX code at $869A, not converted yet), and the per-edge and per-vertex
   variables `clip_point1_x/_y`, `clip_point2_x/_y`, `view_x`, `view_z2`, `view_z`, `vertex_cache_slot`,
-  `face_visible_workspace_1/_2`, `screen_radius` and `on_screen_left/right/top/bottom`. A single-byte access to
+  `face_visible_workspace_1/_2`, `screen_radius` and `on_screen_left/right/top/bottom`. So are the object
+workspace's position and orientation words (`object_position_x/_y/_z`, `side_vector*`, `nose_vector*`,
+`roof_vector*`, $F7CE-$F7E5) - and so the same words in the object table's records, which are copies of
+it, and the data copied into it (`station_launch_orientation`, `title_ship_start`,
+`title_letters_orientation`); their high-byte labels (`object_z_sign`, `position_x_hi`...) are `equ`s of the
+words. A single-byte access to
   one of these goes to the high byte at the label and the low byte at the label + 1. Constant tables read only by TI
   code (`log_table`, `antilog_table`) are big-endian `data`.
 - **No MSX page assumptions**: Z80 code that builds addresses from page numbers (`LD H,$E6`, `LD H,$02` for the

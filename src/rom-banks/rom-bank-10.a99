@@ -152,23 +152,19 @@ _1d17:                                                     ; >1d17
        joc  !                                              ; JP C,$1C9E        ; flown out of sight - next ship
        b    @title_screen_next_ship                        ;
 !
-       movb @object_position_z_lo+1,hl                     ; LD HL,($F7D2)     ; else nudge $F7D2 towards +200...
-       movb @object_position_z_lo,@l                       ;                   ;
+       mov  @object_position_z,hl                          ; LD HL,($F7D2)     ; else nudge $F7D2 towards +200...
        li   de,>00c8                                       ; LD DE,$00C8       ;
        a    de,hl                                          ; ADD HL,DE         ;
-       movb hl,@object_position_z_lo+1                     ; LD ($F7D2),HL     ; fly off: Z += 200
-       movb @l,@object_position_z_lo                       ;                   ;
+       mov  hl,@object_position_z                          ; LD ($F7D2),HL     ; fly off: Z += 200
        jmp  _1d62                                          ; JR $1D62          ;
 title_screen_frame:                                        ; >1d3d
        movb @title_ship_arrived,a                          ; LD A,($E88A)      ; has the ship arrived?
        socb a,a                                            ; OR A              ;
        jne  _1d62                                          ; JR NZ,$1D62       ; yes
-       movb @object_position_z_lo+1,hl                     ; LD HL,($F7D2)     ; no: move it closer
-       movb @object_position_z_lo,@l                       ;                   ;
+       mov  @object_position_z,hl                          ; LD HL,($F7D2)     ; no: move it closer
        li   de,>ff88                                       ; LD DE,$FF88       ;
        a    de,hl                                          ; ADC HL,DE         ;
-       movb hl,@object_position_z_lo+1                     ; LD ($F7D2),HL     ;
-       movb @l,@object_position_z_lo                       ;                   ;
+       mov  hl,@object_position_z                          ; LD ($F7D2),HL     ; 
        movb @title_ship_distance+1,de                      ; LD DE,($E888)     ; DE = distance to stop at
        movb @title_ship_distance,@e                        ;                   ;
        mov  hl,hl                                          ;                   ; test the sign of the new distance (the MOVs above changed the status)
@@ -180,8 +176,7 @@ title_screen_frame:                                        ; >1d3d
        s    de,hl                                          ; SBC HL,DE         ;
        joc  _1d62                                          ; JR NC,$1D62       ; not there yet
 title_screen_ship_arrived:                                 ; >1d5a
-       movb de,@object_position_z_lo+1                     ; LD ($F7D2),DE     ; there: stop at that distance
-       movb @e,@object_position_z_lo                       ;                   ;
+       mov  de,@object_position_z                          ; LD ($F7D2),DE     ; there: stop at that distance
        li   hl,title_ship_arrived                          ; LD HL,$E88A       ;
        sb   one,*hl                                        ; DEC (HL)          ; and flag it as arrived
 _1d62:                                                     ; >1d62
@@ -327,8 +322,7 @@ title_screen_add_letter:                                   ; >1e18
        inc  hl                                             ; INC HL            ;
        movb *hl,d                                          ; LD D,(HL)         ;
        inc  hl                                             ; INC HL            ;
-       movb de,@object_position_x+1                        ; LD ($F7CE),DE     ; set its X position
-       movb @e,@object_position_x                          ;                   ;
+       mov  de,@object_position_x                          ; LD ($F7CE),DE     ; set its X position
        .push bc                                            ; PUSH BC           ;
        .push hl                                            ; PUSH HL           ;
        li   hl,title_letters_orientation                   ; LD HL,$1F1E       ;
@@ -428,18 +422,18 @@ _1e67:                                                     ; >1e67
        jne  _1e94                                          ; JR NZ,$1E94       ; not the one being added
        movb @bytes+>7f,a                                   ; LD A,$7F          ;
        bl   @pitch_object                                  ; CALL $2365        ; turn it 30 degrees
-       movb @object_position_z_lo,a                        ; LD A,($F7D2)      ;
+       movb @object_position_z+1,a                         ; LD A,($F7D2)      ;
        sb   @bytes+>07,a                                   ; SUB $07           ;
-       movb a,@object_position_z_lo                        ; LD ($F7D2),A      ; and move it 7 closer
+       movb a,@object_position_z+1                         ; LD ($F7D2),A      ; and move it 7 closer
 _1e94:                                                     ; >1e94
        jmp  _1ea4                                          ; JR $1EA4          ;
 title_screen_letter_away:                                  ; >1e96
        .pop de                                             ; POP DE            ;
        movb @bytes+>81,a                                   ; LD A,$81          ;
        bl   @pitch_object                                  ; CALL $2365        ; turn it 30 degrees the other way
-       movb @object_position_z_lo,a                        ; LD A,($F7D2)      ;
+       movb @object_position_z+1,a                         ; LD A,($F7D2)      ;
        ab   @bytes+>07,a                                   ; ADD A,$07         ;
-       movb a,@object_position_z_lo                        ; LD ($F7D2),A      ; and move it 7 away
+       movb a,@object_position_z+1                         ; LD ($F7D2),A      ; and move it 7 away
 _1ea4:                                                     ; >1ea4
        bl   @draw_object                                   ; CALL $422E        ; draw it
        .pop de                                             ; POP DE            ;
@@ -490,9 +484,10 @@ title_letters:                                             ; >1f0c
 * Copied to $F7D0 for each letter by #R$1E01: Y = 0, Z = 192, then the
 * orientation vectors.
        .msxalign >1f1e
+* (TI: big-endian words, as in the object workspace at #R$F7CD)
 title_letters_orientation:                                 ; >1f1e
-       byte >00,>00,>C0,>00,>00,>40,>00,>00
-       byte >00,>00,>00,>00,>00,>00,>00,>40
+       byte >00,>00,>00,>C0,>40,>00,>00,>00
+       byte >00,>00,>00,>00,>00,>00,>40,>00
 
 ********************************************************************************
 * Title screen ships' starting position and orientation
@@ -500,10 +495,11 @@ title_letters_orientation:                                 ; >1f1e
 * Copied to $F7CE by #R$1C5C for each ship: X = 0, Y = 0, Z = 2000, then
 * the orientation vectors.
        .msxalign >1f2e
+* (TI: big-endian words, as in the object workspace at #R$F7CD)
 title_ship_start:                                          ; >1f2e
-       byte >00,>00,>00,>00,>D0,>07,>00,>C0
+       byte >00,>00,>00,>00,>07,>D0,>C0,>00
        byte >00,>00,>00,>00,>00,>00,>00,>00
-       byte >00,>C0
+       byte >C0,>00
 
 ********************************************************************************
 * Title screen ships
@@ -665,22 +661,17 @@ launch_place_planet_station_and_sun:                       ; >8d2a
        .proc                                               ;                   ; 
        bl   @clear_all_ship_slots                          ; CALL $28D4        ; clear the object table
        movb @bytes+>0d,@object_status_byte                 ; LD A,$0D / LD ($F7CD),A; status: in use, can't be shot, no collisions
-       clr  r0                                             ; LD HL,$0000       ; x = 0, y = 0...
-       movb r0,@object_position_x                          ; LD ($F7CE),HL     ; 
-       movb r0,@object_position_x+1                        ;                   ; 
-       movb r0,@object_position_y                          ; LD ($F7D0),HL     ; 
-       movb r0,@object_position_y+1                        ;                   ; 
-       li   r0,>581b                                       ; LD HL,$1B58       ; ...z = 7000: straight ahead
-       movb r0,@object_position_z_lo                       ; LD ($F7D2),HL     ; (TI: R0 holds it byte-swapped)
-       movb @r0lb,@object_position_z_lo+1                  ;                   ; 
+       clr  @object_position_x                             ; LD HL,$0000 / LD ($F7CE),HL; x = 0, y = 0...
+       clr  @object_position_y                             ; LD ($F7D0),HL     ; 
+       li   r0,7000                                        ; LD HL,$1B58       ; ...z = 7000: straight ahead
+       mov  r0,@object_position_z                          ; LD ($F7D2),HL     ; 
        sb   @handler_type,@handler_type                    ; LD A,$00 / LD ($F7EE),A; handler type 0
        movb @bytes+>64,@ship_type                          ; LD A,$64 / LD ($F7E7),A; ship type $64: the planet
        sb   @object_speed,@object_speed                    ; XOR A / LD ($F7E6),A; speed 0
        bl   @add_object                                    ; CALL $3037        ; add the planet (slot 0)
        movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
-       li   r0,>0cfe                                       ; LD HL,$FE0C       ; z = -500: just behind the player
-       movb r0,@object_position_z_lo                       ; LD ($F7D2),HL     ; (TI: R0 holds it byte-swapped)
-       movb @r0lb,@object_position_z_lo+1                  ;                   ; 
+       li   r0,-500                                        ; LD HL,$FE0C       ; z = -500: just behind the player
+       mov  r0,@object_position_z                          ; LD ($F7D2),HL     ; 
        li   hl,station_launch_orientation                  ; LD HL,$9080       ; the station's orientation at launch...
        li   de,side_vector                                 ; LD DE,$F7D4       ; ...into its side and nose vectors
        li   bc,>000c                                       ; LD BC,$000C       ; 
@@ -741,20 +732,17 @@ _8f3f:                                                     ; >8f3f
        bl   @multiply_by_sine                              ; CALL $8F94        ; r * cos(a1)
        movb @scratch_buffer_5,a                            ; LD A,($E605)      ; A = cos(a2)
        bl   @multiply_by_sine                              ; CALL $8F94        ; * cos(a2)
-       movb hl,@object_position_x+1                        ; LD ($F7CE),HL     ; x
-       movb @l,@object_position_x                          ;                   ; 
+       mov  hl,@object_position_x                          ; LD ($F7CE),HL     ; x
        mov  @-2(sp),hl                                     ; LD HL,($E600)     ; HL = r
        movb @scratch_buffer_4,a                            ; LD A,($E604)      ; A = sin(a2)
        bl   @multiply_by_sine                              ; CALL $8F94        ; r * sin(a2)
-       movb hl,@object_position_y+1                        ; LD ($F7D0),HL     ; y
-       movb @l,@object_position_y                          ;                   ; 
+       mov  hl,@object_position_y                          ; LD ($F7D0),HL     ; y
        mov  @-2(sp),hl                                     ; LD HL,($E600)     ; HL = r
        movb @circle_connector_no_prev_point_gate,a         ; LD A,($E602)      ; A = sin(a1)
        bl   @multiply_by_sine                              ; CALL $8F94        ; r * sin(a1)
        movb @scratch_buffer_5,a                            ; LD A,($E605)      ; A = cos(a2)
        bl   @multiply_by_sine                              ; CALL $8F94        ; * cos(a2)
-       movb hl,@object_position_z_lo+1                     ; LD ($F7D2),HL     ; z
-       movb @l,@object_position_z_lo                       ;                   ; 
+       mov  hl,@object_position_z                          ; LD ($F7D2),HL     ; z
        dect sp                                             ;                   ; drop r
        .endproc                                            ; RET               ; 
 * TI: pick a random angle, 0-360 degrees (#R$8F25, at $8F2A and $8F49)
@@ -897,9 +885,10 @@ sine_table:                                                ; >9025
 * 
 * Copied into the station's side and nose vectors by #R$8D2A: side (1, 0,
 * 0) and nose (0, 0, 1), so its slot faces forward.
+* (TI: big-endian words, as in the object workspace at #R$F7CD)
 station_launch_orientation:                                ; >9080
-       byte >00,>40,>00,>00,>00,>00                               ; side vector
-       byte >00,>00,>00,>00,>00,>40                               ; nose vector
+       byte >40,>00,>00,>00,>00,>00                               ; side vector
+       byte >00,>00,>00,>00,>40,>00                               ; nose vector
 
 
 rom_bank_10_end:

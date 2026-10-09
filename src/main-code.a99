@@ -1049,15 +1049,11 @@ refresh_pitch_table:                                       ; >2212
 step_pitch_rotation:                                       ; >221b
        .proc                                               ;                   ; 
        li   ix,live_pitch_coeff_table                      ; LD IX,$EB7C       ; IX -> the live pitch-rotation coefficient table
-       movb @object_position_y+1,bc                        ; LD BC,($F7D0)     ; BC = y
-       movb @object_position_y,@c                          ;                   ; 
-       movb @object_position_z_lo+1,de                     ; LD DE,($F7D2)     ; DE = z
-       movb @object_position_z_lo,@e                       ;                   ; 
+       mov  @object_position_y,bc                          ; LD BC,($F7D0)     ; BC = y
+       mov  @object_position_z,de                          ; LD DE,($F7D2)     ; DE = z
        bl   @rotate_pair                                   ; CALL $2450        ; rotate (y, z) by one pitch step
-       movb hl,@object_position_y+1                        ; LD ($F7D0),HL     ; store y'
-       movb @l,@object_position_y                          ;                   ; 
-       movb de,@object_position_z_lo+1                     ; LD ($F7D2),DE     ; store z'
-       movb @e,@object_position_z_lo                       ;                   ; 
+       mov  hl,@object_position_y                          ; LD ($F7D0),HL     ; store y'
+       mov  de,@object_position_z                          ; LD ($F7D2),DE     ; store z'
        li   hl,object_status_byte                          ; LD HL,$F7CD       ; 
        movb *hl,r0                                         ; BIT 3,(HL)        ; the planet, the sun or an explosion?
        andi r0,>0800                                       ;                   ; 
@@ -1091,15 +1087,11 @@ _221b_end:
 step_roll_rotation:                                        ; >22c0
        .proc                                               ;                   ; 
        li   ix,live_roll_coeff_table                       ; LD IX,$EB76       ; IX -> the live roll-rotation coefficient table
-       movb @object_position_x+1,bc                        ; LD BC,($F7CE)     ; BC = x
-       movb @object_position_x,@c                          ;                   ; 
-       movb @object_position_y+1,de                        ; LD DE,($F7D0)     ; DE = y
-       movb @object_position_y,@e                          ;                   ; 
+       mov  @object_position_x,bc                          ; LD BC,($F7CE)     ; BC = x
+       mov  @object_position_y,de                          ; LD DE,($F7D0)     ; DE = y
        bl   @rotate_pair                                   ; CALL $2450        ; rotate (x, y) by one roll step
-       movb hl,@object_position_x+1                        ; LD ($F7CE),HL     ; store x'
-       movb @l,@object_position_x                          ;                   ; 
-       movb de,@object_position_y+1                        ; LD ($F7D0),DE     ; store y'
-       movb @e,@object_position_y                          ;                   ; 
+       mov  hl,@object_position_x                          ; LD ($F7CE),HL     ; store x'
+       mov  de,@object_position_y                          ; LD ($F7D0),DE     ; store y'
        li   hl,object_status_byte                          ; LD HL,$F7CD       ; 
        movb *hl,r0                                         ; BIT 3,(HL)        ; the planet, the sun or an explosion?
        andi r0,>0800                                       ;                   ; 
@@ -1134,12 +1126,10 @@ pitch_object:                                              ; >2365
        bl   @work_out_roof                                 ; CALL $4599        ; make sure the roof vector is up to date (#R$4599)
        li   hl,object_status_byte                          ; LD HL,$F7CD       ; 
        szcb @bit7,*hl                                      ; RES 7,(HL)        ; it will need working out again
-       movb @roof_vector+1,hl                              ; LD HL,($F7E0)     ; HL = roof.x
-       movb @roof_vector,@l                                ;                   ;
+       mov  @roof_vector,hl                                ; LD HL,($F7E0)     ; HL = roof.x
        bl   @multiply_by_sin                               ; CALL $24A7        ; HL = roof.x * sin (#R$24A7)
        .push hl                                            ; PUSH HL           ; save it
-       movb @nose_vector+1,hl                              ; LD HL,($F7DA)     ; HL = nose.x
-       movb @nose_vector,@l                                ;                   ;
+       mov  @nose_vector,hl                                ; LD HL,($F7DA)     ; HL = nose.x
        bl   @multiply_by_cos                               ; CALL $24D1        ; HL = nose.x * cos (#R$24D1)
        .pop de                                             ; POP DE            ; 
        socb a,a                                            ; OR A              ; 
@@ -1150,14 +1140,11 @@ pitch_object:                                              ; >2365
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
 pitch_object_nose_x:                                       ; >2393
-       movb hl,@nose_vector+1                              ; LD ($F7DA),HL     ; store the new nose.x
-       movb @l,@nose_vector                                ;                   ;
-       movb @roof_vector_y+1,hl                            ; LD HL,($F7E2)     ; HL = roof.y
-       movb @roof_vector_y,@l                              ;                   ;
+       mov  hl,@nose_vector                                ; LD ($F7DA),HL     ; store the new nose.x
+       mov  @roof_vector_y,hl                              ; LD HL,($F7E2)     ; HL = roof.y
        bl   @multiply_by_sin                               ; CALL $24A7        ; HL = roof.y * sin
        .push hl                                            ; PUSH HL           ; 
-       movb @nose_vector_y+1,hl                            ; LD HL,($F7DC)     ; HL = nose.y
-       movb @nose_vector_y,@l                              ;                   ;
+       mov  @nose_vector_y,hl                              ; LD HL,($F7DC)     ; HL = nose.y
        bl   @multiply_by_cos                               ; CALL $24D1        ; HL = nose.y * cos
        .pop de                                             ; POP DE            ; 
        socb a,a                                            ; OR A              ; 
@@ -1168,14 +1155,11 @@ pitch_object_nose_x:                                       ; >2393
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
 pitch_object_nose_y:                                       ; >23b2
-       movb hl,@nose_vector_y+1                            ; LD ($F7DC),HL     ; store the new nose.y
-       movb @l,@nose_vector_y                              ;                   ;
-       movb @roof_vector_z+1,hl                            ; LD HL,($F7E4)     ; HL = roof.z
-       movb @roof_vector_z,@l                              ;                   ;
+       mov  hl,@nose_vector_y                              ; LD ($F7DC),HL     ; store the new nose.y
+       mov  @roof_vector_z,hl                              ; LD HL,($F7E4)     ; HL = roof.z
        bl   @multiply_by_sin                               ; CALL $24A7        ; HL = roof.z * sin
        .push hl                                            ; PUSH HL           ; 
-       movb @nose_vector_z+1,hl                            ; LD HL,($F7DE)     ; HL = nose.z
-       movb @nose_vector_z,@l                              ;                   ;
+       mov  @nose_vector_z,hl                              ; LD HL,($F7DE)     ; HL = nose.z
        bl   @multiply_by_cos                               ; CALL $24D1        ; HL = nose.z * cos
        .pop de                                             ; POP DE            ; 
        socb a,a                                            ; OR A              ; 
@@ -1186,8 +1170,7 @@ pitch_object_nose_y:                                       ; >23b2
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
 pitch_object_nose_z:                                       ; >23d1
-       movb hl,@nose_vector_z+1                            ; LD ($F7DE),HL     ; store the new nose.z
-       movb @l,@nose_vector_z                              ;                   ;
+       mov  hl,@nose_vector_z                              ; LD ($F7DE),HL     ; store the new nose.z
        li   hl,rotation_count                              ; LD HL,$F7E8       ; 
        ab   one,*hl                                        ; INC (HL)          ; count the rotation
        .endproc                                            ; RET               ; 
@@ -1209,12 +1192,10 @@ roll_object:                                               ; >23d9
        bl   @work_out_roof                                 ; CALL $4599        ; make sure the roof vector is up to date (#R$4599)
        li   hl,object_status_byte                          ; LD HL,$F7CD       ; 
        szcb @bit7,*hl                                      ; RES 7,(HL)        ; it will need working out again
-       movb @side_vector+1,hl                              ; LD HL,($F7D4)     ; HL = side.x
-       movb @side_vector,@l                                ;                   ;
+       mov  @side_vector,hl                                ; LD HL,($F7D4)     ; HL = side.x
        bl   @multiply_by_cos                               ; CALL $24D1        ; HL = side.x * cos (#R$24D1)
        .push hl                                            ; PUSH HL           ; save it
-       movb @roof_vector+1,hl                              ; LD HL,($F7E0)     ; HL = roof.x
-       movb @roof_vector,@l                                ;                   ;
+       mov  @roof_vector,hl                                ; LD HL,($F7E0)     ; HL = roof.x
        bl   @multiply_by_sin                               ; CALL $24A7        ; HL = roof.x * sin (#R$24A7)
        .pop de                                             ; POP DE            ; 
        .ex_de_hl                                           ; EX DE,HL          ; 
@@ -1226,14 +1207,11 @@ roll_object:                                               ; >23d9
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
 roll_object_side_x:                                        ; >2408
-       movb hl,@side_vector+1                              ; LD ($F7D4),HL     ; store the new side.x
-       movb @l,@side_vector                                ;                   ;
-       movb @side_vector_y+1,hl                            ; LD HL,($F7D6)     ; HL = side.y
-       movb @side_vector_y,@l                              ;                   ;
+       mov  hl,@side_vector                                ; LD ($F7D4),HL     ; store the new side.x
+       mov  @side_vector_y,hl                              ; LD HL,($F7D6)     ; HL = side.y
        bl   @multiply_by_cos                               ; CALL $24D1        ; HL = side.y * cos
        .push hl                                            ; PUSH HL           ; 
-       movb @roof_vector_y+1,hl                            ; LD HL,($F7E2)     ; HL = roof.y
-       movb @roof_vector_y,@l                              ;                   ;
+       mov  @roof_vector_y,hl                              ; LD HL,($F7E2)     ; HL = roof.y
        bl   @multiply_by_sin                               ; CALL $24A7        ; HL = roof.y * sin
        .pop de                                             ; POP DE            ; 
        .ex_de_hl                                           ; EX DE,HL          ; 
@@ -1245,14 +1223,11 @@ roll_object_side_x:                                        ; >2408
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
 roll_object_side_y:                                        ; >2428
-       movb hl,@side_vector_y+1                            ; LD ($F7D6),HL     ; store the new side.y
-       movb @l,@side_vector_y                              ;                   ;
-       movb @side_vector_z+1,hl                            ; LD HL,($F7D8)     ; HL = side.z
-       movb @side_vector_z,@l                              ;                   ;
+       mov  hl,@side_vector_y                              ; LD ($F7D6),HL     ; store the new side.y
+       mov  @side_vector_z,hl                              ; LD HL,($F7D8)     ; HL = side.z
        bl   @multiply_by_cos                               ; CALL $24D1        ; HL = side.z * cos
        .push hl                                            ; PUSH HL           ; 
-       movb @roof_vector_z+1,hl                            ; LD HL,($F7E4)     ; HL = roof.z
-       movb @roof_vector_z,@l                              ;                   ;
+       mov  @roof_vector_z,hl                              ; LD HL,($F7E4)     ; HL = roof.z
        bl   @multiply_by_sin                               ; CALL $24A7        ; HL = roof.z * sin
        .pop de                                             ; POP DE            ; 
        .ex_de_hl                                           ; EX DE,HL          ; 
@@ -1264,8 +1239,7 @@ roll_object_side_y:                                        ; >2428
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
 roll_object_side_z:                                        ; >2448
-       movb hl,@side_vector_z+1                            ; LD ($F7D8),HL     ; store the new side.z
-       movb @l,@side_vector_z                              ;                   ;
+       mov  hl,@side_vector_z                              ; LD ($F7D8),HL     ; store the new side.z
        li   hl,rotation_count                              ; LD HL,$F7E8       ; 
        ab   one,*hl                                        ; INC (HL)          ; count the rotation
        .endproc                                            ; RET               ; 
@@ -1335,7 +1309,7 @@ _24a2:                                                     ; >24a2
        ai   sp,-6                                          ;                   ; drop the saved values
        jmp  rotate_pair_exit                               ; RET               ; 
 * TI: rotate a pair of the object's axis vector components (sign-magnitude
-* words, little-endian, the second 2 bytes after the first) by the rotation
+* words, big-endian, the second 2 bytes after the first) by the rotation
 * record at IX, as #R$221B and #R$22C0 do inline: X' = X.cos - Y.sin and
 * Y' = X.sin + Y.cos, stored back in sign-magnitude form.
 *
@@ -1344,13 +1318,11 @@ _24a2:                                                     ; >24a2
 rotate_axis_pair:                                          
        .proc                                               ;                   ; 
        mov  r1,*sp+                                        ;                   ; save the pointer (at -6(SP) below)
-       movb @1(r1),hl                                      ; LD HL,(X)         ; HL = X
-       movb *r1,@l                                         ;                   ; 
+       mov  *r1,hl                                         ; LD HL,(X)         ; HL = X
        bl   @multiply_by_cos                               ; CALL $24D1        ; X.cos
        .push hl                                            ; PUSH HL           ; 
        mov  @-4(sp),r1                                     ;                   ; 
-       movb @3(r1),hl                                      ; LD HL,(Y)         ; HL = Y
-       movb @2(r1),@l                                      ;                   ; 
+       mov  @2(r1),hl                                      ; LD HL,(Y)         ; HL = Y
        bl   @multiply_by_sin                               ; CALL $24A7        ; Y.sin
        mov  @-2(sp),r0                                     ; POP DE / EX DE,HL ; R0 = X.cos
        s    hl,r0                                          ; OR A / SBC HL,DE  ; X' = X.cos - Y.sin
@@ -1361,13 +1333,11 @@ rotate_axis_pair:
 rotate_axis_pair_1:                                        
        mov  r0,@-2(sp)                                     ; PUSH HL           ; save X'
        mov  @-4(sp),r1                                     ;                   ; 
-       movb @1(r1),hl                                      ; LD HL,(X)         ; HL = X again
-       movb *r1,@l                                         ;                   ; 
+       mov  *r1,hl                                         ; LD HL,(X)         ; HL = X again
        bl   @multiply_by_sin                               ; CALL $24A7        ; X.sin
        .push hl                                            ; PUSH HL           ; 
        mov  @-6(sp),r1                                     ;                   ; 
-       movb @3(r1),hl                                      ; LD HL,(Y)         ; HL = Y again
-       movb @2(r1),@l                                      ;                   ; 
+       mov  @2(r1),hl                                      ; LD HL,(Y)         ; HL = Y again
        bl   @multiply_by_cos                               ; CALL $24D1        ; Y.cos
        a    @-2(sp),hl                                     ; POP DE / OR A / ADC HL,DE; Y' = Y.cos + X.sin
        abs  hl                                             ; JP P,... / XOR A / SUB L ...; in sign-magnitude form
@@ -1376,11 +1346,9 @@ rotate_axis_pair_1:
        ori  hl,>8000                                       ; SET 7,H           ; 
 rotate_axis_pair_2:                                        
        mov  @-6(sp),r1                                     ;                   ; R1 -> X
-       movb hl,@3(r1)                                      ; LD (Y),HL         ; store Y'
-       movb @l,@2(r1)                                      ;                   ; 
+       mov  hl,@2(r1)                                      ; LD (Y),HL         ; store Y'
        mov  @-4(sp),r0                                     ; POP HL            ; R0 = X'
-       movb r0,@1(r1)                                      ; LD (X),HL         ; store it
-       movb @r0lb,*r1                                      ;                   ; 
+       mov  r0,*r1                                         ; LD (X),HL         ; store it
        ai   sp,-6                                          ;                   ; drop the saved values
 rotate_pair_exit:
        .endproc                                            ; RET               ; 
@@ -4284,10 +4252,8 @@ draw_object_body:
        movb a,@nothing_changed_flag                        ; LD ($E6F3),A      ; don't draw it this frame
        .endproc                                            ; RET               ; and return without drawing it
 draw_ship:                                                 ; >4255
-       movb @object_position_x+1,de                        ; LD DE,($F7CE)     ; DE = the object's world position, first half
-       movb @object_position_x,@e                          ;                   ;
-       movb @object_position_z_lo+1,hl                     ; LD HL,($F7D2)     ; HL = ...second half
-       movb @object_position_z_lo,@l                       ;                   ;
+       mov  @object_position_x,de                          ; LD DE,($F7CE)     ; DE = the object's world position, first half
+       mov  @object_position_z,hl                          ; LD HL,($F7D2)     ; HL = ...second half
        bl   @convert_to_view                               ; CALL $44CE        ; project the object's position
        mov  de,@view_x                                     ; LD ($E6D8),DE     ; store the projected first half
        mov  hl,@view_z                                     ; LD ($E6DC),HL     ; store the projected second half
@@ -4321,8 +4287,7 @@ _427c:                                                     ; >427c
        .endproc                                            ;                   
 !
        mov  @view_x,de                                     ; LD DE,($E6D8)     ; DE = the projected first half
-       movb @object_position_y+1,bc                        ; LD BC,($F7D0)     ; BC = the vector's shared middle component
-       movb @object_position_y,@c                          ;                   ;
+       mov  @object_position_y,bc                          ; LD BC,($F7D0)     ; BC = the vector's shared middle component
        mov  @view_z2,hl                                    ; LD HL,($E6DA)     ; HL = the doubled depth value
        bl   @project_point                                 ; CALL $47C4        ; scale (DE,BC) against it via #R$47C4
        movb b,ixh                                          ; LD IXH,B          ; IX = the scaled first pair
@@ -4434,43 +4399,34 @@ draw_object_exit:
 * #R$EB68. Marks the cache valid (#R$E6F0).
 cache_orientation:                                         ; >433f
        .proc
-       movb @side_vector+1,hl                              ; LD HL,($F7D4)     ; HL = a position/axis word
-       movb @side_vector,@l                                ;                   ;
+       mov  @side_vector,hl                                ; LD HL,($F7D4)     ; HL = a position/axis word
        bl   @log_sign_tagged                               ; CALL $1FCF        ; side vector's x
        mov  hl,@side_vector_logs                           ; LD ($E6CC),HL     ; cache the result
-       movb @side_vector_y+1,hl                            ; LD HL,($F7D6)     ; side y
-       movb @side_vector_y,@l                              ;                   ;
+       mov  @side_vector_y,hl                              ; LD HL,($F7D6)     ; side y
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
        mov  hl,@side_vector_log_y                          ; LD ($E6CE),HL     ; cache the result
-       movb @side_vector_z+1,hl                            ; LD HL,($F7D8)     ; side z
-       movb @side_vector_z,@l                              ;                   ;
+       mov  @side_vector_z,hl                              ; LD HL,($F7D8)     ; side z
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
        mov  hl,@side_vector_log_z                          ; LD ($E6D0),HL     ; cache the result
-       movb @roof_vector+1,hl                              ; LD HL,($F7E0)     ; roof x
-       movb @roof_vector,@l                                ;                   ;
+       mov  @roof_vector,hl                                ; LD HL,($F7E0)     ; roof x
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
        mov  hl,@roof_vector_logs                           ; LD ($E6D2),HL     ; cache the result
-       movb @roof_vector_y+1,hl                            ; LD HL,($F7E2)     ; roof y
-       movb @roof_vector_y,@l                              ;                   ;
+       mov  @roof_vector_y,hl                              ; LD HL,($F7E2)     ; roof y
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
        mov  hl,@roof_vector_log_y                          ; LD ($E6D4),HL     ; cache the result
-       movb @roof_vector_z+1,hl                            ; LD HL,($F7E4)     ; roof z
-       movb @roof_vector_z,@l                              ;                   ;
+       mov  @roof_vector_z,hl                              ; LD HL,($F7E4)     ; roof z
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
        mov  hl,@roof_vector_log_z                          ; LD ($E6D6),HL     ; cache the result
        movb @object_status_byte,a                          ; LD A,($F7CD)      ; A = the object status byte
        andi a,>1000                                        ; AND $10           ; test bit 4
        jne  _4397                                          ; JR NZ,$4397       ; skip the nose vector
-       movb @nose_vector+1,hl                              ; LD HL,($F7DA)     ; nose x
-       movb @nose_vector,@l                                ;                   ;
+       mov  @nose_vector,hl                                ; LD HL,($F7DA)     ; nose x
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
        mov  hl,@nose_vector_logs                           ; LD ($EB68),HL     ; cache the result
-       movb @nose_vector_y+1,hl                            ; LD HL,($F7DC)     ; nose y
-       movb @nose_vector_y,@l                              ;                   ;
+       mov  @nose_vector_y,hl                              ; LD HL,($F7DC)     ; nose y
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
        mov  hl,@nose_vector_log_y                          ; LD ($EB6A),HL     ; cache the result
-       movb @nose_vector_z+1,hl                            ; LD HL,($F7DE)     ; nose z
-       movb @nose_vector_z,@l                              ;                   ;
+       mov  @nose_vector_z,hl                              ; LD HL,($F7DE)     ; nose z
        bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
        mov  hl,@nose_vector_log_z                          ; LD ($EB6C),HL     ; cache the result
 _4397:                                                     ; >4397
@@ -4561,8 +4517,7 @@ add_object_position:                                       ; >44d2
        mov  @view_x,hl                                     ; LD HL,($E6D8)     ; HL = the projected first half (see #R$4255)
        a    de,hl                                          ; ADD HL,DE         ; HL += DE
        .ex_de_hl                                           ; EX DE,HL          ; DE = the combined result
-       movb @object_position_y+1,hl                        ; LD HL,($F7D0)     ; HL = the vector's shared middle component
-       movb @object_position_y,@l                          ;                   ;
+       mov  @object_position_y,hl                          ; LD HL,($F7D0)     ; HL = the vector's shared middle component
        a    bc,hl                                          ; ADD HL,BC         ; HL += BC
        .ex_sp_hl                                           ; EX (SP),HL        ; swap HL with the saved value on the stack
        mov  @view_z2,bc                                    ; LD BC,($E6DA)     ; BC = the depth scale (see #R$4255/#R$43C2)
@@ -4611,16 +4566,12 @@ straighten_orientation:                                    ; >4503
        li   hl,object_status_byte                          ; LD HL,$F7CD       ; HL -> the "third vector already derived" guard byte
        szcb @bit7,*hl                                      ; RES 7,(HL)        ; 
        bl   @work_out_roof                                 ; CALL $4599        ; roof = nose x side
-       movb @side_vector_y+1,hl                            ; LD HL,($F7D6)     ; side.y * roof.z
-       movb @side_vector_y,@l                              ;                   ;
-       movb @roof_vector_z+1,de                            ; LD DE,($F7E4)     ; DE = vector3.z
-       movb @roof_vector_z,@e                              ;                   ;
+       mov  @side_vector_y,hl                              ; LD HL,($F7D6)     ; side.y * roof.z
+       mov  @roof_vector_z,de                              ; LD DE,($F7E4)     ; DE = vector3.z
        bl   @multiply_components                           ; CALL $200A        ; HL = vector1.y * vector3.z
        .push hl                                            ; PUSH HL           ; save it
-       movb @roof_vector_y+1,hl                            ; LD HL,($F7E2)     ; roof.y * side.z
-       movb @roof_vector_y,@l                              ;                   ;
-       movb @side_vector_z+1,de                            ; LD DE,($F7D8)     ; DE = vector1.z
-       movb @side_vector_z,@e                              ;                   ;
+       mov  @roof_vector_y,hl                              ; LD HL,($F7E2)     ; roof.y * side.z
+       mov  @side_vector_z,de                              ; LD DE,($F7D8)     ; DE = vector1.z
        bl   @multiply_components                           ; CALL $200A        ; HL = vector3.y * vector1.z
        .ex_de_hl                                           ; EX DE,HL          ; DE = that product
        .pop hl                                             ; POP HL            ; HL = the first product (vector1.y * vector3.z)
@@ -4632,18 +4583,13 @@ straighten_orientation:                                    ; >4503
        neg  hl                                             ; SUB L             ; ...H:L = abs(HL)
        socb @bit7,h                                        ; SET 7,H           ; ...and tag it negative, sign-magnitude style
 straighten_nose_x:                                         ; >4545
-       movb hl,@nose_vector+1                              ; LD ($F7DA),HL     ; 
-       movb @l,@nose_vector                                ;                   ;
-       movb @roof_vector+1,hl                              ; LD HL,($F7E0)     ; roof.x * side.z
-       movb @roof_vector,@l                                ;                   ;
-       movb @side_vector_z+1,de                            ; LD DE,($F7D8)     ; DE = vector1.z
-       movb @side_vector_z,@e                              ;                   ;
+       mov  hl,@nose_vector                                ; LD ($F7DA),HL     ; 
+       mov  @roof_vector,hl                                ; LD HL,($F7E0)     ; roof.x * side.z
+       mov  @side_vector_z,de                              ; LD DE,($F7D8)     ; DE = vector1.z
        bl   @multiply_components                           ; CALL $200A        ; HL = vector3.x * vector1.z
        .push hl                                            ; PUSH HL           ; save it
-       movb @side_vector+1,hl                              ; LD HL,($F7D4)     ; side.x * roof.z
-       movb @side_vector,@l                                ;                   ;
-       movb @roof_vector_z+1,de                            ; LD DE,($F7E4)     ; DE = vector3.z
-       movb @roof_vector_z,@e                              ;                   ;
+       mov  @side_vector,hl                                ; LD HL,($F7D4)     ; side.x * roof.z
+       mov  @roof_vector_z,de                              ; LD DE,($F7E4)     ; DE = vector3.z
        bl   @multiply_components                           ; CALL $200A        ; HL = vector1.x * vector3.z
        .ex_de_hl                                           ; EX DE,HL          ; DE = that product
        .pop hl                                             ; POP HL            ; HL = the first product (vector3.x * vector1.z)
@@ -4655,18 +4601,13 @@ straighten_nose_x:                                         ; >4545
        neg  hl                                             ; SUB L             ; ...H:L = abs(HL)
        socb @bit7,h                                        ; SET 7,H           ; ...and tag it negative, sign-magnitude style
 straighten_nose_y:                                         ; >456d
-       movb hl,@nose_vector_y+1                            ; LD ($F7DC),HL     ; 
-       movb @l,@nose_vector_y                              ;                   ;
-       movb @side_vector+1,hl                              ; LD HL,($F7D4)     ; side.x * roof.y
-       movb @side_vector,@l                                ;                   ;
-       movb @roof_vector_y+1,de                            ; LD DE,($F7E2)     ; DE = vector3.y
-       movb @roof_vector_y,@e                              ;                   ;
+       mov  hl,@nose_vector_y                              ; LD ($F7DC),HL     ; 
+       mov  @side_vector,hl                                ; LD HL,($F7D4)     ; side.x * roof.y
+       mov  @roof_vector_y,de                              ; LD DE,($F7E2)     ; DE = vector3.y
        bl   @multiply_components                           ; CALL $200A        ; HL = vector1.x * vector3.y
        .push hl                                            ; PUSH HL           ; save it
-       movb @roof_vector+1,hl                              ; LD HL,($F7E0)     ; roof.x * side.y
-       movb @roof_vector,@l                                ;                   ;
-       movb @side_vector_y+1,de                            ; LD DE,($F7D6)     ; DE = vector1.y
-       movb @side_vector_y,@e                              ;                   ;
+       mov  @roof_vector,hl                                ; LD HL,($F7E0)     ; roof.x * side.y
+       mov  @side_vector_y,de                              ; LD DE,($F7D6)     ; DE = vector1.y
        bl   @multiply_components                           ; CALL $200A        ; HL = vector3.x * vector1.y
        .ex_de_hl                                           ; EX DE,HL          ; DE = that product
        .pop hl                                             ; POP HL            ; HL = the first product (vector1.x * vector3.y)
@@ -4678,8 +4619,7 @@ straighten_nose_y:                                         ; >456d
        neg  hl                                             ; SUB L             ; ...H:L = abs(HL)
        socb @bit7,h                                        ; SET 7,H           ; ...and tag it negative, sign-magnitude style
 straighten_nose_z:                                         ; >4595
-       movb hl,@nose_vector_z+1                            ; LD ($F7DE),HL     ; store as the new vector2.z
-       movb @l,@nose_vector_z                              ;                   ;
+       mov  hl,@nose_vector_z                              ; LD ($F7DE),HL     ; store as the new vector2.z
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -4700,16 +4640,12 @@ work_out_roof:                                             ; >4599
        .endproc                                            ;                   
 !
        socb @bit7,*hl                                      ; SET 7,(HL)        ; it soon will be
-       movb @nose_vector_y+1,hl                            ; LD HL,($F7DC)     ; nose.y * side.z
-       movb @nose_vector_y,@l                              ;                   ;
-       movb @side_vector_z+1,de                            ; LD DE,($F7D8)     ; 
-       movb @side_vector_z,@e                              ;                   ;
+       mov  @nose_vector_y,hl                              ; LD HL,($F7DC)     ; nose.y * side.z
+       mov  @side_vector_z,de                              ; LD DE,($F7D8)     ; 
        bl   @multiply_components                           ; CALL $200A        ; (#R$200A)
        .push hl                                            ; PUSH HL           ; save it
-       movb @side_vector_y+1,hl                            ; LD HL,($F7D6)     ; side.y * nose.z
-       movb @side_vector_y,@l                              ;                   ;
-       movb @nose_vector_z+1,de                            ; LD DE,($F7DE)     ; 
-       movb @nose_vector_z,@e                              ;                   ;
+       mov  @side_vector_y,hl                              ; LD HL,($F7D6)     ; side.y * nose.z
+       mov  @nose_vector_z,de                              ; LD DE,($F7DE)     ; 
        bl   @multiply_components                           ; CALL $200A        ; 
        .ex_de_hl                                           ; EX DE,HL          ; DE = the second product
        .pop hl                                             ; POP HL            ; 
@@ -4721,18 +4657,13 @@ work_out_roof:                                             ; >4599
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; (sign-magnitude)
 work_out_roof_x:                                           ; >45c6
-       movb hl,@roof_vector+1                              ; LD ($F7E0),HL     ; store roof.x
-       movb @l,@roof_vector                                ;                   ;
-       movb @side_vector+1,hl                              ; LD HL,($F7D4)     ; side.x * nose.z
-       movb @side_vector,@l                                ;                   ;
-       movb @nose_vector_z+1,de                            ; LD DE,($F7DE)     ; 
-       movb @nose_vector_z,@e                              ;                   ;
+       mov  hl,@roof_vector                                ; LD ($F7E0),HL     ; store roof.x
+       mov  @side_vector,hl                                ; LD HL,($F7D4)     ; side.x * nose.z
+       mov  @nose_vector_z,de                              ; LD DE,($F7DE)     ; 
        bl   @multiply_components                           ; CALL $200A        ; 
        .push hl                                            ; PUSH HL           ; save it
-       movb @nose_vector+1,hl                              ; LD HL,($F7DA)     ; nose.x * side.z
-       movb @nose_vector,@l                                ;                   ;
-       movb @side_vector_z+1,de                            ; LD DE,($F7D8)     ; 
-       movb @side_vector_z,@e                              ;                   ;
+       mov  @nose_vector,hl                                ; LD HL,($F7DA)     ; nose.x * side.z
+       mov  @side_vector_z,de                              ; LD DE,($F7D8)     ; 
        bl   @multiply_components                           ; CALL $200A        ; 
        .ex_de_hl                                           ; EX DE,HL          ; DE = the second product
        .pop hl                                             ; POP HL            ; 
@@ -4744,18 +4675,13 @@ work_out_roof_x:                                           ; >45c6
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
 work_out_roof_y:                                           ; >45ee
-       movb hl,@roof_vector_y+1                            ; LD ($F7E2),HL     ; store roof.y
-       movb @l,@roof_vector_y                              ;                   ;
-       movb @nose_vector+1,hl                              ; LD HL,($F7DA)     ; nose.x * side.y
-       movb @nose_vector,@l                                ;                   ;
-       movb @side_vector_y+1,de                            ; LD DE,($F7D6)     ; 
-       movb @side_vector_y,@e                              ;                   ;
+       mov  hl,@roof_vector_y                              ; LD ($F7E2),HL     ; store roof.y
+       mov  @nose_vector,hl                                ; LD HL,($F7DA)     ; nose.x * side.y
+       mov  @side_vector_y,de                              ; LD DE,($F7D6)     ; 
        bl   @multiply_components                           ; CALL $200A        ; 
        .push hl                                            ; PUSH HL           ; save it
-       movb @side_vector+1,hl                              ; LD HL,($F7D4)     ; side.x * nose.y
-       movb @side_vector,@l                                ;                   ;
-       movb @nose_vector_y+1,de                            ; LD DE,($F7DC)     ; 
-       movb @nose_vector_y,@e                              ;                   ;
+       mov  @side_vector,hl                                ; LD HL,($F7D4)     ; side.x * nose.y
+       mov  @nose_vector_y,de                              ; LD DE,($F7DC)     ; 
        bl   @multiply_components                           ; CALL $200A        ; 
        .ex_de_hl                                           ; EX DE,HL          ; DE = the second product
        .pop hl                                             ; POP HL            ; 
@@ -4767,8 +4693,7 @@ work_out_roof_y:                                           ; >45ee
        neg  hl                                             ; SUB L             ; negate HL
        socb @bit7,h                                        ; SET 7,H           ; ...in sign-magnitude form
 work_out_roof_z:                                           ; >4616
-       movb hl,@roof_vector_z+1                            ; LD ($F7E4),HL     ; store roof.z
-       movb @l,@roof_vector_z                              ;                   ;
+       mov  hl,@roof_vector_z                              ; LD ($F7E4),HL     ; store roof.z
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -4805,10 +4730,7 @@ normalise_vector:                                          ; >4642
        .push hl                                            ; PUSH HL           ; save the vector's address
        movb @bytes+>03,b                                   ; LD B,$03          ; 3 components
 _4645:                                                     ; >4645
-       movb *hl,@e                                         ; LD E,(HL)         ; DE = the next component
-       inc  hl                                             ; INC HL            ; 
-       movb *hl,d                                          ; LD D,(HL)         ; 
-       inc  hl                                             ; INC HL            ; 
+       mov  *hl+,de                                        ; LD E,(HL) / INC HL / LD D,(HL) / INC HL; DE = the next component (TI: a big-endian word)
        .push hl                                            ; PUSH HL           ; save the pointer
        .push bc                                            ; PUSH BC           ; 
        bl   @square_component                              ; CALL $461A        ; square it
@@ -4853,16 +4775,11 @@ _4677:                                                     ; >4677
 _468f:                                                     ; >468f
        .push bc                                            ; PUSH BC           ; 
        .push hl                                            ; PUSH HL           ; save the pointer
-       movb *hl,a                                          ; LD A,(HL)         ; 
-       inc  hl                                             ; INC HL            ; 
-       movb *hl,h                                          ; LD H,(HL)         ; 
-       movb a,@l                                           ; LD L,A            ; HL = the component
+       mov  *hl,hl                                         ; LD A,(HL) / INC HL / LD H,(HL) / LD L,A; HL = the component (TI: a big-endian word)
        bl   @divide_by_length                              ; CALL $46A1        ; divide it by the length
        .pop hl                                             ; POP HL            ; 
-       movb @c,*hl                                         ; LD (HL),C         ; store it
-       inc  hl                                             ; INC HL            ; 
-       movb a,*hl                                          ; LD (HL),A         ; 
-       inc  hl                                             ; INC HL            ; 
+       movb a,*hl+                                         ; LD (HL),C / INC HL; store it (TI: high byte first)
+       movb @c,*hl+                                        ; LD (HL),A / INC HL; 
        .pop bc                                             ; POP BC            ; 
        sb   one,b                                          ; DJNZ $468F        ; next component
        jne  _468f                                          ;                   
@@ -4999,8 +4916,7 @@ _4738:                                                     ; >4738
        s    de,hl                                          ; SBC HL,DE         ; HL -= DE
        joc  ship_screen_size_exit                          ; RET NC            ; outside the sights
 !
-       movb @object_position_y+1,hl                        ; LD HL,($F7D0)     ; HL = Y coordinate
-       movb @object_position_y,@l                          ;                   ;
+       mov  @object_position_y,hl                          ; LD HL,($F7D0)     ; HL = Y coordinate
        bl   @project_coordinate                            ; CALL $47F0        ; scale it by the distance
        movb @targetable_area+1,hl                          ; LD HL,($E6EF)     ; HL = the same threshold at $E6EF
        movb @targetable_area,@l                            ;                   ;
@@ -9433,20 +9349,17 @@ compass:                                                   ; >85fb
        cb   @current_slot,@station_in_range                ; LD A,($E911) / LD HL,$EB05 / CP (HL); the compass target?
        jne  _85fb_end                                      ; RET NZ            ; no
        bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; return if the dashboard isn't shown
-       movb @object_position_z_lo+1,hl                     ; LD HL,($F7D2)     ; HL = Z
-       movb @object_position_z_lo,@l                       ;                   ; 
+       mov  @object_position_z,hl                          ; LD HL,($F7D2)     ; HL = Z
        abs  hl                                             ; BIT 7,H / ...     ; HL = the size of Z
        movb hl,@delta_z_hi                                 ; LD ($EB86),HL     ; $EB86 = the size of Z
        movb @l,@abs_delta_z                                ;                   ; 
-       movb @object_position_y+1,hl                        ; LD HL,($F7D0)     ; HL = Y
-       movb @object_position_y,@l                          ;                   ; 
+       mov  @object_position_y,hl                          ; LD HL,($F7D0)     ; HL = Y
        li   r0,8                                           ; LD A,$08          ; 8 (vertical range)
        bl   @compass_coordinate                            ; CALL $8570        ; A = 8 * Y / sqrt(Y^2 + Z^2), R1 = its magnitude
        .push a                                             ; PUSH AF           ; save it
        movb @compass_range_table(r1),r0                    ; LD H,$00 / LD BC,$8664 / ADD HL,BC / LD A,(HL); the horizontal range for that height
        srl  r0,8                                           ;                   ; 
-       movb @object_position_x+1,hl                        ; LD HL,($F7CE)     ; HL = X
-       movb @object_position_x,@l                          ;                   ; 
+       mov  @object_position_x,hl                          ; LD HL,($F7CE)     ; HL = X
        bl   @compass_coordinate                            ; CALL $8570        ; A = k * X / sqrt(X^2 + Z^2)
        .pop r2                                             ; POP BC            ; R2 = vertical offset
        ab   @bytes+>a5,a                                   ; ADD A,$A5         ; C = sprite X ($A5 = compass centre)
@@ -9535,16 +9448,13 @@ move_along_axis:                                           ; >8685
        movb a,r1                                           ; LD L,A / LD H,$00 ; 
        srl  r1,7                                           ; ADD HL,HL         ; R1 = speed * 2
        mov  @log_table(r1),@type_entry_cache               ; LD BC,$0800 / ADD HL,BC / LD DE,$E874 / LDI / LDI; $E874 = log(speed) (TI: a big-endian word)
-       movb @nose_vector+1,hl                              ; LD HL,($F7DA)     ; HL = nose.x
-       movb @nose_vector,@l                                ;                   ; 
+       mov  @nose_vector,hl                                ; LD HL,($F7DA)     ; HL = nose.x
        bl   @log_sign_tagged                               ; CALL $1FCF        ; its log
        mov  hl,@nose_vector_logs                           ; LD ($EB68),HL     ; 
-       movb @nose_vector_y+1,hl                            ; LD HL,($F7DC)     ; HL = nose.y
-       movb @nose_vector_y,@l                              ;                   ; 
+       mov  @nose_vector_y,hl                              ; LD HL,($F7DC)     ; HL = nose.y
        bl   @log_sign_tagged                               ; CALL $1FCF        ; its log
        mov  hl,@nose_vector_log_y                          ; LD ($EB6A),HL     ; 
-       movb @nose_vector_z+1,hl                            ; LD HL,($F7DE)     ; HL = nose.z
-       movb @nose_vector_z,@l                              ;                   ; 
+       mov  @nose_vector_z,hl                              ; LD HL,($F7DE)     ; HL = nose.z
        bl   @log_sign_tagged                               ; CALL $1FCF        ; its log
        mov  hl,@nose_vector_log_z                          ; LD ($EB6C),HL     ; 
        socb @bit4,@object_status_byte                      ; LD HL,$F7CD / SET 4,(HL); set bit 4
@@ -9554,7 +9464,7 @@ move_along_axis:                                           ; >8685
        li   de,object_position_y                           ; LD HL,($F7D0)     ; y...
        mov  @nose_vector_log_y,bc                          ; LD BC,($EB6A)     ; 
        bl   @move_one_coordinate                           ; CALL $86DC / LD ($F7D0),HL; ...+= speed * nose.y
-       li   de,object_position_z_lo                        ; LD HL,($F7D2)     ; z...
+       li   de,object_position_z                           ; LD HL,($F7D2)     ; z...
        mov  @nose_vector_log_z,bc                          ; LD BC,($EB6C)     ; 
        bl   @move_one_coordinate                           ; CALL $86DC / LD ($F7D2),HL; ...+= speed * nose.z
        .endproc                                            ; RET               ; 
@@ -9579,11 +9489,9 @@ move_one_coordinate:                                       ; >86dc
        .proc                                               ;                   ; 
        mov  @type_entry_cache,hl                           ; PUSH HL / LD HL,($E874); HL = log(speed)
        bl   @multiply_logs                                 ; CALL $2160        ; HL = speed * component
-       movb @1(de),r0                                      ; POP DE            ; R0 = the coordinate
-       movb *de,@r0lb                                      ;                   ; 
+       mov  *de,r0                                         ; POP DE            ; R0 = the coordinate
        a    r0,hl                                          ; ADD HL,DE         ; add it
-       movb hl,@1(de)                                      ;                   ; (TI: store it)
-       movb @l,*de                                         ;                   ; 
+       mov  hl,*de                                         ;                   ; (TI: store it)
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -9639,18 +9547,15 @@ update_stardust_exit:
 * O:HL The distance
 work_out_distance:                                         ; >883d
        .proc                                               ;                   ; 
-       movb @object_position_x+1,hl                        ; LD HL,($F7CE)     ; HL = x
-       movb @object_position_x,@l                          ;                   ; 
+       mov  @object_position_x,hl                          ; LD HL,($F7CE)     ; HL = x
        abs  hl                                             ; BIT 7,H / ...     ; its size
        movb hl,@delta_x_hi                                 ; LD ($EB82),HL     ; X for #R$84A6
        movb @l,@abs_delta_x                                ;                   ; 
-       movb @object_position_y+1,hl                        ; LD HL,($F7D0)     ; HL = y
-       movb @object_position_y,@l                          ;                   ; 
+       mov  @object_position_y,hl                          ; LD HL,($F7D0)     ; HL = y
        abs  hl                                             ; BIT 7,H / ...     ; its size
        movb hl,@delta_y_hi                                 ; LD ($EB84),HL     ; Y for #R$84A6
        movb @l,@abs_delta_y                                ;                   ; 
-       movb @object_position_z_lo+1,hl                     ; LD HL,($F7D2)     ; HL = z
-       movb @object_position_z_lo,@l                       ;                   ; 
+       mov  @object_position_z,hl                          ; LD HL,($F7D2)     ; HL = z
        abs  hl                                             ; BIT 7,H / ...     ; its size
        movb hl,@delta_z_hi                                 ; LD ($EB86),HL     ; Z for #R$84A6
        movb @l,@abs_delta_z                                ;                   ; 
@@ -9762,11 +9667,9 @@ _8b52:                                                     ; >8b52
 _8b58:                                                     ; >8b58
        movb de,@last_move+1                                ; LD ($E876),DE     ; remember the amount
        movb @e,@last_move                                  ;                   ; 
-       movb @object_position_z_lo+1,hl                     ; LD HL,($F7D2)     ; HL = z
-       movb @object_position_z_lo,@l                       ;                   ; 
+       mov  @object_position_z,hl                          ; LD HL,($F7D2)     ; HL = z
        s    de,hl                                          ; OR A / SBC HL,DE  ; take the amount off
-       movb hl,@object_position_z_lo+1                     ; LD ($F7D2),HL     ; 
-       movb @l,@object_position_z_lo                       ;                   ; 
+       mov  hl,@object_position_z                          ; LD ($F7D2),HL     ; 
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -13758,9 +13661,9 @@ object_status_byte:                                        ; >f7cd
 * #R$EBA0). The player's roll and pitch (#R$221B, #R$22C0) rotate it every
 * frame. Part of the object being processed, with #R$F7CD.
 object_position_x:                                         ; >f7ce
-       byte >00                                                      ; 
-position_x_hi:                                             ; >f7cf
-       byte >00                                                      ; 
+       data >0000                                                 ; (TI: the position and orientation words are big-endian)
+position_x_hi:
+       equ  object_position_x
 
 ********************************************************************************
 * Position Y (word), per-object workspace
@@ -13768,18 +13671,19 @@ position_x_hi:                                             ; >f7cf
 * Second word of the same position vector - see #R$F7CE's own
 * comment. Within the same per-object workspace as #R$F7CD.
 object_position_y:                                         ; >f7d0
-       byte >00                                                      ; 
-position_y_hi:                                             ; >f7d1
-       byte >00                                                      ; 
+       data >0000                                                 ; 
+position_y_hi:
+       equ  object_position_y
 
 ********************************************************************************
-* Position Z, low byte (per-object workspace)
+* Position Z (word), per-object workspace
 * 
-* Low byte of the position vector's third word (Z) - #R$F7D3 is its
-* high byte, doubling as the position's Z sign. Within the same
+* The position vector's third word (Z) - #R$F7D3 is its high byte,
+* doubling as the position's Z sign (TI: at this label, as the word is
+* big-endian). Within the same
 * per-object workspace as #R$F7CD.
-object_position_z_lo:                                      ; >f7d2
-       byte >C0
+object_position_z:                                         ; >f7d2
+       data >00C0                                                 ; 
 
 ********************************************************************************
 * Position's Z sign byte
@@ -13788,8 +13692,8 @@ object_position_z_lo:                                      ; >f7d2
 * $F7D2, within the same per-object workspace as #R$F7CD. Read
 * throughout the render pipeline (#R$87DD, #R$8238, #R$863B) and picks
 * between #R$F80F/#R$F810 in #R$193F's shield-damage routine.
-object_z_sign:                                             ; >f7d3
-       byte >00
+object_z_sign:
+       equ  object_position_z
 
 ********************************************************************************
 * Side vector
@@ -13799,11 +13703,11 @@ object_z_sign:                                             ; >f7d3
 * Each component is sign-magnitude, with 1.0 = $4000. A vertex at (x, y,
 * z) in the blueprint is at x * side + y * roof + z * nose (#R$4464).
 side_vector:                                               ; >f7d4
-       byte >00,>40                                                  ; 
+       data >4000                                                 ; 
 side_vector_y:                                             ; >f7d6
-       byte >00,>00                                                  ; 
+       data >0000                                                 ; 
 side_vector_z:                                             ; >f7d8
-       byte >00,>00                                                  ; 
+       data >0000                                                 ; 
 
 ********************************************************************************
 * Nose vector
@@ -13811,13 +13715,13 @@ side_vector_z:                                             ; >f7d8
 * See #R$F7D4. Used for docking (#R$87DD) and ships' laser beams
 * (#R$43C2).
 nose_vector:                                               ; >f7da
-       byte >00                                                      ; 
-nose_vector_x_hi:                                          ; >f7db
-       byte >00                                                      ; 
+       data >0000                                                 ; 
+nose_vector_x_hi:
+       equ  nose_vector
 nose_vector_y:                                             ; >f7dc
-       byte >08,>00                                                  ; 
+       data >0008                                                 ; 
 nose_vector_z:                                             ; >f7de
-       byte >01                                                      ; 
+       data >4001                                                 ; 
 
 ********************************************************************************
 * Orientation vector 2: Z high byte/sign
@@ -13825,19 +13729,19 @@ nose_vector_z:                                             ; >f7de
 * High byte of #R$F7DA's Z word - see that entry's own comment. Read
 * standalone as vector 2's Z sign byte by #R$2F2F (see #R$E866's own
 * comment).
-orientation_vector_2_z_sign:                               ; >f7df
-       byte >40
+orientation_vector_2_z_sign:
+       equ  nose_vector_z
 
 ********************************************************************************
 * Roof vector
 * 
 * See #R$F7D4. Worked out as nose x side (#R$4599).
 roof_vector:                                               ; >f7e0
-       byte >00,>00                                                  ; 
+       data >0000                                                 ; 
 roof_vector_y:                                             ; >f7e2
-       byte >6A,>37                                                  ; 
+       data >376A                                                 ; 
 roof_vector_z:                                             ; >f7e4
-       byte >07,>A0
+       data >A007                                                 ; 
 
 ********************************************************************************
 * Speed

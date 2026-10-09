@@ -4387,6 +4387,7 @@ key_table:                                                 ; >419b
        data >3200,code_bank_7_select,buy_cargo                    ; '2': buy cargo when docked (#R$417D, #R$5BBD) (TI: no rear view yet)
        data >3300,code_bank_7_select,sell_cargo                   ; '3': sell cargo when docked (#R$4187, #R$5CEE) (TI: no left view yet)
        data >3400,code_bank_7_select,equip_ship                   ; '4': equip ship when docked (#R$4191, #R$5DBB) (TI: no right view yet)
+       data >3500,code_bank_8_select,galactic_chart               ; '5': galactic chart (#R$4D0B)
        data >3700,code_bank_8_select,key_data_on_system           ; '7': data on system (#R$6164)
        data >3800,code_bank_7_select,key_handler_8                ; '8': market prices (#R$5B99)
        data >3900,code_bank_7_select,status_page                  ; '9': commander status (#R$6276)
@@ -8703,6 +8704,17 @@ screen_frame:                                              ; >7161
        byte >AB,>E8                                               ; to (232, 171)
        byte >FF                                                   ; 
        byte >FF                                                   ; end of the list
+
+********************************************************************************
+* Move sprite 0 to the cursor position $E709
+* 
+* Used by the routines at #R$540D and #R$7373.
+move_chart_cursor_sprite:                                  ; >73a6
+       movb @bytes+>10,@vdpwa                              ; LD A,$10 / OUT ($99),A; VRAM address low byte
+       movb @bytes+>5b,@vdpwa                              ; LD A,$5B / OUT ($99),A; ...high byte, write mode: $1B10 (sprite 4's attributes)
+       movb @chart_cursor_x+1,@vdpwd                       ; LD HL,($E709) / LD A,H / OUT ($98),A; sprite 4's Y
+       movb @chart_cursor_x,@vdpwd                         ; LD A,L / OUT ($98),A; sprite 4's X
+       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Unpack the commander file

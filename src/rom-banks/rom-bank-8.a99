@@ -1,4 +1,4 @@
-* ROM bank 8: the math tables, and code: the data on system screen
+* ROM bank 8: the math tables, and code: the data on system screen and the galactic chart
 * Assembled for real by code-bank-8.a99, and DORG in the other builds for its labels
        .ifdef code_bank_8
        aorg >6000
@@ -850,6 +850,563 @@ adjective_ending:                                          ; >a300
        text 'ian ',>00                                            ; 
 vowels:                                                    ; >a305
        text 'aeiou'                                               ; 
+
+* The galactic chart, with its own data and the circle point lists
+
+********************************************************************************
+* Circle point lists
+* 
+* Eight lists of the points in one quadrant of a circle, for radii 0, 2, 4,
+* ..., 14 pixels. Each list is the number of points, then each point's (x,
+* y) offset from the centre; the routines that draw the circles plot each
+* point in all four quadrants. Used for the fuel range circle on the
+* galactic chart (#R$4DAB), with a radius of the fuel / 10, and for the
+* systems on the local chart (#R$5204), with a radius of 2-8.
+circle_points:                                             ; >133f
+       byte >01                                                   ; radius 0
+       byte >00,>00                                               ; 
+circle_points_r2:                                          ; >1342
+       byte >04                                                   ; radius 2
+       byte >00,>02,>01,>02,>02,>00,>02,>01                       ; 
+circle_points_r4:                                          ; >134b
+       byte >06                                                   ; radius 4
+       byte >00,>04,>01,>04,>02,>02,>02,>03,>03,>00,>03,>01       ; 
+circle_points_r6:                                          ; >1358
+       byte >09                                                   ; radius 6
+       byte >00,>06,>01,>06,>02,>05,>02,>06,>03,>04,>04,>03,>05,>00,>05,>01; 
+       byte >05,>02                                               ; 
+circle_points_r8:                                          ; >136b
+       byte >0C                                                   ; radius 8
+       byte >00,>08,>01,>08,>02,>07,>02,>08,>03,>07,>04,>06,>05,>05,>06,>00; 
+       byte >06,>01,>06,>02,>06,>03,>06,>04                       ; 
+circle_points_r10:                                         ; >1384
+       byte >0E                                                   ; radius 10
+       byte >00,>0A,>01,>0A,>02,>0A,>03,>09,>04,>09,>05,>08,>06,>06,>06,>07; 
+       byte >07,>04,>07,>05,>08,>00,>08,>01,>08,>02,>08,>03       ; 
+circle_points_r12:                                         ; >13a1
+       byte >11                                                   ; radius 12
+       byte >00,>0C,>01,>0C,>02,>0C,>03,>0B,>04,>0B,>05,>0A,>06,>09,>06,>0A; 
+       byte >07,>08,>08,>06,>08,>07,>09,>04,>09,>05,>0A,>00,>0A,>01,>0A,>02; 
+       byte >0A,>03                                               ; 
+circle_points_r14:                                         ; >13c4
+       byte >14                                                   ; radius 14
+       byte >00,>0E,>01,>0E,>02,>0E,>03,>0D,>04,>0D,>05,>0D,>06,>0B,>06,>0C; 
+       byte >07,>0B,>08,>0A,>09,>08,>09,>09,>0A,>04,>0A,>05,>0A,>06,>0A,>07; 
+       byte >0B,>00,>0B,>01,>0B,>02,>0B,>03                       ; 
+
+********************************************************************************
+* Circle point list addresses
+* 
+* The address of each list in #R$133F, indexed by radius / 2.
+circle_point_lists:                                        ; >13ed
+       byte circle_points%%256,circle_points//256                 ; radius 0
+       byte circle_points_r2%%256,circle_points_r2//256           ; radius 2
+       byte circle_points_r4%%256,circle_points_r4//256           ; radius 4
+       byte circle_points_r6%%256,circle_points_r6//256           ; radius 6
+       byte circle_points_r8%%256,circle_points_r8//256           ; radius 8
+       byte circle_points_r10%%256,circle_points_r10//256         ; radius 10
+       byte circle_points_r12%%256,circle_points_r12//256         ; radius 12
+       byte circle_points_r14%%256,circle_points_r14//256         ; radius 14
+
+********************************************************************************
+* Get the coordinates of the next system
+* 
+* Used by the routines at #R$4D0B, #R$502C and #R$5325.
+* .
+* Works out the current system's coordinates from the seeds at #R$E904,
+* as #R$4C2B does, and moves the seeds on to the next system (#R$5613).
+* Used for going through all 256 systems in turn.
+* 
+* O:B y coordinate
+* O:C x coordinate
+next_system_coordinates:                                   ; >4c80
+       .proc                                               ;                   ; 
+       .exx                                                ; EXX               ; switch to the shadow register set
+       movb @seed_s0_hi,r1                                 ; LD A,($E905)      ; 
+       srl  r1,1                                           ; SRL A             ; y = s0_hi / 2
+       .push r1                                            ; PUSH AF           ; 
+       movb @seed_s1_hi,r1                                 ; LD A,($E907)      ; 
+       srl  r1,8                                           ;                   ; 
+       li   r0,252                                         ; LD E,$FC          ; 
+       mpy  r0,r1                                          ; CALL $1F60        ; (TI: MPY)
+       movb r2,r0                                          ;                   ; the product's high byte
+       ab   @bytes+>02,r0                                  ; LD A,$02 / ADD A,H; x = 2 + s1_hi * 252 / 256
+       .push r0                                            ; PUSH AF           ; 
+       bl   @next_system_seeds                             ; CALL $5613        ; move on to the next system
+       .exx                                                ; EXX               ; back to the main register set
+       .pop r0                                             ; POP AF            ; 
+       movb r0,@c                                          ; LD C,A            ; C = x
+       .pop r0                                             ; POP BC            ; 
+       movb r0,b                                           ;                   ; B = y
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Key '5': show the galactic chart
+* 
+* Reached via the key table at #R$419B. Does nothing if the chart is
+* already showing (#R$E902 = 4). Prints "Galaxy" and the galaxy's number
+* (#R$EB66 + 1), gives the chart area random colours (20 rows of the colour
+* table from $2118, from the R register), and plots all 256 systems
+* (#R$4C80, #R$4EEC, #R$3793). Then sets up the cursor sprite (#R$4D8A) and
+* puts it on the selected system (#R$53FD) - or, in witchspace, on the
+* ship's position ($4D6C).
+* .
+* At $4D6C, puts the cursor on the ship's position in witchspace ($EEC3).
+* At $4D76, turns the chart cursor on (#R$E70B), draws the sprite for the
+* current system's marker (#R$4DAB, #R$4E4D), and marks the chart as
+* showing (#R$E902 = 4).
+galactic_chart:                                            ; >4d0b
+       .proc                                               ;                   ; 
+       cb   @current_screen,@bytes+>04                     ; LD A,($E902) / CP $04; 
+       jne  _4d11                                          ; RET Z             ; already showing
+       .endproc                                            ;                   ; 
+_4d11:                                                     ; >4d11
+       bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide the sprites
+       li   hl,galactic_chart_title                        ; LD HL,$566C       ; "Galaxy #"
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print it
+       movb @current_galaxy,@c                             ; LD A,($EB66) / LD C,A; 
+       ab   one,@c                                         ; INC C             ; C = galaxy number + 1
+       sb   a,a                                            ; XOR A             ; 
+       clr  hl                                             ; SBC HL,HL         ; 
+       bl   @rst_18_target_format_value_print              ; RST $18           ; print it
+       li   hl,>2118                                       ; LD HL,$2118       ; the colour table for the chart
+       movb @bytes+>14,@c                                  ; LD C,$14          ; 20 rows
+_4d26:                                                     ; >4d26
+       movb @l,@vdpwa                                      ; LD A,L / OUT ($99),A; 
+       movb h,r0                                           ; LD A,H            ; 
+       ori  r0,>4000                                       ; OR $40            ; 
+       movb r0,@vdpwa                                      ; OUT ($99),A       ; 
+       bl   @random_byte                                   ; LD A,R            ; random colours (TI: from #R$2176, as there's no R register)
+       movb a,@e                                           ; LD E,A            ; 
+       movb @bytes+>d0,b                                   ; LD B,$D0          ; 208 bytes
+_4d34:                                                     ; >4d34
+       movb @e,a                                           ; LD A,E            ; 
+       andi a,>f000                                        ; AND $F0           ; 
+       cb   a,@bytes+>11                                   ; CP $11            ; 
+       jhe  _4d3d                                          ; JR NC,$4D3D       ; 
+       movb @bytes+>f0,a                                   ; LD A,$F0          ; no black on black
+_4d3d:                                                     ; >4d3d
+       ori  a,>0100                                        ; OR $01            ; on black
+       movb a,@vdpwd                                       ; OUT ($98),A       ; 
+       clr  r0                                             ; RLC E             ; 
+       movb @e,r0                                          ;                   ; 
+       sla  r0,1                                           ;                   ; 
+       jnc  _4d41                                          ;                   ; 
+       ori  r0,>0100                                       ;                   ; 
+_4d41:                                                     
+       movb r0,@e                                          ;                   ; 
+       sb   one,b                                          ; DJNZ $4D34        ; 
+       jne  _4d34                                          ;                   ; 
+       ab   one,h                                          ; INC H             ; next row
+       sb   one,@c                                         ; DEC C             ; 
+       jne  _4d26                                          ; JR NZ,$4D26       ; 
+       bl   @galaxy_seeds_to_system                        ; CALL $5607        ; start at system 0
+       clr  bc                                             ;                   ; (TI: B = 0 for 256 systems)
+_4d51:                                                     ; >4d51
+       .push bc                                            ; PUSH BC           ; 
+       bl   @next_system_coordinates                       ; CALL $4C80        ; BC = the system's coordinates
+       bl   @galactic_chart_coordinates                    ; CALL $4EEC        ; convert them to screen coordinates
+       bl   @plot_line_pixel                               ; CALL $3793        ; plot it
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $4D51        ; next system
+       jne  _4d51                                          ;                   ; 
+       bl   @set_up_chart_cursor                           ; CALL $4D8A        ; set up the cursor sprite
+       movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; 
+       jne  galactic_chart_2                               ; JR NZ,$4D6C       ; in witchspace
+       bl   @galactic_chart_cursor_to_selected             ; CALL $53FD        ; put the cursor on the selected system
+       jmp  _4d76                                          ; JR $4D76          ; 
+galactic_chart_2:                                          ; >4d6c
+       movb @witchspace_position+1,b                       ; LD BC,($EEC3)     ; the ship's position in witchspace
+       movb @witchspace_position,@c                        ;                   ; 
+       bl   @galactic_chart_coordinates                    ; CALL $4EEC        ; convert it to screen coordinates
+       bl   @move_cursor_to_position                       ; CALL $540D        ; move the cursor there
+_4d76:                                                     ; >4d76
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@chart_cursor_active_flag                   ; LD ($E70B),A      ; turn the chart cursor on
+       bl   @draw_fuel_range_sprite                        ; CALL $4DAB        ; 
+       bl   @place_fuel_range_sprites                      ; CALL $4E4D        ; 
+       movb @bytes+>04,a                                   ; LD A,$04          ; 
+       movb a,@current_screen                              ; LD ($E902),A      ; the galactic chart is showing
+       movb a,@hyperspace_target_selected                  ; LD ($E91A),A      ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Set up the chart cursor sprite
+* 
+* Used by the routines at #R$4D0B and #R$4F64.
+* .
+* Used by both charts (#R$4D0B, #R$4FA2). Uploads the cursor's pattern
+* (#R$5647) to sprite patterns 16-19 ($3880), and sets sprite 4's
+* attributes ($1B10, #R$3830) from #R$5658: y $DF (out
+* of sight until it's moved, #R$540D), x 0, pattern 16 and colour 5.
+set_up_chart_cursor:                                       ; >4d8a
+       .proc                                               ;                   ; 
+       movb @bytes+>80,@vdpwa                              ; LD A,$80 / OUT ($99),A; VRAM address low byte
+       movb @bytes+>78,@vdpwa                              ; LD A,$78 / OUT ($99),A; ...high byte, write mode: $3880
+       li   hl,chart_cursor_pattern                        ; LD HL,$5647       ; the cursor's pattern
+       bl   @write_run_length_encoded_byte_stream          ; CALL $39B9        ; upload it
+       movb @bytes+>10,@vdpwa                              ; LD A,$10 / OUT ($99),A; VRAM address low byte
+       movb @bytes+>5b,@vdpwa                              ; LD A,$5B / OUT ($99),A; ...high byte, write mode: $1B10
+       li   hl,chart_cursor_attributes                     ; LD HL,$5658       ; sprite 4's attributes
+       movb @bytes+>04,b                                   ; LD B,$04          ; 
+       bl   @copy_to_vram                                  ; CALL $3830        ; set them
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Draw the fuel range circle
+* 
+* Used by the routine at #R$4D0B.
+* .
+* Draws the circle showing how far the ship can jump into a 32x32-pixel
+* image at $D600, and uploads it as the four 16x16 sprite patterns at
+* $3800. The circle is centred on the current system - or in witchspace (at
+* $4DCA) on the ship's position (#R$EEC3) - converted to chart coordinates
+* (#R$4EEC) in $E82E/$E82F. Its points come from the table at #R$13ED,
+* indexed by the fuel (#R$F775) / 10; each is plotted in all four quadrants
+* (#R$4EA5).
+draw_fuel_range_sprite:                                    ; >4dab
+       .proc                                               ;                   ; 
+       li   r1,space_view_buffer                           ; LD HL,$D600 / LD (HL),$00; clear the 32x32-pixel image (4 bytes a row)
+       li   r2,>40                                         ; LD BC,$007F / LDIR; (TI: a word at a time)
+_4dab_clear:                                               
+       clr  *r1+                                           ;                   ; 
+       dec  r2                                             ;                   ; 
+       jne  _4dab_clear                                    ;                   ; 
+       movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; in witchspace?
+       jne  other_origin_bc_shared_marker_plot             ; JR NZ,$4DCA       ; yes - centre on the ship's position
+       movb @current_system,a                              ; LD A,($EB67)      ; A = the current system
+       bl   @generate_system                               ; CALL $4C9B        ; generate its data (#R$4C9B)
+       movb @system_y,b                                    ; LD BC,($F751)     ; BC = its coordinates
+       movb @system_x,@c                                   ;                   ; 
+       jmp  _4dce                                          ; JR $4DCE          ; 
+other_origin_bc_shared_marker_plot:                        ; >4dca
+       movb @witchspace_position+1,b                       ; LD BC,($EEC3)     ; 
+       movb @witchspace_position,@c                        ;                   ; 
+_4dce:                                                     ; >4dce
+       bl   @galactic_chart_coordinates                    ; CALL $4EEC        ; convert them to chart coordinates (#R$4EEC)
+       movb @c,@chart_marker_screen_position               ; LD ($E82E),BC     ; the circle's centre
+       movb b,@chart_marker_screen_position+1              ;                   ; 
+       movb @fuel_level,r1                                 ; LD HL,($F775) / LD H,$00; the fuel
+       srl  r1,8                                           ;                   ; 
+       li   r0,10                                          ; LD A,$0A          ; 
+       mov  r1,r2                                          ;                   ; R1:R2 = 0:fuel
+       clr  r1                                             ;                   ; 
+       div  r0,r1                                          ; CALL $2079        ; R1 = fuel / 10, the radius / 2 (TI: DIV)
+       sla  r1,1                                           ; ADD HL,HL         ; 
+       movb @circle_point_lists+1(r1),hl                   ; LD BC,$13ED / ADD HL,BC / LD A,(HL) ...; HL -> the circle's point list (#R$133F)
+       movb @circle_point_lists(r1),@l                     ;                   ; 
+       movb *hl+,b                                         ; LD B,(HL) / INC HL; B = the number of points
+_4dee:                                                     ; >4dee
+       .push bc                                            ; PUSH BC           ; save the point counter
+       movb *hl+,@e                                        ; LD E,(HL) / INC HL; E = the point's x offset
+       movb *hl+,d                                         ; LD D,(HL) / INC HL; D = its y offset
+       .push hl                                            ; PUSH HL           ; save the list pointer
+       movb @e,@c                                          ; LD C,E            ; 
+       movb d,b                                            ; LD B,D            ; 
+       bl   @fuel_range_sprite_point                       ; CALL $4EA5        ; plot (x, y)
+       movb @e,a                                           ; LD A,E / NEG      ; 
+       andi a,>ff00                                        ;                   ; 
+       neg  a                                              ;                   ; 
+       movb a,@c                                           ; LD C,A            ; 
+       movb d,b                                            ; LD B,D            ; 
+       bl   @fuel_range_sprite_point                       ; CALL $4EA5        ; plot (-x, y)
+       movb @e,a                                           ; LD A,E / NEG      ; 
+       andi a,>ff00                                        ;                   ; 
+       neg  a                                              ;                   ; 
+       movb a,@c                                           ; LD C,A            ; 
+       movb d,a                                            ; LD A,D / NEG      ; 
+       andi a,>ff00                                        ;                   ; 
+       neg  a                                              ;                   ; 
+       movb a,b                                            ; LD B,A            ; 
+       bl   @fuel_range_sprite_point                       ; CALL $4EA5        ; plot (-x, -y)
+       movb @e,@c                                          ; LD C,E            ; 
+       movb d,a                                            ; LD A,D / NEG      ; 
+       andi a,>ff00                                        ;                   ; 
+       neg  a                                              ;                   ; 
+       movb a,b                                            ; LD B,A            ; 
+       bl   @fuel_range_sprite_point                       ; CALL $4EA5        ; plot (x, -y)
+       .pop hl                                             ; POP HL            ; 
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $4DEE        ; next point
+       jne  _4dee                                          ;                   ; 
+       movb @zero,@vdpwa                                   ; LD A,$00 / OUT ($99),A; 
+       movb @bytes+>78,@vdpwa                              ; LD A,$78 / OUT ($99),A; VRAM address $3800: sprite patterns 0-3
+       li   r2,vdpwd                                       ; LD HL,$D600 / LD DE,$0004; 
+       li   ix,fuel_range_quarters                         ; LD C,$02 / LD B,$02; (TI: the 4 quarters through a table of their offsets)
+_4e29:                                                     ; >4e29
+       mov  *ix+,de                                        ;                   ; DE -> the quarter's top left byte
+       ai   de,space_view_buffer                           ;                   ; 
+       movb @bytes+>02,b                                   ; LD C,$02          ; 2 bytes across
+_4e30:                                                     ; >4e30
+       mov  de,r0                                          ; PUSH HL           ; 
+       li   r1,>0010                                       ; LD B,$10          ; 16 rows
+_4e33:                                                     ; >4e33
+       movb *r0,*r2                                        ; LD A,(HL) / OUT ($98),A; copy a byte of the quarter to its sprite pattern
+       ai   r0,4                                           ; ADD HL,DE         ; the next row
+       dec  r1                                             ; DJNZ $4E33        ; 
+       jne  _4e33                                          ;                   ; 
+       inc  de                                             ; INC HL            ; the next byte across
+       sb   one,b                                          ; DEC C             ; 
+       jne  _4e30                                          ; JR NZ,$4E30       ; 
+       ci   ix,fuel_range_quarters+8                       ; DJNZ $4E2C / DEC C / JR NZ,$4E29; 
+       jne  _4e29                                          ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* TI-specific: the offsets in the 32x32-pixel image of the quarters that
+* make sprite patterns 0-3 (top left, bottom left, top right, bottom right)
+fuel_range_quarters:                                       
+       data 0,>40,2,>42                                           ; 
+
+********************************************************************************
+* Show the fuel range circle
+* 
+* Used by the routine at #R$4D0B.
+* .
+* Places the four 16x16 sprites (0-3) that show the fuel range circle's 32x32
+* image (#R$4DAB), in red, centred on the circle's centre (#R$E82E):
+* patterns 0 and 4 on the left, 8 and 12 on the right.
+place_fuel_range_sprites:                                  ; >4e4d
+       .proc                                               ;                   ; 
+       movb @zero,@vdpwa                                   ; LD A,$00 / OUT ($99),A; 
+       movb @bytes+>5b,@vdpwa                              ; LD A,$5B / OUT ($99),A; VRAM address $1B00: sprite 0's attributes
+       sb   d,d                                            ; LD D,$00          ; pattern 0
+       bl   @fuel_range_sprite_left                        ; CALL $4E86        ; C = the left column's x (#R$4E86)
+       movb @bytes+>f0,b                                   ; LD B,$F0          ; 
+       bl   @fuel_range_sprite_row                         ; CALL $4E9D        ; B = the top row's y (#R$4E9D)
+       bl   @set_sprite                                    ; CALL $39A4        ; sprite 0: top left (#R$39A4)
+       bl   @fuel_range_sprite_left                        ; CALL $4E86        ; 
+       sb   b,b                                            ; LD B,$00          ; 
+       bl   @fuel_range_sprite_row                         ; CALL $4E9D        ; B = the bottom row's y
+       bl   @set_sprite                                    ; CALL $39A4        ; sprite 1: bottom left
+       bl   @fuel_range_sprite_right                       ; CALL $4E95        ; C = the right column's x (#R$4E95)
+       movb @bytes+>f0,b                                   ; LD B,$F0          ; 
+       bl   @fuel_range_sprite_row                         ; CALL $4E9D        ; 
+       bl   @set_sprite                                    ; CALL $39A4        ; sprite 2: top right
+       bl   @fuel_range_sprite_right                       ; CALL $4E95        ; 
+       sb   b,b                                            ; LD B,$00          ; 
+       bl   @fuel_range_sprite_row                         ; CALL $4E9D        ; 
+       bl   @set_sprite                                    ; CALL $39A4        ; sprite 3: bottom right
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Show the fuel range circle: left column
+* 
+* Used by the routine at #R$4E4D.
+* .
+* Sets C to the x of the left-hand sprites: the circle's centre - 15. If that
+* would be off the left of the screen, adds 32 and sets the early clock bit in
+* the colour, which moves the sprite 32 pixels left.
+* 
+* O:C x
+* O:E Colour (red, with the early clock bit if needed)
+fuel_range_sprite_left:                                    ; >4e86
+       movb @bytes+>08,@e                                  ; LD E,$08          ; red
+       movb @chart_marker_screen_position,a                ; LD A,($E82E)      ; 
+       sb   @bytes+>0f,a                                   ; SUB $0F           ; 
+       joc  _4e93                                          ; JR NC,$4E93       ; on the screen
+       movb @bytes+>88,@e                                  ; LD E,$88          ; red, with the early clock bit
+       ab   @bytes+>20,a                                   ; ADD A,$20         ; 
+_4e93:                                                     ; >4e93
+       movb a,@c                                           ; LD C,A            ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Show the fuel range circle: right column
+* 
+* Used by the routine at #R$4E4D.
+* .
+* Sets C to the x of the right-hand sprites: the circle's centre + 1.
+* 
+* O:C x
+* O:E Colour (red)
+fuel_range_sprite_right:                                   ; >4e95
+       movb @bytes+>08,@e                                  ; LD E,$08          ; red
+       movb @chart_marker_screen_position,a                ; LD A,($E82E)      ; 
+       ab   one,a                                          ; INC A             ; 
+       movb a,@c                                           ; LD C,A            ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Show the fuel range circle: row
+* 
+* Used by the routine at #R$4E4D.
+* .
+* Adds the circle's centre's y to B: -16 for the top sprites, 0 for the bottom
+* ones.
+* 
+* I:B -16 or 0
+* O:B y
+* O:E Colour (red)
+fuel_range_sprite_row:                                     ; >4e9d
+       movb @bytes+>08,@e                                  ; LD E,$08          ; red
+       movb @chart_marker_screen_position+1,a              ; LD A,($E82F)      ; 
+       ab   b,a                                            ; ADD A,B           ; 
+       movb a,b                                            ; LD B,A            ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Draw the fuel range circle: plot a point
+* 
+* Used by the routine at #R$4DAB.
+* .
+* Adds the offset (C, B) to the circle's centre ($E82E, $E82F) - or
+* subtracts it (at $4EAF, $4EC1) - and, unless that's off the chart, plots
+* the point in the image at $D600 (#R$4DAB).
+* 
+* I:B y offset (bit 7 set if negative)
+* I:C x offset (bit 7 set if negative)
+* I:D Size of the y offset
+* I:E Size of the x offset
+fuel_range_sprite_point:                                   ; >4ea5
+       movb @chart_marker_screen_position,a                ; LD A,($E82E)      ; A = the centre's x on the chart
+       movb @c,r0                                          ; BIT 7,C           ; negative x offset?
+       jlt  negative_offset_x_case_bounds_check            ; JR NZ,$4EAF       ; yes - subtract it
+       ab   @e,a                                           ; ADD A,E           ; no: add it
+       joc  _4ea5_end                                      ; RET C             ; off the chart
+       jmp  _4eb0                                          ; JR $4EB0          ; 
+negative_offset_x_case_bounds_check:                       ; >4eaf
+       sb   @e,a                                           ; SUB E             ; 
+       jnc  _4ea5_end                                      ; RET C             ; off the chart (TI: SB sets the carry when there's no borrow)
+_4eb0:                                                     ; >4eb0
+       cb   a,@bytes+>18                                   ; CP $18            ; 
+       jl   _4ea5_end                                      ; RET C             ; left of the chart
+       cb   a,@bytes+>e8                                   ; CP $E8            ; 
+       jhe  _4ea5_end                                      ; RET NC            ; right of the chart
+       movb @chart_marker_screen_position+1,a              ; LD A,($E82F)      ; A = the centre's y on the chart
+       movb b,b                                            ; BIT 7,B           ; negative y offset?
+       jlt  negative_offset_y_case_bounds_check            ; JR NZ,$4EC1       ; yes - subtract it
+       ab   d,a                                            ; ADD A,D           ; no: add it
+       joc  _4ea5_end                                      ; RET C             ; off the chart
+       jmp  _4ec2                                          ; JR $4EC2          ; 
+negative_offset_y_case_bounds_check:                       ; >4ec1
+       sb   d,a                                            ; SUB D             ; 
+       jnc  _4ea5_end                                      ; RET C             ; off the chart
+_4ec2:                                                     ; >4ec2
+       cb   a,@bytes+>08                                   ; CP $08            ; 
+       jl   _4ea5_end                                      ; RET C             ; above the chart
+       cb   a,@bytes+>a8                                   ; CP $A8            ; 
+       jhe  _4ea5_end                                      ; RET NC            ; below the chart
+       movb b,r1                                           ; LD A,B            ; 
+       ab   @bytes+>0f,r1                                  ; ADD A,$0F         ; the image's row: y offset + 15...
+       srl  r1,8                                           ;                   ; 
+       sla  r1,2                                           ; ADD A,A x 2       ; ...times 4 bytes a row
+       andi r1,>00ff                                       ;                   ; (8 bits, as on the MSX)
+       movb @c,r2                                          ; LD A,C            ; 
+       ab   @bytes+>0f,r2                                  ; ADD A,$0F         ; the image's column: x offset + 15
+       srl  r2,8                                           ;                   ; 
+       mov  r2,r0                                          ;                   ; 
+       srl  r0,3                                           ; RRA x 3 / AND $1F ; 
+       a    r0,r1                                          ; ADD A,L           ; R1 = the byte's offset in the image
+       andi r2,>0007                                       ; AND $07           ; the pixel's bit position
+       movb @pixel_bitmask_table(r2),r0                    ; LD A,(IX+d)       ; the pixel's mask (TI: indexed, not self-modified)
+       socb r0,@space_view_buffer(r1)                      ; LD BC,$D600 / ADD HL,BC / OR (HL) / LD (HL),A; plot the pixel
+_4ea5_end:                                                 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Galactic chart: convert coordinates to screen coordinates
+* 
+* Used by the routines at #R$4D0B, #R$4DAB, #R$527F and #R$53FD.
+* .
+* Scales galaxy coordinates (0-255) to the galactic chart: y * 159 / 127
+* + 8, and x * 207 / 256 + 24.
+* 
+* I:B y coordinate
+* I:C x coordinate
+* O:B,C Screen coordinates
+galactic_chart_coordinates:                                ; >4eec
+       movb b,r1                                           ; LD A,B            ; (TI: MPY and DIV)
+       srl  r1,8                                           ;                   ; 
+       li   r0,159                                         ; LD E,$9F          ; 
+       mpy  r0,r1                                          ; CALL $1F60        ; R2 = y * 159
+       clr  r1                                             ;                   ; 
+       li   r0,127                                         ; LD A,$7F          ; 
+       div  r0,r1                                          ; CALL $2079        ; R1 = y * 159 / 127
+       ai   r1,8                                           ; LD A,L / ADD A,$08; add 8
+       swpb r1                                             ;                   ; 
+       movb r1,d                                           ; PUSH AF           ; (kept in D)
+       movb @c,r1                                          ; LD A,C            ; 
+       srl  r1,8                                           ;                   ; 
+       li   r0,207                                         ; LD E,$CF          ; 
+       mpy  r0,r1                                          ; CALL $1F60        ; R2 = x * 207
+       movb r2,r0                                          ; LD A,H            ; the high byte
+       ab   @bytes+>18,r0                                  ; ADD A,$18         ; A = x * 207 / 256 + 24
+       movb r0,@c                                          ; LD C,A            ; C = the screen x
+       movb d,b                                            ; POP BC            ; B = the screen y
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Galactic chart: move the cursor to the selected system
+* 
+* Used by the routines at #R$4D0B, #R$527F, #R$52CE, #R$541E, #R$55A3 and
+* #R$88AC.
+* .
+* Generates the selected system (#R$E72B, #R$4C9B), and moves the cursor
+* (#R$540D) to its position on the galactic chart (#R$4EEC).
+galactic_chart_cursor_to_selected:                         ; >53fd
+       .proc                                               ;                   ; 
+       movb @selected_system,a                             ; LD A,($E72B)      ; the selected system
+       bl   @generate_system                               ; CALL $4C9B        ; generate its data
+       movb @system_y,b                                    ; LD BC,($F751)     ; 
+       movb @system_x,@c                                   ;                   ; 
+       bl   @galactic_chart_coordinates                    ; CALL $4EEC        ; convert to galactic chart coordinates
+       bl   @move_cursor_to_position                       ; JP $540D          ; move the cursor there
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Move the cursor/marker sprite to screen position (B, C)
+* 
+* Used by the routines at #R$4D0B, #R$4F64, #R$527F, #R$53ED and #R$53FD.
+* .
+* Undoes #R$5314's own (+7,+8) cell-centring nudge and stores the
+* result to #R$E709 (the cursor position), then calls #R$73A6 to
+* actually redraw the sprite there.
+move_cursor_to_position:                                   ; >540d
+       .proc                                               ;                   ; 
+       movb @c,a                                           ; LD A,C            ; A = C (the target X)
+       sb   @bytes+>07,a                                   ; SUB $07           ; undo #R$5314's nudge
+       movb a,@chart_cursor_x                              ; LD L,A / LD ($E709),HL; set the cursor position
+       movb b,a                                            ; LD A,B            ; A = B (the target Y)
+       sb   @bytes+>08,a                                   ; SUB $08           ; undo #R$5314's nudge
+       movb a,@chart_cursor_x+1                            ; LD H,A            ; 
+       bl   @move_chart_cursor_sprite                      ; CALL $73A6        ; redraw the sprite there
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Chart cursor sprite pattern
+* 
+* The 16x16 pattern of the cursor on the galactic and local charts: a run-
+* length encoded stream (see #R$39B9) of (count, byte) pairs ending with 0,
+* uploaded to sprite pattern 16 by #R$4D8A. It draws a cross with a gap in the
+* middle.
+chart_cursor_pattern:                                      ; >5647
+       byte >05,>01                                               ; 
+       byte >02,>00                                               ; 
+       byte >01,>F8                                               ; 
+       byte >02,>00                                               ; 
+       byte >05,>01                                               ; 
+       byte >08,>00                                               ; 
+       byte >01,>3E                                               ; 
+       byte >08,>00                                               ; 
+       byte >00                                                   ; 
+
+********************************************************************************
+* Chart cursor sprite attributes
+* 
+* Copied to sprite 4 by #R$4D8A: y $DF (off the screen until the cursor is
+* moved, #R$540D), x 0, pattern 16 and colour 5.
+chart_cursor_attributes:                                   ; >5658
+       byte >DF,>00,>10,>05                                       ; 
+
+********************************************************************************
+* Galactic chart title
+* 
+* Printed by #R$4D0B (RST $20), followed by the galaxy number. A list of
+* (column, row, string) records ending with $FF (see #R$3596).
+galactic_chart_title:                                      ; >566c
+       text >11,>16,'Galaxy #',>00                                ; 
+       byte >FF                                                   ; 
 
 rom_bank_8_end:
        equ  $

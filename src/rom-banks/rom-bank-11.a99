@@ -248,23 +248,7 @@ _2532:                                                     ; >2532
        b    *r1                                            ; JP (HL)           ; jump to the handler
 
 ********************************************************************************
-* Continue the handler only on this object's turn
-* 
-* Used by the routines at #R$2641, #R$265E, #R$26A9, #R$27C0 and #R$27F4.
-* .
-* Called by several object handlers before work that only needs doing
-* every third frame. Returns normally (so the handler carries on) if the
-* object's turn number ($F7ED) matches the 3-2-1 counter at #R$E92E;
-* otherwise returns from the handler as well. Its final RET is also the
-* handler for types 0 and 13 (see #R$288D).
-every_third_frame:                                         ; >2542
-       movb @turn_number,a                                 ; LD A,($F7ED)      ; A = this object's turn number
-       li   hl,current_turn                                ; LD HL,$E92E       ; HL -> the live cycling counter
-       cb   a,*hl                                          ; CP (HL)           ; this object's frame to do extra work?
-       jne  !                                              ; RET Z             ; yes - nothing more for this (no-op) handler anyway
-       .ret                                                ;                   
-!
-       .pop hl                                             ; POP HL            ; no - skip an extra return level too
+* Handler types 0 and 13: nothing to do (#R$254B; TI: separate from #R$2542)
 handler_none:                                              ; >254b
        rt                                                  ; RET               ; handler types 0 and 13: nothing to do
 
@@ -290,24 +274,25 @@ _2551:                                                     ; >2551
 * station, 3 the player's missile and 14 a missile fired at the player;
 * 15 is the Cobra left behind by the escape capsule (#R$19FC); the rest
 * are ships' tactics, from attacking to turning away and leaving.
-* TI: only the handlers converted so far; the others do nothing yet.
+* TI: only the handlers converted so far; the others do nothing yet (the
+* explosion and the missiles).
 object_handler_table:                                      ; >288d
        data handler_none                                          ; 0: none
        data handler_none                                          ; 1: explosion (#R$2556, not converted yet)
        data handler_space_station                                 ; 2: space station
        data handler_none                                          ; 3: the player's missile (#R$25B9, not converted yet)
-       data handler_none                                          ; 4: turn away, then leave (#R$265E, not converted yet)
-       data handler_none                                          ; 5: turn away, then attack (#R$2641, not converted yet)
-       data handler_none                                          ; 6: attack (#R$26A9, not converted yet)
-       data handler_none                                          ; 7: turn away (#R$2758, not converted yet)
-       data handler_none                                          ; 8: fly on, then attack (#R$27A1, not converted yet)
-       data handler_none                                          ; 9: spin, fly on and leave (#R$27B3, not converted yet)
-       data handler_none                                          ; 10: head for the planet (#R$27C0, not converted yet)
-       data handler_none                                          ; 11: break off (#R$27DF, not converted yet)
-       data handler_none                                          ; 12: fly on and leave (#R$27F4, not converted yet)
+       data handler_turn_then_leave                               ; 4: turn away, then leave
+       data handler_turn_then_attack                              ; 5: turn away, then attack
+       data handler_attack                                        ; 6: attack
+       data handler_turn_away                                     ; 7: turn away
+       data handler_fly_then_attack                               ; 8: fly on, then attack
+       data handler_spin_and_leave                                ; 9: spin, fly on and leave
+       data handler_head_for_planet                               ; 10: head for the planet
+       data handler_break_off                                     ; 11: break off
+       data handler_leave                                         ; 12: fly on and leave
        data handler_none                                          ; 13: none
        data handler_none                                          ; 14: missile homing in on the player (#R$2618, not converted yet)
-       data handler_none                                          ; 15: the escape capsule's countdown (#R$2810, not converted yet)
+       data handler_escape_capsule                                ; 15: the escape capsule's countdown
 
 ********************************************************************************
 * Check for a collision with the object
@@ -437,6 +422,1798 @@ clear_cargo_hold:                                          ; >9237
        li   bc,>0047                                       ; LD BC,$0047       ; 18 entries of 4 bytes
        .ldir                                               ; LDIR              ; 
        .endproc                                            ; RET               ; 
+
+
+********************************************************************************
+* Spawn new ships
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called every frame by the main loop (#R$13FD). In witchspace (#R$EEC1)
+* only Thargoids appear: whenever the number of Thargoids about ($E857, see
+* #R$E844) isn't the number wanted (#R$EEC5), spawns another one near the
+* player (#R$2D3B), attacking. Otherwise goes on to $2B24.
+* .
+* At $2B24, first launches any police due (#R$315C). Then, in the space
+* station's safe zone (#R$EB05) - but only once the station is at least
+* $300 away ($E72A, the high byte of its distance), with no Orbit Shuttle
+* or Transporter already about (#R$E844) and not in mission state $52
+* ($E93D) - counts #R$EF8F down, and when it runs out launches an Orbit
+* Shuttle or a Transporter from the station (#R$3187), heading for the
+* planet (handler type 10).
+* .
+* At $2B66, outside the safe zone with no asteroid about, counts #R$EF90
+* down, and when it runs out spawns an asteroid $1000-$17FF away (#R$8F25),
+* flying past (handler type 12). With a 26/256 chance it will break up into
+* 1-4 pieces when destroyed (byte $14 of the asteroid blueprint, see
+* #R$8DB9); otherwise none.
+* .
+* At $2BAF, if there are no traders about (#R$E93A), counts #R$EF91 down,
+* and when it runs out picks a Cobra MkIII, Python, Anaconda or Cobra MK1
+* (ship types $0E-$11): outside the safe zone it's spawned near the player
+* (#R$2D3B), flying past (handler type 12); in the safe zone it's launched
+* from the space station (#R$3187) with handler type 4 (fly on, then turn
+* away and leave), unless the station is less than $300 away.
+* .
+* At $2BE9, in mission states $17 and $40 ($E93D), spawns the mission's
+* ship (#R$2C3C: the Constrictor or the Cougar), advances the state and
+* returns.
+* .
+* At $2BFD, outside the safe zone with fewer than 2 pirates about
+* (#R$E939), counts the 16-bit #R$EF9A down, and when it runs out restarts
+* it at (government + 2) * 256 frames - so pirates come more often in
+* lawless systems - and spawns a pirate pack (#R$2C3C).
+spawn_ships:                                               ; >2b05
+       .proc                                               ;                   ; 
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; in witchspace?
+       jeq  spawn_ships_normal_space                       ; JR Z,$2B24        ; not in witchspace
+       cb   @num_thargoids,@witchspace_thargoids           ; LD A,($E857) / LD HL,$EEC5 / CP (HL); the number of Thargoids wanted?
+       jne  _2b0f                                          ; RET Z             ; enough Thargoids already?
+       .endproc                                            ;                   ; yes
+_2b0f:                                                     ; >2b0f
+       movb @bytes+>13,@ship_type                          ; LD A,$13 / LD ($F7E7),A; ship type $13: Thargoid
+       movb @bytes+>06,@handler_type                       ; LD A,$06 / LD ($F7EE),A; handler type 6: attack
+       sb   @speed_up_flag,@speed_up_flag                  ; XOR A / LD ($F7F4),A; slowing down
+       .pop r11                                            ;                   ; 
+       b    @spawn_near_player                             ; JP $2D3B          ; spawn it near the player
+spawn_ships_normal_space:                                  ; >2b24
+       bl   @launch_police                                 ; CALL $315C        ; launch any police due
+       movb @station_in_range,r0                           ; LD A,($EB05) / OR A; 
+       jeq  _2b66                                          ; JR Z,$2B66        ; not in the safe zone
+       cb   @station_distance_hi,@bytes+>03                ; LD A,($E72A) / CP $03; the station at least $300 away?
+       jl   _2b66                                          ; JR C,$2B66        ; no - too close
+       movb @num_orbit_shuttles,r0                         ; LD A,($E860) / OR A; any Orbit Shuttles about?
+       jne  _2b66                                          ; JR NZ,$2B66       ; yes
+       movb @num_transporters,r0                           ; LD A,($E861) / OR A; any Transporters about?
+       jne  _2b66                                          ; JR NZ,$2B66       ; yes
+       cb   @mission_state,@bytes+>52                      ; LD A,($E93D) / CP $52; 
+       jeq  _2b66                                          ; JR Z,$2B66        ; mission state $52
+       sb   one,@shuttle_countdown                         ; LD HL,$EF8F / DEC (HL); 
+       jne  _2b66                                          ; JR NZ,$2B66       ; not time yet
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+       movb one,@speed_up_flag                             ; LD ($F7F4),A      ; speeding up
+       bl   @random_byte                                   ; LD A,R            ; (TI: a random byte for the R register)
+       andi a,>0100                                        ; AND $01           ; a coin-flip
+       ab   @bytes+>1c,a                                   ; ADD A,$1C         ; ship type $1C (Orbit Shuttle) or $1D (Transporter)
+       movb a,@ship_type                                   ; LD ($F7E7),A      ; 
+       movb @bytes+>0a,@handler_type                       ; LD A,$0A / LD ($F7EE),A; handler type 10: head for the planet
+       bl   @launch_from_station                           ; CALL $3187        ; launch it from the station
+_2b66:                                                     ; >2b66
+       movb @station_in_range,r0                           ; LD A,($EB05) / OR A; in the safe zone?
+       jne  _2baf                                          ; JR NZ,$2BAF       ; in the safe zone - no asteroids
+       movb @num_asteroids,r0                              ; LD A,($E848) / OR A; any asteroids about?
+       jne  _2baf                                          ; JR NZ,$2BAF       ; yes
+       sb   one,@asteroid_countdown                        ; LD HL,$EF90 / DEC (HL); 
+       jne  _2baf                                          ; JR NZ,$2BAF       ; not time yet
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>0700                                        ; AND $07           ; 
+       movb a,h                                            ; LD H,A            ; 
+       bl   @random_byte                                   ; CALL $2176        ; 
+       movb a,@l                                           ; LD L,A            ; 
+       ai   hl,>1000                                       ; LD DE,$1000 / ADD HL,DE; HL = distance $1000-$17FF
+       bl   @random_point                                  ; SCF / CALL $8F25  ; pick a random point at that distance, in any direction
+       bl   @point_at_player                               ; CALL $8D8E        ; point it at the player
+       movb @bytes+>04,@ship_type                          ; LD A,$04 / LD ($F7E7),A; ship type 4: asteroid
+       movb @bytes+>0c,@handler_type                       ; LD A,$0C / LD ($F7EE),A; handler type 12: fly on and leave
+       bl   @add_object                                    ; CALL $3037        ; add it to the object table
+       bl   @random_byte                                   ; CALL $2176        ; 
+       cb   a,@bytes+>1a                                   ; CP $1A            ; 26/256 chance...
+       jhe  spawn_traders                                  ; JR NC,$2BAB       ; ...of breaking up
+       andi a,>0300                                        ; AND $03           ; 0-3
+       ab   one,a                                          ; INC A             ; into 1-4 pieces
+       jmp  _2bac                                          ; JR $2BAC          ; 
+spawn_traders:                                             ; >2bab
+       sb   a,a                                            ; XOR A             ; no pieces
+_2bac:                                                     ; >2bac
+       movb a,@asteroid_pieces                             ; LD (IY+$14),A     ; (TI: in RAM, as the blueprint is in ROM)
+_2baf:                                                     ; >2baf
+       movb @trader_count,r0                               ; LD A,($E93A) / OR A; any traders about?
+       jne  _2be9                                          ; JR NZ,$2BE9       ; traders about already
+       sb   one,@trader_countdown                          ; LD HL,$EF91 / DEC (HL); 
+       jne  _2be9                                          ; JR NZ,$2BE9       ; not time yet
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>0300                                        ; AND $03           ; 0-3
+       ab   @bytes+>0e,a                                   ; ADD A,$0E         ; ship type $0E-$11: a trader
+       movb a,@ship_type                                   ; LD ($F7E7),A      ; 
+       movb @station_in_range,r0                           ; LD A,($EB05) / OR A; in the safe zone?
+       jne  spawn_trader_from_station                      ; JR NZ,$2BDA       ; yes - launch it from the station
+       movb @bytes+>0c,@handler_type                       ; LD A,$0C / LD ($F7EE),A; handler type 12: fly on and leave
+       bl   @spawn_near_player                             ; CALL $2D3B        ; spawn it near the player
+       jmp  _2be9                                          ; JR $2BE9          ; 
+spawn_trader_from_station:                                 ; >2bda
+       cb   @station_distance_hi,@bytes+>03                ; LD A,($E72A) / CP $03; 
+       jl   _2be9                                          ; JR C,$2BE9        ; too close - no launch
+       movb @bytes+>04,@handler_type                       ; LD A,$04 / LD ($F7EE),A; handler type 4: turn away, then leave
+       bl   @launch_from_station                           ; CALL $3187        ; launch it from the station
+_2be9:                                                     ; >2be9
+       movb @mission_state,a                               ; LD A,($E93D)      ; A = mission state
+       cb   a,@bytes+>17                                   ; CP $17            ; 
+       jeq  _2bf4                                          ; JR Z,$2BF4        ; $17: spawn the Constrictor
+       cb   a,@bytes+>40                                   ; CP $40            ; 
+       jne  spawn_pirates                                  ; JR NZ,$2BFD       ; not $40 either
+_2bf4:                                                     ; >2bf4
+       bl   @condition_red                                 ; CALL $2C3C        ; $40: spawn the Cougar
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); advance the mission state
+       jmp  _2c20                                          ; JR $2C20          ; 
+spawn_pirates:                                             ; >2bfd
+       movb @station_in_range,r0                           ; LD A,($EB05) / OR A; in the safe zone?
+       jne  _2c20                                          ; JR NZ,$2C20       ; in the safe zone - no pirates
+       cb   @pirate_count,@bytes+>02                       ; LD A,($E939) / CP $02; 
+       jhe  _2c20                                          ; JR NC,$2C20       ; 2 or more pirates
+       movb @pirate_countdown_hi,r0                        ; LD HL,($EF9A)     ; 
+       movb @pirate_countdown,@r0lb                        ;                   ; 
+       dec  r0                                             ; DEC HL            ; 
+       movb r0,@pirate_countdown_hi                        ; LD ($EF9A),HL     ; 
+       movb @r0lb,@pirate_countdown                        ;                   ; 
+       mov  r0,r0                                          ; LD A,H / OR L     ; 
+       jne  _2c20                                          ; JR NZ,$2C20       ; not time yet
+       movb @current_system_government,a                   ; LD A,($F762)      ; 
+       ab   @bytes+>02,a                                   ; ADD A,$02         ; 
+       movb a,@pirate_countdown_hi                         ; LD ($EF9B),A      ; restart the countdown
+       bl   @condition_red                                 ; CALL $2C3C        ; Condition RED: spawn pirates
+_2c20:                                                     ; >2c20
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Condition RED: spawn a hostile ship
+* 
+* Used by the routines at #R$13FD and #R$2B05.
+* .
+* Announces "Condition RED!" and spawns a hostile ship, which it picks by
+* mission state ($E93D): the Constrictor (ship type $1F) in state $17, a
+* Thargoid ($13) in states $21 and $52, the Cougar ($1E) in state $40,
+* and otherwise a random pirate (#R$3326). Called for the mission ships
+* and pirates (#R$2B24), and sometimes at the end of a Torus Jump Drive
+* jump (#R$13FD).
+* .
+* At $2C64, spawns the ship in A $0800-$0FFF away (#R$8F25), attacking
+* (handler type 6), at speed 1 and slowing down. It gets escorts unless
+* it's a Thargoid or the Constrictor (in mission states $21 and $52 even
+* a Thargoid gets them): a random number from 0 to (rank (#R$EB12) + 3) /
+* 2 - 1 of them, each an Asp MkII in mission state $40 (the Cougar's
+* escorts), a Thargoid in states $21 and $52, or otherwise a random
+* pirate.
+* .
+* At $2CEF, each escort is placed by the next record in the formation
+* table at #R$343B (via the cursor at #R$E871): 700 units along the
+* leader's side or roof vector, either way (#R$439D), so the escorts fly
+* to its left and right, above and below it, in the same direction. Each
+* is added to the object table (#R$3037).
+condition_red:                                             ; >2c3c
+       .proc                                               ;                   ; 
+       li   hl,msg_condition_red                           ; LD HL,$3388       ; "Condition RED!"
+       bl   @show_view_message                             ; CALL $39C8        ; announce it
+       movb @mission_state,a                               ; LD A,($E93D)      ; A = mission state
+       cb   a,@bytes+>17                                   ; CP $17            ; 
+       jne  condition_red_thargoid                         ; JR NZ,$2C4D       ; not $17
+       movb @bytes+>1f,a                                   ; LD A,$1F          ; $17: the Constrictor
+       jmp  _2c64                                          ; JR $2C64          ; 
+condition_red_thargoid:                                    ; >2c4d
+       cb   a,@bytes+>21                                   ; CP $21            ; 
+       jeq  _2c55                                          ; JR Z,$2C55        ; 
+       cb   a,@bytes+>52                                   ; CP $52            ; 
+       jne  condition_red_cougar                           ; JR NZ,$2C59       ; 
+_2c55:                                                     ; >2c55
+       movb @bytes+>13,a                                   ; LD A,$13          ; ship type $13: Thargoid
+       jmp  _2c64                                          ; JR $2C64          ; 
+condition_red_cougar:                                      ; >2c59
+       cb   a,@bytes+>40                                   ; CP $40            ; 
+       jne  condition_red_spawn                            ; JR NZ,$2C61       ; 
+       movb @bytes+>1e,a                                   ; LD A,$1E          ; ship type $1E: Cougar
+       jmp  _2c64                                          ; JR $2C64          ; 
+condition_red_spawn:                                       ; >2c61
+       bl   @random_pirate                                 ; CALL $3326        ; otherwise a random pirate
+_2c64:                                                     ; >2c64
+       movb a,@ship_type                                   ; LD ($F7E7),A      ; 
+       movb @bytes+>06,@handler_type                       ; LD A,$06 / LD ($F7EE),A; handler type 6: attack
+       sb   @speed_up_flag,@speed_up_flag                  ; XOR A / LD ($F7F4),A; slowing down
+       movb one,@object_status_byte                        ; INC A / LD ($F7CD),A; status: in use
+       movb one,@object_speed                              ; LD ($F7E6),A      ; speed 1
+       bl   @random_byte                                   ; CALL $2176        ; 
+       movb a,@l                                           ; LD L,A            ; 
+       andi a,>0700                                        ; AND $07           ; 
+       movb a,h                                            ; LD H,A            ; 
+       ai   hl,>0800                                       ; LD DE,$0800 / ADD HL,DE; HL = distance $0800-$0FFF
+       bl   @random_point                                  ; SCF / CALL $8F25  ; pick a random point at that distance, in any direction
+* TI: the MSX copies the position to the nose vector here ($2C80-$2C8D), which
+* #R$8D8E then works out again
+       bl   @point_at_player                               ; CALL $8D8E        ; point it at the player
+       bl   @add_object                                    ; CALL $3037        ; add it to the object table
+       jnc  _2c3c_end                                      ; RET NC            ; no room
+       movb @mission_state,a                               ; LD A,($E93D)      ; 
+       cb   a,@bytes+>21                                   ; CP $21            ; 
+       jeq  _2cb0                                          ; JR Z,$2CB0        ; $21: escorts
+       cb   a,@bytes+>52                                   ; CP $52            ; 
+       jeq  _2cb0                                          ; JR Z,$2CB0        ; $52: escorts
+       movb @ship_type,a                                   ; LD A,($F7E7)      ; 
+       cb   a,@bytes+>13                                   ; CP $13            ; 
+       jeq  _2c3c_end                                      ; RET Z             ; a Thargoid - no escorts
+       cb   a,@bytes+>1f                                   ; CP $1F            ; 
+       jeq  _2c3c_end                                      ; RET Z             ; the Constrictor - no escorts
+_2cb0:                                                     ; >2cb0
+       bl   @work_out_roof                                 ; CALL $4599        ; work out its roof vector
+       bl   @save_working_object_to_scratch                ; CALL $3341        ; save it as the leader
+       li   r0,escort_formation                            ; LD HL,$343B       ; 
+       movb r0,@escort_table_cursor                        ; LD ($E871),HL     ; the escorts' formation (TI: big-endian)
+       movb @r0lb,@escort_table_cursor+1                   ;                   ; 
+       clr  r0                                             ; LD A,($EB12)      ; 
+       movb @combat_rank,r0                                ;                   ; 
+       swpb r0                                             ;                   ; 
+       ai   r0,3                                           ; ADD A,$03         ; 
+       srl  r0,1                                           ; RRA               ; 
+       swpb r0                                             ;                   ; 
+       movb r0,@c                                          ; LD C,A            ; C = (rank + 3) / 2
+_2cc3:                                                     ; >2cc3
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>1f00                                        ; AND $1F           ; 0-31
+       cb   a,@c                                           ; CP C              ; 
+       jhe  _2cc3                                          ; JR NC,$2CC3       ; too many - pick again
+       movb a,b                                            ; OR A / LD B,A     ; B = number of escorts
+       jeq  _2c3c_end                                      ; RET Z             ; no escorts
+_2cce:                                                     ; >2cce
+       .push bc                                            ; PUSH BC           ; save the loop counter
+       bl   @restore_working_object_from_scratch           ; CALL $334D        ; restore the leader
+       movb @mission_state,a                               ; LD A,($E93D)      ; 
+       cb   a,@bytes+>40                                   ; CP $40            ; 
+       jne  condition_red_thargoid_escort                  ; JR NZ,$2CE0       ; not $40
+       movb @bytes+>19,@ship_type                          ; LD A,$19 / LD ($F7E7),A; $40: an Asp MkII
+       jmp  _2cef                                          ; JR $2CEF          ; 
+condition_red_thargoid_escort:                             ; >2ce0
+       cb   a,@bytes+>21                                   ; CP $21            ; 
+       jeq  _2ce8                                          ; JR Z,$2CE8        ; 
+       cb   a,@bytes+>52                                   ; CP $52            ; 
+       jne  condition_red_escort                           ; JR NZ,$2CEC       ; otherwise a random pirate
+_2ce8:                                                     ; >2ce8
+       movb @bytes+>13,@ship_type                          ; LD A,$13 / LD ($F7E7),A; ship type $13: Thargoid
+       jmp  _2cef                                          ; JR $2CEF          ; 
+condition_red_escort:                                      ; >2cec
+       bl   @random_pirate                                 ; CALL $3326        ; otherwise a random pirate
+_2cef:                                                     ; >2cef
+       movb @escort_table_cursor,r1                        ; LD HL,($E871)     ; R1 -> the next formation record
+       movb @escort_table_cursor+1,@r1lb                   ;                   ; 
+       mov  *r1+,ix                                        ; LD C,(HL) / INC HL / LD B,(HL) / INC HL / PUSH BC / POP IX; IX -> the leader's side or roof vector
+       mov  *r1+,hl                                        ; LD E,(HL) / INC HL / LD D,(HL) / INC HL; HL = the distance
+       mov  *r1+,r2                                        ; LD A,(HL) / INC HL; R2 = $0000, or $8000 to negate the vector
+       movb r1,@escort_table_cursor                        ; LD ($E871),HL     ; move on to the next record
+       movb @r1lb,@escort_table_cursor+1                   ;                   ; 
+       mov  ix,r1                                          ; LD H,B / LD L,C / LD C,A / LD B,$03; 
+       movb @bytes+>03,b                                   ; LD B,$03          ; 3 components
+_2d07:                                                     ; >2d07
+       mov  *r1,r0                                         ; INC HL / LD A,(HL); flip the sign bit if negating
+       xor  r2,r0                                          ; XOR C             ; 
+       mov  r0,*r1+                                        ; LD (HL),A / INC HL; 
+       sb   one,b                                          ; DJNZ $2D07        ; 
+       jne  _2d07                                          ;                   ; 
+       bl   @multiply_vector                               ; EX DE,HL / CALL $439D; DE, BC, HL = the offset from the leader
+       a    bc,@object_position_x                          ; PUSH HL / LD HL,($F7CE) / ADD HL,BC / LD ($F7CE),HL; x
+       a    de,@object_position_y                          ; LD HL,($F7D0) / ADD HL,DE / LD ($F7D0),HL; y
+       a    hl,@object_position_z                          ; POP DE / LD HL,($F7D2) / ADD HL,DE / LD ($F7D2),HL; z
+       li   hl,object_scratch+7                            ; LD HL,$0087       ; the leader's side vector (#R$3341)
+       li   de,side_vector                                 ; LD DE,$F7D4       ; 
+       li   bc,>0006                                       ; LD BC,$0006       ; 
+       .ldir                                               ; LDIR              ; restore it, in case it was negated
+       bl   @add_object                                    ; CALL $3037        ; spawn the escort
+       .pop bc                                             ; POP BC            ; restore the loop counter
+       sb   one,b                                          ; DJNZ $2CCE        ; next escort
+       jne  _2cce                                          ;                   ; 
+_2c3c_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Spawn a ship near the player
+* 
+* Used by the routine at #R$2B05.
+* .
+* Spawns the ship set up in the working object (whose ship and handler
+* types the caller has set) at speed 1, at a random point 2048-4095 away
+* (#R$8F25), with a random orientation (#R$8E45), and adds it to the
+* object table
+* (#R$3037).
+spawn_near_player:                                         ; >2d3b
+       .proc                                               ;                   ; 
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+       movb one,@object_speed                              ; LD ($F7E6),A      ; speed 1
+       bl   @random_byte                                   ; CALL $2176        ; 
+       movb a,@l                                           ; LD L,A            ; 
+       andi a,>0700                                        ; AND $07           ; 
+       movb a,h                                            ; LD H,A            ; 
+       ai   hl,>0800                                       ; LD DE,$0800 / ADD HL,DE; HL = distance $0800-$0FFF
+       bl   @random_point                                  ; SCF / CALL $8F25  ; pick a random point at that distance, in any direction
+       bl   @random_orientation                            ; CALL $8E45        ; point it in a random direction
+       .pop r11                                            ;                   ; 
+       b    @add_object                                    ; JP $3037          ; add it to the object table
+
+********************************************************************************
+* Launch the police from the space station
+* 
+* Used by the routine at #R$2B05.
+* .
+* Called every frame. While Vipers are due (($E934)), counts down 100
+* frames between launches ($E870), then launches one (#R$3187): a Viper
+* (ship type $0C) - or, in mission state $52, a Thargoid ($13) - with
+* handler type 5 (fly out, then attack).
+launch_police:                                             ; >315c
+       movb @police_to_launch,r0                           ; LD A,($E934) / OR A; 
+       jne  _3161                                          ; RET Z             ; no Vipers due
+       rt                                                  ;                   ; 
+_3161:                                                     ; >3161
+       sb   one,@police_launch_timer                       ; LD HL,$E870 / DEC (HL); one fewer cooldown frame
+       jeq  _3167                                          ; RET NZ            ; not time yet
+       rt                                                  ;                   ; 
+_3167:                                                     ; >3167
+       movb @bytes+>64,@police_launch_timer                ; LD (HL),$64       ; 100 frames until the next
+       sb   one,@police_to_launch                          ; LD HL,$E934 / DEC (HL); one fewer due
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+       movb @bytes+>0c,a                                   ; LD A,$0C          ; ship type $0C: Viper...
+       cb   @mission_state,@bytes+>52                      ; LD A,($E93D) / CP $52; 
+       jne  _317c                                          ; JR NZ,$317C       ; 
+       movb @bytes+>13,a                                   ; LD A,$13          ; ...or a Thargoid in mission state $52
+_317c:                                                     ; >317c
+       movb a,@ship_type                                   ; LD ($F7E7),A      ; 
+       movb @bytes+>05,@handler_type                       ; LD A,$05 / LD ($F7EE),A; handler type 5: fly out, then attack
+       b    @launch_from_station                           ; JP $3187          ; launch it
+
+********************************************************************************
+* Launch a ship from the space station
+* 
+* Used by the routines at #R$2B05 and #R$315C.
+* .
+* Does nothing if the space station has been destroyed (($EFA9), see
+* #R$291E). Otherwise gives the working object - whose ship and handler
+* types the caller has set - the station's position and orientation (from
+* its object-table slot, slot 1), moves it out by the station's size
+* (#R$8685), sets its speed to 0 and speeding up, and adds it to the
+* object table (#R$3037).
+launch_from_station:                                       ; >3187
+       .proc                                               ;                   ; 
+       movb @station_destroyed,r0                          ; LD A,($EFA9) / OR A; 
+       jne  _3187_end                                      ; RET NZ            ; station destroyed - no launches
+       li   hl,station_position                            ; LD HL,$EBC9       ; HL -> the station's object-table slot (slot 1)
+       li   de,object_position_x                           ; LD DE,$F7CE       ; DE -> the working object's position field
+       li   bc,>0018                                       ; LD BC,$0018       ; its position and orientation
+       .ldir                                               ; LDIR              ; 
+       movb one,a                                          ; LD A,$01          ; type 1 (station)
+       li   r2,>10                                         ; CALL $2FE9        ; (TI: through blueprint_byte, as the blueprints are in other banks)
+       bl   @blueprint_byte                                ; LD A,(IY+$10)     ; A = the station's size
+       bl   @move_along_axis                               ; CALL $8685        ; move the ship out by the station's size
+       sb   @object_speed,@object_speed                    ; XOR A / LD ($F7E6),A; speed 0
+       movb one,@speed_up_flag                             ; INC A / LD ($F7F4),A; speeding up
+       .pop r11                                            ;                   ; 
+       b    @add_object                                    ; JP $3037          ; add it to the object table
+_3187_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Pick a random pirate ship type
+* 
+* Used by the routine at #R$2C3C.
+* .
+* Picks one of the ten pirate ship types $12-$1B (Krait, Thargoid, Boa
+* Class Cruiser, Gecko, Moray Star Boat, Adder, Mamba, Asp MkII,
+* Sidewinder, Wolf MkII) at random - but only a Thargoid if there are no
+* pirates about (#R$E939).
+* 
+* O:A Ship type (also in #R$F7E7)
+random_pirate:                                             ; >3326
+       .proc                                               ;                   ; 
+_3326:                                                     
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>0f00                                        ; AND $0F           ; 
+       cb   a,@bytes+>0a                                   ; CP $0A            ; 
+       jhe  _3326                                          ; JR NC,$3326       ; 0-9 only
+       ab   @bytes+>12,a                                   ; ADD A,$12         ; ship type $12-$1B
+       movb a,@ship_type                                   ; LD ($F7E7),A      ; 
+       cb   a,@bytes+>13                                   ; CP $13            ; 
+       jne  _3326_end                                      ; RET NZ            ; not a Thargoid
+       movb @pirate_count,r0                               ; LD A,($E939) / OR A; 
+       jne  _3326                                          ; JR NZ,$3326       ; there are some - pick again
+_3326_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Save the working object record to scratch ($0080)
+* 
+* Used by the routines at #R$2A3A, #R$2A71, #R$2A94, #R$2C3C and #R$8DB9.
+* .
+* Copies the full 40-byte #R$F7CD working-object record to the fixed
+* scratch buffer at $0080, freeing #R$F7CD up for other use before
+* #R$334D restores it.
+* TI: to object_scratch, as $0080 is console ROM.
+save_working_object_to_scratch:                            ; >3341
+       .proc                                               ;                   ; 
+       li   hl,object_status_byte                          ; LD HL,$F7CD       ; 
+       li   de,object_scratch                              ; LD DE,$0080       ; 
+       li   bc,>0028                                       ; LD BC,$0028       ; 40 bytes
+       .ldir                                               ; LDIR              ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Restore the working object record from scratch ($0080)
+* 
+* Used by the routines at #R$2A3A, #R$2A71, #R$2A94, #R$2C3C and #R$8DB9.
+* .
+* The inverse of #R$3341: copies the 40-byte record back from $0080
+* into #R$F7CD.
+restore_working_object_from_scratch:                       ; >334d
+       .proc                                               ;                   ; 
+       li   hl,object_scratch                              ; LD HL,$0080       ; 
+       li   de,object_status_byte                          ; LD DE,$F7CD       ; 
+       li   bc,>0028                                       ; LD BC,$0028       ; 40 bytes
+       .ldir                                               ; LDIR              ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Escort formation
+* 
+* Where #R$2C3C puts a pirate's (or the Cougar's, or a Thargoid's)
+* escorts, one 5-byte record each: the address of one of the leader's
+* orientation vectors (side or roof), the distance (700), and $00 to use
+* the vector as it is or $80 to negate it. So the escorts fly to the
+* right of, to the left of, above and below the leader. There are at most
+* 4 escorts.
+* TI: (the vector, the distance, $0000 or $8000 to negate) words.
+escort_formation:                                          ; >343b
+       data side_vector,>02bc,>0000                               ; right: +side
+       data side_vector,>02bc,>8000                               ; left: -side
+       data roof_vector,>02bc,>0000                               ; above: +roof
+       data roof_vector,>02bc,>8000                               ; below: -roof
+
+********************************************************************************
+* Multiply a vector by a number
+* 
+* Used by the routines at #R$2C3C and #R$43C2.
+* .
+* Multiplies each component of the vector at IX by HL (#R$200A).
+* 
+* I:HL The number
+* I:IX The vector (three words)
+* O:DE,BC,HL x, y and z
+* TI: the vector's words are big-endian.
+multiply_vector:                                           ; >439d
+       .proc                                               ;                   ; 
+       .push hl                                            ; PUSH HL           ; save the number
+       mov  hl,de                                          ; EX DE,HL          ; 
+       mov  *ix,hl                                         ; LD L,(IX+$00) / LD H,(IX+$01); the vector's x
+       bl   @multiply_components                           ; CALL $200A        ; 
+       .push hl                                            ; EX (SP),HL / PUSH HL; save x
+       mov  @-4(sp),de                                     ; EX DE,HL          ; DE = the number
+       mov  @2(ix),hl                                      ; LD L,(IX+$02) / LD H,(IX+$03); the vector's y
+       bl   @multiply_components                           ; CALL $200A        ; 
+       .push hl                                            ; EX (SP),HL        ; save y
+       mov  @-6(sp),de                                     ; EX DE,HL          ; DE = the number
+       mov  @4(ix),hl                                      ; LD L,(IX+$04) / LD H,(IX+$05); the vector's z
+       bl   @multiply_components                           ; CALL $200A        ; HL = z
+       .pop bc                                             ; POP BC            ; BC = y
+       .pop de                                             ; POP DE            ; DE = x
+       dect sp                                             ;                   ; drop the number
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Point the object at the player
+* 
+* Used by the routines at #R$2B05, #R$2C3C and #R$8C94.
+* .
+* Sets the nose vector (#R$F7DA) to minus the object's position (#R$F7CE),
+* in sign-magnitude form - negative components become positive magnitudes,
+* and positive ones get the sign bit ($8DAD) - and works out the rest of
+* the orientation from it (#R$8E62). Used for asteroids (#R$2B24) and
+* pirates (#R$2C3C); and for the space station (#R$8CB1), whose position at
+* that point is its offset from the planet, so that it points at the
+* planet.
+* .
+* At $8DAD, makes a positive component negative; at $8DAF, stores it and
+* moves on to the next.
+* TI: the vectors are big-endian words.
+point_at_player:                                           ; >8d8e
+       mov  @object_position_x,r0                          ; LD HL,$F7CE / LD DE,$F7DA / LD BC,$0006 / LDIR; the nose vector = minus the position
+       jlt  _8d8e_1                                        ; JP P,$8DAD        ; positive?
+       ori  r0,>8000                                       ; OR $80            ; yes: make it negative
+       jmp  _8d8e_2                                        ;                   ; 
+_8d8e_1:                                                   
+       neg  r0                                             ; XOR A / SUB E / ...; no: make it positive
+_8d8e_2:                                                   
+       mov  r0,@nose_vector                                ; LD (HL),A / LD (HL),E; 
+       mov  @object_position_y,r0                          ;                   ; the same for y
+       jlt  _8d8e_3                                        ;                   ; 
+       ori  r0,>8000                                       ;                   ; 
+       jmp  _8d8e_4                                        ;                   ; 
+_8d8e_3:                                                   
+       neg  r0                                             ;                   ; 
+_8d8e_4:                                                   
+       mov  r0,@nose_vector_y                              ;                   ; 
+       mov  @object_position_z,r0                          ;                   ; and z
+       jlt  _8d8e_5                                        ;                   ; 
+       ori  r0,>8000                                       ;                   ; 
+       jmp  _8d8e_6                                        ;                   ; 
+_8d8e_5:                                                   
+       neg  r0                                             ;                   ; 
+_8d8e_6:                                                   
+       mov  r0,@nose_vector_z                              ;                   ; 
+       b    @orientation_from_nose                         ; JP $8E62          ; work out the rest of the orientation
+
+********************************************************************************
+* Give the object a random orientation
+* 
+* Used by the routines at #R$2A71, #R$2A94, #R$2D3B and #R$8DB9.
+* .
+* Gives the object a random nose vector (#R$F7DA, #R$8E51) and works out
+* the rest of its orientation from it (#R$8E62). Used for escape
+* capsules, Thargons, ships spawned near the player, and cargo and
+* platlets, so that they fly off in random directions. Preserves BC.
+random_orientation:                                        ; >8e45
+       .proc                                               ;                   ; 
+       .push bc                                            ; PUSH BC           ; 
+       li   de,nose_vector                                 ; LD DE,$F7DA       ; the nose vector
+       bl   @random_vector                                 ; CALL $8E51        ; make it random
+       bl   @orientation_from_nose                         ; CALL $8E62        ; work out the rest
+       .pop bc                                             ; POP BC            ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Make a random vector
+* 
+* Used by the routines at #R$8E45 and #R$8E62.
+* .
+* Fills the vector at DE with three random sign-magnitude components, each
+* less than $4000 (1.0).
+* 
+* I:DE The vector
+* TI: the vector's words are big-endian (the first random byte is still the
+* low byte).
+random_vector:                                             ; >8e51
+       .proc                                               ;                   ; 
+       movb @bytes+>03,b                                   ; LD B,$03          ; 3 components
+_8e53:                                                     ; >8e53
+       bl   @random_byte                                   ; CALL $2176        ; low byte
+       movb a,@1(de)                                       ; LD (DE),A / INC DE; 
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>bf00                                        ; AND $BF           ; high byte: keep the sign, under $4000
+       movb a,*de                                          ; LD (DE),A / INC DE; 
+       inct de                                             ;                   ; 
+       sb   one,b                                          ; DJNZ $8E53        ; 
+       jne  _8e53                                          ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Work out an orientation from the nose vector
+* 
+* Used by the routines at #R$1703, #R$8D8E and #R$8E45.
+* .
+* Normalises the nose vector (#R$F7DA, #R$4642). Then picks random
+* vectors (#R$8E51) for the roof (#R$F7E0) until one isn't too close to
+* the nose's direction - otherwise their cross product would be too small
+* to normalise reliably: at $8E74, the dot product of the two (the roof's
+* component along the nose) must be between -$3F07 and $3F07 (about
+* 0.98).
+* .
+* At $8EAA, sets the side vector (#R$F7D4) to roof x nose, in
+* sign-magnitude form, and normalises it (#R$4642). The random roof is
+* only a helper: it isn't normalised or at right angles to the nose, but
+* the roof is worked out properly, as nose x side (#R$4599), before the
+* object is drawn.
+* .
+* Used after a random nose (#R$8E45), a nose pointing at the player
+* (#R$8D8E), and in the death scene (#R$1703).
+orientation_from_nose:                                     ; >8e62
+       .proc                                               ;                   ; 
+       li   hl,nose_vector                                 ; LD HL,$F7DA       ; 
+       bl   @normalise_vector                              ; CALL $4642        ; normalise the nose vector
+_8e68:                                                     ; >8e68
+       li   de,roof_vector                                 ; LD DE,$F7E0       ; the roof vector
+       bl   @random_vector                                 ; CALL $8E51        ; make it random
+       mov  @nose_vector,hl                                ; LD HL,($F7DA)     ; nose.x
+       mov  @roof_vector,de                                ; LD DE,($F7E0)     ; roof.x
+       bl   @multiply_components                           ; CALL $200A        ; nose.x * roof.x
+       .push hl                                            ; PUSH HL           ; 
+       mov  @nose_vector_y,hl                              ; LD HL,($F7DC)     ; nose.y
+       mov  @roof_vector_y,de                              ; LD DE,($F7E2)     ; roof.y
+       bl   @multiply_components                           ; CALL $200A        ; nose.y * roof.y
+       .push hl                                            ; PUSH HL           ; 
+       mov  @nose_vector_z,hl                              ; LD HL,($F7DE)     ; nose.z
+       mov  @roof_vector_z,de                              ; LD DE,($F7E4)     ; roof.z
+       bl   @multiply_components                           ; CALL $200A        ; nose.z * roof.z
+       .pop de                                             ; POP DE            ; 
+       a    de,hl                                          ; ADD HL,DE         ; 
+       .pop de                                             ; POP DE            ; 
+       a    de,hl                                          ; OR A / ADC HL,DE  ; HL = the dot product
+       jlt  orientation_check_parallel_2                   ; JP M,$8EA2        ; negative
+       ci   hl,>3f07                                       ; LD DE,$C0F9 / ADD HL,DE; under $3F07?
+       jhe  _8e68                                          ; JR NC,$8EAA / JR $8EA8; no - try again
+       jmp  orientation_side                               ;                   ; 
+orientation_check_parallel_2:                              ; >8ea2
+       ci   hl,>c0f9                                       ; LD DE,$3F07 / ADD HL,DE; over -$3F07?
+       jl   _8e68                                          ; JR C,$8EAA        ; no - try again
+orientation_side:                                          ; >8eaa
+       mov  @roof_vector_y,hl                              ; LD HL,($F7E2)     ; roof.y * nose.z
+       mov  @nose_vector_z,de                              ; LD DE,($F7DE)     ; 
+       bl   @multiply_components                           ; CALL $200A        ; 
+       .push hl                                            ; PUSH HL           ; 
+       mov  @roof_vector_z,hl                              ; LD HL,($F7E4)     ; roof.z * nose.y
+       mov  @nose_vector_y,de                              ; LD DE,($F7DC)     ; 
+       bl   @multiply_components                           ; CALL $200A        ; 
+       .pop r0                                             ; EX DE,HL / POP HL ; 
+       s    hl,r0                                          ; XOR A / SBC HL,DE ; side.x = the difference
+       abs  r0                                             ; JP P,$8ECE / ...  ; in sign-magnitude form
+       jgt  orientation_side_x                             ;                   ; 
+       jeq  orientation_side_x                             ;                   ; 
+       ori  r0,>8000                                       ; OR $80            ; 
+orientation_side_x:                                        ; >8ece
+       mov  r0,@side_vector                                ; LD ($F7D4),HL     ; 
+       mov  @roof_vector_z,hl                              ; LD HL,($F7E4)     ; roof.z * nose.x
+       mov  @nose_vector,de                                ; LD DE,($F7DA)     ; 
+       bl   @multiply_components                           ; CALL $200A        ; 
+       .push hl                                            ; PUSH HL           ; 
+       mov  @roof_vector,hl                                ; LD HL,($F7E0)     ; roof.x * nose.z
+       mov  @nose_vector_z,de                              ; LD DE,($F7DE)     ; 
+       bl   @multiply_components                           ; CALL $200A        ; 
+       .pop r0                                             ; EX DE,HL / POP HL ; 
+       s    hl,r0                                          ; XOR A / SBC HL,DE ; side.y
+       abs  r0                                             ; JP P,$8EF5 / ...  ; in sign-magnitude form
+       jgt  orientation_side_y                             ;                   ; 
+       jeq  orientation_side_y                             ;                   ; 
+       ori  r0,>8000                                       ; OR $80            ; 
+orientation_side_y:                                        ; >8ef5
+       mov  r0,@side_vector_y                              ; LD ($F7D6),HL     ; 
+       mov  @roof_vector,hl                                ; LD HL,($F7E0)     ; roof.x * nose.y
+       mov  @nose_vector_y,de                              ; LD DE,($F7DC)     ; 
+       bl   @multiply_components                           ; CALL $200A        ; 
+       .push hl                                            ; PUSH HL           ; 
+       mov  @roof_vector_y,hl                              ; LD HL,($F7E2)     ; roof.y * nose.x
+       mov  @nose_vector,de                                ; LD DE,($F7DA)     ; 
+       bl   @multiply_components                           ; CALL $200A        ; 
+       .pop r0                                             ; EX DE,HL / POP HL ; 
+       s    hl,r0                                          ; XOR A / SBC HL,DE ; side.z
+       abs  r0                                             ; JP P,$8F1C / ...  ; in sign-magnitude form
+       jgt  orientation_side_z                             ;                   ; 
+       jeq  orientation_side_z                             ;                   ; 
+       ori  r0,>8000                                       ; OR $80            ; 
+orientation_side_z:                                        ; >8f1c
+       mov  r0,@side_vector_z                              ; LD ($F7D8),HL     ; 
+       li   hl,side_vector                                 ; LD HL,$F7D4       ; 
+       .pop r11                                            ;                   ; 
+       b    @normalise_vector                              ; JP $4642          ; normalise the side vector
+
+
+********************************************************************************
+* Pick a random point at a given distance
+* 
+* Used by the routines at #R$2B05, #R$2C3C, #R$2D3B, #R$8C94 and #R$8D2A.
+* .
+* Sets the object's position (#R$F7CE, #R$F7D0, #R$F7D2) to a point at
+* distance r from the player, in a direction given by two angles in degrees
+* (0-360): a1 (the longitude) and a2 (the latitude), with x = r * cos(a1) *
+* cos(a2), y = r * sin(a2) and z = r * sin(a1) * cos(a2) (#R$8FBB,
+* #R$8F94). With carry set both angles are random, so the point is anywhere
+* around the player (for ships, asteroids, the planet and the station,
+* #R$2B24, #R$2C3C, #R$2D3B, #R$8C94, #R$8CB1). With carry clear a1 is 0,
+* so the point is on the circle z = 0, beside, above or below the player
+* (for the sun on launching, #R$8D2A).
+* .
+* At $8F3C, sets a1 to 0; at $8F3F, picks a random a2 (0-360) and works out
+* the point.
+* 
+* I:HL Distance (r)
+* I:F Carry set for any direction
+* TI: two entry points rather than the carry: random_point for any direction,
+* random_point_beside (at $8F3C) for a1 = 0. The distance is kept on the
+* stack rather than at $E600.
+random_point:                                              ; >8f25
+       .proc                                               ;                   ; 
+       .push hl                                            ; LD ($E600),HL     ; r
+       bl   @random_angle                                  ; CALL $2176 ...    ; DE = a1
+       jmp  _8f3f                                          ; JR $8F3F          ; 
+random_point_beside:                                       ; >8f3c
+       .proc                                               ;                   ; 
+       .push hl                                            ; LD ($E600),HL     ; r
+       clr  de                                             ; LD DE,$0000       ; a1 = 0
+_8f3f:                                                     ; >8f3f
+       bl   @sin_cos                                       ; CALL $8FBB        ; A = sin(a1), B = cos(a1)
+       movb a,@circle_connector_no_prev_point_gate         ; LD ($E602),A      ; 
+       movb b,@lineplot_scratch_vars_e603                  ; LD A,E / LD ($E603),A; 
+       bl   @random_angle                                  ; CALL $2176 ...    ; DE = a2
+       bl   @sin_cos                                       ; CALL $8FBB        ; A = sin(a2), B = cos(a2)
+       movb a,@scratch_buffer_4                            ; LD ($E604),A      ; 
+       movb b,@scratch_buffer_5                            ; LD A,E / LD ($E605),A; 
+       mov  @-2(sp),hl                                     ; LD HL,($E600)     ; HL = r
+       movb @lineplot_scratch_vars_e603,a                  ; LD A,($E603)      ; A = cos(a1)
+       bl   @multiply_by_sine                              ; CALL $8F94        ; r * cos(a1)
+       movb @scratch_buffer_5,a                            ; LD A,($E605)      ; A = cos(a2)
+       bl   @multiply_by_sine                              ; CALL $8F94        ; * cos(a2)
+       mov  hl,@object_position_x                          ; LD ($F7CE),HL     ; x
+       mov  @-2(sp),hl                                     ; LD HL,($E600)     ; HL = r
+       movb @scratch_buffer_4,a                            ; LD A,($E604)      ; A = sin(a2)
+       bl   @multiply_by_sine                              ; CALL $8F94        ; r * sin(a2)
+       mov  hl,@object_position_y                          ; LD ($F7D0),HL     ; y
+       mov  @-2(sp),hl                                     ; LD HL,($E600)     ; HL = r
+       movb @circle_connector_no_prev_point_gate,a         ; LD A,($E602)      ; A = sin(a1)
+       bl   @multiply_by_sine                              ; CALL $8F94        ; r * sin(a1)
+       movb @scratch_buffer_5,a                            ; LD A,($E605)      ; A = cos(a2)
+       bl   @multiply_by_sine                              ; CALL $8F94        ; * cos(a2)
+       mov  hl,@object_position_z                          ; LD ($F7D2),HL     ; z
+       dect sp                                             ;                   ; drop r
+       .endproc                                            ; RET               ; 
+* TI: pick a random angle, 0-360 degrees (#R$8F25, at $8F2A and $8F49)
+*
+* O:DE The angle
+random_angle:                                              
+       .proc                                               ;                   ; 
+random_angle_1:                                            
+       bl   @random_byte                                   ; CALL $2176        ; 
+       movb a,r2                                           ; LD E,A            ; 
+       bl   @random_byte                                   ; CALL $2176        ; A = another random byte
+       swpb r2                                             ;                   ; 
+       andi a,>0100                                        ; AND $01           ; 
+       movb a,r2                                           ; LD D,A            ; a random 0-511
+       ci   r2,361                                         ; LD HL,$FE97 / ADD HL,DE; 
+       jhe  random_angle_1                                 ; JR C,$8F2A        ; over 360 - try again
+       mov  r2,de                                          ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Multiply by a sine or cosine
+* 
+* Used by the routine at #R$8F25.
+* .
+* Returns HL * A / 128, with A a sine or cosine from #R$8FBB (1.0 = 127,
+* so this is very slightly short). Both are two's complement; the result
+* is truncated.
+* 
+* I:A Sine or cosine
+* I:HL Value
+* O:HL The product
+multiply_by_sine:                                          ; >8f94
+       clr  r0                                             ; LD C,A            ; 
+       movb a,r0                                           ;                   ; 
+       sra  r0,8                                           ;                   ; R0 = the sine
+       mov  hl,a                                           ; XOR H / EX AF,AF' ; A bit 15 = the product's sign
+       xor  r0,a                                           ;                   ; 
+       abs  r0                                             ; NEG               ; the size of the sine
+       mov  hl,r1                                          ;                   ; 
+       abs  r1                                             ; XOR A / SUB L ... ; the size of HL
+       mpy  r0,r1                                          ; CALL $1F86        ; R1:R2 = the product
+       sla  r1,9                                           ; RL L / RL H / RLA ; HL = the product >> 7
+       srl  r2,7                                           ; LD L,H / LD H,A   ; 
+       soc  r2,r1                                          ;                   ; 
+       mov  r1,hl                                          ;                   ; 
+       mov  a,a                                            ; EX AF,AF'         ; the product's sign
+       jlt  multiply_by_sine_negative                      ; RET P             ; positive - done
+       rt                                                  ;                   ; 
+multiply_by_sine_negative:                                 
+       neg  hl                                             ; XOR A / SUB L ... ; negate it
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Get the sine and cosine of an angle
+* 
+* Used by the routine at #R$8F25.
+* .
+* Works out which quadrant the angle is in, and gets the sine and cosine
+* from the sine table (#R$901C) using these identities:
+* .
+* #LIST
+* { 0-90 degrees: sin(x), and cos(x) = sin(90 - x) }
+* { 91-180 (at $8FCE): sin(x) = sin(180 - x), and cos(x) = -sin(x - 90) }
+* { 181-270 (at $8FE5): sin(x) = -sin(x - 180), and cos(x) = -sin(270 - x) }
+* { 271-360 (at $9004): sin(x) = -sin(360 - x), and cos(x) = sin(x - 270) }
+* LIST#
+* .
+* Each part saves the sine in A' while it works out the cosine; the exit
+* at $9019 returns them. The results are 127 times the sine and cosine,
+* in two's complement.
+* 
+* I:DE Angle in degrees (0-360)
+* O:A Sine
+* O:E Cosine
+* TI: returns the cosine in B, not E.
+sin_cos:                                                   ; >8fbb
+       mov  de,r1                                          ;                   ; 
+       ci   r1,91                                          ; LD HL,$FFA5 / ADD HL,DE; 
+       jhe  _8fce                                          ; JR C,$8FCE        ; 91 or more
+       movb @sine_table(r1),a                              ; LD A,E / CALL $901C; A = sin(x)
+       li   r2,90                                          ; LD A,$5A          ; 
+       s    r1,r2                                          ; SUB E             ; 90 - x
+       movb @sine_table(r2),b                              ; CALL $901C        ; B = sin(90 - x) = cos(x)
+       rt                                                  ; RET               ; 
+_8fce:                                                     ; >8fce
+       ci   r1,181                                         ; LD HL,$FF4B / ADD HL,DE; 
+       jhe  _8fe5                                          ; JR C,$8FE5        ; 181 or more
+       li   r2,180                                         ; LD A,$B4          ; 
+       s    r1,r2                                          ; SUB E             ; 180 - x
+       movb @sine_table(r2),a                              ; CALL $901C        ; A = sin(180 - x) = sin(x)
+       clr  r0                                             ;                   ; 
+       movb @sine_table-90(r1),r0                          ; LD A,E / SUB $5A / CALL $901C; sin(x - 90)
+       neg  r0                                             ; NEG               ; 
+       movb r0,b                                           ;                   ; B = -sin(x - 90) = cos(x)
+       rt                                                  ; RET               ; 
+_8fe5:                                                     ; >8fe5
+       ci   r1,271                                         ; LD HL,$FEF1 / ADD HL,DE; 
+       jhe  _9004                                          ; JR C,$9004        ; 271 or more
+       clr  r0                                             ;                   ; 
+       movb @sine_table-180(r1),r0                         ; LD HL,$FF4C / ADD HL,DE / LD A,L / CALL $901C; sin(x - 180)
+       neg  r0                                             ; NEG               ; 
+       movb r0,a                                           ;                   ; A = -sin(x - 180) = sin(x)
+       li   r2,270                                         ; LD HL,$010E       ; 
+       s    r1,r2                                          ; OR A / SBC HL,DE  ; 270 - x
+       clr  r0                                             ;                   ; 
+       movb @sine_table(r2),r0                             ; CALL $901C        ; sin(270 - x)
+       neg  r0                                             ; NEG               ; 
+       movb r0,b                                           ;                   ; B = -sin(270 - x) = cos(x)
+       rt                                                  ; RET               ; 
+_9004:                                                     ; >9004
+       li   r2,360                                         ; LD HL,$0168       ; 
+       s    r1,r2                                          ; OR A / SBC HL,DE  ; 360 - x
+       clr  r0                                             ;                   ; 
+       movb @sine_table(r2),r0                             ; CALL $901C        ; sin(360 - x)
+       neg  r0                                             ; NEG               ; 
+       movb r0,a                                           ;                   ; A = -sin(360 - x) = sin(x)
+       movb @sine_table-270(r1),b                          ; LD HL,$FEF2 / ADD HL,DE / LD A,L / CALL $901C; B = sin(x - 270) = cos(x)
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Sine table
+* 
+* sin(n) * 127 for n = 0-90 degrees (#R$901C).
+sine_table:                                                ; >9025
+       byte >00,>02,>04,>07,>09,>0B,>0D,>0F                       ; 
+       byte >12,>14,>16,>18,>1A,>1D,>1F,>21                       ; 
+       byte >23,>25,>27,>29,>2B,>2E,>30,>32                       ; 
+       byte >34,>36,>38,>3A,>3C,>3E,>40,>41                       ; 
+       byte >43,>45,>47,>49,>4B,>4C,>4E,>50                       ; 
+       byte >52,>53,>55,>57,>58,>5A,>5B,>5D                       ; 
+       byte >5E,>60,>61,>63,>64,>65,>67,>68                       ; 
+       byte >69,>6B,>6C,>6D,>6E,>6F,>70,>71                       ; 
+       byte >72,>73,>74,>75,>76,>77,>77,>78                       ; 
+       byte >79,>79,>7A,>7B,>7B,>7C,>7C,>7D                       ; 
+       byte >7D,>7D,>7E,>7E,>7E,>7F,>7F,>7F                       ; 
+       byte >7F,>7F,>7F                                           ; 
+
+********************************************************************************
+* Continue the handler only on this object's turn
+* 
+* Used by the routines at #R$2641, #R$265E, #R$26A9, #R$27C0 and #R$27F4.
+* .
+* Called by several object handlers before work that only needs doing
+* every third frame. Returns normally (so the handler carries on) if the
+* object's turn number ($F7ED) matches the 3-2-1 counter at #R$E92E;
+* otherwise returns from the handler as well. Its final RET is also the
+* handler for types 0 and 13 (see #R$288D).
+* TI: when it isn't this object's turn, it ends the handler's .proc frame, so
+* the handler must call it with nothing else on the stack.
+every_third_frame:                                         ; >2542
+       cb   @turn_number,@current_turn                     ; LD A,($F7ED) / LD HL,$E92E / CP (HL); this object's frame to do extra work?
+       jne  every_third_frame_skip                         ; RET Z             ; yes
+       rt                                                  ;                   ; 
+every_third_frame_skip:                                    
+       .endproc                                            ; POP HL / RET      ; no - return from the handler as well
+
+********************************************************************************
+* Handler type 5: fly on, then turn away and attack
+* 
+* As type 4 (#R$265E): when the ship comes close to the player, or is
+* 900 or more away from the space station, it turns away (#R$281E) - but
+* then flies on for a while (type 8) and attacks (type 6).
+handler_turn_then_attack:                                  ; >2641
+       .proc                                               ;                   ; 
+       bl   @speed_up_or_slow_down                         ; CALL $2869        ; speed up or slow down
+       bl   @close_to_player                               ; CALL $2744        ; close to the player?
+       jl   _2656                                          ; JR C,$2656        ; yes - turn away (below)
+       bl   @every_third_frame                             ; CALL $2542        ; every third frame only
+       movb one,a                                          ; LD A,$01          ; 
+       bl   @distance_to_object                            ; CALL $3113        ; HL = distance to the space station
+       ci   hl,900                                         ; LD DE,$FC7C / ADD HL,DE; 
+       jl   _2641_end                                      ; RET NC            ; within 900
+_2656:                                                     ; >2656
+       movb @bytes+>08,@next_handler_type                  ; LD A,$08 / LD ($F7F3),A; type 8 after turning away
+       .pop r11                                            ;                   ; 
+       b    @start_turning_away                            ; JP $281E          ; turn away (type 7)
+_2641_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Handler type 4: fly on, then turn away and leave
+* 
+* Speeds up or slows down (#R$2869). When the ship comes close to the
+* player (#R$2744), or (checked every third frame) is 900 or more away
+* from the space station (#R$3113), it turns away - a single turning
+* phase with a random direction - and then leaves (handler type 12).
+handler_turn_then_leave:                                   ; >265e
+       .proc                                               ;                   ; 
+       bl   @speed_up_or_slow_down                         ; CALL $2869        ; speed up or slow down
+       bl   @close_to_player                               ; CALL $2744        ; close to the player?
+       jl   _2673                                          ; JR C,$2673        ; yes - turn away (below)
+       bl   @every_third_frame                             ; CALL $2542        ; every third frame only
+       movb one,a                                          ; LD A,$01          ; 
+       bl   @distance_to_object                            ; CALL $3113        ; HL = distance to the space station
+       ci   hl,900                                         ; LD DE,$FC7C / ADD HL,DE; 
+       jl   _265e_end                                      ; RET NC            ; within 900
+_2673:                                                     ; >2673
+       movb @ship_type,r2                                  ; LD A,($F7E7)      ; 
+       sb   @bytes+>0e,r2                                  ; SUB $0E           ; (TI: bit 0 picks the length, bit 1 the direction)
+       li   hl,360                                         ; LD HL,$0168       ; 
+       czc  @bit0,r2                                       ; RRA               ; 
+       jeq  _2681                                          ; JR NC,$2681       ; 
+       li   hl,540                                         ; LD HL,$021C       ; 
+_2681:                                                     ; >2681
+       .push r2                                            ; PUSH AF           ; 
+       movb @bp_manoeuvrability,a                          ; LD A,($F806)      ; 
+       bl   @divide_hl_a                                   ; CALL $2079        ; scale HL by $F806
+       movb @l,@handler_countdown                          ; LD A,L / LD ($F7EF),A; phase 1's countdown
+       .pop r2                                             ; POP AF            ; 
+       movb @bp_manoeuvrability,a                          ; RRA / LD A,($F806); 
+       czc  @bit1,r2                                       ;                   ; 
+       jeq  _2695                                          ; JR NC,$2695       ; 
+       andi a,>ff00                                        ; NEG               ; randomly sign-flip $F806's value
+       neg  a                                              ;                   ; 
+_2695:                                                     ; >2695
+       sra  a,1                                            ; SRA A             ; halve it, keeping the sign
+       movb a,@per_type_parameter_block                    ; LD ($F7F0),A      ; phase 1's rotation rate
+       sb   @turn_phase_2_length,@turn_phase_2_length      ; XOR A / LD ($F7F1),A; phase 2's countdown = 0 (already expired)
+       movb @bytes+>07,@handler_type                       ; LD A,$07 / LD ($F7EE),A; handler type 7: turn away
+       movb @bytes+>0c,@next_handler_type                  ; LD A,$0C / LD ($F7F3),A; type 12 after turning away
+_265e_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Handler type 6: attack the player
+* 
+* Marks the ship as hostile (bit 5 of its status byte, see #R$2528). A
+* pirate ((($F807) AND $1C) = 4) inside the space station's safe zone
+* (#R$EB05) leaves instead (type 12). When the ship is within 1500 and
+* speeding up, the player isn't cloaked (#R$EF9F) and a random roll beats
+* its aggression (($F80A)), it fires: plays the laser sound and, with a
+* 180/256 chance, damages the player's shields (#R$193F) - by 6 for a
+* Constrictor (ship type $1F), otherwise by a random amount limited by the
+* player's rank (#R$28CB). Then, if it has come close to the player
+* (#R$2744), it turns away (type 7, then 8); otherwise it steers towards
+* the player ($2723).
+* .
+* At $2723, every third frame (except for ship types $1E and $1F), steers
+* the ship towards the player - the reference point at #R$EB88 is zeroed,
+* i.e. the player's position (#R$2EB2) - then speeds up or slows down
+* (#R$2869, minimum 10).
+handler_attack:                                            ; >26a9
+       .proc                                               ;                   ; 
+       socb @bit5,@object_status_byte                      ; LD HL,$F7CD / SET 5,(HL); hostile
+       movb @station_in_range,r0                           ; LD A,($EB05) / OR A; 
+       jeq  _26c2                                          ; JR Z,$26C2        ; not in the safe zone
+       movb @bp_class,r0                                   ; LD A,($F807)      ; 
+       andi r0,>1c00                                       ; AND $1C           ; 
+       cb   r0,@bytes+>04                                  ; CP $04            ; 
+       jne  _26c2                                          ; JR NZ,$26C2       ; not a pirate
+       movb @bytes+>0c,@handler_type                       ; LD A,$0C / LD ($F7EE),A; pirate in the safe zone: leave
+_26c2:                                                     ; >26c2
+       movb @object_distance+1,r0                          ; LD HL,($EB8E)     ; 
+       movb @object_distance,@r0lb                         ;                   ; 
+       ci   r0,1500                                        ; LD DE,$FA24 / ADD HL,DE; 
+       jhe  _2716                                          ; JR C,$2716        ; 1500 or more away - don't fire
+       movb @speed_up_flag,r0                              ; LD A,($F7F4) / OR A; 
+       jeq  _2716                                          ; JR Z,$2716        ; slowing down
+       movb @cloaking_active_flag,r0                       ; LD A,($EF9F) / OR A; 
+       jne  _2716                                          ; JR NZ,$2716       ; player cloaked
+       bl   @random_byte                                   ; CALL $2176        ; 
+       cb   a,@bp_aggression                               ; LD HL,$F80A / CP (HL); 
+       jhe  _2716                                          ; JR NC,$2716       ; roll failed
+       movb @flight_controls_off,r0                        ; LD A,($EF8E) / OR A; 
+       jne  _2716                                          ; JR NZ,$2716       ; flight controls off - don't fire
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@ship_fired                                 ; LD ($E92D),A      ; 
+* TI: no sound effect 3 (#R$7468), as the sound effects aren't converted yet
+       bl   @random_byte                                   ; CALL $2176        ; 
+       cb   a,@bytes+>b4                                   ; CP $B4            ; 
+       jhe  _2716                                          ; JR NC,$2716       ; missed
+       movb @bytes+>06,a                                   ; LD A,$06          ; 
+       cb   @ship_type,@bytes+>1f                          ; LD A,($F7E7) / CP $1F; a Constrictor?
+       jeq  _2713                                          ; JR Z,$2713        ; yes - damage 6
+       clr  r1                                             ; LD HL,($EB12) / LD H,$00; 
+       movb @combat_rank,r1                                ;                   ; 
+       swpb r1                                             ;                   ; 
+       movb @laser_damage_by_rank(r1),@c                   ; LD BC,$28CB / ADD HL,BC / LD C,(HL); 
+_270a:                                                     ; >270a
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>0700                                        ; AND $07           ; 
+       cb   a,@c                                           ; CP C              ; 
+       jhe  _270a                                          ; JR NC,$270A       ; 
+       ab   one,a                                          ; INC A             ; A = 1 to the limit for the player's rank
+_2713:                                                     ; >2713
+       bl   @damage_shields                                ; CALL $193F        ; damage the player's shields
+_2716:                                                     ; >2716
+       bl   @close_to_player                               ; CALL $2744        ; close to the player?
+       jhe  attack_steer                                   ; JR NC,$2723       ; no
+       movb @bytes+>08,@next_handler_type                  ; LD A,$08 / LD ($F7F3),A; type 8 after turning away
+       .pop r11                                            ;                   ; 
+       b    @start_turning_away                            ; JP $281E          ; turn away (type 7)
+attack_steer:                                              ; >2723
+       movb @ship_type,a                                   ; LD A,($F7E7)      ; 
+       cb   a,@bytes+>1f                                   ; CP $1F            ; 
+       jeq  _272f                                          ; JR Z,$272F        ; the Constrictor - no stagger
+       cb   a,@bytes+>1e                                   ; CP $1E            ; 
+       jeq  _272f                                          ;                   ; the Cougar - no stagger
+       bl   @every_third_frame                             ; CALL NZ,$2542     ; 
+_272f:                                                     ; >272f
+       clr  @reference_point_x                             ; LD HL,$EB88 / LD (HL),$00 / LD DE,$EB89 / LD BC,$0005 / LDIR; the reference point is the player
+       clr  @reference_point_y                             ;                   ; 
+       clr  @reference_point_z                             ;                   ; 
+       bl   @steer_towards_point                           ; CALL $2EB2        ; steer towards it
+       movb @bytes+>0a,@c                                  ; LD C,$0A          ; a minimum speed of 10
+       .pop r11                                            ;                   ; 
+       b    @speed_up_or_slow_down                         ; JP $2869          ; speed up or slow down
+
+********************************************************************************
+* Check whether the object has come close to the player
+* 
+* Used by the routines at #R$2641, #R$265E, #R$26A9 and #R$27C0.
+* .
+* Compares the object's distance ($EB8E) with 480 - 4 * ($F806), a
+* distance from the ship's blueprint data.
+* 
+* O:F Carry set if the object is closer than that
+* TI: returns the result of comparing the distance with that, for JL.
+close_to_player:                                           ; >2744
+       clr  r0                                             ; LD HL,($F806) / LD H,$00; 
+       movb @bp_manoeuvrability,r0                         ;                   ; 
+       swpb r0                                             ;                   ; 
+       sla  r0,2                                           ; ADD HL,HL / ADD HL,HL / EX DE,HL; 
+       li   r1,480                                         ; LD HL,$01E0       ; 
+       s    r0,r1                                          ; SBC HL,DE / EX DE,HL; R1 = 480 - 4 * ($F806)
+       movb @object_distance+1,r0                          ; LD HL,($EB8E)     ; R0 = the distance
+       movb @object_distance,@r0lb                         ;                   ; 
+       c    r0,r1                                          ; SBC HL,DE         ; L if closer
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Handler type 7: turn away
+* 
+* Objects get this handler type when they come close to the player (see
+* #R$2744): from types 5, 6 and 10 via #R$281E, and type 4 by setting it
+* up directly. Escape capsules also start with it. Each frame the object
+* speeds up (#R$2869) and turns in two phases, which run at the same time
+* while they last: for ($F7EF) frames by ($F7F0) per frame about one axis
+* (#R$2365), and for ($F7F1) frames by ($F7F2) about another (#R$23D9).
+* When both have run out, the object switches to the handler type waiting
+* in ($F7F3), still speeding up: types 12 and 11 set up their own
+* countdowns, type 8 gets a 50-81 frame countdown (#R$2859), and any other
+* type a 35-frame one in ($F7EF).
+handler_turn_away:                                         ; >2758
+       .proc                                               ;                   ; 
+       bl   @speed_up_or_slow_down                         ; CALL $2869        ; speed up
+       sb   @c,@c                                          ; LD C,$00          ; C = number of phases still running
+       movb @handler_countdown,r0                          ; LD A,($F7EF) / OR A; 
+       jeq  _2770                                          ; JR Z,$2770        ; first phase over
+       sb   one,@handler_countdown                         ; LD HL,$F7EF / DEC (HL); one frame less
+       .push bc                                            ; PUSH BC           ; 
+       movb @per_type_parameter_block,a                    ; LD A,($F7F0)      ; A = phase 1's rotation rate
+       bl   @pitch_object                                  ; CALL $2365        ; turn about the first axis
+       .pop bc                                             ; POP BC            ; 
+       ab   one,@c                                         ; INC C             ; 
+_2770:                                                     ; >2770
+       movb @turn_phase_2_length,r0                        ; LD A,($F7F1) / OR A; 
+       jeq  _2783                                          ; JR Z,$2783        ; second phase over
+       sb   one,@turn_phase_2_length                       ; LD HL,$F7F1 / DEC (HL); one frame less
+       .push bc                                            ; PUSH BC           ; 
+       movb @turn_phase_2_rate,a                           ; LD A,($F7F2)      ; A = phase 2's rotation rate
+       bl   @roll_object                                   ; CALL $23D9        ; turn about the second axis
+       .pop bc                                             ; POP BC            ; 
+       ab   one,@c                                         ; INC C             ; 
+_2783:                                                     ; >2783
+       movb @c,r0                                          ; LD A,C / OR A     ; 
+       jne  _2758_end                                      ; RET NZ            ; still turning
+       movb one,@speed_up_flag                             ; INC A / LD ($F7F4),A; keep speeding up
+       movb @next_handler_type,a                           ; LD A,($F7F3)      ; 
+       movb a,@handler_type                                ; LD ($F7EE),A      ; switch to the next handler type
+       cb   a,@bytes+>0c                                   ; CP $0C            ; 
+       jeq  _2758_end                                      ; RET Z             ; type 12 - done
+       cb   a,@bytes+>0b                                   ; CP $0B            ; 
+       jeq  _2758_end                                      ; RET Z             ; type 11 - done
+       cb   a,@bytes+>08                                   ; CP $08            ; 
+       jne  _279b                                          ; JP Z,$2859        ; 
+       .pop r11                                            ;                   ; 
+       b    @countdown_and_speed_up                        ;                   ; type 8 - 50-81 frame countdown
+_279b:                                                     ; >279b
+       movb @bytes+>23,@handler_countdown                  ; LD A,$23 / LD ($F7EF),A; otherwise a 35-frame countdown
+_2758_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Handler type 8: fly on for a while, then attack again
+* 
+* Counts ($F7EF) down (set by #R$2859 or #R$27DF), then switches to type
+* 6 (attack) and starts slowing down.
+handler_fly_then_attack:                                   ; >27a1
+       .proc                                               ;                   ; 
+       bl   @speed_up_or_slow_down                         ; CALL $2869        ; speed up or slow down
+       sb   one,@handler_countdown                         ; LD HL,$F7EF / DEC (HL); tick the countdown down
+       jne  _27a1_end                                      ; RET NZ            ; not expired yet
+       movb @bytes+>06,@handler_type                       ; LD A,$06 / LD ($F7EE),A; switch back to type 6
+       sb   @speed_up_flag,@speed_up_flag                  ; XOR A / LD ($F7F4),A; and start slowing down
+_27a1_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Handler type 9: spin, fly on and leave
+* 
+* As type 12 (#R$27F4), but also rolls the object (#R$23D9, rate 10)
+* while it's on screen (($EF98) set by #R$4255).
+handler_spin_and_leave:                                    ; >27b3
+       .proc                                               ;                   ; 
+       bl   @handler_leave                                 ; CALL $27F4        ; run entry 12's handler
+       movb @ef98_per_object_flag,r0                       ; LD A,($EF98) / OR A; on screen?
+       jeq  _27b3_end                                      ; RET Z             ; 
+       movb @bytes+>0a,a                                   ; LD A,$0A          ; 
+       .pop r11                                            ;                   ; 
+       b    @roll_object                                   ; JP $23D9          ; roll
+_27b3_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Handler type 10: head for the planet
+* 
+* When the ship comes close to the player (#R$2744) it turns away and then
+* leaves (type 12). Otherwise $27CD removes it once it's within 3500 of the
+* planet.
+* .
+* At $27CD, every third frame, speeds up or slows down, and removes the
+* ship (#R$30A9) if it's within 3500 of the planet (#R$3113).
+handler_head_for_planet:                                   ; >27c0
+       .proc                                               ;                   ; 
+       bl   @close_to_player                               ; CALL $2744        ; close to the player?
+       jhe  head_for_planet_check                          ; JR NC,$27CD       ; no
+       movb @bytes+>0c,@next_handler_type                  ; LD A,$0C / LD ($F7F3),A; type 12 after turning away
+       .pop r11                                            ;                   ; 
+       b    @start_turning_away                            ; JP $281E          ; turn away (type 7)
+head_for_planet_check:                                     ; >27cd
+       bl   @every_third_frame                             ; CALL $2542        ; every third frame only
+       bl   @speed_up_or_slow_down                         ; CALL $2869        ; speed up or slow down
+       sb   a,a                                            ; XOR A             ; 
+       bl   @distance_to_object                            ; CALL $3113        ; HL = distance to the planet
+       ci   hl,3500                                        ; LD DE,$F254 / ADD HL,DE; 
+       jhe  _27c0_end                                      ; RET C             ; 3500 or more
+       .pop r11                                            ;                   ; 
+       b    @remove_object                                 ; JP $30A9          ; near the planet - remove the ship
+_27c0_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Handler type 11: break off briefly
+* 
+* Sets a 10-17 frame countdown and switches to type 8, speeding up, so
+* the ship flies on briefly before attacking again.
+handler_break_off:                                         ; >27df
+       .proc                                               ;                   ; 
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>0700                                        ; AND $07           ; 
+       ab   @bytes+>0a,a                                   ; ADD A,$0A         ; A = 10-17
+       movb a,@handler_countdown                           ; LD ($F7EF),A      ; a short countdown
+       movb @bytes+>08,@handler_type                       ; LD A,$08 / LD ($F7EE),A; switch straight to type 8
+       movb one,@speed_up_flag                             ; LD A,$01 / LD ($F7F4),A; and speed up
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Handler type 12: fly on and leave
+* 
+* Used by the routine at #R$27B3.
+* .
+* Clears the hostile bit (bit 5 of the status byte, see #R$2528). Every
+* third frame, speeds up (#R$2869), and once the ship is $1000 or more
+* away removes it (#R$30A9), cancelling any missile lock on it (#R$30EA).
+* Also used by type 9 (#R$27B3).
+handler_leave:                                             ; >27f4
+       .proc                                               ;                   ; 
+       szcb @bit5,@object_status_byte                      ; LD HL,$F7CD / RES 5,(HL); not hostile
+       bl   @every_third_frame                             ; CALL $2542        ; every third frame only
+       movb one,@speed_up_flag                             ; LD A,$01 / LD ($F7F4),A; always speeding up
+       bl   @speed_up_or_slow_down                         ; CALL $2869        ; speed up or slow down
+       movb @object_distance_hi,r0                         ; LD A,($EB8F)      ; 
+       andi r0,>f000                                       ; AND $F0           ; 
+       jeq  _27f4_end                                      ; RET Z             ; less than $1000 away
+       bl   @cancel_missile_lock_on_object                 ; CALL $30EA        ; cancel any missile lock on it
+       .pop r11                                            ;                   ; 
+       b    @remove_object                                 ; JP $30A9          ; remove the ship
+_27f4_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Handler type 15: the escape capsule's countdown
+* 
+* Entry 15 in #R$288D. The Cobra left behind by the escape capsule
+* (#R$19FC) switches to this handler after turning away (handler type 7).
+* Counts down ($F7EF), and when it runs out, gives the player the flight
+* controls back (#R$EF8E) and docks (#R$E917): the capsule has reached
+* the space station.
+handler_escape_capsule:                                    ; >2810
+       sb   one,@handler_countdown                         ; LD HL,$F7EF / DEC (HL); count down
+       jne  _2810_end                                      ; RET NZ            ; not yet
+       sb   @flight_controls_off,@flight_controls_off      ; XOR A / LD ($EF8E),A; flight controls back on
+       seto r0                                             ; DEC A             ; 
+       movb r0,@docking                                    ; LD ($E917),A      ; docked
+_2810_end:                                                 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Start turning away (handler type 7)
+* 
+* Used by the routines at #R$2641, #R$26A9, #R$27C0 and #R$28F6.
+* .
+* Called by the ship handlers when the ship comes close to the player
+* (#R$2744). Sets up the two turning phases for #R$2758: each gets a
+* random length ((random + 45) * 4, scaled by ($F806)) in ($F7EF) and
+* ($F7F1), and a turn rate of half ($F806), with a random sign, in
+* ($F7F0) and ($F7F2). Then sets handler type 7 and starts the object
+* speeding up. The caller has already put the handler type to switch to
+* afterwards in ($F7F3).
+start_turning_away:                                        ; >281e
+       .proc                                               ;                   ; 
+       li   de,handler_countdown                           ; LD DE,$F7EF       ; DE -> the first countdown to fill
+       movb @bytes+>02,b                                   ; LD B,$02          ; 2 (countdown, rate) pairs to fill
+_2823:                                                     ; >2823
+       .push bc                                            ; PUSH BC           ; 
+       .push de                                            ; PUSH DE           ; 
+       bl   @random_byte                                   ; CALL $2176        ; A = random byte
+       clr  hl                                             ; LD H,$00          ; 
+       movb a,@l                                           ; LD L,A            ; 
+       ai   hl,>002d                                       ; LD DE,$002D / ADD HL,DE; HL = random + 45
+       sla  hl,2                                           ; ADD HL,HL / ADD HL,HL; HL = (random+45)*4
+       movb @bp_manoeuvrability,a                          ; LD A,($F806)      ; 
+       bl   @divide_hl_a                                   ; CALL $2079        ; scale by ($F806)
+       .pop de                                             ; POP DE            ; 
+       movb @l,*de+                                        ; LD A,L / LD (DE),A / INC DE; phase length
+       .push de                                            ;                   ; 
+       bl   @random_byte                                   ; CALL $2176        ; A = another random byte
+       .pop de                                             ;                   ; 
+       movb a,r0                                           ; OR A              ; 
+       movb @bp_manoeuvrability,a                          ; LD A,($F806)      ; 
+       mov  r0,r0                                          ;                   ; 
+       jgt  start_turning_away_rate                        ; JP P,$2847        ; 
+       jeq  start_turning_away_rate                        ;                   ; 
+       andi a,>ff00                                        ; NEG               ; random sign
+       neg  a                                              ;                   ; 
+start_turning_away_rate:                                   ; >2847
+       sra  a,1                                            ; SRA A             ; halve it
+       movb a,*de+                                         ; LD (DE),A / INC DE; turn rate
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $2823        ; next phase
+       jne  _2823                                          ;                   ; 
+       movb @bytes+>07,@handler_type                       ; LD A,$07 / LD ($F7EE),A; handler type 7: turn away
+       movb one,@speed_up_flag                             ; LD A,$01 / LD ($F7F4),A; and speed up
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Set a 50-81 frame countdown and start speeding up
+* 
+* Used by the routines at #R$2758 and #R$2A94.
+* .
+* Puts a random 50-81 in ($F7EF) and sets ($F7F4) so that #R$2869 speeds
+* the object up. Used when #R$2758 switches an object to type 8, and by
+* #R$2A94 for the ships it spawns.
+countdown_and_speed_up:                                    ; >2859
+       .proc                                               ;                   ; 
+       bl   @random_byte                                   ; CALL $2176        ; A = random byte
+       andi a,>1f00                                        ; AND $1F           ; 0-31
+       ab   @bytes+>32,a                                   ; ADD A,$32         ; 50-81
+       movb a,@handler_countdown                           ; LD ($F7EF),A      ; arm the countdown
+       movb one,@speed_up_flag                             ; LD A,$01 / LD ($F7F4),A; start speeding up
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Speed up or slow down
+* 
+* Used by the routines at #R$25B9, #R$2618, #R$2641, #R$265E, #R$26A9, #R$2758,
+* #R$27A1, #R$27C0 and #R$27F4.
+* .
+* Called by most of the object handlers. If ($F7F4) is set, increases the
+* object's speed ($F7E6) by 4, up to the maximum in ($F802); otherwise
+* slows it down by 4 (at $287F), down to the minimum in C.
+* 
+* I:C Minimum speed (when slowing down)
+speed_up_or_slow_down:                                     ; >2869
+       movb @speed_up_flag,r0                              ; LD A,($F7F4) / OR A; 
+       jeq  slow_down                                      ; JR Z,$287F        ; clear - slow down
+       movb @object_speed,a                                ; LD A,($F7E6)      ; 
+       ab   @bytes+>04,a                                   ; ADD A,$04         ; speed up by 4
+       cb   a,@bp_max_speed                                ; LD HL,$F802 / CP (HL); 
+       jle  speed_store                                    ; JR Z,$287D / JR C,$287D; at or under the maximum - keep it
+       movb @bp_max_speed,a                                ; LD A,(HL)         ; too fast - use the maximum
+       jmp  speed_store                                    ; JR $2889          ; 
+slow_down:                                                 ; >287f
+       movb @object_speed,a                                ; LD A,($F7E6)      ; 
+       sb   @bytes+>04,a                                   ; SUB $04           ; slow down by 4
+       movb a,r0                                           ; CP C              ; 
+       sb   @c,r0                                          ;                   ; 
+       jgt  speed_store                                    ; JP P,$2889        ; still at or above the minimum - keep it
+       jeq  speed_store                                    ;                   ; 
+       movb @c,a                                           ; LD A,C            ; too slow - use the minimum
+speed_store:                                               ; >2889
+       movb a,@object_speed                                ; LD ($F7E6),A      ; store the new speed
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Maximum laser damage by combat rank
+* 
+* When a ship's laser hits the player (#R$26A9), the damage to the shields
+* (#R$193F) is a random number from 1 up to this table's entry for the
+* player's combat rank (#R$EB12), so the higher the rank, the harder ships
+* hit. A Constrictor always does 6 instead.
+laser_damage_by_rank:                                      ; >28cb
+       byte >02,>02,>02                                           ; ranks 0-2 (Harmless to Poor): 1-2
+       byte >03,>03,>03                                           ; ranks 3-5 (Average to Competent): 1-3
+       byte >04,>04,>04                                           ; ranks 6-8 (Dangerous to E-L-I-T-E): 1-4
+       even                                                       ; 
+
+********************************************************************************
+* Key 'U': unarm the missile (cancel a missile lock)
+* 
+* Used by the routine at #R$30EA.
+* .
+* Bails (beeps) if #R$E910 (the missile lock-on state) is already 0;
+* otherwise clears it back to 0 and redraws the missile indicator.
+* #R$30EA calls this when the locked-on target object goes away.
+cancel_missile_lock:                                       ; >2d70
+       movb @missile_state,r0                              ; LD A,($E910) / OR A; 
+       jne  _2d75                                          ; JP Z,$16FE        ; already idle (TI: no beep yet)
+       rt                                                  ;                   ; 
+_2d75:                                                     ; >2d75
+       sb   @missile_state,@missile_state                  ; XOR A / LD ($E910),A; back to idle
+       b    @draw_missile_indicator                        ; JP $6B6E          ; redraw the missile indicator
+
+********************************************************************************
+* Compute the signed relative position to the working object, then scale it
+* 
+* Used by the routine at #R$2EB2.
+* .
+* For each of the 3 axes, subtracts the working object's rotated
+* position (#R$F7CE/#R$F7D0/#R$F7D2) from a cached reference point
+* (#R$EB88/#R$EB8A/#R$EB8C) into a signed 16-bit delta (#R$EB82/#R$EB84/
+* #R$EB86), also stashing that delta's sign-extended high byte at
+* #R$E864/#R$E865/#R$E866. Calls #R$84A6 for the length of the delta
+* vector - the distance - and caches it at #R$EB6E, then right-shifts it by #R$EB9B bits (0 = no shift) into
+* #R$E86A - a scaled magnitude #R$2E7B's division uses as its divisor.
+* TI: the reference point is big-endian words.
+compute_relative_position_scale:                           ; >2df1
+       .proc                                               ;                   ; 
+       mov  @reference_point_x,hl                          ; LD HL,($EB88)     ; HL = the reference point's X
+       s    @object_position_x,hl                          ; LD DE,($F7CE) / OR A / SBC HL,DE; HL = delta X
+       movb hl,@cached_delta_x_sign                        ; LD A,H / LD ($E864),A; cache delta X's high byte
+       abs  hl                                             ; JP P,$2E08 / ...  ; its size
+       movb hl,@delta_x_hi                                 ; LD ($EB82),HL     ; store it
+       movb @l,@abs_delta_x                                ;                   ; 
+       mov  @reference_point_y,hl                          ; LD HL,($EB8A)     ; the same for Y
+       s    @object_position_y,hl                          ; LD DE,($F7D0) / OR A / SBC HL,DE; 
+       movb hl,@cached_delta_y_sign                        ; LD A,H / LD ($E865),A; 
+       abs  hl                                             ; JP P,$2E22 / ...  ; 
+       movb hl,@delta_y_hi                                 ; LD ($EB84),HL     ; 
+       movb @l,@abs_delta_y                                ;                   ; 
+       mov  @reference_point_z,hl                          ; LD HL,($EB8C)     ; and Z
+       s    @object_position_z,hl                          ; LD DE,($F7D2) / OR A / SBC HL,DE; 
+       movb hl,@cached_delta_z_sign                        ; LD A,H / LD ($E866),A; 
+       abs  hl                                             ; JP P,$2E3C / ...  ; 
+       movb hl,@delta_z_hi                                 ; LD ($EB86),HL     ; 
+       movb @l,@abs_delta_z                                ;                   ; 
+       bl   @vector_length                                 ; CALL $84A6        ; HL = the distance
+       movb hl,@reference_distance+1                       ; LD ($EB6E),HL     ; 
+       movb @l,@reference_distance                         ;                   ; 
+       clr  r0                                             ; LD A,($EB9B) / OR A; the shift count
+       movb @depth_shift,r0                                ;                   ; 
+       jeq  _2e52                                          ; JR Z,$2E52        ; 0 - no shift needed
+       swpb r0                                             ; LD B,A            ; 
+       srl  hl,0                                           ; SRL H / RR L / DJNZ $2E4C; scale it right by that many bits
+_2e52:                                                     ; >2e52
+       movb hl,@scaled_delta_divisor+1                     ; LD ($E86A),HL     ; the scaled divisor for #R$2E7B
+       movb @l,@scaled_delta_divisor                       ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Signed 16-bit by 8-bit multiply, 24-bit result in C:H:L
+* 
+* Used by the routine at #R$2EB2.
+* 
+* I:DE Signed 16-bit multiplicand
+* I:L Unsigned 8-bit multiplier
+* I:D bit 7 XORed with the caller's A beforehand encodes the result's
+* .   sign (this routine RES's it, so DE's own sign bit is discarded
+* .   here and must already be folded into that XOR by the caller)
+* O:C:H:L Signed 24-bit product
+* TI: #R$2E56 and #R$2E7B are done together here, with MPY and DIV: works out
+* the dot product of the direction to the reference point (its sizes at
+* #R$EF92 and signs at #R$E864) with the vector at R2 (sign-magnitude
+* words), divided by the scaled distance (#R$E86A).
+*
+* I:R2 -> The vector
+* O:HL The dot product, in sign-magnitude form (also in #R$E86E)
+steer_dot_product:                                         
+       clr  bc                                             ; XOR A / ...       ; BC:DE = the sum of the products
+       clr  de                                             ;                   ; 
+       clr  iy                                             ;                   ; IY = the axis
+steer_dot_product_axis:                                    
+       mov  iy,r0                                          ;                   ; 
+       sla  r0,1                                           ;                   ; 
+       a    r2,r0                                          ;                   ; 
+       mov  *r0,r1                                         ; LD DE,(vector)    ; R1 = the vector's component
+       movb @cached_delta_x_sign(iy),a                     ; LD A,($E864)      ; A = the direction's sign...
+       xor  r1,a                                           ; XOR D             ; ...XOR the component's: the product's sign
+       mov  r1,hl                                          ; RES 7,D           ; 
+       andi hl,>7fff                                       ;                   ; 
+       clr  r0                                             ; LD HL,($EF92)     ; the direction's size
+       movb @ef92_scaled_magnitude_1(iy),r0                ;                   ; 
+       swpb r0                                             ;                   ; 
+       mpy  hl,r0                                          ; CALL $2E56        ; R0:R1 = the product
+       mov  a,a                                            ;                   ; 
+       jgt  steer_dot_product_add                          ; RET P             ; 
+       jeq  steer_dot_product_add                          ;                   ; 
+       inv  r0                                             ;                   ; negative: negate it
+       inv  r1                                             ;                   ; 
+       ai   r1,1                                           ;                   ; 
+       jnc  steer_dot_product_add                          ;                   ; 
+       inc  r0                                             ;                   ; 
+steer_dot_product_add:                                     
+       a    r1,de                                          ; ADD HL,DE / ADC A,C; add it
+       jnc  steer_dot_product_hi                           ;                   ; 
+       inc  bc                                             ;                   ; 
+steer_dot_product_hi:                                      
+       a    r0,bc                                          ;                   ; 
+       inc  iy                                             ;                   ; 
+       ci   iy,3                                           ;                   ; 
+       jl   steer_dot_product_axis                         ;                   ; 
+       mov  bc,a                                           ; PUSH AF           ; A = the sign of the sum
+       jgt  steer_dot_product_div                          ; JP P,$2E8A        ; 
+       jeq  steer_dot_product_div                          ;                   ; 
+       inv  bc                                             ;                   ; negative: negate it
+       inv  de                                             ;                   ; 
+       ai   de,1                                           ;                   ; 
+       jnc  steer_dot_product_div                          ;                   ; 
+       inc  bc                                             ;                   ; 
+steer_dot_product_div:                                     
+       movb @scaled_delta_divisor+1,r0                     ; LD DE,($E86A)     ; R0 = the divisor
+       movb @scaled_delta_divisor,@r0lb                    ;                   ; 
+       c    bc,r0                                          ;                   ; does the quotient fit in 16 bits?
+       jl   steer_dot_product_ok                           ;                   ; 
+       li   hl,>7fff                                       ;                   ; no (TI: the largest)
+       jmp  steer_dot_product_sign                         ;                   ; 
+steer_dot_product_ok:                                      
+       div  r0,bc                                          ; LD B,$10 / ... / DJNZ $2E95; BC = the quotient
+       mov  bc,hl                                          ; CPL / LD H,A / ... / LD L,A; 
+steer_dot_product_sign:                                    
+       mov  a,a                                            ; POP AF / AND $80  ; 
+       jgt  steer_dot_product_store                        ;                   ; 
+       jeq  steer_dot_product_store                        ;                   ; 
+       ori  hl,>8000                                       ; OR H / LD H,A     ; fold the sign into the top bit
+steer_dot_product_store:                                   
+       mov  hl,@steering_dot_product                       ; LD ($E86E),HL     ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Steer the object towards a point
+* 
+* Used by the routines at #R$25B9, #R$2618 and #R$26A9.
+* .
+* Steers the object towards the point at #R$EB88 (the player's position
+* when that's 0), much as BBC Elite's TACTICS does. Works out the direction
+* to the point (#R$2DF1) and its dot products with the object's side and
+* roof vectors (#R$2E56, #R$2E7B), which are near 0 when the point is in
+* the object's nose-roof and nose-side planes; the tolerance for "near"
+* depends on the distance (#R$33C7, indexed by #R$EB9B).
+* .
+* If the side dot product is outside the tolerance, rolls the object
+* (#R$23D9) by its turn rate (#R$F806) - but by no more than the angle
+* it is off line, in half-degrees (#R$2FBC), so the turn slows as the
+* object comes into line - in the direction given by the dot product's
+* sign (#R$E86E). Otherwise, at $2F2F, works out the roof dot product. If
+* the point's z and the nose's z have different signs, pitches the object
+* (#R$2365) by its turn rate; if the roof dot product is outside the
+* tolerance (at $2F85), pitches it as for rolling. Otherwise (at $2FB4) the
+* object is pointing at the point.
+* .
+* The object speeds up ($F7F4 set) when it's pointing at the point, or when
+* the pitch is capped; otherwise it slows down.
+steer_towards_point:                                       ; >2eb2
+       .proc                                               ;                   ; 
+       sb   @speed_up_flag,@speed_up_flag                  ; XOR A / LD ($F7F4),A; slow down
+       .push ix                                            ; PUSH IX           ; 
+       bl   @compute_relative_position_scale               ; CALL $2DF1        ; work out the direction to the point
+       clr  r1                                             ; LD A,($EB9B) / ADD A,A / LD C,A / LD B,$00; 
+       movb @depth_shift,r1                                ;                   ; 
+       srl  r1,7                                           ;                   ; 
+       mov  @steering_tolerances(r1),r0                    ; LD HL,$33C7 / ADD HL,BC / LD DE,$E86C / LDI / LDI; the tolerance (TI: kept on the stack)
+       .push r0                                            ;                   ; 
+       li   r2,side_vector                                 ; LD A,($E864) / ... / CALL $2E56 x 3 / CALL $2E7B; 
+       bl   @steer_dot_product                             ;                   ; HL = the side dot product
+       andi hl,>7fff                                       ; RES 7,H           ; without its sign
+       c    hl,@-2(sp)                                     ; LD DE,($E86C) / OR A / SBC HL,DE; 
+       jl   retest_alignment_against_vector3               ; JR C,$2F2F        ; inside the tolerance - check the roof
+       bl   @steering_table_lookup                         ; CALL $2FBC        ; outside it - E = its place in the table
+       movb @bp_manoeuvrability,a                          ; LD A,($F806)      ; A = the turn rate
+       movb a,@c                                           ; LD C,A            ; 
+       ab   @e,a                                           ; ADD A,E           ; 
+       cb   a,@bytes+>29                                   ; CP $29            ; rate + E over 40?
+       jl   _2f1f                                          ; JR C,$2F1F        ; no - use the turn rate
+       movb @bytes+>28,a                                   ; LD A,$28          ; yes - use 40 - E
+       sb   @e,a                                           ; SUB E             ; 
+       movb a,@c                                           ; LD C,A            ; 
+_2f1f:                                                     ; >2f1f
+       movb @c,a                                           ; LD A,C            ; 
+       mov  @steering_dot_product,r0                       ; LD A,($E86F) / OR A; the dot product's sign
+       jgt  steer_roll                                     ; JP P,$2F29        ; 
+       jeq  steer_roll                                     ;                   ; 
+       andi a,>ff00                                        ; NEG               ; 
+       neg  a                                              ;                   ; 
+steer_roll:                                                ; >2f29
+       bl   @roll_object                                   ; CALL $23D9        ; roll
+       jmp  steer_done                                     ; JP $2FB9          ; 
+retest_alignment_against_vector3:                          ; >2f2f
+       bl   @work_out_roof                                 ; CALL $4599        ; work out the roof vector
+       li   r2,roof_vector                                 ; LD A,($E864) / ... / CALL $2E56 x 3 / CALL $2E7B; 
+       bl   @steer_dot_product                             ;                   ; HL = the roof dot product
+       movb @cached_delta_z_sign,r0                        ; LD A,($E866) / LD C,A; the direction's z sign...
+       xor  @nose_vector_z,r0                              ; LD A,($F7DF) / XOR C; ...XOR nose.z's sign
+       jgt  check_reduced_ratio_against_threshold          ; JP P,$2F85        ; the same - check the tolerance
+       jeq  check_reduced_ratio_against_threshold          ;                   ; 
+       movb @bp_manoeuvrability,a                          ; LD A,($F806)      ; different: A = the turn rate
+       mov  @steering_dot_product,r0                       ; LD A,($E86F) / OR A; the dot product's sign
+       jgt  steer_pitch_behind                             ; JP P,$2F80        ; 
+       jeq  steer_pitch_behind                             ;                   ; 
+       andi a,>ff00                                        ; NEG               ; 
+       neg  a                                              ;                   ; 
+steer_pitch_behind:                                        ; >2f80
+       bl   @pitch_object                                  ; CALL $2365        ; pitch
+       jmp  steer_done                                     ; JR $2FB9          ; 
+check_reduced_ratio_against_threshold:                     ; >2f85
+       andi hl,>7fff                                       ; RES 7,H           ; without its sign
+       c    hl,@-2(sp)                                     ; LD DE,($E86C) / OR A / SBC HL,DE; 
+       jl   abandon_axis_flag_f7f4                         ; JR C,$2FB4        ; inside the tolerance - pointing at the point
+       bl   @steering_table_lookup                         ; CALL $2FBC        ; outside it - E = its place in the table
+       movb @bp_manoeuvrability,a                          ; LD A,($F806)      ; A = the turn rate
+       movb a,@c                                           ; LD C,A            ; 
+       ab   @e,a                                           ; ADD A,E           ; 
+       cb   a,@bytes+>29                                   ; CP $29            ; rate + E over 40?
+       jl   _2fa5                                          ; JR C,$2FA5        ; no - use the turn rate
+       movb @bytes+>28,a                                   ; LD A,$28          ; yes - use 40 - E
+       sb   @e,a                                           ; SUB E             ; 
+       movb a,@c                                           ; LD C,A            ; 
+       movb one,@speed_up_flag                             ; LD A,$01 / LD ($F7F4),A; and speed up
+_2fa5:                                                     ; >2fa5
+       movb @c,a                                           ; LD A,C            ; 
+       mov  @steering_dot_product,r0                       ; LD A,($E86F) / OR A; the dot product's sign
+       jgt  steer_pitch                                    ; JP P,$2FAF        ; 
+       jeq  steer_pitch                                    ;                   ; 
+       andi a,>ff00                                        ; NEG               ; 
+       neg  a                                              ;                   ; 
+steer_pitch:                                               ; >2faf
+       bl   @pitch_object                                  ; CALL $2365        ; pitch
+       jmp  steer_done                                     ; JR $2FB9          ; 
+abandon_axis_flag_f7f4:                                    ; >2fb4
+       movb one,@speed_up_flag                             ; LD A,$01 / LD ($F7F4),A; speed up
+steer_done:                                                ; >2fb9
+       dect sp                                             ;                   ; drop the tolerance
+       .pop ix                                             ; POP IX            ; restore the caller's IX
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Steering: how far is the object off line?
+* 
+* Used by the routine at #R$2EB2.
+* .
+* Looks up the dot product (#R$E86E, without its sign) in the sine table
+* at #R$33D7 - sin(20 - n/2 degrees) for n = 0 to 40 - by binary search,
+* finding the entry n with sin(20 - n/2) >= the dot product >
+* sin(20 - (n+1)/2). So 40 - n is how far off line the object is, in
+* half-degrees (up to 40, for 20 degrees or more), which #R$2EB2 uses to
+* cap the turn rate. Returns at once on an exact match.
+* 
+* O:E 40 - the angle off line, in half-degrees (0-40)
+* TI: returns E in the low byte of DE.
+steering_table_lookup:                                     ; >2fbc
+       mov  @steering_dot_product,r2                       ; LD DE,($E86E)     ; R2 = the dot product...
+       andi r2,>7fff                                       ; RES 7,D           ; ...without its sign
+       clr  r0                                             ; LD BC,$0029       ; R0 = the low bound (0)...
+       li   hl,41                                          ;                   ; ...HL = the high bound (41)
+_2fca:                                                     ; >2fca
+       mov  r0,r1                                          ; LD A,B / ADD A,C / RRA; 
+       a    hl,r1                                          ;                   ; 
+       srl  r1,1                                           ;                   ; R1 = the midpoint
+       movb @r1lb,@e                                       ; LD E,A            ; E = the midpoint
+       mov  r1,de                                          ;                   ; 
+       sla  de,1                                           ; ADD A,A / LD L,A / LD H,$00 / ADD HL,BC; 
+       c    @steering_sines(de),r2                         ; LD A,(HL) / ... / SBC HL,DE; compare the entry with the dot product
+       jeq  _2fbc_end                                      ; RET Z             ; exact match
+       c    r1,r0                                          ; LD A,E / CP B     ; the midpoint is the low bound?
+       jeq  _2fbc_end                                      ; RET Z             ; yes
+       c    @steering_sines(de),r2                         ; EX AF,AF'         ; 
+       jhe  binary_search_narrow_low_bound                 ; JR NC,$2FE6       ; entry >= the dot product - raise the low bound
+       mov  r1,hl                                          ; LD C,E            ; entry < the dot product - lower the high bound
+       jmp  _2fca                                          ; JR $2FE7 / JR $2FCA; 
+binary_search_narrow_low_bound:                            ; >2fe6
+       mov  r1,r0                                          ; LD B,E            ; the midpoint is the new low bound
+       jmp  _2fca                                          ; JR $2FCA          ; 
+_2fbc_end:                                                 
+       movb @r1lb,@e                                       ;                   ; E = the midpoint
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Use an object's position as the reference point
+* 
+* Used by the routines at #R$25B9 and #R$3113.
+* .
+* Copies the position (x, y and z) of the object in slot A of the object
+* table (#R$EBA0) to the reference point (#R$EB88), the point that objects
+* steer towards: a missile's target (#R$25B9) or the space station
+* (#R$3113).
+* 
+* I:A Slot number (0-19)
+* O:IX The object's slot
+set_reference_point:                                       ; >2ff9
+       clr  r0                                             ; LD E,$28 / CALL $1F60; 
+       movb a,r0                                           ;                   ; 
+       swpb r0                                             ;                   ; 
+       li   r1,40                                          ;                   ; 
+       mpy  r1,r0                                          ;                   ; R0:R1 = A * 40
+       li   ix,ship_object_table                           ; LD DE,$EBA0 / ADD HL,DE / PUSH HL / POP IX; 
+       a    r1,ix                                          ;                   ; IX -> the slot
+       movb @1(ix),@reference_point_x                      ; INC HL / LD DE,$EB88 / LDI x 6; copy its position (TI: the words are at odd addresses)
+       movb @2(ix),@reference_point_x+1                    ;                   ; 
+       movb @3(ix),@reference_point_y                      ;                   ; 
+       movb @4(ix),@reference_point_y+1                    ;                   ; 
+       movb @5(ix),@reference_point_z                      ;                   ; 
+       movb @6(ix),@reference_point_z+1                    ;                   ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Remove the working object
+* 
+* Used by the routines at #R$2556, #R$25B9, #R$27C0, #R$27F4 and #R$8BA6.
+* .
+* Marks the working object's record as unused, and updates the counts of
+* objects about: the ship type's count (#R$E844); in witchspace, the number
+* of kills still needed before hyperspace works (#R$EEC2); and the traders
+* (#R$E93A) or pirates (#R$E939, $30D7). Removing a Cougar (ship type $1E)
+* resets the mission state ($E93D) to 0.
+remove_object:                                             ; >30a9
+       szcb @bit0,@object_status_byte                      ; LD HL,$F7CD / RES 0,(HL); unused
+       movb @ship_type,r1                                  ; LD A,($F7E7)      ; A = its ship type
+       cb   r1,@bytes+>20                                  ; CP $20            ; 
+       jhe  _30e9                                          ; RET NC            ; the planet or the sun
+       srl  r1,8                                           ; LD C,A / LD B,$00 / LD HL,$E844 / ADD HL,BC; 
+       sb   one,@ship_type_counts(r1)                      ; DEC (HL)          ; one fewer of this ship type
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; 
+       jeq  _30ca                                          ; JR Z,$30CA        ; not in witchspace
+       movb @witchspace_kills_needed,r0                    ; LD HL,$EEC2 / LD A,(HL) / OR A; 
+       jeq  _30ca                                          ; JR Z,$30CA        ; none left to kill
+       sb   one,@witchspace_kills_needed                   ; DEC (HL)          ; one fewer to kill
+_30ca:                                                     ; >30ca
+       movb @bp_class,r0                                   ; LD A,($F807)      ; 
+       andi r0,>1c00                                       ; AND $1C           ; 
+       jne  remove_object_pirates                          ; JR NZ,$30D7       ; not a trader
+       sb   one,@trader_count                              ; LD HL,$E93A / DEC (HL); one fewer trader
+       jmp  _30df                                          ; JR $30DF          ; 
+remove_object_pirates:                                     ; >30d7
+       cb   r0,@bytes+>04                                  ; CP $04            ; 
+       jne  _30df                                          ; JR NZ,$30DF       ; not a pirate
+       sb   one,@pirate_count                              ; LD HL,$E939 / DEC (HL); one fewer pirate
+_30df:                                                     ; >30df
+       cb   @ship_type,@bytes+>1e                          ; LD A,($F7E7) / SUB $1E; the Cougar?
+       jne  _30e9                                          ; JR NZ,$30E9       ; no - done
+       sb   @mission_state,@mission_state                  ; LD ($E93D),A      ; yes - mission state 0
+_30e9:                                                     ; >30e9
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Cancel any missile lock on the object being removed
+* 
+* Used by the routines at #R$27F4, #R$28F6 and #R$8755.
+* .
+* Called when the object in the current slot (#R$E911) is destroyed or
+* leaves. If the player's missile is locked on it (#R$E910 = 2, #R$E928),
+* cancels the lock (#R$2D70) and shows "Target Lost"; otherwise, if a
+* missile in flight has it as its target (#R$3016), removes that missile
+* and shows "Target Lost" ($3100).
+* .
+* At $3100, removing the missile updates the count of missiles about (see
+* #R$E844). At $310D, shows "Target Lost".
+cancel_missile_lock_on_object:                             ; >30ea
+       .proc                                               ;                   ; 
+       cb   @missile_state,@bytes+>02                      ; LD HL,$E911 / LD A,($E910) / CP $02; 
+       jl   remove_missile_at_object                       ; JR C,$3100        ; no missile locked on
+       cb   @missile_target,@current_slot                  ; LD A,($E928) / CP (HL); 
+       jne  remove_missile_at_object                       ; JR NZ,$3100       ; not this one
+       bl   @cancel_missile_lock                           ; CALL $2D70        ; cancel the lock
+       jmp  target_lost                                    ; JP $310D          ; 
+remove_missile_at_object:                                  ; >3100
+       movb @current_slot,@c                               ; LD C,(HL)         ; C = the object's slot
+       bl   @find_missile_at_object                        ; CALL $3016        ; find a missile aimed at it
+       jne  _30ea_end                                      ; RET NZ            ; none
+       szcb @bit0,*ix                                      ; RES 0,(IX+$00)    ; remove the missile
+       sb   one,@num_missiles                              ; LD HL,$E846 / DEC (HL); one fewer missile about
+target_lost:                                               ; >310d
+       li   hl,msg_target_lost                             ; LD HL,$337D       ; "Target Lost"
+       bl   @show_view_message                             ; JP $39C8          ; display it
+_30ea_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Get the distance to another object
+* 
+* Used by the routines at #R$2641, #R$265E and #R$27C0.
+* .
+* Makes the object in slot A the reference point (#R$2FF9), and works out
+* the distance from the current object to it (#R$84A6), from the sizes of
+* the differences in x, y and z (#R$EB82). Used by the ship handlers for
+* the distance to the planet (slot 0) or the space station (slot 1).
+* Unlike #R$2DF1, it doesn't keep the signs of the differences or scale the
+* distance.
+* .
+* The subtractions for y (at $3132) and z (at $3147) don't clear the carry
+* flag first, so either difference can be out by one.
+* 
+* I:A Slot number (0-19)
+* O:HL The distance (also in #R$EB6E)
+* TI: the subtractions are exact (see above).
+distance_to_object:                                        ; >3113
+       .proc                                               ;                   ; 
+       bl   @set_reference_point                           ; CALL $2FF9        ; the object in slot A is the reference point
+       mov  @object_position_x,hl                          ; LD HL,($F7CE)     ; 
+       s    @reference_point_x,hl                          ; LD DE,($EB88) / SBC HL,DE; HL = x - the reference point's x
+       abs  hl                                             ; JP P,$3128 / ...  ; its size
+       movb hl,@delta_x_hi                                 ; LD ($EB82),HL     ; 
+       movb @l,@abs_delta_x                                ;                   ; 
+       mov  @object_position_y,hl                          ; LD HL,($F7D0)     ; 
+       s    @reference_point_y,hl                          ; LD DE,($EB8A) / SBC HL,DE; 
+       abs  hl                                             ; JP P,$313D / ...  ; 
+       movb hl,@delta_y_hi                                 ; LD ($EB84),HL     ; 
+       movb @l,@abs_delta_y                                ;                   ; 
+       mov  @object_position_z,hl                          ; LD HL,($F7D2)     ; 
+       s    @reference_point_z,hl                          ; LD DE,($EB8C) / SBC HL,DE; 
+       abs  hl                                             ; JP P,$3152 / ...  ; 
+       movb hl,@delta_z_hi                                 ; LD ($EB86),HL     ; 
+       movb @l,@abs_delta_z                                ;                   ; 
+       bl   @vector_length                                 ; CALL $84A6        ; HL = the distance
+       movb hl,@reference_distance+1                       ; LD ($EB6E),HL     ; 
+       movb @l,@reference_distance                         ;                   ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Steering tolerances
+* 
+* The tolerance #R$2EB2 uses when deciding whether an object is pointing at
+* its target, indexed by the depth's shift (#R$EB9B, 0-8), so the further
+* away the target, the smaller the tolerance. Entry n is sin(3 + 2n degrees)
+* * $4000, i.e. the dot product of two unit vectors (1.0 = $4000) that are
+* that far apart; entry 8, sin(20 degrees), is the first entry of #R$33D7.
+* TI: big-endian words; the steering sine table must follow (entry 8)
+steering_tolerances:                                       ; >33c7
+       data >0359                                                 ; 0: sin(3)
+       data >0594                                                 ; 1: sin(5)
+       data >07cd                                                 ; 2: sin(7)
+       data >0a03                                                 ; 3: sin(9)
+       data >0c36                                                 ; 4: sin(11)
+       data >0e66                                                 ; 5: sin(13)
+       data >1090                                                 ; 6: sin(15)
+       data >12b6                                                 ; 7: sin(17)
+steering_sines:                                            ; >33d7
+       data >15e3,>155d,>14d6,>144e,>13c6,>133e,>12b6,>122d       ; sin(20 - n/2 degrees) * $4000, n = 0-7
+       data >11a4,>111a,>1090,>1006,>0f7b,>0ef0,>0e65,>0dda       ; 8-15
+       data >0d4e,>0cc2,>0c36,>0ba9,>0b1d,>0a90,>0a03,>0975       ; 16-23
+       data >08e8,>085a,>07cc,>073e,>06b0,>0622,>0593,>0505       ; 24-31
+       data >0476,>03e8,>0359,>02ca,>023b,>01ac,>011d,>008e       ; 32-39
+       data >0000                                                 ; 40
 
 
 rom_bank_11_end:

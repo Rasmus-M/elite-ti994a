@@ -302,8 +302,9 @@ _150b:                                                     ; >150b
        .far_call code_bank_11_select,check_safe_zone       ; CALL $1549        ; update the space station safe-zone flag
 * TI: not converted yet: the altitude and cabin temperature (#R$1577).
 _1517:                                                     ; >1517
-* TI: not converted yet: spawning ships (#R$2B05), the alert level (#R$15E7),
-* death (#R$16BA), hyperspace (#R$894D) and the ECM (#R$323C).
+       .far_call code_bank_11_select,spawn_ships           ; CALL $2B05        ; spawn new ships
+* TI: not converted yet: the alert level (#R$15E7), death (#R$16BA),
+* hyperspace (#R$894D) and the ECM (#R$323C).
        movb @docking,a                                     ; LD A,($E917) / OR A; docking?
        jeq  _1531                                          ; JR Z,$1531        ; no
        .far_call code_bank_11_select,dock                  ; CALL $1873        ; yes - dock
@@ -1509,6 +1510,22 @@ get_blueprint:                                             ; >2fe9
        movb @c,@iyl                                        ; LD IYL,C          ; IY = BC
        rt                                                  ; RET               ; 
 
+* TI: read byte R2 of the blueprint for ship type A, from code in any bank
+* (#R$2FE9 selects the blueprint's bank, so code in a ROM bank can't read
+* through IY itself)
+*
+* I:A Ship type
+* I:R2 The offset
+* O:A The byte
+blueprint_byte:
+       .proc                                               ;                   ; 
+       .save_bank                                          ;                   ; 
+       bl   @get_blueprint                                 ; CALL $2FE9        ; IY -> the blueprint
+       a    iy,r2                                          ;                   ; 
+       movb *r2,a                                          ; LD A,(IY+n)       ; 
+       .restore_bank                                       ;                   ; 
+       .endproc                                            ;                   ; 
+
 ********************************************************************************
 * Find the missile aimed at an object
 * 
@@ -1632,6 +1649,16 @@ add_object_next_slot:                                      ; >30a4
        socb a,a                                            ; OR A              ; 
        .restore_bank
        .retnc                                              ; RET               ; 
+
+********************************************************************************
+* The message "Target Lost"
+msg_target_lost:                                           ; >337d
+       text 'Target Los',>f4                                      ; 
+
+********************************************************************************
+* The message "Condition RED!"
+msg_condition_red:                                         ; >3388
+       text 'Condition RED',>a1                                   ; 
 
 ********************************************************************************
 * RST $00 target: print character A
@@ -11088,9 +11115,9 @@ steering_tolerance:                                        ; >e86c
 * ($E86F) is the sign, which gives the direction to turn (at $2F1F, $2F74
 * and $2FA5).
 steering_dot_product:                                      ; >e86e
-       byte >00                                                      ; 
-steering_dot_product_hi:                                   ; >e86f
-       byte >00                                                      ; 
+       data 0                                                        ; (TI: a big-endian word)
+steering_dot_product_hi:
+       equ  steering_dot_product
 
 ********************************************************************************
 * Police launch timer
@@ -12576,7 +12603,7 @@ delta_z_hi:                                                ; >eb87
 * (#R$2FF9), or zero for the player. #R$2DF1 and #R$3113 work out the vector from the object to it
 * (#R$EB82).
 reference_point_x:                                         ; >eb88
-       byte >00,>00
+       data 0                                                        ; (TI: a big-endian word, as the object table's positions are)
 
 ********************************************************************************
 * Reference-point Y (word)
@@ -12584,7 +12611,7 @@ reference_point_x:                                         ; >eb88
 * Second word of the same reference-point vector - see #R$EB88's own
 * comment.
 reference_point_y:                                         ; >eb8a
-       byte >00,>00
+       data 0                                                        ; (TI: a big-endian word, as the object table's positions are)
 
 ********************************************************************************
 * Reference-point Z (word)
@@ -12592,7 +12619,7 @@ reference_point_y:                                         ; >eb8a
 * Third word of the same reference-point vector - see #R$EB88's own
 * comment.
 reference_point_z:                                         ; >eb8c
-       byte >00,>00
+       data 0                                                        ; (TI: a big-endian word, as the object table's positions are)
 
 ********************************************************************************
 * Distance of the object being processed (word)

@@ -29,6 +29,15 @@ plot_pixel_xor:
 * ti_read_joysticks: bit 0 SPACE (speed up), bit 1 '/' (slow down).
 speed_keys:
        byte 0
+
+* The working object saved by #R$3341 (TI-specific: the MSX uses $0080)
+object_scratch:
+       bss  >28
+
+* The number of pieces an asteroid breaks up into (TI-specific: the MSX
+* stores it in the asteroid blueprint, #R$2BAC, which is in ROM on the TI)
+asteroid_pieces:
+       byte 0
        even
 
 * Space view bitmap buffer

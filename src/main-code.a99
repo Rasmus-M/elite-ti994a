@@ -311,8 +311,12 @@ _150b:                                                     ; >150b
 * TI: not converted yet: the altitude and cabin temperature (#R$1577).
 _1517:                                                     ; >1517
        .far_call code_bank_11_select,spawn_ships           ; CALL $2B05        ; spawn new ships
-* TI: not converted yet: the alert level (#R$15E7), death (#R$16BA),
-* hyperspace (#R$894D) and the ECM (#R$323C).
+* TI: not converted yet: the alert level (#R$15E7), death (#R$16BA) and
+* hyperspace (#R$894D).
+       movb @ecm_countdown,r0                              ;                   ; (TI: only while the ECM is on)
+       jeq  !                                              ;                   ; 
+       .far_call code_bank_12_select,ecm_active            ; CALL $323C        ; run the ECM
+!
        movb @docking,a                                     ; LD A,($E917) / OR A; docking?
        jeq  _1531                                          ; JR Z,$1531        ; no
        .far_call code_bank_11_select,dock                  ; CALL $1873        ; yes - dock
@@ -381,6 +385,16 @@ get_blueprint_data_exit:
 bp_name_buffer:
        bss  20
        even
+
+********************************************************************************
+* The message "Capsule released"
+msg_capsule_released:                                      ; >1b6d
+       text 'Capsule release',>e4                                 ; 
+
+********************************************************************************
+* The message "Malfunction!!!"
+msg_malfunction:                                           ; >1b98
+       text 'Malfunction!!',>a1                                   ; 
 
 ********************************************************************************
 * The message "Cargo lost"
@@ -1691,6 +1705,11 @@ msg_condition_red:                                         ; >3388
 * The message "Right On Commander"
 msg_right_commander:                                       ; >3396
        text 'Right On Commande',>f2                               ; 
+
+********************************************************************************
+* The message "Missile jammed!"
+msg_missile_jammed:                                        ; >33a8
+       text 'Missile jammed',>a1                                  ; 
 
 ********************************************************************************
 * The message "Incoming missile"
@@ -4279,6 +4298,12 @@ key_table:                                                 ; >419b
        data >3800,code_bank_7_select,key_handler_8                ; '8': market prices (#R$5B99)
        data >3900,code_bank_7_select,status_page                  ; '9': commander status (#R$6276)
        data >5b00,code_bank_7_select,commander_menu               ; '[' (FCTN-R): load/save commander menu (#R$A30A)
+       data >5400,code_bank_12_select,key_handler_t               ; 'T': target a missile (#R$2D58)
+       data >5500,code_bank_11_select,cancel_missile_lock         ; 'U': unarm the missile (#R$2D70)
+       data >4d00,code_bank_12_select,key_fire_missile            ; 'M': fire the missile (#R$2D7E)
+       data >4500,code_bank_12_select,key_handler_e               ; 'E': ECM (#R$3223)
+       data >0900,code_bank_12_select,key_handler_tab             ; TAB (FCTN-7): energy bomb (#R$329E)
+       data >1b00,code_bank_12_select,key_escape_capsule          ; Esc (FCTN-9): escape capsule (#R$19FC)
        data 0                                                     ; end of the table
 
 ********************************************************************************
@@ -13297,7 +13322,7 @@ vdp_reg1_cache:                                            ; >f3e0
        .msxalign >f6c0
 commander_menu_buffer:                                     ; >f6c0
        byte >00,>4A,>5A
-       byte >48,>02,>53,>B7,>07,>03,>E8,>03
+       byte >48,>02,>53,>B7,>07,>03,>50,>C3            ; (TI: cash temporarily 5000.0 credits, for testing)
        byte >00,>00,>2D,>31,>01,>FF,>46,>03
        byte >00,>00,>81,>80,>00,>00,>00,>00
        byte >00,>00,>80,>80,>00,>00,>00,>00

@@ -995,6 +995,293 @@ _8e38:                                                     ; >8e38
 _8db9_end:                                                 
        .endproc                                            ;                   ; 
 
+********************************************************************************
+* Key Esc: launch the escape capsule
+* 
+* Reached via the key table at #R$419B; only in flight (#R$6DCF). Needs an
+* escape capsule (#R$F77C), and doesn't work in witchspace (#R$EEC1) or in
+* mission state $52 (#R$E93D) - #R$16FE beeps instead. Cancels any
+* hyperspace countdown (#R$E91B), and leaves the player's Cobra Mk III
+* (ship type $0E) behind, at the position and orientation in #R$1C4A, turning
+* away (handler type 7, then 15, #R$2810). If there's room for it in the object
+* table (#R$3037), uses up the capsule, stops the ship (#R$F814, #R$1A7D),
+* clears the legal status (#R$EB65), switches to the front view (#R$64A1),
+* loses the cargo (#R$9237), plays sound effect 11 and shows "Capsule
+* released"; otherwise (at $1A77) "Malfunction!!!".
+key_escape_capsule:                                        ; >19fc
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; refuse if docked
+       movb @item_escape_capsule,r0                        ; LD A,($F77C) / OR A; an escape capsule?
+       jeq  _19fc_end                                      ; JP Z,$16FE        ; no (TI: no beep yet)
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; in witchspace?
+       jne  _19fc_end                                      ; JP NZ,$16FE       ; yes
+       cb   @mission_state,@bytes+>52                      ; LD A,($E93D) / CP $52; 
+       jeq  _19fc_end                                      ; JP Z,$16FE        ; that mission state
+       sb   @hyperspace_countdown_inner,@hyperspace_countdown_inner; XOR A / LD ($E91B),A; cancel any hyperspace countdown
+       sb   @hyperspace_trigger,@hyperspace_trigger        ; LD ($E920),A      ; 
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+       li   hl,escape_capsule_cobra_start                  ; LD HL,$1C4A       ; the Cobra's position and orientation
+       li   de,object_position_x                           ; LD DE,$F7CE       ; 
+       li   bc,>0012                                       ; LD BC,$0012       ; 18 bytes
+       .ldir                                               ; LDIR              ; 
+       movb @bytes+>07,@handler_type                       ; LD A,$07 / LD ($F7EE),A; handler type 7: turn away...
+       movb @bytes+>12,@handler_countdown                  ; LD A,$12 / LD ($F7EF),A; 
+       movb @bytes+>0a,@per_type_parameter_block           ; LD A,$0A / LD ($F7F0),A; 
+       movb @bytes+>12,@turn_phase_2_length                ; LD A,$12 / LD ($F7F1),A; 
+       movb @bytes+>06,a                                   ; LD A,$06          ; 
+       movb a,@turn_phase_2_rate                           ; LD ($F7F2),A      ; 
+       movb a,@speed_up_flag                               ; LD ($F7F4),A      ; 
+       movb a,@object_speed                                ; LD ($F7E6),A      ; speed 6
+       movb @bytes+>0f,@next_handler_type                  ; LD A,$0F / LD ($F7F3),A; ...then 15: the escape capsule's countdown
+       movb @bytes+>0e,@ship_type                          ; LD A,$0E / LD ($F7E7),A; ship type $0E: Cobra Mk III
+       bl   @add_object                                    ; CALL $3037        ; add it to the object table
+       jnc  _1a77                                          ; JR NC,$1A77       ; no room for it
+       sb   @item_escape_capsule,@item_escape_capsule      ; XOR A / LD ($F77C),A; the capsule is used up
+       sb   @speed_gauge_value,@speed_gauge_value          ; LD ($F814),A      ; stop
+       sb   @legal_status,@legal_status                    ; LD ($EB65),A      ; clean
+       bl   @stop_roll_and_pitch                           ; CALL $1A7D        ; stop any roll and pitch
+       bl   @switch_to_front_view                          ; CALL $64A1        ; switch to the front view
+       .far_call code_bank_11_select,clear_cargo_hold      ; CALL $9237        ; lose the cargo
+* TI: no sound effect 11 (#R$7468), as the sound effects aren't converted yet
+       li   hl,msg_capsule_released                        ; LD HL,$1B6D       ; "Capsule released"
+       jmp  _1a7a                                          ; JR $1A7A          ; 
+_1a77:                                                     ; >1a77
+       li   hl,msg_malfunction                             ; LD HL,$1B98       ; "Malfunction!!!"
+_1a7a:                                                     ; >1a7a
+       bl   @show_view_message                             ; JP $39C8          ; show it
+_19fc_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Stop rolling and pitching
+* 
+* Used by the routines at #R$19FC, #R$86E6 and #R$894D.
+* .
+* Turns the flight controls off (#R$EF8E) and clears the roll and pitch
+* rates ($F815/$F816).
+stop_roll_and_pitch:                                       ; >1a7d
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@flight_controls_off                        ; LD ($EF8E),A      ; flight controls off
+       sb   @roll_rate,@roll_rate                          ; XOR A / LD ($F815),A; no roll
+       sb   @pitch_rate,@pitch_rate                        ; LD ($F816),A      ; no pitch
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Escape capsule: the abandoned Cobra's position and orientation
+* 
+* Copied to #R$F7CE by #R$19FC for the Cobra Mk III the player leaves behind:
+* X = 0, Y = -150, Z = 50, then the side vector (1, 0, 0) and the nose vector
+* (0, 0, 1).
+* TI: big-endian, as the object workspace's words are
+escape_capsule_cobra_start:                                ; >1c4a
+       data >0000,>ff6a,>0032                                     ; X, Y, Z
+       data >4000,>0000,>0000                                     ; side vector
+       data >0000,>0000,>4000                                     ; nose vector
+
+********************************************************************************
+* Key 'T': target a missile
+* 
+* Reached only via #R$419B's (key code, handler) table - not a literal
+* CALL/JP.
+* .
+* Begins arming a missile lock: bails if #R$E910 (the missile
+* lock-on state - 0 idle, 1 while acquiring, 2 once locked; #R$4735
+* advances 1 -> 2 once #R$E911's candidate target is confirmed still
+* live via #R$3016, caching it to #R$E928) is already nonzero, or if
+* #R$F776 (the missile count) is 0 (nothing to fire). Otherwise
+* advances #R$E910 from 0 to 1 and redraws the missile indicator.
+key_handler_t:                                             ; >2d58
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; refuse if docked
+       movb @missile_state,r0                              ; LD A,($E910) / OR A; 
+       jne  _2d58_end                                      ; JP NZ,$16FE       ; already arming or locked (TI: no beep yet)
+       movb @missile_count,r0                              ; LD A,($F776) / OR A; 
+       jeq  _2d58_end                                      ; JP Z,$16FE        ; no missiles left
+       ab   one,@missile_state                             ; LD HL,$E910 / INC (HL); start arming (state 0 -> 1)
+       bl   @draw_missile_indicator                        ; JP $6B6E          ; redraw the missile indicator
+_2d58_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Key 'M': fire the missile
+* 
+* Reached via the key table at #R$419B. Needs the missile to be locked on
+* to a target (#R$E910 = 2). Adds a missile (ship type 2, handler type 3)
+* to the object table (#R$3037), at the position and orientation in #R$3429,
+* with the target (#R$E928) in ($F7EF). If there's room for it, plays sound
+* effect 11 and takes one off the number of missiles (#R$F776); otherwise
+* (at $2DBC) shows "Missile jammed!".
+key_fire_missile:                                          ; >2d7e
+       .proc                                               ;                   ; 
+       movb @missile_state,a                               ; LD A,($E910)      ; 
+       sb   @bytes+>02,a                                   ; SUB $02           ; locked on?
+       jne  _2d7e_end                                      ; JP NZ,$16FE       ; no (TI: no beep yet)
+       movb a,@missile_state                               ; LD ($E910),A      ; yes - clear the lock
+       movb @bytes+>41,a                                   ; LD A,$41          ; 
+       movb a,@object_status_byte                          ; LD ($F7CD),A      ; 
+       movb a,@object_speed                                ; LD ($F7E6),A      ; 
+       li   hl,missile_launch_start                        ; LD HL,$3429       ; the missile's position and orientation
+       li   de,object_position_x                           ; LD DE,$F7CE       ; 
+       li   bc,>0012                                       ; LD BC,$0012       ; 18 bytes
+       .ldir                                               ; LDIR              ; 
+       movb @bytes+>02,@ship_type                          ; LD A,$02 / LD ($F7E7),A; ship type 2: missile
+       movb @bytes+>03,@handler_type                       ; LD A,$03 / LD ($F7EE),A; handler type 3: the player's missile
+       movb @missile_target,@handler_countdown             ; LD A,($E928) / LD ($F7EF),A; its target
+       bl   @add_object                                    ; CALL $3037        ; add it to the object table
+       jnc  continue_2d7e_missile_jammed                   ; JR NC,$2DBC       ; no room for it
+* TI: no sound effect 11 (#R$7468), as the sound effects aren't converted yet
+       sb   one,@missile_count                             ; LD HL,$F776 / DEC (HL); one fewer missile
+       jmp  _2dc5                                          ; JR $2DC5          ; 
+continue_2d7e_missile_jammed:                              ; >2dbc
+       li   hl,msg_missile_jammed                          ; CALL $16FE / LD HL,$33A8; "Missile jammed!" (TI: no beep yet)
+       bl   @show_view_message                             ; CALL $39C8        ; 
+_2dc5:                                                     ; >2dc5
+       bl   @draw_missile_indicator                        ; JP $6B6E          ; redraw the missile indicator
+_2d7e_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Key 'E': set off the ECM
+* 
+* Reached via the key table at #R$419B; only in flight (#R$6DCF). Needs an
+* ECM system (#R$F778), and doesn't work while the jammer is on (#R$EFA8) -
+* #R$16FE beeps instead. Plays the ECM sound effect, which runs the ECM
+* (#R$782B), and shows the "E" indicator (#R$6B12).
+key_handler_e:                                             ; >3223
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; refuse if docked
+       movb @item_ecm_system,r0                            ; LD A,($F778) / OR A; ECM fitted?
+       jeq  _3223_end                                      ; JP Z,$16FE        ; no (TI: no beep yet)
+       movb @jammer_active_flag,r0                         ; LD A,($EFA8) / OR A; jammer on?
+       jne  _3223_end                                      ; JP NZ,$16FE       ; yes
+* TI: no sound effect 8 (#R$7468); the countdown it starts (#R$7815) is set here
+       movb @bytes+>78,@ecm_countdown                      ; LD A,$08 / CALL $7468; the ECM's countdown
+       bl   @draw_ecm_indicator                            ; JP $6B12          ; show the "E" indicator
+_3223_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* ECM: drain energy and destroy missiles while it's on
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called every frame by the main loop (#R$13FD). Does nothing unless the
+* ECM countdown (#R$E912) is running; once it has run out, turns the ECM
+* off ($3294). While it's running, and the countdown (decremented on every
+* VBlank) happens to be odd - about half the frames - it drains the energy
+* banks by 1 (#R$19EC) and plays sound effect 4 if it isn't already playing
+* (#R$E915); neither happens if it was an enemy's ECM (#R$EEC0 set, see
+* #R$25B9). Then destroys (#R$31AD) every missile (ship type 2) that isn't
+* already exploding - the player's as well as enemies' - and plays the
+* explosion sound if there were any.
+* .
+* At $3294, once the ECM countdown has run out, clears the countdown and
+* #R$EEC0, and hides the "E" indicator (#R$6B12).
+* TI: process_frame only calls this while the ECM countdown is running, and
+* ti_poll_vblank counts it down (#R$7246).
+ecm_active:                                                ; >323c
+       .proc                                               ;                   ; 
+       movb @ecm_countdown,a                               ; LD A,($E912) / OR A; A = ECM countdown
+       jeq  _323c_end                                      ; RET Z             ; ECM off
+       jgt  _3244                                          ; JP M,$3294        ; 
+       bl   @ecm_off                                       ;                   ; finished - turn it off
+       jmp  _323c_end                                      ;                   ; 
+_3244:                                                     
+       czc  @bit0,a                                        ; BIT 0,A           ; 
+       jeq  _325e                                          ; JR Z,$325E        ; countdown even - skip the energy drain
+       movb @enemy_ecm,r0                                  ; LD A,($EEC0) / OR A; an enemy's ECM?
+       jne  _325e                                          ; JR NZ,$325E       ; yes - no cost to the player
+* TI: no sound effect 4 (#R$7468), as the sound effects aren't converted yet
+       movb one,b                                          ; LD B,$01          ; 
+       .far_call code_bank_11_select,decay_counter_f817    ; CALL $19EC        ; drain the energy banks by 1
+_325e:                                                     ; >325e
+       sb   @something_destroyed,@something_destroyed      ; XOR A / LD ($E869),A; nothing destroyed yet
+       li   ix,ship_object_table                           ; LD IX,$EBA0       ; IX -> the object table
+       li   de,>0028                                       ; LD DE,$0028       ; DE = 40 (one object record)
+       movb @bytes+>14,b                                   ; LD B,$14          ; 20 slots
+_326b:                                                     ; >326b
+       movb *ix,r0                                         ; BIT 0,(IX+$00)    ; in use?
+       andi r0,>0100                                       ;                   ; 
+       jeq  _3285                                          ; JR Z,$3285        ; no - next slot
+       movb *ix,r0                                         ; BIT 3,(IX+$00)    ; already exploding?
+       andi r0,>0800                                       ;                   ; 
+       jne  _3285                                          ; JR NZ,$3285       ; yes - next slot
+       cb   @>1a(ix),@bytes+>02                            ; LD A,(IX+$1A) / CP $02; a missile?
+       jne  _3285                                          ; JR NZ,$3285       ; no - next slot
+       socb @bit6,*ix                                      ; SET 6,(IX+$00)    ; no bounty for it
+       .push bc                                            ;                   ; 
+       .push de                                            ;                   ; 
+       bl   @destroy_object                                ; CALL $31AD        ; destroy it
+       .pop de                                             ;                   ; 
+       .pop bc                                             ;                   ; 
+_3285:                                                     ; >3285
+       a    de,ix                                          ; ADD IX,DE         ; IX -> the next slot
+       sb   one,b                                          ; DJNZ $326B        ; 
+       jne  _326b                                          ;                   ; 
+* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+_323c_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Turn the ECM off
+ecm_off:                                                   ; >3294
+       sb   @enemy_ecm,@enemy_ecm                          ; XOR A / LD ($EEC0),A; clear the enemy-ECM flag
+       sb   @ecm_countdown,@ecm_countdown                  ; LD ($E912),A      ; clear the ECM countdown
+       b    @draw_ecm_indicator                            ; JP $6B12          ; hide the "E" indicator
+
+********************************************************************************
+* Key TAB: set off the energy bomb
+* 
+* Reached only via #R$419B's (key code, handler) table - not a literal
+* CALL/JP. Beeps (#R$16FE) and returns unless an energy bomb is fitted
+* (#R$F77D, entry 8 of the equipment array at #R$F775); if it is, uses it up
+* and destroys (#R$31AD) every active object except Thargoids (ship type
+* $13), over the 17 (or, with #R$EEC1 set, 20) slots from slot 3 onward.
+key_handler_tab:                                           ; >329e
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; refuse if docked
+       movb @item_energy_bomb,r0                           ; LD A,($F77D) / OR A; an energy bomb?
+       jeq  _329e_end                                      ; JP Z,$16FE        ; no (TI: no beep yet)
+       sb   @item_energy_bomb,@item_energy_bomb            ; XOR A / LD ($F77D),A; it's used up
+       sb   @something_destroyed,@something_destroyed      ; LD ($E869),A      ; nothing destroyed yet
+       li   ix,object_slot_3                               ; LD IX,$EC18       ; IX -> slot 3 (after the planet, the sun and the station)
+       movb @bytes+>11,b                                   ; LD B,$11          ; 17 slots
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; in witchspace?
+       jeq  _32c1                                          ; JR Z,$32C1        ; 
+       movb @bytes+>14,b                                   ; LD IX,$EC18 / LD B,$14; 20 slots (3 past the end of the table, as on the MSX)
+_32c1:                                                     ; >32c1
+       li   de,>0028                                       ; LD DE,$0028       ; DE = 40 (one object record)
+_32c4:                                                     ; >32c4
+       movb *ix,r0                                         ; BIT 0,(IX+$00)    ; in use?
+       andi r0,>0100                                       ;                   ; 
+       jeq  _32d8                                          ; JR Z,$32D8        ; no - next slot
+       cb   @>1a(ix),@bytes+>13                            ; LD A,(IX+$1A) / CP $13; a Thargoid?
+       jeq  _32d8                                          ; JR Z,$32D8        ; yes - the bomb doesn't affect it
+       socb @bit6,*ix                                      ; SET 6,(IX+$00)    ; no bounty for it
+       .push bc                                            ;                   ; 
+       .push de                                            ;                   ; 
+       bl   @destroy_object                                ; CALL $31AD        ; destroy it
+       .pop de                                             ;                   ; 
+       .pop bc                                             ;                   ; 
+_32d8:                                                     ; >32d8
+       a    de,ix                                          ; ADD IX,DE         ; IX -> the next slot
+       sb   one,b                                          ; DJNZ $32C4        ; 
+       jne  _32c4                                          ;                   ; 
+* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+_329e_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Missile launch position and orientation
+* 
+* Copied to #R$F7CE by #R$2D7E for a missile fired by the player: X = 0, Y =
+* -50, Z = 20, then the side vector (1, 0, 0) and the nose vector (0, 0, 1).
+* TI: big-endian, as the object workspace's words are
+missile_launch_start:                                      ; >3429
+       data >0000,>ffce,>0014                                     ; X, Y, Z
+       data >4000,>0000,>0000                                     ; side vector
+       data >0000,>0000,>4000                                     ; nose vector
+
 rom_bank_12_end:
        equ  $
        bss  >8000-$

@@ -286,7 +286,7 @@ object_handler_table:                                      ; >288d
        data handler_none                                          ; 0: none
        data handler_explosion_bank_11                             ; 1: explosion (#R$2556, in bank 12)
        data handler_space_station                                 ; 2: space station
-       data handler_none                                          ; 3: the player's missile (#R$25B9, not converted yet)
+       data handler_player_missile                                ; 3: the player's missile
        data handler_turn_then_leave                               ; 4: turn away, then leave
        data handler_turn_then_attack                              ; 5: turn away, then attack
        data handler_attack                                        ; 6: attack
@@ -297,7 +297,7 @@ object_handler_table:                                      ; >288d
        data handler_break_off                                     ; 11: break off
        data handler_leave                                         ; 12: fly on and leave
        data handler_none                                          ; 13: none
-       data handler_none                                          ; 14: missile homing in on the player (#R$2618, not converted yet)
+       data handler_enemy_missile                                 ; 14: missile homing in on the player
        data handler_escape_capsule                                ; 15: the escape capsule's countdown
 
 ********************************************************************************
@@ -2250,6 +2250,96 @@ steering_sines:                                            ; >33d7
        data >0476,>03e8,>0359,>02ca,>023b,>01ac,>011d,>008e       ; 32-39
        data >0000                                                 ; 40
 
+
+********************************************************************************
+* Handler type 3: the player's missile
+* 
+* Steers the missile towards its target (the object in the slot in ($F7EF),
+* #R$2EB2) and keeps it at speed (minimum 10). If the target's blueprint
+* says it has no ECM ((IY+$13) bit 7 clear), goes on to $25FF to see
+* whether it has hit. Otherwise - unless the player's ECM jammer is on and
+* the target isn't the space station - the target may set off its ECM
+* (always when close, else a 25/256 chance), destroying the missile: plays
+* the ECM sound, sets #R$EEC0 and shows the "E" indicator (#R$6B12).
+* .
+* At $25FF, if the target is within its blueprint's distance (IY+$10),
+* removes the missile (#R$30A9), destroys the target (#R$31AD, which also
+* scores the kill), spawns #R$8DB9's objects and plays the explosion sound.
+handler_player_missile:                                    ; >25b9
+       .proc                                               ;                   ; 
+       movb @handler_countdown,a                           ; LD A,($F7EF)      ; the target's slot
+       bl   @set_reference_point                           ; CALL $2FF9        ; use the target's position as the reference point
+       bl   @steer_towards_point                           ; CALL $2EB2        ; steer towards it
+       movb @bytes+>0a,@c                                  ; LD C,$0A          ; 
+       bl   @speed_up_or_slow_down                         ; CALL $2869        ; speed up or slow down
+       movb @>1a(ix),a                                     ; LD A,(IX+$1A)     ; 
+       li   r2,>13                                         ; CALL $2FE9 / LD A,(IY+$13); (TI: the blueprint is in another ROM bank)
+       bl   @blueprint_byte                                ;                   ; 
+       movb a,a                                            ; OR A              ; 
+       jgt  player_missile_hit                             ; JP P,$25FF        ; no ECM - check for a hit
+       jeq  player_missile_hit                             ;                   ; 
+       cb   @>1a(ix),one                                   ; LD A,(IX+$1A) / CP $01; 
+       jeq  _25e1                                          ; JR Z,$25E1        ; the space station
+       movb @jammer_active_flag,r0                         ; LD A,($EFA8) / OR A; 
+       jne  player_missile_hit                             ; JR NZ,$25FF       ; player's jammer on - no ECM
+_25e1:                                                     ; >25e1
+       movb @reference_distance_hi,r0                      ; LD A,($EB6F) / OR A; 
+       jeq  _25ed                                          ; JR Z,$25ED        ; close - set off the ECM
+       bl   @random_byte                                   ; CALL $2176        ; 
+       cb   a,@bytes+>19                                   ; CP $19            ; 
+       jhe  _25b9_end                                      ; RET NC            ; otherwise only a 25/256 chance
+_25ed:                                                     ; >25ed
+       movb @ecm_countdown,r0                              ; LD A,($E912) / OR A; 
+       jne  _25b9_end                                      ; RET NZ            ; an ECM is already on
+* TI: no sound effect 8 (#R$7468); the countdown it starts (#R$7815) is set here
+       movb @bytes+>78,@ecm_countdown                      ; CALL $7468        ; the ECM's countdown
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@enemy_ecm                                  ; LD ($EEC0),A      ; an enemy's ECM
+       bl   @draw_ecm_indicator                            ; JP $6B12          ; show the "E" indicator
+       jmp  _25b9_end                                      ;                   ; 
+player_missile_hit:                                        ; >25ff
+       movb @>1a(ix),a                                     ;                   ; 
+       li   r2,>10                                         ; LD E,(IY+$10) / LD D,$00; DE = the target's size
+       bl   @blueprint_byte                                ;                   ; 
+       movb a,@e                                           ;                   ; 
+       sb   d,d                                            ;                   ; 
+       movb @reference_distance+1,hl                       ; LD HL,($EB6E)     ; HL = distance to the target
+       movb @reference_distance,@l                         ;                   ; 
+       c    hl,de                                          ; AND A / SBC HL,DE ; 
+       jhe  _25b9_end                                      ; RET NC            ; too far
+       bl   @remove_object                                 ; CALL $30A9        ; remove the missile
+       .far_call code_bank_12_select,destroy_object        ; CALL $31AD        ; destroy the target
+       .far_call code_bank_12_select,spawn_cargo           ; CALL $8DB9        ; 
+* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+_25b9_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Handler type 14: a missile homing in on the player
+* 
+* Steers the missile towards the player (the reference point at #R$EB88
+* is zeroed, #R$2EB2) and keeps it at speed (minimum 10). Once it's
+* within 100, it explodes (#R$31AD) and damages the player's shields by
+* 48 (#R$193F).
+handler_enemy_missile:                                     ; >2618
+       .proc                                               ;                   ; 
+       clr  @reference_point_x                             ; LD HL,$EB88 / LD (HL),$00; the reference point is the player
+       clr  @reference_point_y                             ; LD DE,$EB89 / LD BC,$0005 / LDIR; 
+       clr  @reference_point_z                             ;                   ; 
+       bl   @steer_towards_point                           ; CALL $2EB2        ; steer towards the player
+       movb @bytes+>0a,@c                                  ; LD C,$0A          ; 
+       bl   @speed_up_or_slow_down                         ; CALL $2869        ; speed up or slow down
+       movb @object_distance+1,hl                          ; LD HL,($EB8E)     ; 
+       movb @object_distance,@l                            ;                   ; 
+       ci   hl,100                                         ; LD DE,$FF9C / ADD HL,DE; 
+       jhe  _2618_end                                      ; RET C             ; not within 100 yet
+       li   ix,object_status_byte                          ; LD IX,$F7CD       ; 
+       .far_call code_bank_12_select,destroy_object        ; CALL $31AD        ; the missile explodes
+       movb @bytes+>30,a                                   ; LD A,$30          ; 
+       .pop r11                                            ;                   ; 
+       b    @damage_shields                                ; JP $193F          ; damage the player's shields by 48
+_2618_end:                                                 
+       .endproc                                            ;                   ; 
 
 rom_bank_11_end:
        equ  $

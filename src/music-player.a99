@@ -292,6 +292,13 @@ ti_poll_vblank_1:
 ti_poll_vblank_2:
        ab   one,@vblank_frame_counter
        ab   one,@vblank_subtick_counter
+       movb @ecm_countdown,@ecm_countdown ; count the ECM down (#R$7246)...
+       jeq  ti_poll_vblank_3           ; not running
+       jlt  ti_poll_vblank_3           ; stopped
+       sb   one,@ecm_countdown
+       jne  ti_poll_vblank_3
+       sb   one,@ecm_countdown         ; ...until it stops at -1
+ti_poll_vblank_3:
        blwp @music_tick_vector
        blwp @chart_cursor_vector       ; move the chart cursor (#R$73BA)
        blwp @keyboard_vector           ; read the keyboard (#R$347A)

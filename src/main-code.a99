@@ -313,7 +313,11 @@ _14b1:                                                     ; >14b1
        bl   @scanner_draw                                  ;                   ; (TI: now, rather than in the VBlank handler, #R$7202)
 _14bb:                                                     ; >14bb
        .far_call code_bank_12_select,draw_laser_beams      ; CALL $2DC8        ; draw the laser beams if the laser was just fired
-* TI: not converted yet: the Torus jump ($14BE-$1500).
+       movb @torus_jump_countdown,r0                       ; LD A,($E918) / OR A; (TI: only while a Torus jump is in progress...)
+       socb @secondary_flag_counter_pair,r0                ; LD A,($E933) / OR A; (...or being cut short)
+       jeq  !                                              ;                   ; 
+       .far_call code_bank_12_select,torus_jump_frame      ;                   ; the Torus jump ($14BE-$1500)
+!
        li   hl,current_turn                                ; LD HL,$E92E       ; cycle the counter at $E92E: 3, 2, 1, 3...
        sb   one,*hl                                        ; DEC (HL)          ; 
        jne  _150b                                          ; JR NZ,$150B       ; 
@@ -4296,7 +4300,11 @@ _4061:                                                     ; >4061
        jne  _4066                                          ;                   ; 
        .far_call code_bank_12_select,fire_laser            ; CALL Z,$2AD0      ; fire: fire the laser
 _4066:                                                     ; >4066
-* TI: 'J' (#R$86E6) isn't converted yet.
+       movb @speed_keys,r0                                 ; IN A,($A9) / AND $80; 'J'? (TI: read by ti_read_joysticks)
+       czc  @bit2,r0                                       ;                   ; 
+       jeq  !                                              ;                   ; 
+       .far_call code_bank_12_select,engage_torus_jump_drive; CALL Z,$86E6      ; yes - engage the Torus Jump Drive
+!
        .pop r11                                            ;                   ; 
 _4077:                                                     ; >4077
        movb @pending_debounced_keypress_byte_status,a      ; LD A,($E8F5) / OR A; A = key typed, if any
@@ -4407,6 +4415,7 @@ key_table:                                                 ; >419b
        data >4800,code_bank_13_select,key_handler_h               ; 'H': hyperspace (#R$88AC)
        data >4700,code_bank_13_select,key_handler_g               ; 'G': galactic hyperspace (#R$8926)
        data >8400,code_bank_13_select,key_f5_info                 ; F5 (FCTN-5): game time, score and credits (#R$1A8A)
+       data >4300,code_bank_12_select,key_handler_c               ; 'C': docking computer (#R$1692)
        data 0                                                     ; end of the table
 
 ********************************************************************************

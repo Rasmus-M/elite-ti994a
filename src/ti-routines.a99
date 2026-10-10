@@ -653,8 +653,8 @@ ti_read_keyboard_column:
 * #R$E8F4 from both joysticks, as the MSX does (0 = pressed): bit 0 up,
 * 1 down, 2 left, 3 right, 4 fire; and the classic Elite keys, as the MSX
 * does (#R$73F2): S up, X down, ',' left, '.' right, and A or SHIFT fire
-* (the MSX's cursor keys aren't read). Also sets speed_keys from SPACE and
-* '/', which the MSX reads in #R$401C.
+* (the MSX's cursor keys aren't read). Also sets speed_keys from SPACE,
+* '/' and J, which the MSX reads in #R$401C.
 *
 joystick_vector:
        data keyboard_ws,ti_read_joysticks
@@ -709,6 +709,11 @@ ti_read_joysticks_9:
        jeq  ti_read_joysticks_10
        ori  r6,>0200                   ; bit 1: '/'
 ti_read_joysticks_10:
+       li   r0,KEY_J
+       bl   @ti_check_key
+       jeq  ti_read_joysticks_11
+       ori  r6,>0400                   ; bit 2: J
+ti_read_joysticks_11:
        movb r6,@speed_keys
        mov  r5,r0
        inv  r0                         ; 0 = pressed, as on the MSX

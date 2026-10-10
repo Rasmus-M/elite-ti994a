@@ -1703,6 +1703,132 @@ switch_to_right_view:                                      ; >64dd
        li   de,view_name_right                             ; LD DE,$11F8       ; the right view's name
        b    @switch_view                                   ; JP $645B          ; switch view
 
+********************************************************************************
+* The Torus jump in the main loop
+*
+* TI: the Torus jump part of the main loop ($14BE-$1500), in ROM bank 12.
+* process_frame only calls it while a jump is in progress or being cut
+* short.
+torus_jump_frame:                                          ; >14be
+       .proc                                               ;                   ; 
+       movb @torus_jump_countdown,a                        ; LD A,($E918) / OR A; A = Torus jump countdown
+       jeq  _14ea                                          ; JR Z,$14EA        ; no jump in progress
+       sb   one,a                                          ; DEC A             ; 
+       movb a,@torus_jump_countdown                        ; LD ($E918),A      ; count down one frame
+       jne  _14ea                                          ; JR NZ,$14EA       ; jump not over yet
+       sb   @jump_in_progress,@jump_in_progress            ; LD ($E722),A      ; jump over: clear the jump-in-progress flag
+       sb   @flight_controls_off,@flight_controls_off      ; LD ($EF8E),A      ; and turn the flight controls back on
+       bl   @restore_speed                                 ; CALL $8B8F        ; restore the speed from before the jump
+       bl   @random_byte                                   ; CALL $2176        ; the jump may end near a hostile ship:
+       movb a,@c                                           ; LD C,A            ; C = random 0-255
+       movb @mission_state,a                               ; LD A,($E93D)      ; 
+       sb   @bytes+>21,a                                   ; SUB $21           ; 
+       jeq  _14e6                                          ; JR Z,$14E6        ; state $21 - A = 0, so almost certainly a hostile
+       movb @current_system_government,a                   ; LD A,($F762)      ; 
+       andi a,>ff00                                        ;                   ; 
+       sla  a,5                                            ; ADD A,A x 5       ; A = government * 32 (mod 256)
+_14e6:                                                     ; >14e6
+       cb   a,@c                                           ; CP C              ; random number above A?
+       jhe  _14ea                                          ; CALL C,$2C3C      ; 
+       .far_call code_bank_11_select,condition_red         ;                   ; yes - "Condition RED!" and spawn a hostile ship
+_14ea:                                                     ; >14ea
+       movb @secondary_flag_counter_pair,r0                ; LD A,($E933) / OR A; jump being cut short?
+       jeq  _14be_end                                      ; JR Z,$1503        ; no
+       sb   @flight_controls_off,@flight_controls_off      ; XOR A / LD ($EF8E),A; turn the flight controls back on
+       sb   @secondary_flag_counter_pair,@secondary_flag_counter_pair; LD ($E933),A      ; and this flag
+       sb   @torus_jump_countdown,@torus_jump_countdown    ; LD ($E918),A      ; end the jump
+       sb   @jump_in_progress,@jump_in_progress            ; LD ($E722),A      ; 
+* TI: no beep (#R$16FE), as the sound effects aren't converted yet
+       bl   @restore_speed                                 ; CALL $8B8F        ; restore the speed from before the jump
+_14be_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Key 'C': dock using the docking computer
+* 
+* Reached via the key table at #R$419B. Beeps unless a docking computer
+* is fitted (#R$F77F), the player is in the space station's safe zone
+* (#R$EB05) and hasn't shot at the station ($EF97, see #R$291E), and the
+* station hasn't been taken over by the Thargoids (mission state $52).
+* Does nothing in witchspace (#R$EEC1). Otherwise docks at once (#R$E917).
+key_handler_c:                                             ; >1692
+       movb @item_docking_computer,r0                      ; LD A,($F77F) / OR A; 
+       jeq  _1692_end                                      ; JP Z,$16FE        ; no docking computer (TI: no beep yet)
+       movb @station_in_range,r0                           ; LD A,($EB05) / OR A; 
+       jeq  _1692_end                                      ; JP Z,$16FE        ; not in the safe zone
+       movb @legal_status_copy,r0                          ; LD A,($EF97) / OR A; 
+       jne  _1692_end                                      ; JP NZ,$16FE       ; the player has shot at the station
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; 
+       jne  _1692_end                                      ; RET NZ            ; in witchspace
+       cb   @mission_state,@bytes+>52                      ; LD A,($E93D) / CP $52; 
+       jeq  _1692_end                                      ; JP Z,$16FE        ; the Thargoids' station
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@docking                                    ; LD ($E917),A      ; dock
+_1692_end:                                                 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Engage the Torus Jump Drive ('J')
+* 
+* Used by the routine at #R$401C.
+* .
+* The manual's "Torus Jump Drive (J)", which "does not function ... if
+* there is another ship, a planet or a sun in the immediate vicinity".
+* Refuses with a beep (#R$16FE) if ($EEC1) is set, if #R$3359 reports
+* one of its three flags set, or if the magnitude at $E727 is 10000 or
+* less. Otherwise saves the current speed at $E87A, stops any roll and
+* pitch (#R$1A7D), brings the speed down to 0 (#R$8B7B), and starts a
+* 25-frame jump (($E918), counted down by #R$13FD, which restores the
+* speed via #R$8B8F at the end) during which #R$872E draws the stardust
+* as lengthening streaks. Also sets $E878 to 200 (see #R$8B00).
+engage_torus_jump_drive:                                   ; >86e6
+       .proc                                               ;                   ; 
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; 
+       jne  _86e6_end                                      ; JP NZ,$16FE       ; in witchspace (TI: no beep yet)
+       movb @trader_count,r0                               ; CALL $3359        ; any traders,
+       socb @pirate_count,r0                               ;                   ; pirates
+       socb @num_thargoids,r0                              ;                   ; or Thargoids about?
+       jne  _86e6_end                                      ; JP NZ,$16FE       ; yes
+       movb @planet_distance+1,r0                          ; LD DE,($E727)     ; R0 = the distance from the planet
+       movb @planet_distance,@r0lb                         ;                   ; 
+       li   r1,10000                                       ; LD HL,$2710 / OR A / SBC HL,DE; 
+       c    r0,r1                                          ;                   ; 
+       jle  _86e6_end                                      ; JP NC,$16FE       ; 10000 or less
+       movb @speed_gauge_value,@cached_f814_at_engage      ; LD A,($F814) / LD ($E87A),A; save the speed
+       bl   @stop_roll_and_pitch                           ; CALL $1A7D        ; stop any roll and pitch
+       .far_call code_bank_13_select,stop_ship             ; CALL $8B7B        ; bring the speed down to 0
+       movb @bytes+>19,@torus_jump_countdown               ; LD A,$19 / LD ($E918),A; the jump lasts 25 frames
+       movb @bytes+>02,@jump_in_progress                   ; LD A,$02 / LD ($E722),A; flag the jump as in progress
+       movb @bytes+>c8,@jump_speed                         ; LD HL,$00C8 / LD ($E878),HL; (little-endian)
+       sb   @jump_speed+1,@jump_speed+1                    ;                   ; 
+       movb @bytes+>05,@stardust_passes_interval           ; LD A,$05 / LD ($E87C),A; lengthen the stardust streaks every 5 frames...
+       movb one,@stardust_passes                           ; LD A,$01 / LD ($E723),A; ...starting from 1 pass per frame
+       movb one,@stardust_passes_countdown                 ; LD ($E87B),A      ; 
+* TI: no sound effect 10 (#R$7468), as the sound effects aren't converted yet
+_86e6_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Restore the speed after a Torus jump
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called by the main loop (#R$13FD) when the jump ends. Brings the speed
+* (#R$F814) back up to what it was before the jump (#R$E87A) one step at a
+* time (#R$6956), without redrawing the speed gauge each time (#R$E92B);
+* $8BA1 turns the redrawing back on.
+restore_speed:                                             ; >8b8f
+       .proc                                               ;                   ; 
+       sb   @redraw_speed_gauge,@redraw_speed_gauge        ; XOR A / LD ($E92B),A; don't redraw the speed gauge
+_8b93:                                                     ; >8b93
+       cb   @speed_gauge_value,@cached_f814_at_engage      ; LD A,($F814) / LD HL,$E87A / CP (HL); back to the speed before the jump?
+       jeq  restore_speed_2                                ; JR Z,$8BA1        ; yes
+       bl   @speed_up                                      ; CALL $6956        ; speed up
+       jmp  _8b93                                          ; JR $8B93          ; 
+restore_speed_2:                                           ; >8ba1
+       sb   one,@redraw_speed_gauge                        ; LD HL,$E92B / DEC (HL); redraw the speed gauge again
+       .endproc                                            ; RET               ; 
+
 rom_bank_12_end:
        equ  $
        bss  >8000-$

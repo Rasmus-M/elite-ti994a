@@ -27,7 +27,8 @@ plot_pixel_xor:
        byte 0
 
 * The speed keys held (TI-specific: the MSX reads them in #R$401C), set by
-* ti_read_joysticks: bit 0 SPACE (speed up), bit 1 '/' (slow down).
+* ti_read_joysticks: bit 0 SPACE (speed up), bit 1 '/' (slow down), bit 2 J
+* (the Torus jump drive).
 speed_keys:
        byte 0
 

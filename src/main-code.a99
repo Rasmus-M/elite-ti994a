@@ -4433,7 +4433,13 @@ key_table:                                                 ; >419b
        data >4900,code_bank_13_select,key_handler_i               ; 'I': identify the target (#R$1B0D)
        data >5900,code_bank_13_select,key_handler_y               ; 'Y': cloaking device on/off (#R$1B13)
        data >4c00,code_bank_13_select,key_handler_l               ; 'L': ECM jammer on/off (#R$1B25)
+       data >8600,code_bank_12_select,freeze_game                 ; STOP (FCTN-6): freeze the game (#R$40DE)
        data 0                                                     ; end of the table
+
+********************************************************************************
+* The message "     Game Frozen     "
+msg_game_frozen:                                           ; >420d
+       text '     Game Frozen     ',>a0                           ; 
 
 ********************************************************************************
 * Draw the object

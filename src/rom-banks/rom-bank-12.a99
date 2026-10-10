@@ -1829,6 +1829,136 @@ restore_speed_2:                                           ; >8ba1
        sb   one,@redraw_speed_gauge                        ; LD HL,$E92B / DEC (HL); redraw the speed gauge again
        .endproc                                            ; RET               ; 
 
+********************************************************************************
+* Key STOP: freeze the game
+* 
+* Reached via the key table at #R$419B. Stops any hyperspace countdown
+* (#R$E91B) for the time being, and shows "Game Frozen" - over the space
+* view if it's showing (#R$E903), or on the dashboard otherwise ($40F9).
+* Then waits for one of the keys at #R$41FE (#R$4102).
+* .
+* At $40F9, when docked, shows "Game Frozen" on the dashboard. The entry at
+* $4102 waits for one of the keys at #R$41FE, with a click: STOP unfreezes
+* the game, restarting any hyperspace countdown; the others are options
+* ($412C), after which it waits for another key.
+* .
+* At $412C, '1' ends the game (#R$F749) with cause 3, so the main loop
+* (#R$0106) skips the death scene and goes back to the title screen; the
+* `POP AF` discards the saved hyperspace countdown. Any other key goes on
+* to $413C.
+* .
+* At $413C, sets bit 0 of the options (#R$E914), unless muted (bit 6).
+* .
+* At $414B, clears bit 0 of the options (#R$E914), unless muted (bit 6).
+* .
+* At $4157, toggles bit 6 of the options (#R$E914); unmuting also turns the
+* sound on (bit 0).
+* .
+* At $4165, toggles the key's bit of the options (#R$E914), from the table
+* at #R$4208. The entry at $4171 waits for another key.
+freeze_game:                                               ; >40de
+       .proc                                               ;                   ; 
+       movb @hyperspace_countdown_inner,a                  ; LD HL,$E91B / LD A,(HL); A = hyperspace countdown
+       .push af                                            ; PUSH AF           ; save it
+       sb   @hyperspace_countdown_inner,@hyperspace_countdown_inner; LD (HL),$00       ; stop it
+       movb @space_view_showing,r0                         ; LD A,($E903) / OR A; 
+       jeq  freeze_game_2                                  ; JR Z,$40F9        ; no space view showing
+       li   hl,msg_game_frozen                             ; LD HL,$420D       ; "Game Frozen"
+       bl   @show_view_message                             ; CALL $39C8        ; show it
+       bl   @copy_space_view                               ; CALL $3846        ; copy the space view to the screen
+       jmp  _4102                                          ; JR $4102          ; 
+freeze_game_2:                                             ; >40f9
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       li   hl,msg_game_frozen_4223                        ; LD HL,$4223       ; "Game Frozen"
+       bl   @rst_08_target_print_tokenised_string          ; CALL $357A        ; show it
+_4102:                                                     ; >4102
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, which reads the keyboard)
+       movb @pending_debounced_keypress_byte_status,a      ; LD HL,$E8F5 / LD A,(HL) / OR A; 
+       jeq  _4102                                          ; JR Z,$4105        ; wait for a key
+       sb   @pending_debounced_keypress_byte_status,@pending_debounced_keypress_byte_status; LD (HL),$00       ; 
+       clr  r1                                             ; LD HL,$41FE / LD BC,$000A; R1 = the key's position in the keys for the frozen game
+_4111:                                                     ; >4111
+       cb   a,@frozen_keys(r1)                             ; CPIR              ; search for a match
+       jeq  _4115                                          ;                   ; 
+       inc  r1                                             ;                   ; 
+       ci   r1,10                                          ;                   ; 
+       jne  _4111                                          ;                   ; 
+       jmp  _4102                                          ; JR NZ,$4102       ; not one of them
+_4115:                                                     ; >4115
+* TI: no click (sound effect 0, #R$7468), as the sound effects aren't converted yet
+       cb   a,@bytes+>86                                   ; CP $86            ; STOP?
+       jne  pause_quit                                     ; JR NZ,$412C       ; no - an option
+       movb @space_view_showing,r0                         ; LD A,($E903) / OR A; 
+       jne  _4127                                          ; CALL Z,$3955      ; 
+       bl   @clear_message_line                            ;                   ; clear the message line
+_4127:                                                     ; >4127
+       .pop af                                             ; POP AF            ; restart the hyperspace countdown
+       movb a,@hyperspace_countdown_inner                  ; LD ($E91B),A      ; 
+       .endproc                                            ; RET               ; 
+pause_quit:                                                ; >412c
+       cb   a,@bytes+>31                                   ; CP $31            ; '1'?
+       jne  pause_sound_on                                 ; JR NZ,$413C       ; 
+       .pop af                                             ; POP AF            ; 
+       movb @b255,@game_over                               ; LD A,$FF / LD ($F749),A; game over...
+       movb @bytes+>03,@game_over_cause                    ; LD A,$03 / LD ($F74A),A; ...because the player quit
+       .endproc                                            ; RET               ; 
+pause_sound_on:                                            ; >413c
+       movb @options,r0                                    ; LD HL,$E914       ; R0 = the options
+       cb   a,@bytes+>53                                   ; CP $53            ; 'S'?
+       jne  pause_sound_off                                ; JR NZ,$414B       ; no - try the next key
+       czc  @bit6,r0                                       ; BIT 6,(HL)        ; muted?
+       jne  _4102                                          ; JR NZ,$4149       ; yes
+       socb @bit0,@options                                 ; SET 0,(HL)        ; sound on
+       jmp  _4102                                          ; JR $4171          ; wait for another key
+pause_sound_off:                                           ; >414b
+       cb   a,@bytes+>51                                   ; CP $51            ; 'Q'?
+       jne  pause_mute                                     ; JR NZ,$4157       ; no - try the next key
+       czc  @bit6,r0                                       ; BIT 6,(HL)        ; muted?
+       jne  _4102                                          ; JR NZ,$4155       ; yes
+       szcb @bit0,@options                                 ; RES 0,(HL)        ; sound off
+       jmp  _4102                                          ; JR $4171          ; wait for another key
+pause_mute:                                                ; >4157
+       cb   a,@bytes+>4d                                   ; CP $4D            ; 'M'?
+       jne  pause_toggle_option                            ; JR NZ,$4165       ; no - try the remaining keys
+       li   r2,>4000                                       ; LD A,(HL) / XOR $40; toggle mute
+       xor  r2,r0                                          ;                   ; 
+       movb r0,@options                                    ; LD (HL),A         ; 
+       jne  _4102                                          ; JR NZ,$4163       ; muted
+       socb @bit0,@options                                 ; SET 0,(HL)        ; unmuted - sound on
+       jmp  _4102                                          ; JR $4171          ; wait for another key
+pause_toggle_option:                                       ; >4165
+       movb @option_bits(r1),r2                            ; LD A,$09 / SUB C / LD C,A / LD HL,$4208 / ADD HL,BC; the key's bit
+       xor  r2,r0                                          ; LD A,(DE) / XOR (HL); toggle it
+       movb r0,@options                                    ; LD (DE),A         ; 
+       jmp  _4102                                          ; JR $4102          ; wait for another key
+
+********************************************************************************
+* Keys for the frozen game
+* 
+* Used by the routine at #R$40DE.
+* .
+* The keys #R$4102 waits for while the game is frozen: 'R', 'D', 'Y',
+* 'B' and 'F' toggle options (#R$4165, #R$4208), 'M' mutes (#R$4157),
+* 'S' and 'Q' turn the sound on and off (#R$413C, #R$414B), '1' quits
+* (#R$412C), and STOP ($86) unfreezes the game.
+frozen_keys:                                               ; >41fe
+       byte >52,>44,>59,>42,>46,>4D,>53,>51                       ; 'R', 'D', 'Y', 'B', 'F', 'M', 'S', 'Q'
+       byte >31,>86                                               ; '1', STOP
+
+********************************************************************************
+* Option bits
+* 
+* The bit of the options (#R$E914) toggled by each of 'R', 'D', 'Y', 'B'
+* and 'F' while the game is frozen (#R$4165).
+option_bits:                                               ; >4208
+       byte >04,>02,>10,>08,>20                                   ; 
+
+********************************************************************************
+* The message "Game Frozen"
+msg_game_frozen_4223:                                      ; >4223
+       text 'Game Froze',>ee                                      ; 
+       even                                                       ; 
+
 rom_bank_12_end:
        equ  $
        bss  >8000-$

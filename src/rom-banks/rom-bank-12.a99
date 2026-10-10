@@ -1577,6 +1577,132 @@ _181f:                                                     ; >181f
        jne  _1814                                          ; JR NZ,$1814       ; 
        .endproc                                            ; RET               ; 
 
+********************************************************************************
+* "REAR VIEW" bitmap
+* 
+* The view name shown when switching to the rear view (#R$64B5): 7
+* characters of 5 pixel rows each, one character per line, which #R$645B
+* copies into rows 1-5 of the character patterns at VRAM $0060-$0097.
+* TI: the view names are in ROM bank 12 with the code that switches to them
+view_name_rear:                                            ; >11b2
+       byte >3C,>36,>3C,>34,>32                                   ; 
+       byte >F9,>C3,>F3,>C3,>FB                                   ; 
+       byte >CF,>6D,>EF,>6D,>6C                                   ; 
+       byte >03,>83,>03,>01,>80                                   ; 
+       byte >6F,>66,>66,>46,>8F                                   ; 
+       byte >7D,>61,>79,>61,>7C                                   ; 
+       byte >B0,>B0,>B0,>F0,>A0                                   ; 
+view_name_left:                                            ; >11d5
+       byte >30,>30,>30,>30,>3E                                   ; 
+       byte >FB,>C3,>F3,>C3,>FB                                   ; 
+       byte >EF,>06,>C6,>06,>06                                   ; 
+       byte >03,>03,>03,>01,>00                                   ; 
+       byte >6F,>66,>66,>46,>8F                                   ; 
+       byte >7D,>61,>79,>61,>7C                                   ; 
+       byte >B0,>B0,>B0,>F0,>A0                                   ; 
+view_name_right:                                           ; >11f8
+       byte >F3,>D9,>F1,>D1,>CB                                   ; 
+       byte >CF,>98,>9B,>99,>CF                                   ; 
+       byte >6D,>6C,>7C,>6C,>6C                                   ; 
+       byte >E0,>C0,>C0,>C0,>C0                                   ; 
+       byte >6D,>6C,>6C,>28,>11                                   ; 
+       byte >EF,>CC,>CF,>CC,>EF                                   ; 
+       byte >B6,>36,>36,>3E,>94                                   ; 
+       even                                                       ; 
+
+********************************************************************************
+* Key '2': buy cargo, or switch to the rear view
+* 
+* Reached via the key table at #R$419B.
+key_handler_2:                                             ; >417d
+       .proc                                               ;                   ; 
+       movb @docked,r0                                     ; LD A,($E90A) / OR A; 
+       jeq  key_handler_2_1                                ; JP NZ,$5BBD       ; 
+       .far_call code_bank_7_select,buy_cargo              ;                   ; docked - buy cargo
+       jmp  key_handler_2_2                                ;                   ; 
+key_handler_2_1:                                           
+       bl   @switch_to_rear_view                           ; JP $64B5          ; in flight - the rear view
+key_handler_2_2:                                           
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Key '3': sell cargo, or switch to the left view
+* 
+* Reached via the key table at #R$419B.
+key_handler_3:                                             ; >4187
+       .proc                                               ;                   ; 
+       movb @docked,r0                                     ; LD A,($E90A) / OR A; 
+       jeq  key_handler_3_1                                ; JP NZ,$5CEE       ; 
+       .far_call code_bank_7_select,sell_cargo             ;                   ; docked - sell cargo
+       jmp  key_handler_3_2                                ;                   ; 
+key_handler_3_1:                                           
+       bl   @switch_to_left_view                           ; JP $64C9          ; in flight - the left view
+key_handler_3_2:                                           
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Key '4': equip ship, or switch to the right view
+* 
+* Reached via the key table at #R$419B.
+key_handler_4:                                             ; >4191
+       .proc                                               ;                   ; 
+       movb @docked,r0                                     ; LD A,($E90A) / OR A; 
+       jeq  key_handler_4_1                                ; JP NZ,$5DBB       ; 
+       .far_call code_bank_7_select,equip_ship             ;                   ; docked - equip the ship
+       jmp  key_handler_4_2                                ;                   ; 
+key_handler_4_1:                                           
+       bl   @switch_to_right_view                          ; JP $64DD          ; in flight - the right view
+key_handler_4_2:                                           
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Switch to the rear view
+* 
+* Used by the routine at #R$417D.
+* .
+* Rear view counterpart of #R$64A1 (key '2').
+switch_to_rear_view:                                       ; >64b5
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; 
+       li   hl,view_rear                                   ; LD HL,$44E6       ; the rear view's conversion
+       mov  hl,@convert_to_view+>0002                      ; LD ($44CF),HL     ; patch the view conversion (#R$44CE)
+       movb @bytes+>01,b                                   ; LD B,$01          ; B = 1 (rear view)
+       li   hl,stardust_rear_view                          ; LD HL,$656B       ; the rear view's stardust handler
+       li   de,view_name_rear                              ; LD DE,$11B2       ; the rear view's name
+       b    @switch_view                                   ; JP $645B          ; switch view
+
+********************************************************************************
+* Switch to the left view
+* 
+* Used by the routine at #R$4187.
+* .
+* Left view counterpart of #R$64A1 (key '3').
+switch_to_left_view:                                       ; >64c9
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; 
+       li   hl,view_left                                   ; LD HL,$44F3       ; the left view's conversion
+       mov  hl,@convert_to_view+>0002                      ; LD ($44CF),HL     ; patch the view conversion (#R$44CE)
+       movb @bytes+>02,b                                   ; LD B,$02          ; B = 2 (left view)
+       li   hl,stardust_left_view                          ; LD HL,$6628       ; the left view's stardust handler
+       li   de,view_name_left                              ; LD DE,$11D5       ; the left view's name
+       b    @switch_view                                   ; JP $645B          ; switch view
+
+********************************************************************************
+* Switch to the right view
+* 
+* Used by the routine at #R$4191.
+* .
+* Right view counterpart of #R$64A1 (key '4').
+switch_to_right_view:                                      ; >64dd
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; 
+       li   hl,view_right                                  ; LD HL,$44FB       ; the right view's conversion
+       mov  hl,@convert_to_view+>0002                      ; LD ($44CF),HL     ; patch the view conversion (#R$44CE)
+       movb @bytes+>03,b                                   ; LD B,$03          ; B = 3 (right view)
+       li   hl,stardust_right_view                         ; LD HL,$6682       ; the right view's stardust handler
+       li   de,view_name_right                             ; LD DE,$11F8       ; the right view's name
+       b    @switch_view                                   ; JP $645B          ; switch view
+
 rom_bank_12_end:
        equ  $
        bss  >8000-$

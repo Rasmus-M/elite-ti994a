@@ -321,6 +321,680 @@ scoop_announce:                                            ; >8c2f
        .retc                                               ; SCF / RET         ; scooped
 
 
+********************************************************************************
+* Recharge the energy banks and shields
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called every frame by the main loop (#R$13FD). Every 16 frames (counted
+* by #R$E944) cools the laser and charges the energy banks by 1 (#R$190D),
+* and once they're full charges the shields too (#R$1928). An energy unit
+* (#R$F77E) makes this faster and charges the shields at the same time
+* ($18FF).
+* .
+* At $18FF, recharges every 8 frames with an extra energy unit (#R$F77E =
+* 1), or every 4 with a naval energy unit (2, the reward for mission 2),
+* charging the shields as well as the energy banks.
+recharge:                                                  ; >18e6
+       .proc                                               ;                   ; 
+       sb   one,@recharge_timer                            ; LD HL,$E944 / DEC (HL); 
+       jne  _18e6_end                                      ; RET NZ            ; not time yet
+       movb @item_energy_unit,a                            ; LD A,($F77E) / OR A; energy unit?
+       jne  recharge_energy_unit                           ; JR NZ,$18FF       ; fitted
+       movb @bytes+>10,@recharge_timer                     ; LD (HL),$10       ; 16 frames until the next time
+       bl   @cool_laser_charge_energy                      ; CALL $190D        ; cool the laser, charge the energy banks
+       cb   @energy_gauge,@bytes+>60                       ; LD A,($F817) / CP $60; 
+       jne  _18e6_end                                      ; CALL Z,$1928      ; 
+       bl   @charge_shields                                ;                   ; full: charge the shields
+       jmp  _18e6_end                                      ; RET               ; 
+recharge_energy_unit:                                      ; >18ff
+       movb @bytes+>08,r0                                  ; DEC A / LD A,$08  ; 8 frames until the next time...
+       cb   a,one                                          ;                   ; 
+       jeq  _1906                                          ; JR Z,$1906        ; 
+       movb @bytes+>04,r0                                  ; LD A,$04          ; ...or 4 with a naval energy unit
+_1906:                                                     ; >1906
+       movb r0,@recharge_timer                             ; LD (HL),A         ; 
+       bl   @cool_laser_charge_energy                      ; CALL $190D        ; cool the laser, charge the energy banks
+       bl   @charge_shields                                ; JP $1928          ; charge the shields
+_18e6_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Cool the laser and charge the energy banks
+* 
+* Used by the routine at #R$18E6.
+* .
+* Cools the laser by 2 (#R$F813, not below 0), and charges the energy
+* banks (#R$F817) by 1, up to 96; redrawing the gauges (#R$6B60,
+* #R$6A88).
+cool_laser_charge_energy:                                  ; >190d
+       .proc                                               ;                   ; 
+       movb @laser_temp_gauge,r0                           ; LD HL,$F813 / LD A,(HL) / OR A; 
+       jeq  _191d                                          ; JR Z,$191D        ; already 0
+       sb   @bytes+>02,@laser_temp_gauge                   ; DEC (HL) / DEC (HL); cool by 2...
+       jgt  cool_laser_redraw                              ; JP P,$191A        ; 
+       jeq  cool_laser_redraw                              ;                   ; 
+       ab   one,@laser_temp_gauge                          ; INC (HL)          ; overshot below 0 - back up to 0
+cool_laser_redraw:                                         ; >191a
+       bl   @draw_laser_temperature                        ; CALL $6B60        ; redraw the laser temperature gauge
+_191d:                                                     ; >191d
+       cb   @energy_gauge,@bytes+>60                       ; LD HL,$F817 / LD A,(HL) / CP $60; full (96)?
+       jeq  _190d_end                                      ; RET Z             ; yes
+       ab   one,@energy_gauge                              ; INC (HL)          ; charge by 1
+       bl   @draw_energy_banks                             ; JP $6A88          ; redraw the energy gauge
+_190d_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Charge the shields
+* 
+* Used by the routine at #R$18E6.
+* .
+* Charges the fore and aft shields (#R$F80F, #R$F810) by 1 each, up to
+* 24, redrawing them (#R$6B48, #R$6B54).
+charge_shields:                                            ; >1928
+       .proc                                               ;                   ; 
+       cb   @fore_shield,@bytes+>18                        ; LD HL,$F80F / LD A,(HL) / CP $18; full (24)?
+       jeq  _1934                                          ; JR Z,$1934        ; 
+       ab   one,@fore_shield                               ; INC (HL)          ; charge by 1
+       bl   @draw_gauge_dashboard_6b48                     ; CALL $6B48        ; redraw the fore shield
+_1934:                                                     ; >1934
+       cb   @aft_shield,@bytes+>18                         ; LD HL,$F810 / LD A,(HL) / CP $18; full (24)?
+       jeq  _1928_end                                      ; RET Z             ; 
+       ab   one,@aft_shield                                ; INC (HL)          ; charge by 1
+       bl   @draw_gauge_dashboard_6b54                     ; JP $6B54          ; redraw the aft shield
+_1928_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Check whether the player's laser has hit the object
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called for each object by the main loop (#R$13FD). Only acts in the frame
+* the laser is fired (bit 7 of ($F81B), see #R$2AD0), if the object is in
+* the sights (($EF99), set by #R$4735) and the shot hasn't already hit
+* something (($E873) zero). Unless the ship is already attacking (type 6)
+* or turning away (7), it reacts according to bits 0-1 of its class byte
+* ($F807): 0 not at all, 1 by turning away and leaving (type 12), 2 or 3 by
+* turning away and then attacking. Then works out the damage.
+* .
+* At $291E, makes the ship turn away (#R$281E) and then attack: type 11
+* (break off, then attack) if it was flying on (type 8), otherwise type 6.
+* At $2929, sets the handler type to switch to after turning away.
+* .
+* At $292F, works out the damage from the laser's power (($F81A), set by
+* #R$6D82 for the current view's laser): for the space station (ship type
+* 1) none - unless a mission ($E93D = $52) needs it destroyed, when it's a
+* quarter - but the player's legal status worsens by 10 (#R$EB65); a
+* quarter for ship types $1E and $1F; none for a cargo canister (ship type
+* 3) unless ($F7EC) is negative; otherwise the full power.
+* .
+* At $2977, the damage is taken off the object's energy ($F7E9). If that
+* leaves none, the object is destroyed: for the Constrictor (ship type $1F)
+* the mission state ($E93D) advances first; for the space station, ($EFA9)
+* records that it has gone (which stops #R$3187 launching ships) and the
+* mission state advances. Then (at $299A) the object is removed (#R$31AD),
+* the explosion sound plays, #R$8DB9 spawns its debris and any missile lock
+* on it is cancelled (#R$30EA).
+* .
+* If the object survives (at $29AE) with at most one more shot's worth of
+* energy left, there's a 10/256 chance that - if it's a trader, pirate or
+* shuttle (class 0-2, see #R$A817) - its pilot ejects in an escape capsule
+* (#R$2A71). Then, if it still has missiles (($F7EA)), a 20/256 chance that
+* it fires one at the player (#R$2A3A) - or, for a Thargoid (ship type
+* $13), releases Thargons (#R$2A94).
+* .
+* Finally (at $29E0, for every hit) calls the police (#R$2A1C) if the
+* player is in the station's safe zone (#R$EB05), fewer than 2 Vipers (ship
+* type $0C, count at $E850) are about, none are already due, and the target
+* was the station itself, a trader or shuttle (class 0 or 8), or a
+* Thargoid-class ship during mission state $52; then marks the shot as used
+* (($E873)) and plays the hit sound (effect 9).
+* TI: process_frame only calls this when the laser has fired this frame.
+laser_hit_check:                                           ; >28f6
+       .proc                                               ;                   ; 
+       movb @laser_state,r0                                ; LD A,($F81B) / OR A; 
+       jgt  _28f6_exit                                     ; RET P             ; laser not fired this frame
+       jeq  _28f6_exit                                     ;                   ; 
+       movb @in_sights,r0                                  ; LD A,($EF99) / OR A; 
+       jeq  _28f6_exit                                     ; RET Z             ; not in the sights
+       movb @laser_shot_used,r0                            ; LD A,($E873) / OR A; 
+       jne  _28f6_exit                                     ; RET NZ            ; the shot has already hit something
+       jmp  laser_hit_check_1                              ;                   ; 
+_28f6_exit:
+       .endproc                                            ;                   ; 
+laser_hit_check_1:
+       movb @handler_type,a                                ; LD A,($F7EE)      ; 
+       cb   a,@bytes+>06                                   ; CP $06            ; 
+       jeq  _292f                                          ; JR Z,$292F        ; attacking - no reaction
+       cb   a,@bytes+>07                                   ; CP $07            ; 
+       jeq  _292f                                          ; JR Z,$292F        ; turning away - no reaction
+       movb @bp_class,r0                                   ; LD A,($F807)      ; 
+       andi r0,>0300                                       ; AND $03           ; how it reacts to being shot
+       jeq  _292f                                          ; JR Z,$292F        ; 0: no reaction
+       cb   r0,one                                         ; DEC A             ; 
+       jne  laser_hit_react                                ; JR NZ,$291E       ; 2 or 3
+       movb @bytes+>0c,a                                   ; LD A,$0C          ; 1: turn away, then leave (type 12)
+       jmp  _2929                                          ; JR $2929          ; 
+laser_hit_react:                                           ; >291e
+       movb @bytes+>0b,r0                                  ; LD A,$0B          ; 
+       cb   a,@bytes+>08                                   ; LD A,($F7EE) / CP $08; 
+       jeq  laser_hit_react_1                              ; JR Z,$2929        ; was flying on - break off (11)
+       movb @bytes+>06,r0                                  ; LD A,$06          ; otherwise attack (6)
+laser_hit_react_1:                                         
+       movb r0,a                                           ;                   ; 
+_2929:                                                     ; >2929
+       movb a,@next_handler_type                           ; LD ($F7F3),A      ; handler type after turning away
+       .far_call code_bank_11_select,start_turning_away    ; CALL $281E        ; turn away
+_292f:                                                     ; >292f
+       movb @laser_power,@c                                ; LD A,($F81A) / LD C,A; C = laser power
+       movb @ship_type,a                                   ; LD A,($F7E7)      ; 
+       cb   a,one                                          ; CP $01            ; 
+       jne  laser_quarter_damage                           ; JR NZ,$2959       ; not the space station
+       ab   @bytes+>0a,@legal_status                       ; LD A,($EB65) / ADD A,$0A; station: legal status += 10...
+       jnc  _2942                                          ; JR NC,$2942       ; 
+       seto r0                                             ; SBC A,A           ; ...up to $FF
+       movb r0,@legal_status                               ;                   ; 
+_2942:                                                     ; >2942
+       movb @legal_status,@legal_status_copy               ; LD ($EB65),A / LD ($EF97),A; ...and copied to $EF97
+       sb   a,a                                            ;                   ; 
+       cb   @mission_state,@bytes+>52                      ; LD A,($E93D) / CP $52; 
+       jne  _2977                                          ; JR NZ,$2956 / XOR A; no mission - no damage
+       movb @c,a                                           ; LD A,C            ; 
+       srl  a,2                                            ; SRL A / SRL A     ; a quarter of the power
+       andi a,>3f00                                        ;                   ; 
+       jmp  _2977                                          ; JR $2977          ; 
+laser_quarter_damage:                                      ; >2959
+       cb   a,@bytes+>1f                                   ; CP $1F            ; 
+       jeq  _2961                                          ; JR Z,$2961        ; 
+       cb   a,@bytes+>1e                                   ; CP $1E            ; 
+       jne  laser_cargo_damage                             ; JR NZ,$2968       ; 
+_2961:                                                     ; >2961
+       movb @c,a                                           ; LD A,C            ; 
+       srl  a,2                                            ; SRL A / SRL A     ; a quarter of the power
+       andi a,>3f00                                        ;                   ; 
+       jmp  _2977                                          ; JR $2977          ; 
+laser_cargo_damage:                                        ; >2968
+       cb   a,@bytes+>03                                   ; CP $03            ; a cargo canister?
+       jne  laser_damage                                   ; JR NZ,$2976       ; no - full damage
+       sb   a,a                                            ;                   ; 
+       movb @cargo_type,r0                                 ; LD A,($F7EC) / OR A; 
+       jlt  _2977                                          ; JP P,$2976 / XOR A; the cloaking device - no damage
+laser_damage:                                              ; >2976
+       movb @c,a                                           ; LD A,C            ; full damage
+_2977:                                                     ; >2977
+       movb a,@c                                           ; LD C,A            ; C = damage
+       movb @object_energy,a                               ; LD A,($F7E9)      ; 
+       sb   @c,a                                           ; SUB C             ; 
+       movb a,@object_energy                               ; LD ($F7E9),A      ; take it off the energy
+       joc  laser_survived                                 ; JR NC,$29AE       ; still has some
+       movb @ship_type,a                                   ; LD A,($F7E7)      ; 
+       cb   a,@bytes+>1f                                   ; CP $1F            ; the Constrictor?
+       jne  laser_destroy                                  ; JR NZ,$298E       ; 
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); yes - advance the mission
+       jmp  _299a                                          ; JR $299A          ; 
+laser_destroy:                                             ; >298e
+       cb   a,one                                          ; CP $01            ; the space station?
+       jne  _299a                                          ; JR NZ,$299A       ; 
+       sb   one,@station_destroyed                         ; LD HL,$EFA9 / DEC (HL); yes - it has gone
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); advance the mission
+_299a:                                                     ; >299a
+       li   ix,object_status_byte                          ; LD IX,$F7CD       ; IX -> the working object
+       bl   @destroy_object                                ; CALL $31AD        ; destroy it
+* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+       bl   @spawn_cargo                                   ; CALL $8DB9        ; its cargo
+       .far_call code_bank_11_select,cancel_missile_lock_on_object; CALL $30EA        ; cancel any missile lock on it
+       jmp  _29e0                                          ; JR $29E0          ; maybe call the police
+laser_survived:                                            ; >29ae
+       sb   @c,a                                           ; SUB C             ; would another shot destroy it?
+       joc  _29c4                                          ; JR NC,$29C4       ; no
+       bl   @random_byte                                   ; CALL $2176        ; 
+       cb   a,@bytes+>0a                                   ; CP $0A            ; 
+       jhe  _29c4                                          ; JR NC,$29C4       ; 10/256 chance
+       movb @bp_class,a                                    ; LD A,($F807)      ; 
+       srl  a,2                                            ; RRA / RRA         ; 
+       andi a,>0700                                        ; AND $07           ; A = class
+       cb   a,@bytes+>03                                   ; CP $03            ; 
+       jhe  _29c4                                          ;                   ; 
+       bl   @eject_escape_capsule                          ; CALL C,$2A71      ; trader, pirate or shuttle: eject an escape capsule
+_29c4:                                                     ; >29c4
+       movb @object_missiles,r0                            ; LD A,($F7EA) / OR A; any missiles left?
+       jeq  _29e0                                          ; JR Z,$29E0        ; no
+       bl   @random_byte                                   ; CALL $2176        ; 
+       cb   a,@bytes+>14                                   ; CP $14            ; 
+       jhe  _29e0                                          ; JR NC,$29E0       ; 20/256 chance
+       cb   @ship_type,@bytes+>13                          ; LD A,($F7E7) / CP $13; 
+       jne  laser_fire_back_and_police                     ; JR NZ,$29DD       ; not a Thargoid - fire a missile
+       bl   @release_thargons                              ; CALL $2A94        ; Thargoid: release Thargons
+       jmp  _29e0                                          ; JR $29E0          ; 
+laser_fire_back_and_police:                                ; >29dd
+       bl   @enemy_fires_missile                           ; CALL $2A3A        ; fire a missile at the player
+_29e0:                                                     ; >29e0
+       cb   @num_vipers,@bytes+>02                         ; LD A,($E850) / CP $02; 
+       jhe  _2a13                                          ; JR NC,$2A13       ; 2 or more Vipers - no more police
+       movb @police_to_launch,r0                           ; LD A,($E934) / OR A; 
+       jne  _2a13                                          ; JR NZ,$2A13       ; police already due
+       movb @station_in_range,r0                           ; LD A,($EB05) / OR A; 
+       jeq  _2a13                                          ; JR Z,$2A13        ; not in the safe zone
+       cb   @ship_type,one                                 ; LD A,($F7E7) / CP $01; 
+       jeq  _2a10                                          ; JR Z,$2A10        ; shot the station - call the police
+       movb @bp_class,a                                    ; LD A,($F807)      ; 
+       andi a,>1c00                                        ; AND $1C           ; 
+       jeq  _2a10                                          ; JR Z,$2A10        ; a trader
+       cb   a,@bytes+>08                                   ; CP $08            ; 
+       jeq  _2a10                                          ; JR Z,$2A10        ; a shuttle
+       cb   a,@bytes+>1c                                   ; CP $1C            ; 
+       jne  _2a13                                          ; JR NZ,$2A13       ; 
+       cb   @mission_state,@bytes+>52                      ; LD A,($E93D) / CP $52; 
+       jne  _2a13                                          ; JR NZ,$2A13       ; 
+_2a10:                                                     ; >2a10
+       bl   @call_police                                   ; CALL $2A1C        ; call the police
+_2a13:                                                     ; >2a13
+       sb   one,@laser_shot_used                           ; LD HL,$E873 / DEC (HL); the shot has hit something
+* TI: no sound effect 9 (#R$7468), as the sound effects aren't converted yet
+_28f6_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Call the police
+* 
+* Used by the routines at #R$28F6 and #R$2C21.
+* .
+* Arms the countdown for #R$315C to launch Vipers from the space station:
+* ($E934) = how many (a random number from 1 to twice the player's rank
+* (#R$EB12) + 2, at most 6), and a 40-frame wait until the first ($E870).
+* 
+* O:($E934) Number of Vipers to launch (1-6)
+* O:($E870) Frames until the first
+call_police:                                               ; >2a1c
+       .proc                                               ;                   ; 
+       movb @combat_rank,a                                 ; LD A,($EB12)      ; 
+       ab   one,a                                          ; INC A             ; 
+       ab   a,a                                            ; ADD A,A           ; 
+       movb a,@c                                           ; LD C,A            ; C = (rank + 1) * 2
+_2a22:                                                     ; >2a22
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>1f00                                        ; AND $1F           ; 
+       cb   a,@c                                           ; CP C              ; 
+       jhe  _2a22                                          ; JR NC,$2A22       ; too many - pick again
+       ab   one,a                                          ; INC A             ; 1 to (rank + 1) * 2
+       cb   a,@bytes+>07                                   ; CP $07            ; 
+       jl   _2a31                                          ; JR C,$2A31        ; 
+       movb @bytes+>06,a                                   ; LD A,$06          ; at most 6
+_2a31:                                                     ; >2a31
+       movb a,@police_to_launch                            ; LD ($E934),A      ; number of Vipers to launch
+       movb @bytes+>28,@police_launch_timer                ; LD A,$28 / LD ($E870),A; 40 frames until the first
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* A ship fires a missile at the player
+* 
+* Used by the routine at #R$28F6.
+* .
+* Does nothing if the ship is too close (distance under $200) or the
+* player is cloaked (#R$EF9F). Otherwise, keeping the working object's
+* record safe (#R$3341, #R$334D), spawns a missile (ship type 2) with
+* handler type 14 (#R$2618) at speed $41, and if there was room for it
+* announces "Incoming missile" and plays the launch sound. Also
+* decrements the byte at $009D, in unused space, which nothing reads.
+enemy_fires_missile:                                       ; >2a3a
+       .proc                                               ;                   ; 
+       cb   @object_distance_hi,@bytes+>02                 ; LD A,($EB8F) / CP $02; 
+       jl   _2a3a_end                                      ; RET C             ; too close - don't fire
+       movb @cloaking_active_flag,r0                       ; LD A,($EF9F) / OR A; 
+       jne  _2a3a_end                                      ; RET NZ            ; player cloaked - don't fire
+       .far_call code_bank_11_select,save_working_object_to_scratch; CALL $3341        ; save the working object
+       movb @bytes+>41,a                                   ; LD A,$41          ; 
+       movb a,@object_status_byte                          ; LD ($F7CD),A      ; 
+       movb a,@object_speed                                ; LD ($F7E6),A      ; speed $41
+       movb @bytes+>0e,@handler_type                       ; LD A,$0E / LD ($F7EE),A; handler type 14: missile homing in on the player
+       movb @bytes+>02,@ship_type                          ; LD A,$02 / LD ($F7E7),A; ship type 2: missile
+       bl   @add_object                                    ; CALL $3037        ; spawn it
+       jnc  _2a6e                                          ; JR NC,$2A6E       ; no room for it
+       li   hl,msg_incoming_missile                        ; LD HL,$33B7       ; "Incoming missile"
+       bl   @show_view_message                             ; CALL $39C8        ; announce it
+* TI: no DEC ($009D) (nothing reads it, and it's console ROM on the TI), and no
+* sound effect 11 (#R$7468)
+_2a6e:                                                     ; >2a6e
+       .far_call code_bank_11_select,restore_working_object_from_scratch; JP $334D          ; restore the working object
+_2a3a_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Eject an escape capsule
+* 
+* Used by the routine at #R$28F6.
+* .
+* Called by #R$291E when a nearly-destroyed trader, pirate or shuttle's
+* pilot ejects. Spawns an escape capsule (ship type 5) near the ship
+* with a random orientation (#R$8E45), at speed 1, which flies away
+* (handler type 12), keeping the
+* working object's record safe meanwhile (#R$3341, #R$334D).
+eject_escape_capsule:                                      ; >2a71
+       .proc                                               ;                   ; 
+       .far_call code_bank_11_select,save_working_object_to_scratch; CALL $3341        ; save the working object
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+       movb one,@object_speed                              ; LD ($F7E6),A      ; speed 1
+       movb @bytes+>05,@ship_type                          ; LD A,$05 / LD ($F7E7),A; ship type 5: escape capsule
+       movb @bytes+>03,@cargo_type                         ; LD A,$03 / LD ($F7EC),A; cargo type 3: slaves (the pilot, if scooped)
+       .far_call code_bank_11_select,random_orientation    ; CALL $8E45        ; point it in a random direction
+       movb @bytes+>0c,@handler_type                       ; LD A,$0C / LD ($F7EE),A; handler type 12: leave
+       bl   @add_object                                    ; CALL $3037        ; spawn it
+       .far_call code_bank_11_select,restore_working_object_from_scratch; JP $334D          ; restore the working object
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* A Thargoid releases its Thargons
+* 
+* Used by the routine at #R$28F6.
+* .
+* Called by #R$291E when a Thargoid fires back. Spawns 4-7 Thargons
+* (ship type 6) at the Thargoid's position, pointing in random directions
+* (#R$8E45), speeding up and then
+* attacking (handler type 8, #R$2859). Each remembers its Thargoid's
+* slot (#R$F7EB), so they can be sent away when it's destroyed (#R$31AD),
+* and holds alien items (cargo type 16, #R$F7EC) if scooped. The
+* Thargoid has none left afterwards (#R$F7EA).
+release_thargons:                                          ; >2a94
+       .proc                                               ;                   ; 
+       sb   @object_missiles,@object_missiles              ; XOR A / LD ($F7EA),A; no more Thargons
+       .far_call code_bank_11_select,save_working_object_to_scratch; CALL $3341        ; save the Thargoid
+       movb @current_slot,@thargons_thargoid               ; LD A,($E911) / LD ($F7EB),A; remember the Thargoid's slot
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>0300                                        ; AND $03           ; 
+       ab   @bytes+>04,a                                   ; ADD A,$04         ; 4-7 Thargons
+       movb a,b                                            ; LD B,A            ; 
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+       movb one,@object_speed                              ; LD ($F7E6),A      ; speed 1
+       movb @bytes+>08,@handler_type                       ; LD A,$08 / LD ($F7EE),A; handler type 8: fly on, then attack
+       movb @bytes+>06,@ship_type                          ; LD A,$06 / LD ($F7E7),A; ship type 6: Thargon
+       movb @bytes+>10,@cargo_type                         ; LD A,$10 / LD ($F7EC),A; cargo type 16: alien items
+_2ac0:                                                     ; >2ac0
+       .push bc                                            ; PUSH BC           ; 
+       .far_call code_bank_11_select,random_orientation    ; CALL $8E45        ; point it in a random direction
+       .far_call code_bank_11_select,countdown_and_speed_up; CALL $2859        ; speed up for a while
+       bl   @add_object                                    ; CALL $3037        ; add it to the object table
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $2AC0        ; next Thargon
+       jne  _2ac0                                          ;                   ; 
+       .far_call code_bank_11_select,restore_working_object_from_scratch; JP $334D          ; restore the Thargoid
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Fire the laser (fire button or 'A')
+* 
+* Used by the routine at #R$401C.
+* .
+* Called by #R$401C while the fire control is held. Does nothing if the
+* current view has no laser (($F818) negative), the laser has overheated
+* (temperature ($F813) at 48) or it's still cooling down from the last
+* shot (($F81B) nonzero). Otherwise fires: sets ($F81B) to $80 so that
+* this frame's objects can be hit (#R$28F6) and the beams are drawn
+* (#R$2DC8), clears ($E873) so that the shot can hit one object, picks
+* the point the beams meet ($E867/$E868, near the centre of the view,
+* randomly jittered by up to 7 pixels), raises the laser temperature by
+* 2, plays the laser sound and redraws the temperature gauge (#R$6B60).
+fire_laser:                                                ; >2ad0
+       .proc                                               ;                   ; 
+       movb @view_laser_type,r0                            ; LD A,($F818) / OR A; 
+       jlt  _2ad0_end                                      ; RET M             ; no laser in this view
+       cb   @laser_temp_gauge,@bytes+>30                   ; LD A,($F813) / CP $30; 
+       jeq  _2ad0_end                                      ; RET Z             ; overheated
+       movb @laser_state,r0                                ; LD HL,$F81B / LD A,(HL) / OR A; 
+       jne  _2ad0_end                                      ; RET NZ            ; still cooling down
+       movb r0,@laser_shot_used                            ; LD ($E873),A      ; the shot hasn't hit anything yet
+       movb @bytes+>80,@laser_state                        ; LD (HL),$80       ; fired this frame
+       bl   @random_byte                                   ; LD A,R            ; (TI: a random byte for the R register)
+       andi a,>0700                                        ; AND $07           ; 
+       ab   @bytes+>55,a                                   ; ADD A,$55         ; 
+       movb a,@laser_target_x                              ; LD ($E867),A      ; the beams meet at X = $55-$5C...
+       bl   @random_byte                                   ; LD A,R            ; 
+       andi a,>0700                                        ; AND $07           ; 
+       ab   @bytes+>3d,a                                   ; ADD A,$3D         ; 
+       movb a,@laser_target_y                              ; LD ($E868),A      ; ...and Y = $3D-$44
+       ab   @bytes+>02,@laser_temp_gauge                   ; LD HL,$F813 / INC (HL) / INC (HL); laser temperature += 2
+* TI: no sound effect 3 (#R$7468), as the sound effects aren't converted yet
+       bl   @draw_laser_temperature                        ; JP $6B60          ; redraw the laser temperature gauge
+_2ad0_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Draw the laser beams
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called every frame by the main loop (#R$13FD); does nothing if the
+* dashboard isn't shown (#R$6C9E). In the frame the laser fires (($F81B)
+* negative, see #R$2AD0), starts the cooldown - loads ($F81B) with the
+* laser's cooldown (#R$F819) - and draws four beams, from the corners of
+* the view (the table at #R$3365) to the point ($E867) where they meet.
+* While ($F81B) is positive, counts the cooldown down ($2DEF).
+draw_laser_beams:                                          ; >2dc8
+       .proc                                               ;                   ; 
+       bl   @gate_dashboard_hidden                         ; CALL $6C9E        ; 
+       movb @laser_state,r0                                ; LD HL,$F81B / LD A,(HL) / OR A; 
+       jeq  _2dc8_end                                      ; RET Z             ; laser ready - nothing to do
+       jlt  _2dd2                                          ; JP P,$2DEF        ; 
+       sb   one,@laser_state                               ; DEC (HL)          ; cooling down: one fewer frame
+       jmp  _2dc8_end                                      ; RET               ; 
+_2dd2:                                                     ; >2dd2
+       movb @laser_cooldown,@laser_state                   ; LD A,($F819) / LD (HL),A; fired this frame: start the cooldown
+       li   hl,laser_beam_start_points                     ; LD HL,$3365       ; the four corners of the view
+       movb @bytes+>04,b                                   ; LD B,$04          ; 
+_2ddd:                                                     ; >2ddd
+       movb *hl+,@e                                        ; LD E,(HL) / INC HL; 
+       movb *hl+,d                                         ; LD D,(HL) / INC HL; 
+       .push bc                                            ; PUSH BC           ; 
+       .push hl                                            ; PUSH HL           ; 
+       movb @laser_target_x,@c                             ; LD BC,($E867)     ; BC = the point where the beams meet
+       movb @laser_target_y,b                              ;                   ; 
+       .call @setup_bresenham_line                         ; CALL $3C48        ; draw a beam
+       .pop hl                                             ; POP HL            ; 
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $2DDD        ; 
+       jne  _2ddd                                          ;                   ; 
+_2dc8_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Laser beam start points
+* 
+* The (x, y) screen coordinates #R$2DC8 draws the laser beams from: two
+* beams from each bottom corner of the space view.
+laser_beam_start_points:                                   ; >3365
+       byte >00,>7F                                               ; bottom left
+       byte >00,>76                                               ; bottom left, a little higher
+       byte >AF,>7F                                               ; bottom right
+       byte >AF,>76                                               ; bottom right, a little higher
+
+********************************************************************************
+* Draw a ship's laser beam
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called by the main loop (#R$13FD) when a ship has fired at the player
+* (#R$E92D, see #R$26A9) and is drawn this frame (#R$E6F3). Draws a line
+* from the ship's gun (vertex #R$F803) to a point 3000 ahead along its nose
+* vector (#R$439D, #R$F7DA). If that point is in front of the player, $442A
+* draws the beam; otherwise, if the gun is, the beam is clipped where it
+* passes the player (#R$4B22).
+* .
+* At $442A, projects the far end (#R$47C4); then the gun vertex (#R$4A5C)
+* is projected too if it's in front of the player (at $4455), otherwise the
+* beam is clipped (#R$4B22). Draws the line (#R$3AC2).
+* TI: process_frame only calls this when the ship has fired (#R$E92D).
+draw_ship_laser:                                           ; >43c2
+       .proc                                               ;                   ; 
+       movb @ship_fired,r0                                 ; LD A,($E92D) / OR A; has the ship fired?
+       jeq  _4463                                          ; RET Z             ; no
+       movb @nothing_changed_flag,r0                       ; LD A,($E6F3) / OR A; 
+       jne  _4463                                          ; RET NZ            ; not drawn this frame
+       movb @vector_cache_valid_flag,r0                    ; LD A,($E6F0) / OR A; 
+       jne  _43d3                                          ; CALL Z,$433F      ; 
+       bl   @cache_orientation                             ;                   ; cache the orientation
+_43d3:                                                     ; >43d3
+       mov  @view_z,hl                                     ; LD HL,($E6DC)     ; 
+       a    hl,hl                                          ; ADD HL,HL         ; 
+       mov  hl,@view_z2                                    ; LD ($E6DA),HL     ; twice the ship's z
+       li   hl,>0bb8                                       ; LD HL,$0BB8       ; 3000...
+       li   ix,nose_vector                                 ; LD IX,$F7DA       ; ...along the nose vector
+       .far_call code_bank_11_select,multiply_vector       ; CALL $439D        ; 
+       bl   @convert_to_view                               ; CALL $44CE        ; convert to the view
+       bl   @add_object_position                           ; CALL $44D2        ; add the ship's position
+       movb de,@line_end_1_x+1                             ; LD ($F769),DE     ; the far end
+       movb @e,@line_end_1_x                               ;                   ; 
+       movb bc,@line_end_1_y+1                             ; LD ($F76B),BC     ; 
+       movb @c,@line_end_1_y                               ;                   ; 
+       movb hl,@line_end_1_z+1                             ; LD ($F76D),HL     ; 
+       movb @l,@line_end_1_z                               ;                   ; 
+       mov  hl,hl                                          ; JR Z,$43FC / LD A,H / OR A; 
+       jgt  draw_ship_laser_2                              ; JP P,$442A        ; in front of the player
+_43fc:                                                     ; >43fc
+       bl   @gun_vertex_relative                           ; LD A,($F803) / LD E,A / CALL $4A5C; the gun vertex relative to the player
+       jnc  _4463                                          ; JR NC,$4428       ; behind the player too
+       movb de,@line_end_2_x+1                             ; LD ($F76F),DE     ; the gun
+       movb @e,@line_end_2_x                               ;                   ; 
+       movb bc,@line_end_2_y+1                             ; LD ($F771),BC     ; 
+       movb @c,@line_end_2_y                               ;                   ; 
+       movb hl,@line_end_2_z+1                             ; LD ($F773),HL     ; 
+       movb @l,@line_end_2_z                               ;                   ; 
+       bl   @project_point                                 ; CALL $47C4        ; project the gun
+       mov  bc,@clip_point1_x                              ; LD ($EB92),BC     ; 
+       mov  de,@clip_point1_y                              ; LD ($EB94),DE     ; 
+       bl   @clip_line_at_player                           ; CALL $4B22        ; clip the beam where it passes the player
+       mov  bc,@clip_point2_x                              ; LD ($EB96),BC     ; 
+       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; 
+       bl   @clip_and_draw_line                            ; CALL $3AC2        ; draw the line
+       jmp  _4463                                          ; JR $4428 / JR $4463; 
+draw_ship_laser_2:                                         ; >442a
+       bl   @project_point                                 ; CALL $47C4        ; project the far end
+       mov  bc,@clip_point1_x                              ; LD ($EB92),BC     ; 
+       mov  de,@clip_point1_y                              ; LD ($EB94),DE     ; 
+       bl   @gun_vertex_relative                           ; LD A,($F803) / LD E,A / CALL $4A5C; the gun vertex relative to the player
+       joc  draw_ship_laser_3                              ; JR C,$4455        ; in front of the player
+       movb de,@line_end_2_x+1                             ; LD ($F76F),DE     ; 
+       movb @e,@line_end_2_x                               ;                   ; 
+       movb bc,@line_end_2_y+1                             ; LD ($F771),BC     ; 
+       movb @c,@line_end_2_y                               ;                   ; 
+       movb hl,@line_end_2_z+1                             ; LD ($F773),HL     ; 
+       movb @l,@line_end_2_z                               ;                   ; 
+       bl   @clip_line_at_player                           ; CALL $4B22        ; clip the beam where it passes the player
+       mov  bc,@clip_point2_x                              ; LD ($EB96),BC     ; 
+       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; 
+       jmp  _4460                                          ; JR $4460          ; 
+draw_ship_laser_3:                                         ; >4455
+       bl   @project_point                                 ; CALL $47C4        ; project the gun
+       mov  bc,@clip_point2_x                              ; LD ($EB96),BC     ; 
+       mov  de,@clip_point2_y                              ; LD ($EB98),DE     ; 
+_4460:                                                     ; >4460
+       bl   @clip_and_draw_line                            ; CALL $3AC2        ; draw the line
+_4463:                                                     ; >4463
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Spawn the cargo of a destroyed ship
+* 
+* Used by the routines at #R$25B9 and #R$28F6.
+* .
+* Called when a ship is destroyed (#R$25FF, #R$291E), with IX pointing at
+* its object record. Byte $14 of the ship's blueprint ($F809, see #R$A817)
+* gives the cargo: its low nibble the most cargo canisters that can appear
+* (a random number from 0 up to that, at most 7), its high nibble the cargo
+* type. $FF means just one canister (the Cougar's, holding the cloaking
+* device). An asteroid (ship type 4) breaks into platlets (ship type 7)
+* instead. Each canister's cargo type (#R$F7EC) is the ship's (with a
+* 27/256 chance of a random one instead), except that cargo type 15 from
+* the blueprint becomes $FF - the cloaking device (see #R$8BA6). The pieces
+* fly apart from the ship's position in random directions (#R$8E45) at
+* speed $FF, as handler type 9 (spin, fly on and leave).
+* .
+* At $8DCA, picks how many pieces there are. At $8E33, picks a random cargo
+* type.
+* .
+* At $8E37, turns cargo type 15 into $FF, the cloaking device. At $8E38,
+* gives the piece its cargo type and adds it to the object table.
+* 
+* I:IX Pointer to the destroyed ship's object record
+* TI: for an asteroid, the number of pieces is in asteroid_pieces (see #R$2BAC).
+spawn_cargo:                                               ; >8db9
+       .proc                                               ;                   ; 
+       movb @bp_cargo,a                                    ; LD A,($F809)      ; A = the ship's cargo byte
+       cb   @>1a(ix),@bytes+>04                            ;                   ; (TI: an asteroid's is in asteroid_pieces)
+       jne  _8db9_1                                        ;                   ; 
+       movb @asteroid_pieces,a                             ;                   ; 
+_8db9_1:                                                   
+       movb a,a                                            ; OR A              ; 
+       jeq  _8db9_end                                      ; RET Z             ; no cargo
+       .push a                                             ;                   ; 
+       .far_call code_bank_11_select,save_working_object_to_scratch; CALL $3341        ; save the working object
+       .pop a                                              ;                   ; 
+       movb a,@c                                           ; LD C,A            ; 
+       cb   a,@b255                                        ; CP $FF            ; the Cougar?
+       jne  spawn_cargo_2                                  ; JR NZ,$8DCA       ; no
+       movb one,a                                          ; LD A,$01          ; one canister
+       jmp  _8dd9                                          ; JR $8DD9          ; 
+spawn_cargo_2:                                             ; >8dca
+       andi a,>0f00                                        ; AND $0F           ; A = the most canisters
+       movb a,b                                            ; LD B,A            ; 
+_8dcd:                                                     ; >8dcd
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>0700                                        ; AND $07           ; A = 0-7
+       cb   a,b                                            ; CP B              ; 
+       jh   _8dcd                                          ; JR Z,$8DD7 / JR NC,$8DCD; too many - pick again
+       movb a,a                                            ; OR A              ; 
+       jeq  _8db9_end                                      ; RET Z             ; none
+_8dd9:                                                     ; >8dd9
+       movb a,b                                            ; LD B,A            ; B = number of canisters
+       movb @c,a                                           ; LD A,C            ; 
+       srl  a,4                                            ; RRA x 4           ; 
+       andi a,>0f00                                        ; AND $0F           ; 
+       movb a,@c                                           ; LD C,A            ; C = cargo type
+       movb @1(ix),@object_position_x                      ; LD L,(IX+$01) / LD H,(IX+$02) / LD ($F7CE),HL; start at the ship's position (TI: big-endian)
+       movb @2(ix),@object_position_x+1                    ;                   ; 
+       movb @3(ix),@object_position_y                      ; LD L,(IX+$03) / LD H,(IX+$04) / LD ($F7D0),HL; 
+       movb @4(ix),@object_position_y+1                    ;                   ; 
+       movb @5(ix),@object_position_z                      ; LD L,(IX+$05) / LD H,(IX+$06) / LD ($F7D2),HL; 
+       movb @6(ix),@object_position_z+1                    ;                   ; 
+       movb @bytes+>41,@object_status_byte                 ; LD A,$41 / LD ($F7CD),A; 
+       movb @bytes+>07,a                                   ; LD A,$07          ; an asteroid breaks into platlets...
+       cb   @>1a(ix),@bytes+>04                            ; LD A,(IX+$1A) / CP $04; 
+       jeq  _8e0d                                          ; JR Z,$8E0D        ; 
+       movb @bytes+>03,a                                   ; LD A,$03          ; ...anything else leaves cargo canisters
+_8e0d:                                                     ; >8e0d
+       movb a,@ship_type                                   ; LD ($F7E7),A      ; 
+       movb @bytes+>09,@handler_type                       ; LD A,$09 / LD ($F7EE),A; handler type 9: spin, fly on and leave
+       movb @b255,@object_speed                            ; LD A,$FF / LD ($F7E6),A; speed $FF
+_8e1a:                                                     ; >8e1a
+       .push bc                                            ;                   ; 
+       .far_call code_bank_11_select,random_orientation    ; CALL $8E45        ; point it in a random direction
+       .pop bc                                             ;                   ; 
+       movb @c,a                                           ; LD A,C            ; A = cargo type
+       cb   @ship_type,@bytes+>03                          ; LD A,($F7E7) / CP $03; a cargo canister?
+       jne  _8e38                                          ; JR NZ,$8E38       ; a platlet
+       cb   a,@bytes+>0f                                   ; SUB $0F           ; cargo type 15?
+       jeq  spawn_cargo_cloaking_device                    ; JR Z,$8E37        ; yes - $FF, the cloaking device
+       bl   @random_byte                                   ; CALL $2176        ; 
+       cb   a,@bytes+>e5                                   ; CP $E5            ; 27/256 chance...
+       jhe  spawn_cargo_random                             ; JR NC,$8E33       ; ...of a random cargo type
+       movb @c,a                                           ; LD A,C            ; otherwise the ship's
+       jmp  _8e38                                          ; JR $8E35 / JR $8E38; 
+spawn_cargo_random:                                        ; >8e33
+       andi a,>0f00                                        ; AND $0F           ; a random cargo type
+       jmp  _8e38                                          ; JR $8E38          ; 
+spawn_cargo_cloaking_device:                               ; >8e37
+       movb @b255,a                                        ; DEC A             ; $FF: the cloaking device
+_8e38:                                                     ; >8e38
+       movb a,@cargo_type                                  ; LD ($F7EC),A      ; cargo type
+       .push bc                                            ; PUSH BC           ; 
+       bl   @add_object                                    ; CALL $3037        ; add it to the object table
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $8E1A        ; next canister
+       jne  _8e1a                                          ;                   ; 
+       .far_call code_bank_11_select,restore_working_object_from_scratch; JP $334D          ; restore the working object
+_8db9_end:                                                 
+       .endproc                                            ;                   ; 
+
 rom_bank_12_end:
        equ  $
        bss  >8000-$

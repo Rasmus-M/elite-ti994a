@@ -264,7 +264,15 @@ process_frame_object:                                      ; >1455
        bl   @move_object                                   ; CALL $866D        ; move it forward by its own speed
        bl   @draw_object                                   ; CALL $422E        ; draw it
        .far_call code_bank_11_select,run_object_handler    ; CALL $2528        ; run the object's handler
-* TI: not converted yet: the laser (#R$28F6) and the ship's laser beam (#R$43C2).
+       movb @laser_state,r0                                ;                   ; (TI: only if the laser has fired this frame)
+       jgt  !                                              ;                   ; 
+       jeq  !                                              ;                   ; 
+       .far_call code_bank_12_select,laser_hit_check       ; CALL $28F6        ; check whether the laser hit the object
+!
+       movb @ship_fired,r0                                 ;                   ; (TI: only if the ship has fired)
+       jeq  !                                              ;                   ; 
+       .far_call code_bank_12_select,draw_ship_laser       ; CALL $43C2        ; draw the ship's laser beam
+!
        movb @roll_rate,a                                   ; LD A,($F815) / OR A; A = roll rate
        jeq  _1496                                          ; CALL NZ,$22C0     ; rolling - rotate the object's position and axes
        bl   @step_roll_rotation                            ;                   ; 
@@ -290,8 +298,8 @@ _14b1:                                                     ; >14b1
        jeq  _14bb                                          ; LD ($EB02),A      ; scanner queue
        bl   @scanner_draw                                  ;                   ; (TI: now, rather than in the VBlank handler, #R$7202)
 _14bb:                                                     ; >14bb
-* TI: not converted yet: the laser beams (#R$2DC8) and
-* the Torus jump ($14BE-$1500).
+       .far_call code_bank_12_select,draw_laser_beams      ; CALL $2DC8        ; draw the laser beams if the laser was just fired
+* TI: not converted yet: the Torus jump ($14BE-$1500).
        li   hl,current_turn                                ; LD HL,$E92E       ; cycle the counter at $E92E: 3, 2, 1, 3...
        sb   one,*hl                                        ; DEC (HL)          ; 
        jne  _150b                                          ; JR NZ,$150B       ; 
@@ -310,7 +318,7 @@ _1517:                                                     ; >1517
        .far_call code_bank_11_select,dock                  ; CALL $1873        ; yes - dock
        jmp  _1548                                          ; JR $1548          ; 
 _1531:                                                     ; >1531
-* TI: not converted yet: recharging (#R$18E6).
+       .far_call code_bank_12_select,recharge              ; CALL $18E6        ; cool the laser, charge energy/shields
        movb @space_view_showing,a                          ; LD A,($E903) / OR A; 
        jeq  _1540                                          ; JR Z,$1540        ; no space view showing
        bl   @copy_space_view                               ; CALL $3846        ; copy the space view's bitmap buffer to VRAM
@@ -1683,6 +1691,11 @@ msg_condition_red:                                         ; >3388
 * The message "Right On Commander"
 msg_right_commander:                                       ; >3396
        text 'Right On Commande',>f2                               ; 
+
+********************************************************************************
+* The message "Incoming missile"
+msg_incoming_missile:                                      ; >33b7
+       text 'Incoming missil',>e5                                 ; 
 
 ********************************************************************************
 * RST $00 target: print character A
@@ -4164,7 +4177,11 @@ _405c:                                                     ; >405c
        jne  _4061                                          ;                   ; 
        bl   @pitch_dive                                    ; CALL Z,$6A10      ; up: dive
 _4061:                                                     ; >4061
-* TI: firing the laser (#R$2AD0) and 'J' (#R$86E6) aren't converted yet.
+       czc  @bit4,a                                        ; BIT 4,A           ; 
+       jne  _4066                                          ;                   ; 
+       .far_call code_bank_12_select,fire_laser            ; CALL Z,$2AD0      ; fire: fire the laser
+_4066:                                                     ; >4066
+* TI: 'J' (#R$86E6) isn't converted yet.
        .pop r11                                            ;                   ; 
 _4077:                                                     ; >4077
        movb @pending_debounced_keypress_byte_status,a      ; LD A,($E8F5) / OR A; A = key typed, if any
@@ -5599,6 +5616,26 @@ project_vertex_from_cache:                                 ; >4a4c
        movb *hl,d                                          ; LD D,(HL)         ; D = the fourth byte - DE is the second cached word
        .ex_de_hl                                           ; EX DE,HL          ; HL = the second cached word (DE becomes a leftover pointer, unused)
        .retc                                               ; RET               ; 
+
+********************************************************************************
+* TI: the gun vertex relative to the player
+*
+* For #R$43C2 (in ROM bank 12), as the vertices are in the blueprint's bank.
+*
+* O:DE,BC,HL x, y and z
+* O:F Carry set if it's in front of the player (z positive)
+gun_vertex_relative:                                       
+       .proc                                               ;                   ; 
+       .save_bank                                          ;                   ; 
+       bl   @select_blueprint_bank                         ;                   ; select the blueprint's bank
+       movb @bp_gun_vertex,a                               ; LD A,($F803)      ; the gun vertex
+       bl   @vertex_relative                               ; CALL $4A5C        ; relative to the player
+       jnc  gun_vertex_relative_1                          ;                   ; 
+       .restore_bank                                       ;                   ; 
+       .retc                                               ;                   ; 
+gun_vertex_relative_1:                                     
+       .restore_bank                                       ;                   ; 
+       .retnc                                              ;                   ; 
 
 ********************************************************************************
 * Get a vertex relative to the player

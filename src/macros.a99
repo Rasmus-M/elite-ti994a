@@ -62,6 +62,14 @@
        data #1,#2
        .endm
 
+* Play sound effect #1 (#R$7468): the sound effects player is in ROM bank 14,
+* and runs in its own workspace, so this changes no registers and not the
+* status.
+       .defm sfx
+       blwp @sound_effect_vector
+       data #1
+       .endm
+
 * Save the caller's ROM bank on the stack, and select it again, for routines in
 * RAM that select a bank but may be called from code in another bank.
 * .restore_bank changes R0 and the status (carry included).

@@ -326,7 +326,8 @@ commander_menu:                                            ; >a30a
 commander_menu_jmp:                                        
        movb @docked,a                                      ; CALL $6393        ; refuse in flight (#R$6393)
        jne  commander_menu_docked                          ;                   ; 
-       .endproc                                            ;                   ; (TI: back to the caller, without the beep, as no sound effects yet)
+       .sfx 6                                              ; CALL $16FE        ; beep
+       .endproc                                            ;                   ; (TI: back to the caller)
 commander_menu_docked:                                     
        bl   @pack_commander                                ; CALL $A44F        ; pack the commander file
        li   hl,commander_name                              ; LD HL,$EB06       ; the commander's name
@@ -899,7 +900,8 @@ buy_cargo:                                                 ; >5bbd
        .proc                                               ;                   ; 
        movb @docked,a                                      ; CALL $6393        ; refuse in flight
        jne  _5bbd_docked                                   ;                   ; 
-       .endproc                                            ;                   ; (TI: back to the caller, without the beep, as no sound effects yet)
+       .sfx 6                                              ; CALL $16FE        ; beep
+       .endproc                                            ;                   ; (TI: back to the caller)
 _5bbd_docked:                                              
        bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide the sprites
        bl   @draw_frame_centred_target_name                ; CALL $6066        ; draw a frame with the current system's name centred
@@ -1039,7 +1041,8 @@ sell_cargo:                                                ; >5cee
        .proc                                               ;                   ; 
        movb @docked,a                                      ; CALL $6393        ; refuse in flight
        jne  _5cee_docked                                   ;                   ; 
-       .endproc                                            ;                   ; (TI: back to the caller, without the beep, as no sound effects yet)
+       .sfx 6                                              ; CALL $16FE        ; beep
+       .endproc                                            ;                   ; (TI: back to the caller)
 _5cee_docked:                                              
        li   hl,cargo_hold                                  ; LD HL,$EB19       ; the cargo hold
        sb   a,a                                            ; XOR A             ; 
@@ -1375,7 +1378,8 @@ equip_ship:                                                ; >5dbb
        .proc                                               ;                   ; 
        movb @docked,a                                      ; CALL $6393        ; refuse in flight
        jne  _5dbb_docked                                   ;                   ; 
-       .endproc                                            ;                   ; (TI: back to the caller, without the beep, as no sound effects yet)
+       .sfx 6                                              ; CALL $16FE        ; beep
+       .endproc                                            ;                   ; (TI: back to the caller)
 _5dbb_docked:                                              
        bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide sprites
        li   ix,equip_ship_screen_frame                     ; LD IX,$5A76       ; IX -> the screen's frame
@@ -1494,7 +1498,7 @@ equip_buy_fuel:                                            ; >5e6b
        andi a,>f000                                        ; AND $F0           ; 
        cb   a,@bytes+>30                                   ; CP $30            ; mission 3?
        jne  buy_fuel                                       ; JR NZ,$5E7D       ; no - buy fuel
-* TI: no beep (#R$16FE), as the sound effects aren't converted yet
+       .sfx 6                                              ; CALL $16FE        ; beep
        li   hl,msg_no_fuel_available                       ; LD HL,$57B7       ; "No fuel available!"
        jmp  _5ecd                                          ; JP $5FFB          ; show it for a while
 buy_fuel:                                                  ; >5e7d

@@ -169,16 +169,23 @@ key_handler_h:                                             ; >88ac
        .proc                                               ;                   ; 
        bl   @refuse_if_docked                              ; CALL $6DCF        ; do nothing if docked
        movb @hyperspace_countdown_inner,r0                 ; LD A,($E91B) / OR A; 
-       jne  _88ac_end                                      ; JP NZ,$16FE       ; already counting down (TI: no beep yet)
+       jeq  !                                              ; JP NZ,$16FE       ; already counting down
+       .sfx 6                                              ;                   ; beep
+       jmp  _88ac_end                                      ;                   ; 
+!
        movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; 
        jeq  _88c3                                          ; JR Z,$88C3        ; not in witchspace
        movb @witchspace_kills_needed,r0                    ; LD A,($EEC2) / OR A; kills still needed?
-       jne  _88ac_end                                      ; JP NZ,$16FE       ; hyperspace not working yet
+       jeq  !                                              ; JP NZ,$16FE       ; hyperspace not working yet
+       .sfx 6                                              ;                   ; beep
+       jmp  _88ac_end                                      ;                   ; 
+!
 _88c3:                                                     ; >88c3
        movb @hyperspace_target_selected,r0                 ; LD A,($E91A) / OR A; 
        jne  _88d2                                          ; JR NZ,$88D2       ; 
 _88c9:                                                     ; >88c9
-       li   hl,msg_select_system                           ; CALL $16FE / LD HL,$8C3C; "Select System!" (TI: no beep yet)
+       .sfx 6                                              ; CALL $16FE        ; beep
+       li   hl,msg_select_system                           ; LD HL,$8C3C       ; "Select System!"
        bl   @show_message_anywhere                         ; JP $1683          ; show it
        jmp  _88ac_end                                      ;                   ; 
 _88d2:                                                     ; >88d2
@@ -204,7 +211,8 @@ _88fa:                                                     ; >88fa
        swpb r0                                             ;                   ; R0 = fuel
        c    r0,hl                                          ; SBC HL,DE         ; enough fuel?
        jhe  _8910                                          ; JR NC,$8910       ; yes
-       li   hl,msg_beyond_range                            ; CALL $16FE / LD HL,$8C4A; no - "Beyond Range!" (TI: no beep yet)
+       .sfx 6                                              ; CALL $16FE        ; beep
+       li   hl,msg_beyond_range                            ; LD HL,$8C4A       ; no - "Beyond Range!"
        bl   @show_message_anywhere                         ; JP $1683          ; show it
        jmp  _88ac_end                                      ;                   ; 
 _8910:                                                     ; >8910
@@ -227,9 +235,15 @@ key_handler_g:                                             ; >8926
        .proc                                               ;                   ; 
        bl   @refuse_if_docked                              ; CALL $6DCF        ; do nothing if docked
        movb @galactic_drive_fitted,r0                      ; LD A,($F780) / OR A; 
-       jeq  _8926_end                                      ; JP Z,$16FE        ; no galactic hyperdrive (TI: no beep yet)
+       jne  !                                              ; JP Z,$16FE        ; no galactic hyperdrive
+       .sfx 6                                              ;                   ; beep
+       jmp  _8926_end                                      ;                   ; 
+!
        movb @hyperspace_countdown_inner,r0                 ; LD A,($E91B) / OR A; 
-       jne  _8926_end                                      ; JP NZ,$16FE       ; already counting down
+       jeq  !                                              ; JP NZ,$16FE       ; already counting down
+       .sfx 6                                              ;                   ; beep
+       jmp  _8926_end                                      ;                   ; 
+!
        sb   @countdown_shown,@countdown_shown              ; XOR A / LD ($E91D),A; 
        sb   @hyperspace_fuel_cost,@hyperspace_fuel_cost    ; LD ($E87F),A      ; no fuel cost
        movb one,@galactic_jump_flag                        ; INC A / LD ($E925),A; a galactic jump
@@ -292,7 +306,7 @@ _8952:
        movb one,@stardust_passes_countdown                 ; LD ($E87B),A      ; 
        movb @bytes+>0a,@stardust_passes_interval           ; LD A,$0A / LD ($E87C),A; 
        movb @bytes+>21,@hyperspace_flash_colour            ; LD A,$21 / LD ($E880),A; the first colour
-* TI: no sound effect 12 (#R$7468), as the sound effects aren't converted yet
+       .sfx 12                                             ; LD A,$0C / CALL $7468; play hyperspace
 _8985:                                                     ; >8985
        .push bc                                            ; PUSH BC           ; 
        bl   @clear_space_view                              ; CALL $388F        ; clear the space view
@@ -733,7 +747,7 @@ _3a3f:                                                     ; >3a3f
        movb @pending_debounced_keypress_byte_status,a      ; LD HL,$E8F5 / LD A,(HL) / OR A; 
        jeq  _3a3f                                          ; JR Z,$3A3F        ; nothing yet - keep waiting
        sb   @pending_debounced_keypress_byte_status,@pending_debounced_keypress_byte_status; LD (HL),$00       ; consume it
-* TI: no click (sound effect 0, #R$7468), as the sound effects aren't converted yet
+       .sfx 0                                              ; LD A,$00 / CALL $7468; click
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -1361,7 +1375,10 @@ key_handler_i:                                             ; >1b0d
 key_handler_y:                                             ; >1b13
        .proc                                               ;                   ; 
        movb @cloaking_device_fitted,r0                     ; LD A,($F784) / OR A; 
-       jeq  _1b13_end                                      ; JP Z,$16FE        ; no cloaking device (TI: no beep yet)
+       jne  !                                              ; JP Z,$16FE        ; no cloaking device
+       .sfx 6                                              ;                   ; beep
+       jmp  _1b13_end                                      ;                   ; 
+!
        bl   @refuse_if_docked                              ; CALL $6DCF        ; do nothing if docked
        movb @cloaking_active_flag,r0                       ; LD A,($EF9F)      ; 
        inv  r0                                             ; CPL               ; 
@@ -1379,7 +1396,10 @@ key_handler_l:                                             ; >1b25
        .proc                                               ;                   ; 
        bl   @refuse_if_docked                              ; CALL $6DCF        ; do nothing if docked
        movb @ecm_jammer_fitted,r0                          ; LD A,($F783) / OR A; 
-       jeq  _1b25_end                                      ; JP Z,$16FE        ; no ECM jammer (TI: no beep yet)
+       jne  !                                              ; JP Z,$16FE        ; no ECM jammer
+       .sfx 6                                              ;                   ; beep
+       jmp  _1b25_end                                      ;                   ; 
+!
        movb @jammer_active_flag,r0                         ; LD A,($EFA8)      ; 
        inv  r0                                             ; CPL               ; 
        movb r0,@jammer_active_flag                         ; LD ($EFA8),A      ; toggle the ECM jammer

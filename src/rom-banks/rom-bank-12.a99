@@ -317,7 +317,7 @@ _8c08:                                                     ; >8c08
 scoop_announce:                                            ; >8c2f
        bl   @show_view_message                             ; CALL $39C8        ; announce it
        .far_call code_bank_11_select,remove_object         ; CALL $30A9        ; remove the object
-* TI: no sound effect 13 (#R$7468), as the sound effects aren't converted yet
+       .sfx 13                                             ; LD A,$0D / CALL $7468; play cargo scooped
        .retc                                               ; SCF / RET         ; scooped
 
 
@@ -542,7 +542,7 @@ laser_destroy:                                             ; >298e
 _299a:                                                     ; >299a
        li   ix,object_status_byte                          ; LD IX,$F7CD       ; IX -> the working object
        bl   @destroy_object                                ; CALL $31AD        ; destroy it
-* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+       .sfx 2                                              ; LD A,$02 / CALL $7468; play the explosion
        bl   @spawn_cargo                                   ; CALL $8DB9        ; its cargo
        .far_call code_bank_11_select,cancel_missile_lock_on_object; CALL $30EA        ; cancel any missile lock on it
        jmp  _29e0                                          ; JR $29E0          ; maybe call the police
@@ -592,7 +592,7 @@ _2a10:                                                     ; >2a10
        bl   @call_police                                   ; CALL $2A1C        ; call the police
 _2a13:                                                     ; >2a13
        sb   one,@laser_shot_used                           ; LD HL,$E873 / DEC (HL); the shot has hit something
-* TI: no sound effect 9 (#R$7468), as the sound effects aren't converted yet
+       .sfx 9                                              ; LD A,$09 / CALL $7468; play sound effect 9
 _28f6_end:                                                 
        .endproc                                            ; RET               ; 
 
@@ -654,8 +654,8 @@ enemy_fires_missile:                                       ; >2a3a
        jnc  _2a6e                                          ; JR NC,$2A6E       ; no room for it
        li   hl,msg_incoming_missile                        ; LD HL,$33B7       ; "Incoming missile"
        bl   @show_view_message                             ; CALL $39C8        ; announce it
-* TI: no DEC ($009D) (nothing reads it, and it's console ROM on the TI), and no
-* sound effect 11 (#R$7468)
+* TI: no DEC ($009D) (nothing reads it, and it's console ROM on the TI)
+       .sfx 11                                             ; LD A,$0B / CALL $7468; play the launch
 _2a6e:                                                     ; >2a6e
        .far_call code_bank_11_select,restore_working_object_from_scratch; JP $334D          ; restore the working object
 _2a3a_end:                                                 
@@ -754,7 +754,7 @@ fire_laser:                                                ; >2ad0
        ab   @bytes+>3d,a                                   ; ADD A,$3D         ; 
        movb a,@laser_target_y                              ; LD ($E868),A      ; ...and Y = $3D-$44
        ab   @bytes+>02,@laser_temp_gauge                   ; LD HL,$F813 / INC (HL) / INC (HL); laser temperature += 2
-* TI: no sound effect 3 (#R$7468), as the sound effects aren't converted yet
+       .sfx 3                                              ; LD A,$03 / CALL $7468; play the laser
        bl   @draw_laser_temperature                        ; JP $6B60          ; redraw the laser temperature gauge
 _2ad0_end:                                                 
        .endproc                                            ;                   ; 
@@ -1012,11 +1012,20 @@ key_escape_capsule:                                        ; >19fc
        .proc                                               ;                   ; 
        bl   @refuse_if_docked                              ; CALL $6DCF        ; refuse if docked
        movb @item_escape_capsule,r0                        ; LD A,($F77C) / OR A; an escape capsule?
-       jeq  _19fc_end                                      ; JP Z,$16FE        ; no (TI: no beep yet)
+       jne  !                                              ; JP Z,$16FE        ; no
+       .sfx 6                                              ;                   ; beep
+       jmp  _19fc_end                                      ;                   ; 
+!
        movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; in witchspace?
-       jne  _19fc_end                                      ; JP NZ,$16FE       ; yes
+       jeq  !                                              ; JP NZ,$16FE       ; yes
+       .sfx 6                                              ;                   ; beep
+       jmp  _19fc_end                                      ;                   ; 
+!
        cb   @mission_state,@bytes+>52                      ; LD A,($E93D) / CP $52; 
-       jeq  _19fc_end                                      ; JP Z,$16FE        ; that mission state
+       jne  !                                              ; JP Z,$16FE        ; that mission state
+       .sfx 6                                              ;                   ; beep
+       jmp  _19fc_end                                      ;                   ; 
+!
        sb   @hyperspace_countdown_inner,@hyperspace_countdown_inner; XOR A / LD ($E91B),A; cancel any hyperspace countdown
        sb   @hyperspace_trigger,@hyperspace_trigger        ; LD ($E920),A      ; 
        movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
@@ -1042,7 +1051,7 @@ key_escape_capsule:                                        ; >19fc
        bl   @stop_roll_and_pitch                           ; CALL $1A7D        ; stop any roll and pitch
        bl   @switch_to_front_view                          ; CALL $64A1        ; switch to the front view
        .far_call code_bank_11_select,clear_cargo_hold      ; CALL $9237        ; lose the cargo
-* TI: no sound effect 11 (#R$7468), as the sound effects aren't converted yet
+       .sfx 11                                             ; LD A,$0B / CALL $7468; play the launch
        li   hl,msg_capsule_released                        ; LD HL,$1B6D       ; "Capsule released"
        jmp  _1a7a                                          ; JR $1A7A          ; 
 _1a77:                                                     ; >1a77
@@ -1094,9 +1103,15 @@ key_handler_t:                                             ; >2d58
        .proc                                               ;                   ; 
        bl   @refuse_if_docked                              ; CALL $6DCF        ; refuse if docked
        movb @missile_state,r0                              ; LD A,($E910) / OR A; 
-       jne  _2d58_end                                      ; JP NZ,$16FE       ; already arming or locked (TI: no beep yet)
+       jeq  !                                              ; JP NZ,$16FE       ; already arming or locked
+       .sfx 6                                              ;                   ; beep
+       jmp  _2d58_end                                      ;                   ; 
+!
        movb @missile_count,r0                              ; LD A,($F776) / OR A; 
-       jeq  _2d58_end                                      ; JP Z,$16FE        ; no missiles left
+       jne  !                                              ; JP Z,$16FE        ; no missiles left
+       .sfx 6                                              ;                   ; beep
+       jmp  _2d58_end                                      ;                   ; 
+!
        ab   one,@missile_state                             ; LD HL,$E910 / INC (HL); start arming (state 0 -> 1)
        bl   @draw_missile_indicator                        ; JP $6B6E          ; redraw the missile indicator
 _2d58_end:                                                 
@@ -1115,7 +1130,10 @@ key_fire_missile:                                          ; >2d7e
        .proc                                               ;                   ; 
        movb @missile_state,a                               ; LD A,($E910)      ; 
        sb   @bytes+>02,a                                   ; SUB $02           ; locked on?
-       jne  _2d7e_end                                      ; JP NZ,$16FE       ; no (TI: no beep yet)
+       jeq  !                                              ; JP NZ,$16FE       ; no
+       .sfx 6                                              ;                   ; beep
+       jmp  _2d7e_end                                      ;                   ; 
+!
        movb a,@missile_state                               ; LD ($E910),A      ; yes - clear the lock
        movb @bytes+>41,a                                   ; LD A,$41          ; 
        movb a,@object_status_byte                          ; LD ($F7CD),A      ; 
@@ -1129,11 +1147,12 @@ key_fire_missile:                                          ; >2d7e
        movb @missile_target,@handler_countdown             ; LD A,($E928) / LD ($F7EF),A; its target
        bl   @add_object                                    ; CALL $3037        ; add it to the object table
        jnc  continue_2d7e_missile_jammed                   ; JR NC,$2DBC       ; no room for it
-* TI: no sound effect 11 (#R$7468), as the sound effects aren't converted yet
+       .sfx 11                                             ; LD A,$0B / CALL $7468; play the launch
        sb   one,@missile_count                             ; LD HL,$F776 / DEC (HL); one fewer missile
        jmp  _2dc5                                          ; JR $2DC5          ; 
 continue_2d7e_missile_jammed:                              ; >2dbc
-       li   hl,msg_missile_jammed                          ; CALL $16FE / LD HL,$33A8; "Missile jammed!" (TI: no beep yet)
+       .sfx 6                                              ; CALL $16FE        ; beep
+       li   hl,msg_missile_jammed                          ; LD HL,$33A8       ; "Missile jammed!"
        bl   @show_view_message                             ; CALL $39C8        ; 
 _2dc5:                                                     ; >2dc5
        bl   @draw_missile_indicator                        ; JP $6B6E          ; redraw the missile indicator
@@ -1151,10 +1170,17 @@ key_handler_e:                                             ; >3223
        .proc                                               ;                   ; 
        bl   @refuse_if_docked                              ; CALL $6DCF        ; refuse if docked
        movb @item_ecm_system,r0                            ; LD A,($F778) / OR A; ECM fitted?
-       jeq  _3223_end                                      ; JP Z,$16FE        ; no (TI: no beep yet)
+       jne  !                                              ; JP Z,$16FE        ; no
+       .sfx 6                                              ;                   ; beep
+       jmp  _3223_end                                      ;                   ; 
+!
        movb @jammer_active_flag,r0                         ; LD A,($EFA8) / OR A; jammer on?
-       jne  _3223_end                                      ; JP NZ,$16FE       ; yes
-* TI: no sound effect 8 (#R$7468); the countdown it starts (#R$7815) is set here
+       jeq  !                                              ; JP NZ,$16FE       ; yes
+       .sfx 6                                              ;                   ; beep
+       jmp  _3223_end                                      ;                   ; 
+!
+       .sfx 8                                              ; LD A,$08 / CALL $7468; play the ECM sound
+* TI: the ECM's countdown, which the sound effect starts on the MSX (#R$7815), is set here
        movb @bytes+>78,@ecm_countdown                      ; LD A,$08 / CALL $7468; the ECM's countdown
        bl   @draw_ecm_indicator                            ; JP $6B12          ; show the "E" indicator
 _3223_end:                                                 
@@ -1191,7 +1217,10 @@ _3244:
        jeq  _325e                                          ; JR Z,$325E        ; countdown even - skip the energy drain
        movb @enemy_ecm,r0                                  ; LD A,($EEC0) / OR A; an enemy's ECM?
        jne  _325e                                          ; JR NZ,$325E       ; yes - no cost to the player
-* TI: no sound effect 4 (#R$7468), as the sound effects aren't converted yet
+       movb @sound_effect_4_playing,r0                     ; LD A,($E915) / OR A; sound effect 4 playing already?
+       jne  !                                              ;                   ; 
+       .sfx 4                                              ; LD A,$04 / CALL $7468; no - play it
+!
        movb one,b                                          ; LD B,$01          ; 
        .far_call code_bank_11_select,decay_counter_f817    ; CALL $19EC        ; drain the energy banks by 1
 _325e:                                                     ; >325e
@@ -1218,7 +1247,10 @@ _3285:                                                     ; >3285
        a    de,ix                                          ; ADD IX,DE         ; IX -> the next slot
        sb   one,b                                          ; DJNZ $326B        ; 
        jne  _326b                                          ;                   ; 
-* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+       movb @something_destroyed,r0                        ; LD A,($E869) / OR A; anything destroyed?
+       jeq  !                                              ; RET Z             ; no
+       .sfx 2                                              ; LD A,$02 / CALL $7468; play the explosion
+!
 _323c_end:                                                 
        .endproc                                            ; RET               ; 
 
@@ -1241,7 +1273,10 @@ key_handler_tab:                                           ; >329e
        .proc                                               ;                   ; 
        bl   @refuse_if_docked                              ; CALL $6DCF        ; refuse if docked
        movb @item_energy_bomb,r0                           ; LD A,($F77D) / OR A; an energy bomb?
-       jeq  _329e_end                                      ; JP Z,$16FE        ; no (TI: no beep yet)
+       jne  !                                              ; JP Z,$16FE        ; no
+       .sfx 6                                              ;                   ; beep
+       jmp  _329e_end                                      ;                   ; 
+!
        sb   @item_energy_bomb,@item_energy_bomb            ; XOR A / LD ($F77D),A; it's used up
        sb   @something_destroyed,@something_destroyed      ; LD ($E869),A      ; nothing destroyed yet
        li   ix,object_slot_3                               ; LD IX,$EC18       ; IX -> slot 3 (after the planet, the sun and the station)
@@ -1267,7 +1302,10 @@ _32d8:                                                     ; >32d8
        a    de,ix                                          ; ADD IX,DE         ; IX -> the next slot
        sb   one,b                                          ; DJNZ $32C4        ; 
        jne  _32c4                                          ;                   ; 
-* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+       movb @something_destroyed,r0                        ; LD A,($E869) / OR A; anything destroyed?
+       jeq  !                                              ; RET Z             ; no
+       .sfx 2                                              ; LD A,$02 / CALL $7468; play the explosion
+!
 _329e_end:                                                 
        .endproc                                            ; RET               ; 
 
@@ -1496,7 +1534,7 @@ _179b:                                                     ; >179b
        .pop bc                                             ; POP BC            ; 
        sb   one,b                                          ; DJNZ $179B        ; 
        jne  _179b                                          ;                   ; 
-* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+       .sfx 2                                              ; LD A,$02 / CALL $7468; play the explosion
 _17b1:                                                     ; >17b1
        bl   @clear_space_view                              ; CALL $388F        ; next frame: clear the space view
        li   hl,ship_object_table                           ; LD HL,$EBA0       ; 
@@ -1738,7 +1776,7 @@ _14ea:                                                     ; >14ea
        sb   @secondary_flag_counter_pair,@secondary_flag_counter_pair; LD ($E933),A      ; and this flag
        sb   @torus_jump_countdown,@torus_jump_countdown    ; LD ($E918),A      ; end the jump
        sb   @jump_in_progress,@jump_in_progress            ; LD ($E722),A      ; 
-* TI: no beep (#R$16FE), as the sound effects aren't converted yet
+       .sfx 6                                              ; CALL $16FE        ; beep
        bl   @restore_speed                                 ; CALL $8B8F        ; restore the speed from before the jump
 _14be_end:                                                 
        .endproc                                            ;                   ; 
@@ -1753,15 +1791,27 @@ _14be_end:
 * Does nothing in witchspace (#R$EEC1). Otherwise docks at once (#R$E917).
 key_handler_c:                                             ; >1692
        movb @item_docking_computer,r0                      ; LD A,($F77F) / OR A; 
-       jeq  _1692_end                                      ; JP Z,$16FE        ; no docking computer (TI: no beep yet)
+       jne  !                                              ; JP Z,$16FE        ; no docking computer
+       .sfx 6                                              ;                   ; beep
+       jmp  _1692_end                                      ;                   ; 
+!
        movb @station_in_range,r0                           ; LD A,($EB05) / OR A; 
-       jeq  _1692_end                                      ; JP Z,$16FE        ; not in the safe zone
+       jne  !                                              ; JP Z,$16FE        ; not in the safe zone
+       .sfx 6                                              ;                   ; beep
+       jmp  _1692_end                                      ;                   ; 
+!
        movb @legal_status_copy,r0                          ; LD A,($EF97) / OR A; 
-       jne  _1692_end                                      ; JP NZ,$16FE       ; the player has shot at the station
+       jeq  !                                              ; JP NZ,$16FE       ; the player has shot at the station
+       .sfx 6                                              ;                   ; beep
+       jmp  _1692_end                                      ;                   ; 
+!
        movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; 
        jne  _1692_end                                      ; RET NZ            ; in witchspace
        cb   @mission_state,@bytes+>52                      ; LD A,($E93D) / CP $52; 
-       jeq  _1692_end                                      ; JP Z,$16FE        ; the Thargoids' station
+       jne  !                                              ; JP Z,$16FE        ; the Thargoids' station
+       .sfx 6                                              ;                   ; beep
+       jmp  _1692_end                                      ;                   ; 
+!
        seto r0                                             ; LD A,$FF          ; 
        movb r0,@docking                                    ; LD ($E917),A      ; dock
 _1692_end:                                                 
@@ -1784,16 +1834,25 @@ _1692_end:
 engage_torus_jump_drive:                                   ; >86e6
        .proc                                               ;                   ; 
        movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; 
-       jne  _86e6_end                                      ; JP NZ,$16FE       ; in witchspace (TI: no beep yet)
+       jeq  !                                              ; JP NZ,$16FE       ; in witchspace
+       .sfx 6                                              ;                   ; beep
+       jmp  _86e6_end                                      ;                   ; 
+!
        movb @trader_count,r0                               ; CALL $3359        ; any traders,
        socb @pirate_count,r0                               ;                   ; pirates
        socb @num_thargoids,r0                              ;                   ; or Thargoids about?
-       jne  _86e6_end                                      ; JP NZ,$16FE       ; yes
+       jeq  !                                              ; JP NZ,$16FE       ; yes
+       .sfx 6                                              ;                   ; beep
+       jmp  _86e6_end                                      ;                   ; 
+!
        movb @planet_distance+1,r0                          ; LD DE,($E727)     ; R0 = the distance from the planet
        movb @planet_distance,@r0lb                         ;                   ; 
        li   r1,10000                                       ; LD HL,$2710 / OR A / SBC HL,DE; 
        c    r0,r1                                          ;                   ; 
-       jle  _86e6_end                                      ; JP NC,$16FE       ; 10000 or less
+       jh   !                                              ; JP NC,$16FE       ; 10000 or less
+       .sfx 6                                              ;                   ; beep
+       jmp  _86e6_end                                      ;                   ; 
+!
        movb @speed_gauge_value,@cached_f814_at_engage      ; LD A,($F814) / LD ($E87A),A; save the speed
        bl   @stop_roll_and_pitch                           ; CALL $1A7D        ; stop any roll and pitch
        .far_call code_bank_13_select,stop_ship             ; CALL $8B7B        ; bring the speed down to 0
@@ -1804,7 +1863,7 @@ engage_torus_jump_drive:                                   ; >86e6
        movb @bytes+>05,@stardust_passes_interval           ; LD A,$05 / LD ($E87C),A; lengthen the stardust streaks every 5 frames...
        movb one,@stardust_passes                           ; LD A,$01 / LD ($E723),A; ...starting from 1 pass per frame
        movb one,@stardust_passes_countdown                 ; LD ($E87B),A      ; 
-* TI: no sound effect 10 (#R$7468), as the sound effects aren't converted yet
+       .sfx 10                                             ; LD A,$0A / CALL $7468; play the Torus Jump Drive
 _86e6_end:                                                 
        .endproc                                            ;                   ; 
 
@@ -1885,7 +1944,7 @@ _4111:                                                     ; >4111
        jne  _4111                                          ;                   ; 
        jmp  _4102                                          ; JR NZ,$4102       ; not one of them
 _4115:                                                     ; >4115
-* TI: no click (sound effect 0, #R$7468), as the sound effects aren't converted yet
+       .sfx 0                                              ; LD A,$00 / CALL $7468; click
        cb   a,@bytes+>86                                   ; CP $86            ; STOP?
        jne  pause_quit                                     ; JR NZ,$412C       ; no - an option
        movb @space_view_showing,r0                         ; LD A,($E903) / OR A; 

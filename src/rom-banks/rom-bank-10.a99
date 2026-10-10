@@ -222,6 +222,7 @@ _1db2:                                                     ; >1db2
 title_screen_key:                                          ; >1db5
        .push af                                            ; PUSH AF           ;
        blwp @music_stop_vector                             ; CALL $7438        ; stop the music
+       blwp @sound_stop_vector                             ;                   ; (TI: and the sound effects)
        bl   @unpack_commander                              ; CALL $A469        ; set up the commander record
        li   hl,options                                     ; LD HL,$E914       ;
        socb @bit0,*hl                                      ; SET 0,(HL)        ; sound effects on

@@ -1,0 +1,560 @@
+* ROM bank 14: the math tables, and code: the sound effects
+* Assembled for real by code-bank-14.a99, and DORG in the other builds for its labels
+       .ifdef code_bank_14
+       aorg >6000
+       .else
+       dorg >6000
+       .endif
+       bss  >40
+       .ifdef code_bank_14
+       bcopy "../../bin/math-tables.bin" ; the math tables, as in the other banks
+       .else
+       bss  math_tables_end-math_tables
+       .endif
+
+* The sound effects (TI-specific: a native SN76489 player)
+*
+* The MSX plays its sound effects on the AY-3-8910 with a script
+* interpreter (#R$753F) and a per-frame handler for each effect (#R$7645).
+* This is a native player for the TI's SN76489 that does the same: the
+* effects (#R$7AC6), their handlers and their numbers are the MSX's, as are
+* the three channels and taking over a busy channel in rotation (#R$74AE).
+*
+* The routines here run in the sound workspace (sound_ws), called through
+* the BLWP vectors in RAM (lower-memory.a99), which select this bank:
+* sound_effect_vector (the .sfx macro: the effect number follows the BLWP),
+* sound_tick_vector (once per MSX frame, from ti_poll_vblank) and
+* sound_stop_vector. So they change none of the caller's registers or its
+* status.
+*
+* The differences from the MSX:
+* - A tone period is the same on both chips, but the SN76489's has 10 bits:
+*   longer periods are played as 1023, and period 0 is silent.
+* - The AY's envelopes (the click, the laser and hyperspace) are played at a
+*   fixed volume.
+* - The SN76489 has one noise channel with three rates rather than noise on
+*   each channel with 32: a channel with its noise on sets the noise's
+*   volume, and the noise period picks the nearest rate.
+* - The ECM sound (effect 8) lasts as long as the ECM (#R$E912), which
+*   ti_poll_vblank counts down, rather than counting it down itself.
+*
+* The three channel records are at #R$E894 (the MSX's sound variables,
+* which nothing else uses on the TI), 16 bytes each:
+sfx_active:                            ; >FF while the channel is playing
+       equ  0
+sfx_noise:                             ; Nonzero if its noise is on
+       equ  1
+sfx_handler:                           ; Its per-frame handler (#R$E899)
+       equ  2
+sfx_count:                             ; Its countdown (#R$E897)
+       equ  4
+sfx_volume:                            ; Its volume, 0-15 (#R$E898)
+       equ  5
+sfx_param:                             ; Its parameter (#R$E89B)
+       equ  6
+sfx_param2:                            ; Its second parameter (#R$E89E)
+       equ  7
+sfx_flag:                              ; The address of its "playing" flag, or 0 (#R$E89C)
+       equ  8
+sfx_period:                            ; Its tone period (#R$E89F)
+       equ  10
+sfx_tone:                              ; The SN76489 command for its tone generator
+       equ  12
+sfx_counter:                           ; A counter (where the MSX uses #R$E89F as one)
+       equ  14
+sfx_size:
+       equ  16
+sfx_channels:
+       equ  sound_channel_active
+sfx_noise_rate:                        ; The noise rate written last (#R$E8D6)
+       equ  sound_mode
+
+*********************************************************************
+*
+* Start a sound effect (#R$7468)
+*
+* Claims a channel (#R$74AE): a free one, or else one of the busy ones in
+* rotation (#R$E8D5), ending its effect. Then sets the channel up from the
+* effect's entry in sfx_effects.
+*
+* I:R4 Effect number (0-13)
+*
+sfx_start:
+       mov  r11,r10
+       ci   r4,13
+       jh   sfx_start_3
+       ci   r4,7                       ; The tunnel rings (#R$77EE)?
+       jne  sfx_start_0
+       sb   @tunnel_rings_finished,@tunnel_rings_finished ; They aren't finished yet (#R$E923)
+sfx_start_0:
+       li   r9,sfx_channels
+       li   r2,3
+sfx_start_1:
+       movb *r9,r0
+       jeq  sfx_start_2                ; A free channel
+       ai   r9,sfx_size
+       dec  r2
+       jne  sfx_start_1
+       clr  r1                         ; All busy: take the next one in rotation
+       movb @sound_channel_rotation,r1
+       swpb r1
+       mov  r1,r9
+       sla  r9,4
+       ai   r9,sfx_channels
+       dec  r1                         ; The counter goes 2, 1, 0, 2...
+       jgt  !
+       jeq  !
+       li   r1,2
+!      swpb r1
+       movb r1,@sound_channel_rotation
+       bl   @sfx_end                   ; End the effect it was playing
+sfx_start_2:
+       mov  r9,r0                      ; The channel's tone generator: >80, >A0 or >C0
+       ai   r0,-sfx_channels
+       sla  r0,1
+       ai   r0,>0080
+       swpb r0
+       movb r0,@sfx_tone(r9)
+       sla  r4,2                       ; R1 -> the effect's entry (12 bytes each)
+       mov  r4,r1
+       sla  r4,1
+       a    r4,r1
+       ai   r1,sfx_effects
+       li   r0,>ff00
+       movb r0,@sfx_active(r9)
+       mov  *r1+,@sfx_handler(r9)
+       mov  *r1+,r2
+       mov  r2,@sfx_flag(r9)
+       jeq  !
+       movb r0,*r2                     ; Set its "playing" flag
+!      mov  *r1+,r2
+       mov  r2,@sfx_period(r9)
+       mov  r2,@sfx_counter(r9)
+       mov  *r1+,@sfx_count(r9)        ; The countdown and the volume
+       mov  *r1+,@sfx_param(r9)        ; The two parameters
+       movb *r1,@sfx_noise(r9)
+       bl   @sfx_update
+sfx_start_3:
+       b    *r10
+*// sfx_start
+
+*********************************************************************
+*
+* Play one tick of the sound effects (#R$7645)
+*
+* Runs the per-frame handler of each channel that is playing, then writes
+* the channel's tone period and volume to the sound chip.
+*
+sfx_tick:
+       mov  r11,r10
+       li   r9,sfx_channels
+       li   r7,3
+sfx_tick_1:
+       movb @sfx_active(r9),r0
+       jeq  sfx_tick_2
+       mov  @sfx_handler(r9),r1
+       bl   *r1
+       movb @sfx_active(r9),r0
+       jeq  sfx_tick_2                 ; The effect has ended
+       bl   @sfx_update
+sfx_tick_2:
+       ai   r9,sfx_size
+       dec  r7
+       jne  sfx_tick_1
+       b    *r10
+*// sfx_tick
+
+*********************************************************************
+*
+* Stop all sound effects (#R$7438)
+*
+sfx_stop:
+       mov  r11,r10
+       li   r9,sfx_channels
+       li   r7,3
+sfx_stop_1:
+       movb @sfx_active(r9),r0
+       jeq  sfx_stop_2
+       bl   @sfx_end
+sfx_stop_2:
+       ai   r9,sfx_size
+       dec  r7
+       jne  sfx_stop_1
+       b    *r10
+*// sfx_stop
+
+*********************************************************************
+*
+* End a channel's sound effect (#R$740C)
+*
+* Turns its tone and its noise off, clears its "playing" flag and marks
+* the channel as free.
+*
+* I:R9 The channel
+*
+sfx_end:
+       movb @sfx_noise(r9),r0
+       jeq  sfx_end_1
+       li   r0,>ff00                   ; Noise off
+       movb r0,@sound
+       sb   @sfx_noise(r9),@sfx_noise(r9)
+sfx_end_1:
+       mov  @sfx_flag(r9),r1
+       jeq  sfx_end_2
+       sb   *r1,*r1                    ; Clear the "playing" flag
+       clr  @sfx_flag(r9)
+sfx_end_2:
+       sb   @sfx_active(r9),@sfx_active(r9)
+       movb @sfx_tone(r9),r0           ; Tone off
+       ori  r0,>1f00
+       movb r0,@sound
+       rt
+*// sfx_end
+
+*********************************************************************
+*
+* Write a channel's tone period and volume to the sound chip
+* (#R$74F6, #R$74EC)
+*
+* The tone is silent if its period is 0, or over 1023 with the noise on;
+* otherwise a period over 1023 is played as 1023. A volume over 15 (16 on
+* the MSX: use the envelope) is played as 13. With the noise on, the noise
+* gets the same volume.
+*
+* I:R9 The channel
+*
+sfx_update:
+       mov  @sfx_period(r9),r0
+       movb @sfx_tone(r9),r3
+       clr  r2
+       movb @sfx_volume(r9),r2
+       swpb r2
+       ci   r2,15
+       jle  sfx_update_1
+       li   r2,13
+sfx_update_1:
+       mov  r0,r0
+       jeq  sfx_update_3
+       ci   r0,1023
+       jle  sfx_update_2
+       movb @sfx_noise(r9),r1
+       jne  sfx_update_3
+       li   r0,1023
+sfx_update_2:
+       mov  r0,r1                      ; The period's low 4 bits, then its high 6
+       andi r1,>000f
+       swpb r1
+       socb r3,r1
+       movb r1,@sound
+       sla  r0,4
+       movb r0,@sound
+       li   r1,15                      ; The attenuation: 15 - the volume
+       s    r2,r1
+       jmp  sfx_update_4
+sfx_update_3:
+       li   r1,15                      ; Silent
+sfx_update_4:
+       swpb r1
+       socb r3,r1
+       ori  r1,>1000
+       movb r1,@sound
+       movb @sfx_noise(r9),r1
+       jeq  sfx_update_5
+       li   r1,15
+       s    r2,r1
+       swpb r1
+       ori  r1,>f000
+       movb r1,@sound
+sfx_update_5:
+       rt
+*// sfx_update
+
+*********************************************************************
+*
+* Set the noise period (PSG register 6 on the MSX)
+*
+* Picks the nearest of the SN76489's three white noise rates, and writes it
+* only when it changes, as writing it restarts the noise.
+*
+* I:R0 The noise period (in the high byte; its low 5 bits are used)
+*
+sfx_set_noise:
+       andi r0,>1f00
+       li   r1,>e400                   ; 0-7: the highest rate
+       ci   r0,>0800
+       jl   sfx_set_noise_1
+       li   r1,>e500                   ; 8-15
+       ci   r0,>1000
+       jl   sfx_set_noise_1
+       li   r1,>e600                   ; 16-31: the lowest
+sfx_set_noise_1:
+       cb   r1,@sfx_noise_rate
+       jeq  sfx_set_noise_2
+       movb r1,@sfx_noise_rate
+       movb r1,@sound
+sfx_set_noise_2:
+       rt
+*// sfx_set_noise
+
+*********************************************************************
+*
+* The sound effects (#R$7AC6)
+*
+* For each effect: its per-frame handler, the address of its "playing"
+* flag (or 0), its tone period, its countdown and volume, its two
+* parameters, and whether its noise is on - from the MSX's scripts
+* (#R$770B-#R$7977). Volume 16 is the MSX's "use the envelope".
+*
+sfx_effects:
+       data sfx_h_count,0,100          ; 0: click (#R$770B)
+       byte 2,16,0,0,0,0
+       data sfx_h_count,0,50           ; 1: beep (#R$771E)
+       byte 10,12,0,0,0,0
+       data sfx_h_explosion,0,0        ; 2: explosion (#R$772F)
+       byte 20,15,0,0,>ff,0
+       data sfx_h_laser,0,15           ; 3: laser (#R$7758)
+       byte 17,16,0,0,0,0
+       data sfx_h_hit,sound_effect_4_playing,0 ; 4: shields hit, energy drained (#R$777E)
+       byte 0,13,0,0,>ff,0
+       data sfx_h_alarm,alarm_playing,300 ; 5: alarm (#R$77A2)
+       byte 0,9,0,0,0,0
+       data sfx_h_beep,0,512           ; 6: beep when something is refused (#R$77CA)
+       byte 131,12,0,0,0,0
+       data sfx_h_tunnel,0,0           ; 7: tunnel rings (#R$77EE)
+       byte 0,0,0,0,0,0
+       data sfx_h_ecm,0,100            ; 8: ECM (#R$7815)
+       byte 0,12,20,0,0,0
+       data sfx_h_incoming,0,0         ; 9: incoming missile (#R$7872)
+       byte 31,14,0,0,>ff,0
+       data sfx_h_torus,0,18           ; 10: Torus Jump Drive (#R$7892)
+       byte 6,0,2,10,0,0
+       data sfx_h_launch,0,0           ; 11: launch (#R$78ED)
+       byte 30,15,15,0,>ff,0
+       data sfx_h_hyperspace,0,170     ; 12: hyperspace (#R$7926)
+       byte 85,16,38,0,0,0
+       data sfx_h_scoop,0,80           ; 13: cargo scooped (#R$7977)
+       byte 15,12,2,0,0,0
+
+*********************************************************************
+*
+* The effects' per-frame handlers
+*
+* I:R9 The channel
+*
+* Effects 0 and 1 (#R$74A6): end when the countdown runs out.
+sfx_h_count:
+       sb   @bytes+1,@sfx_count(r9)
+       jeq  sfx_h_end
+       rt
+sfx_h_end:
+       b    @sfx_end
+
+* Effect 2, the explosion (#R$773E): a random noise period each frame;
+* every 20 frames the volume goes down by one, ending at 0.
+sfx_h_explosion:
+       mov  r11,r8
+       mov  r12,r0                     ; A random number (the R register on the MSX)
+       sla  r0,2
+       a    r0,r12
+       inc  r12
+       mov  r12,r0
+       bl   @sfx_set_noise
+       mov  r8,r11
+       sb   @bytes+1,@sfx_count(r9)
+       jne  sfx_h_explosion_1
+       movb @bytes+20,@sfx_count(r9)
+       sb   @bytes+1,@sfx_volume(r9)
+       jeq  sfx_h_end
+sfx_h_explosion_1:
+       rt
+
+* Effect 3, the laser (#R$776B): the tone period goes up by 2 each frame.
+sfx_h_laser:
+       inct @sfx_period(r9)
+       sb   @bytes+1,@sfx_count(r9)
+       jeq  sfx_h_end
+       rt
+
+* Effect 4 (#R$7791): the noise period goes up by one each frame, to 25.
+sfx_h_hit:
+       mov  r11,r8
+       movb @sfx_param2(r9),r0
+       bl   @sfx_set_noise
+       mov  r8,r11
+       ab   @bytes+1,@sfx_param2(r9)
+       cb   @sfx_param2(r9),@bytes+25
+       jeq  sfx_h_end
+       rt
+
+* Effect 5, the alarm (#R$77B4): the tone period goes down by 10 each
+* frame, ending below 150.
+sfx_h_alarm:
+       mov  @sfx_period(r9),r0
+       ai   r0,-10
+       mov  r0,@sfx_period(r9)
+       ci   r0,150
+       jl   sfx_h_end
+       rt
+
+* Effect 6, the beep (#R$77DB): three frames at tone period 512, then
+* three at 768 (when the countdown goes from >80 to >7F).
+sfx_h_beep:
+       sb   @bytes+1,@sfx_count(r9)
+       jno  sfx_h_beep_1
+       movb @bytes+3,@sfx_count(r9)
+       li   r0,>0300
+       mov  r0,@sfx_period(r9)
+       rt
+sfx_h_beep_1:
+       jeq  sfx_h_end
+       rt
+
+* Effect 7, the tunnel rings (#R$77FB): follows the ring being drawn
+* (#R$E921): volume = radius / 8, tone period = radius + 50, until the
+* rings have finished (#R$E923).
+sfx_h_tunnel:
+       movb @tunnel_rings_finished,r0
+       jne  sfx_h_end
+       clr  r0
+       movb @tunnel_ring_radius,r0
+       swpb r0
+       clr  r1
+       movb @tunnel_ring_radius+1,r1
+       a    r0,r1
+       ai   r1,50
+       mov  r1,@sfx_period(r9)
+       srl  r0,3
+       andi r0,>000f
+       swpb r0
+       movb r0,@sfx_volume(r9)
+       rt
+
+* Effect 8, the ECM (#R$782B): sweeps the tone period up by 50 a frame to
+* 200, then down to under 100, and so on, while the ECM is on (#R$E912).
+sfx_h_ecm:
+       movb @ecm_countdown,r0
+       jgt  sfx_h_ecm_1
+       jmp  sfx_h_end_2
+sfx_h_ecm_1:
+       mov  @sfx_period(r9),r0
+       movb @sfx_param(r9),r1
+       jlt  sfx_h_ecm_2
+       ai   r0,50                      ; Going up
+       mov  r0,@sfx_period(r9)
+       ci   r0,200
+       jl   sfx_h_ecm_3
+       socb @bit7,@sfx_param(r9)
+       rt
+sfx_h_ecm_2:
+       ai   r0,-50                     ; Going down
+       mov  r0,@sfx_period(r9)
+       ci   r0,100
+       jhe  sfx_h_ecm_3
+       szcb @bit7,@sfx_param(r9)
+sfx_h_ecm_3:
+       rt
+
+* Effect 9 (#R$7881): the noise period is the countdown, which goes down
+* by 4 each frame until it would go below 0.
+sfx_h_incoming:
+       sb   @bytes+4,@sfx_count(r9)
+       joc  sfx_h_incoming_1
+       jmp  sfx_h_end_2
+sfx_h_incoming_1:
+       movb @sfx_count(r9),r0
+       b    @sfx_set_noise
+
+sfx_h_end_2:
+       b    @sfx_end
+
+* Effect 10, the Torus Jump Drive (#R$78A7): first 6 frames of tone period
+* 110 with the volume going up by 2 a frame; then 160 frames of noise with
+* a rising period, and a tone with that period. The volume goes down by
+* one every 14 frames.
+sfx_h_torus:
+       mov  r11,r8
+       cb   @sfx_param(r9),@bytes+2
+       jne  sfx_h_torus_1
+       ab   @bytes+2,@sfx_volume(r9)
+       li   r0,110
+       mov  r0,@sfx_period(r9)
+       jmp  sfx_h_torus_2
+sfx_h_torus_1:
+       inc  @sfx_counter(r9)
+       mov  @sfx_counter(r9),r0
+       mov  r0,@sfx_period(r9)
+       swpb r0
+       bl   @sfx_set_noise
+       movb @b255,@sfx_noise(r9)
+sfx_h_torus_2:
+       mov  r8,r11
+       sb   @bytes+1,@sfx_param2(r9)
+       jne  sfx_h_torus_3
+       movb @bytes+14,@sfx_param2(r9)
+       sb   @bytes+1,@sfx_volume(r9)
+sfx_h_torus_3:
+       sb   @bytes+1,@sfx_count(r9)
+       jne  sfx_h_torus_4
+       movb @bytes+160,@sfx_count(r9)
+       sb   @bytes+1,@sfx_param(r9)
+       jeq  sfx_h_end_2
+sfx_h_torus_4:
+       rt
+
+* Effect 11, the launch (#R$78FE), and the end of effect 12: the noise
+* period is the countdown; every 5 frames (30 the first time) the volume is
+* set to the parameter, which goes down by one, ending at 0.
+sfx_h_launch:
+       mov  r11,r8
+       movb @sfx_count(r9),r0
+       bl   @sfx_set_noise
+       mov  r8,r11
+       sb   @bytes+1,@sfx_count(r9)
+       jne  sfx_h_launch_1
+       movb @bytes+5,@sfx_count(r9)
+       movb @sfx_param(r9),@sfx_volume(r9)
+       sb   @bytes+1,@sfx_param(r9)
+       jeq  sfx_h_end_2
+sfx_h_launch_1:
+       rt
+
+* Effect 12, hyperspace (#R$793B): the tone period goes up by one each
+* frame; when the countdown runs out it starts again from the parameter,
+* which goes down by 2 each time, at tone period 60. When that reaches 0:
+* tone period 255 with the noise on, fading out as effect 11 does.
+sfx_h_hyperspace:
+       inc  @sfx_period(r9)
+       sb   @bytes+1,@sfx_count(r9)
+       jne  sfx_h_hyperspace_1
+       movb @sfx_param(r9),@sfx_count(r9)
+       li   r0,60
+       mov  r0,@sfx_period(r9)
+       sb   @bytes+2,@sfx_param(r9)
+       jne  sfx_h_hyperspace_1
+       li   r0,255
+       mov  r0,@sfx_period(r9)
+       movb @b255,@sfx_noise(r9)
+       movb @bytes+5,@sfx_count(r9)
+       movb @bytes+15,@sfx_param(r9)
+       li   r0,sfx_h_launch
+       mov  r0,@sfx_handler(r9)
+sfx_h_hyperspace_1:
+       rt
+
+* Effect 13, cargo scooped (#R$798A): the volume is the countdown, so each
+* blip fades out; two blips, the second at tone period 120.
+sfx_h_scoop:
+       movb @sfx_count(r9),@sfx_volume(r9)
+       sb   @bytes+1,@sfx_count(r9)
+       jne  sfx_h_scoop_1
+       li   r0,120
+       mov  r0,@sfx_period(r9)
+       movb @bytes+15,@sfx_count(r9)
+       sb   @bytes+1,@sfx_param(r9)
+       jeq  sfx_h_end_2
+sfx_h_scoop_1:
+       rt
+
+rom_bank_14_end:
+       equ  $
+       bss  >8000-$

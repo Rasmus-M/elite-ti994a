@@ -26,6 +26,7 @@ main_loop_wait_tick:                                       ; >010f
        sb   @alert_level,@alert_level                      ; XOR A / LD ($E90C),A; 
        sb   @mission_state,@mission_state                  ; LD ($E93D),A      ; 
        blwp @music_stop_vector                             ; CALL $7438        ; stop the sound
+       blwp @sound_stop_vector                             ;                   ; (TI: and the sound effects)
        cb   @game_over_cause,@bytes+>03                    ; LD A,($F74A) / CP $03; 
        jeq  !                                              ; CALL NZ,$1703     ; 
        .far_call code_bank_12_select,death_scene           ;                   ; show the death scene, unless the player quit
@@ -2250,7 +2251,7 @@ _35f1:                                                     ; >35f1
        sb   one,a                                          ; DEC A             ; 
        bl   @set_cursor_position_combined                  ; CALL $3564        ; 
 _3610:                                                     ; >3610
-* TI: no click (sound effect 0, #R$7468), as the sound effects aren't converted yet
+       .sfx 0                                              ; LD A,$00 / CALL $7468; click
        .pop af                                             ; POP AF            ; recover the action code
        .pop hl                                             ; POP HL            ; 
        .pop bc                                             ; POP BC            ; 
@@ -4343,7 +4344,7 @@ _4094:                                                     ; >4094
 _409a:                                                     ; >409a
        rt                                                  ; RET               ; not one of them
 run_key_handler:                                           ; >409b
-* TI: no click (sound effect 0, #R$7468), as the sound effects aren't converted yet
+       .sfx 0                                              ; LD A,$00 / CALL $7468; click
        mov  @2(r1),r0                                      ; INC HL / LD A,(HL) ...; R0 = the handler's ROM bank
        mov  @4(r1),r1                                      ;                   ; R1 = the handler
        b    @far_call_r0_r1                                ; JP (HL)           ; run the handler (in its ROM bank), which returns to the caller
@@ -5223,7 +5224,7 @@ _4738:                                                     ; >4738
        sb   a,a                                            ; XOR A             ; A = 0
        movb a,@identify_target                             ; LD ($EF9D),A      ; 
        movb one,a                                          ; LD A,$01          ; A = 1
-;       .call @play_sound_effect                            ; CALL $7468        ; play sound effect 1
+       .sfx 1                                              ; CALL $7468        ; play the beep
 _4777:                                                     ; >4777
        movb @b255,a                                        ; LD A,$FF          ; A = $FF
        movb a,@in_sights                                   ; LD ($EF99),A      ; in the sights
@@ -5244,7 +5245,7 @@ ship_screen_size_exit:
        movb @current_slot,a                                ; LD A,($E911)      ; A = ($E911) again
        movb a,@missile_target                              ; LD ($E928),A      ; the missile's target
        movb one,a                                          ; LD A,$01          ; A = 1
-;       .call @play_sound_effect                            ; CALL $7468        ; play sound effect 1
+       .sfx 1                                              ; CALL $7468        ; play the beep
        li   hl,msg_missile_locked                          ; LD HL,$4B9A       ; "Missile Locked"
        b    @show_view_message_jmp                         ; JP $39C8          ; show it
 
@@ -8498,7 +8499,7 @@ tunnel_rings:                                              ; >6cb2
        mov  @line_plot_xor,@line_steep_plot_op_pad         ; LD ($3CA8),A      ; 
        ;                                                   ; LD ($3CE7),A      ; 
        movb @bytes+>07,a                                   ; LD A,$07          ; 
-;       .call @play_sound_effect                            ; CALL $7468        ; play sound effect 7
+       .sfx 7                                              ; CALL $7468        ; play the tunnel rings
        movb @bytes+>04,b                                   ; LD B,$04          ; four times
 _6cc4:                                                     ; >6cc4
        .push bc                                            ; PUSH BC           ; 
@@ -8715,7 +8716,7 @@ refuse_if_docked:                                          ; >6dcf
        .proc
        movb @docked,a                                      ; LD A,($E90A) / OR A; 
        jeq  _6de2                                          ; JR Z,$6DE2        ; in flight
-;       .call @trigger_sfx_6                                ; CALL $16FE        ; beep
+       .sfx 6                                              ; CALL $16FE        ; beep
        bl   @clear_message_line                            ; CALL $3955        ; clear the message line
        li   hl,msg_docked                                  ; LD HL,$6F17       ; "Docked!"
        bl   @show_message                                  ; CALL $5FFB        ; show it for a while

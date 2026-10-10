@@ -304,7 +304,7 @@ ti_poll_vblank_3:
        sb   one,@hyperspace_countdown_outer ; one fewer frame
        jne  ti_poll_vblank_4           ; not a whole second yet
        movb @bytes+>32,@hyperspace_countdown_outer ; 50 frames until the next second
-* TI: no beep (sound effect 1), as the sound effects aren't converted yet
+       .sfx 1                          ; beep
        sb   one,@hyperspace_countdown_inner ; one fewer second
        jne  ti_poll_vblank_4
        movb @b255,@hyperspace_trigger  ; time to jump
@@ -326,6 +326,13 @@ ti_poll_vblank_4:
        sb   @game_clock+2,@game_clock+2
        ab   one,@game_clock+3          ; one more day
 ti_poll_vblank_5:
+       cb   @alert_level,@bytes+2      ; alert level 2? (#R$725C)
+       jne  ti_poll_vblank_6
+       movb @alarm_playing,@alarm_playing ; and the alarm not playing already?
+       jne  ti_poll_vblank_6
+       .sfx 5                          ; sound the alarm
+ti_poll_vblank_6:
+       blwp @sound_tick_vector         ; play the sound effects (#R$7645)
        blwp @music_tick_vector
        blwp @chart_cursor_vector       ; move the chart cursor (#R$73BA)
        blwp @keyboard_vector           ; read the keyboard (#R$347A)
@@ -349,6 +356,50 @@ ti_wait_frame_1:
        jeq  ti_wait_frame_1
        .endproc
 *// ti_wait_frame
+
+*********************************************************************
+*
+* The sound effects' entry points
+*
+* The sound effects player is in ROM bank 14 (rom-bank-14.a99) and runs in
+* its own workspace. These select its bank, call it, and select the
+* caller's bank (current_bank) again.
+*
+sound_effect_vector:                   ; Play a sound effect: BLWP, then DATA the effect (.sfx)
+       data sound_ws,sound_effect
+sound_tick_vector:                     ; Play one tick of the sound effects
+       data sound_ws,sound_tick
+sound_stop_vector:                     ; Stop the sound effects
+       data sound_ws,sound_stop
+
+sound_effect:
+       mov  *r14+,r4                   ; R4 = the effect number, after the BLWP
+       movb @options,r0
+       andi r0,>0100                   ; sound effects on (bit 0, see #R$7468)?
+       jeq  sound_return
+       li   r1,sfx_start
+       jmp  sound_bank_call
+sound_stop:
+       li   r1,sfx_stop
+       jmp  sound_bank_call
+sound_tick:
+       movb @sound_channel_active,r0   ; any of the three channels playing?
+       socb @sound_channel_active+16,r0
+       socb @sound_channel_active+32,r0
+       jeq  sound_return
+       li   r1,sfx_tick
+sound_bank_call:
+       li   r0,code_bank_14_select
+       seto *r0
+       bl   *r1
+       mov  @current_bank,r0
+       seto *r0
+sound_return:
+       rtwp
+*// sound_effect
+
+sound_ws:
+       bss  >20
 
 current_bank:                          ; The ROM bank selected last (.select_bank)
        data font_bank_select

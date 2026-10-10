@@ -147,3 +147,5 @@ code_bank_12_select:                   ; Code (rom-bank-12.a99)
        equ  >6018
 code_bank_13_select:                   ; Code (rom-bank-13.a99)
        equ  >601a
+code_bank_14_select:                   ; Code (rom-bank-14.a99)
+       equ  >601c

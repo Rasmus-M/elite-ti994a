@@ -105,7 +105,10 @@ _1881:                                                     ; >1881
 * I:A Amount of damage
 damage_shields:                                            ; >193f
        .proc                                               ; PUSH AF           ; save the damage
-* TI: no sound effect 4 (#R$7468), as the sound effects aren't converted yet
+       movb @sound_effect_4_playing,r0                     ; LD A,($E915) / OR A; sound effect 4 playing already?
+       jne  !                                              ;                   ; 
+       .sfx 4                                              ; LD A,$04 / CALL $7468; no - play it
+!
        li   hl,fore_shield                                 ; LD HL,$F80F       ; HL -> fore shield
        movb @object_z_sign,r0                              ; LD A,($F7D3) / OR A; 
        jgt  damage_shields_hit                             ; JP P,$1958        ; attacker in front
@@ -387,7 +390,7 @@ _87a2:                                                     ; >87a2
        .far_call code_bank_12_select,destroy_object        ; CALL $31AD        ; destroy it
        ab   one,@legal_status_exempt                       ; LD HL,$EFA1 / INC (HL); 
        bl   @cancel_missile_lock_on_object                 ; CALL $30EA        ; cancel any missile lock on it
-* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+       .sfx 2                                              ; LD A,$02 / CALL $7468; play the explosion
 _87cf:                                                     ; >87cf
        movb @bytes+>14,a                                   ; LD A,$14          ; damage 20...
        cb   @ship_type,@bytes+>1f                          ; LD A,($F7E7) / CP $1F; the Constrictor?
@@ -1454,7 +1457,7 @@ _26c2:                                                     ; >26c2
        jne  _2716                                          ; JR NZ,$2716       ; flight controls off - don't fire
        seto r0                                             ; LD A,$FF          ; 
        movb r0,@ship_fired                                 ; LD ($E92D),A      ; 
-* TI: no sound effect 3 (#R$7468), as the sound effects aren't converted yet
+       .sfx 3                                              ; LD A,$03 / CALL $7468; play the laser
        bl   @random_byte                                   ; CALL $2176        ; 
        cb   a,@bytes+>b4                                   ; CP $B4            ; 
        jhe  _2716                                          ; JR NC,$2716       ; missed
@@ -1805,7 +1808,8 @@ laser_damage_by_rank:                                      ; >28cb
 * #R$30EA calls this when the locked-on target object goes away.
 cancel_missile_lock:                                       ; >2d70
        movb @missile_state,r0                              ; LD A,($E910) / OR A; 
-       jne  _2d75                                          ; JP Z,$16FE        ; already idle (TI: no beep yet)
+       jne  _2d75                                          ; JP Z,$16FE        ; already idle
+       .sfx 6                                              ;                   ; beep
        rt                                                  ;                   ; 
 _2d75:                                                     ; >2d75
        sb   @missile_state,@missile_state                  ; XOR A / LD ($E910),A; back to idle
@@ -2291,7 +2295,8 @@ _25e1:                                                     ; >25e1
 _25ed:                                                     ; >25ed
        movb @ecm_countdown,r0                              ; LD A,($E912) / OR A; 
        jne  _25b9_end                                      ; RET NZ            ; an ECM is already on
-* TI: no sound effect 8 (#R$7468); the countdown it starts (#R$7815) is set here
+       .sfx 8                                              ; LD A,$08 / CALL $7468; play the ECM sound
+* TI: the ECM's countdown, which the sound effect starts on the MSX (#R$7815), is set here
        movb @bytes+>78,@ecm_countdown                      ; CALL $7468        ; the ECM's countdown
        seto r0                                             ; LD A,$FF          ; 
        movb r0,@enemy_ecm                                  ; LD ($EEC0),A      ; an enemy's ECM
@@ -2310,7 +2315,7 @@ player_missile_hit:                                        ; >25ff
        bl   @remove_object                                 ; CALL $30A9        ; remove the missile
        .far_call code_bank_12_select,destroy_object        ; CALL $31AD        ; destroy the target
        .far_call code_bank_12_select,spawn_cargo           ; CALL $8DB9        ; 
-* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+       .sfx 2                                              ; LD A,$02 / CALL $7468; play the explosion
 _25b9_end:                                                 
        .endproc                                            ;                   ; 
 

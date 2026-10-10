@@ -29,3 +29,4 @@
        copy "rom-banks/rom-bank-11.a99"
        copy "rom-banks/rom-bank-12.a99"
        copy "rom-banks/rom-bank-13.a99"
+       copy "rom-banks/rom-bank-14.a99"

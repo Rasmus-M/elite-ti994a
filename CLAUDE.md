@@ -20,11 +20,11 @@ data from extra 8K cartridge ROM banks into `>6000` while main code runs in 32K 
 
 1. `xas99.py -i -q -R -L elite.lst -E symbols.txt src/elite.a99 -o bin/elite` — assemble to EA5 program
    image(s) (`bin/elite`, `bin/elitf`, ... when larger than one file).
-2. `xas99.py src/math-tables-bin.a99 -b ...` and `xas99.py src/code-bank-N.a99 -B ...` — assemble the code banks 7-13
+2. `xas99.py src/math-tables-bin.a99 -b ...` and `xas99.py src/code-bank-N.a99 -B ...` — assemble the code banks 7-14
    (`bin/bankN.bin`), which include the math tables (`bin/math-tables.bin`) with `bcopy`.
 3. `xas99.py src/rom-banks/rom-bank-N.a99 -B ...` — assemble the data banks 4-6 (`bin/bankN.bin`).
 4. `java -jar tools/ea5tocart.jar bin\elite "elite"` — pack the program (lower and upper RAM only) with a loader
-   into a 32K cartridge image (banks 0-3), then append banks 4-13 and 2 empty banks: a 128K image (`elite8.bin`).
+   into a 32K cartridge image (banks 0-3), then append banks 4-14 and 1 empty bank: a 128K image (`elite8.bin`).
 5. Package `elite8.bin` + `layout.xml` into `elite.rpk` (MAME cartridge, PCB type `paged378`).
 
 There are no tests; verification is running the cartridge in an emulator.
@@ -103,8 +103,8 @@ words. A single-byte access to
   are constants; update them if those routines change. Code there runs without wait states.
 - **Code in ROM banks**: `program.a99` holds the whole program and is assembled once per output: by `elite.a99` with
   RAM real (`aorg`) and the code banks `dorg`, and by `code-bank-N.a99` with only bank N real, so RAM and the banks
-  can use each other's labels. Banks 7-13 (`code_bank_N_select`, at >6000 + 2N) hold code - 7 the docked screens, 8 the data on system screen,
-  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`), 11 the flight logic `process_frame` calls with `.far_call` (collisions, docking, the safe zone, spawning, the object handlers and steering), 12 more of it (scooping, destroying objects, explosions, the score, the lasers, recharging, the missile, ECM, energy bomb and escape capsule keys, switching views (keys 2-4 and F1-F4), the Torus jump drive (J) and the docking computer (C), freezing the game (STOP), the altitude and cabin temperature, death and the death scene), 13 hyperspace (H, G, the countdown, the jump and witchspace), the alert level, F5, the missions, and the cloaking device, ECM jammer and identify keys (Y, L, I); call into it with `.far_call`. Code in a bank may
+  can use each other's labels. Banks 7-14 (`code_bank_N_select`, at >6000 + 2N) hold code - 7 the docked screens, 8 the data on system screen,
+  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`), 11 the flight logic `process_frame` calls with `.far_call` (collisions, docking, the safe zone, spawning, the object handlers and steering), 12 more of it (scooping, destroying objects, explosions, the score, the lasers, recharging, the missile, ECM, energy bomb and escape capsule keys, switching views (keys 2-4 and F1-F4), the Torus jump drive (J) and the docking computer (C), freezing the game (STOP), the altitude and cabin temperature, death and the death scene), 13 hyperspace (H, G, the countdown, the jump and witchspace), the alert level, F5, the missions, and the cloaking device, ECM jammer and identify keys (Y, L, I), 14 the sound effects player; call into it with `.far_call`. Code in a bank may
   read RAM, the math tables and its own bank only. As a pilot, bank 7 holds the status page (`status_page`,
   `print_commander_name` and their own text and data); the routines and text other screens share (printing,
   number formatting, system names, clearing the page) are in RAM. 'N' on the title screen shows it, and 'Y' the
@@ -123,11 +123,16 @@ words. A single-byte access to
   only for their labels (`main_program` is defined); banks 5 and 6 then reserve the tables' space with `bss`.
 - Interrupts stay disabled (`limi 0` once at startup); the converted `DI`/`EI` are commented out. Instead,
   `ti_poll_vblank` (`music-player.a99`) reads the VDP status and, on a new frame, does the MSX VBlank handler's
-  work: it counts the frame (`vblank_frame_counter`, `vblank_subtick_counter`), counts down the ECM and hyperspace, ticks the game clock, plays a tick of the music and reads
+  work: it counts the frame (`vblank_frame_counter`, `vblank_subtick_counter`), counts down the ECM and hyperspace, ticks the game clock, sounds the alarm, plays a tick of the sound effects and of the music and reads
   the keyboard (`ti_read_keyboard`: each new key press's character goes to `pending_debounced_keypress_byte_status`). It
   ignores every sixth frame, to keep the MSX's 50 Hz timing. It changes no registers, but must be called at least
   once a frame (it's in `clear_space_view`, `copy_space_view`, `draw_object`'s face loop and after each edge) and
   never between the two bytes of a VDP address.
+- **Sound effects**: a native SN76489 player in ROM bank 14 (`rom-bank-14.a99`) rather than a conversion of the MSX's
+  AY-3-8910 engine (#R$7468, #R$7645): the same effects (0-13), handlers and three channels, with its state in the MSX's
+  sound variables (#R$E894). Play one with `.sfx N` (a `blwp @sound_effect_vector` and the number): it runs in its own
+  workspace (`sound_ws`), through entry points in `music-player.a99` that select bank 14 and then `current_bank` again,
+  so it changes no registers and not the status, and works from RAM and from any bank.
 - **Music**: a native SN76489 player (`music-player.a99`, low RAM) with its own workspace, called with `blwp`
   (`music_start_vector` with HL = the tune, `music_stop_vector`, `music_tick_vector`). The title music data
   (`title-music.a99`, bank 6) is generated by `python tools/convert-title-music.py` from the disassembly. Channel 3, the bass, is too low for

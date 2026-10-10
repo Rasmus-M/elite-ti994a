@@ -299,6 +299,16 @@ ti_poll_vblank_2:
        jne  ti_poll_vblank_3
        sb   one,@ecm_countdown         ; ...until it stops at -1
 ti_poll_vblank_3:
+       movb @hyperspace_countdown_inner,@hyperspace_countdown_inner ; a hyperspace countdown? (#R$721F)
+       jeq  ti_poll_vblank_4           ; no
+       sb   one,@hyperspace_countdown_outer ; one fewer frame
+       jne  ti_poll_vblank_4           ; not a whole second yet
+       movb @bytes+>32,@hyperspace_countdown_outer ; 50 frames until the next second
+* TI: no beep (sound effect 1), as the sound effects aren't converted yet
+       sb   one,@hyperspace_countdown_inner ; one fewer second
+       jne  ti_poll_vblank_4
+       movb @b255,@hyperspace_trigger  ; time to jump
+ti_poll_vblank_4:
        blwp @music_tick_vector
        blwp @chart_cursor_vector       ; move the chart cursor (#R$73BA)
        blwp @keyboard_vector           ; read the keyboard (#R$347A)

@@ -239,7 +239,10 @@ process_frame:                                             ; >13fd
        bl   @clear_space_view                              ; CALL $388F        ; clear the space view's bitmap buffer
        bl   @update_stardust                               ; CALL $872E        ; move and plot the stardust
 _1409:                                                     ; >1409
-* TI: not converted yet: the countdown (#R$1651).
+       movb @hyperspace_countdown_inner,r0                 ;                   ; (TI: only while a countdown is running)
+       jeq  !                                              ;                   ; 
+       .far_call code_bank_13_select,show_countdown        ; CALL $1651        ; show the hyperspace countdown
+!
        bl   @settle_roll_pitch                             ; CALL $6BE1        ; stop the roll and pitch if their keys are released
 * TI: not converted yet: the cloaking device and the jammer ($140F-$1434).
 * TI: no waiting for the VBlank handler to draw the scanner ($1437-$143C), as
@@ -322,9 +325,12 @@ _150b:                                                     ; >150b
        .far_call code_bank_12_select,update_altitude_and_temperature; CALL $1577        ; update the altitude and cabin temperature, fuel scoop
 _1517:                                                     ; >1517
        .far_call code_bank_11_select,spawn_ships           ; CALL $2B05        ; spawn new ships
-* TI: not converted yet: the alert level (#R$15E7).
+       .far_call code_bank_13_select,set_alert_level       ; CALL $15E7        ; set the alert level
        .far_call code_bank_12_select,check_for_death       ; CALL $16BA        ; check for death
-* TI: not converted yet: hyperspace (#R$894D).
+       movb @hyperspace_trigger,r0                         ;                   ; (TI: only once the countdown has run out)
+       jeq  !                                              ;                   ; 
+       .far_call code_bank_13_select,hyperspace_jump       ; CALL $894D        ; hyperspace
+!
        movb @ecm_countdown,r0                              ;                   ; (TI: only while the ECM is on)
        jeq  !                                              ;                   ; 
        .far_call code_bank_12_select,ecm_active            ; CALL $323C        ; run the ECM
@@ -399,6 +405,23 @@ bp_name_buffer:
        even
 
 ********************************************************************************
+* The message "Energy Low"
+msg_energy_low:                                            ; >1b37
+       text 'Energy Lo',>f7                                       ; 
+
+********************************************************************************
+* The message "Altitude Low"
+msg_altitude_low:                                          ; >1b41
+       text 'Altitude Lo',>f7                                     ; 
+
+********************************************************************************
+* The message "Countdown:"
+msg_countdown:                                             ; >1b4d
+       text 'Countdown:'                                          ; 
+countdown_digit_buffer:                                    ; >1b57
+       byte >00,>00                                               ; the seconds, formatted by #R$1651
+
+********************************************************************************
 * The message "Fuel Scoop Activated"
 msg_fuel_scoop_activated:                                  ; >1b59
        text 'Fuel Scoop Activate',>e4                             ; 
@@ -414,6 +437,11 @@ msg_game_over_1b7d:                                        ; >1b7d
        text 'Game Ove',>f2                                        ; 
 
 ********************************************************************************
+* The message "Danger: Supernova!"
+msg_danger_supernova:                                      ; >1b86
+       text 'Danger: Supernova',>a1                               ; 
+
+********************************************************************************
 * The message "Malfunction!!!"
 msg_malfunction:                                           ; >1b98
        text 'Malfunction!!',>a1                                   ; 
@@ -422,6 +450,11 @@ msg_malfunction:                                           ; >1b98
 * The message "Cargo lost"
 msg_cargo_lost:                                            ; >1bb9
        text 'Cargo los',>f4                                       ; 
+
+********************************************************************************
+* The message "Drive repaired"
+msg_drive_repaired:                                        ; >1bd9
+       text 'Drive repaire',>e4                                   ; 
 
 ********************************************************************************
 * The message "Load New Commander ?"
@@ -4326,6 +4359,8 @@ key_table:                                                 ; >419b
        data >4500,code_bank_12_select,key_handler_e               ; 'E': ECM (#R$3223)
        data >0900,code_bank_12_select,key_handler_tab             ; TAB (FCTN-7): energy bomb (#R$329E)
        data >1b00,code_bank_12_select,key_escape_capsule          ; Esc (FCTN-9): escape capsule (#R$19FC)
+       data >4800,code_bank_13_select,key_handler_h               ; 'H': hyperspace (#R$88AC)
+       data >4700,code_bank_13_select,key_handler_g               ; 'G': galactic hyperspace (#R$8926)
        data 0                                                     ; end of the table
 
 ********************************************************************************
@@ -9845,6 +9880,31 @@ _8b6f:                                                     ; >8b6f
        jmp  _8b6f                                          ; JR $8B6F          ; 
 _8b66_end:                                                 
        rt                                                  ;                   ; 
+
+********************************************************************************
+* The message "Select System!"
+msg_select_system:                                         ; >8c3c
+       text 'Select System',>a1                                   ; 
+
+********************************************************************************
+* The message "Beyond Range!"
+msg_beyond_range:                                          ; >8c4a
+       text 'Beyond Range',>a1                                    ; 
+
+********************************************************************************
+* The message "Hyperdrive Engaged"
+msg_hyperdrive_engaged:                                    ; >8c57
+       text 'Hyperdrive Engage',>e4                               ; 
+
+********************************************************************************
+* The message "Fuel Leak!"
+msg_fuel_leak:                                             ; >8c69
+       text 'Fuel Leak',>a1                                       ; 
+
+********************************************************************************
+* The message "Drive malfunction!"
+msg_drive_malfunction:                                     ; >8c73
+       text 'Drive malfunction',>a1                               ; 
 
 ********************************************************************************
 * The message "Cloaking device"

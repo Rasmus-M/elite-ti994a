@@ -1,0 +1,570 @@
+* ROM bank 13: the math tables, and code: hyperspace
+* Assembled for real by code-bank-13.a99, and DORG in the other builds for its labels
+       .ifdef code_bank_13
+       aorg >6000
+       .else
+       dorg >6000
+       .endif
+       bss  >40
+       .ifdef code_bank_13
+       bcopy "../../bin/math-tables.bin" ; the math tables, as in the other banks
+       .else
+       bss  math_tables_end-math_tables
+       .endif
+
+* Hyperspace (TI: called with .far_call)
+
+********************************************************************************
+* Set the alert level
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called every frame by the main loop (#R$13FD). Works out the alert level
+* (#R$E90C), shown on the status page as the condition: 1 if there's a
+* hostile ship about (#R$E943); 2 if the energy is low (#R$F817 under 24:
+* "Energy Low"), or - outside witchspace (#R$EEC1) - the altitude is low
+* (#R$F812 under 4: "Altitude Low") or the cabin is hot (#R$F811 at least
+* 16); then checks for "Drive repaired" and the supernova ($162E).
+* .
+* At $162E, in witchspace (#R$EEC1), shows "Drive repaired" once enough
+* ships have been destroyed (#R$EEC2) for hyperspace to work again. At
+* $163A, shows "Danger: Supernova" and raises the alert level ($E90C) in
+* mission states $22 and $33 (the supernova, see #R$909F).
+set_alert_level:                                           ; >15e7
+       .proc                                               ;                   ; 
+       sb   @alert_level,@alert_level                      ; XOR A / LD ($E90C),A; alert level 0
+       movb @hostile_about,r0                              ; LD A,($E943) / OR A; any hostile ships about?
+       jeq  _15f6                                          ; JR Z,$15F6        ; no
+       movb one,@alert_level                               ; LD A,$01 / LD ($E90C),A; alert level 1
+_15f6:                                                     ; >15f6
+       cb   @energy_gauge,@bytes+>18                       ; LD A,($F817) / CP $18; energy below 24?
+       jhe  _1608                                          ; JR NC,$1608       ; not low
+       li   hl,msg_energy_low                              ; LD HL,$1B37       ; "Energy Low"
+       bl   @show_view_message_if_free                     ; CALL $39E9        ; show it
+       movb @bytes+>02,@alert_level                        ; LD A,$02 / LD ($E90C),A; alert level 2
+_1608:                                                     ; >1608
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; 
+       jne  drive_repaired_supernova_warning               ; JR NZ,$162E       ; in witchspace - no planet or sun
+       cb   @altitude_gauge,@bytes+>04                     ; LD A,($F812) / CP $04; altitude below 4?
+       jhe  _1620                                          ; JR NC,$1620       ; not low
+       li   hl,msg_altitude_low                            ; LD HL,$1B41       ; "Altitude Low"
+       bl   @show_view_message_if_free                     ; CALL $39E9        ; show it
+       movb @bytes+>02,@alert_level                        ; LD A,$02 / LD ($E90C),A; alert level 2
+_1620:                                                     ; >1620
+       cb   @cabin_temperature,@bytes+>10                  ; LD A,($F811) / CP $10; at least 16?
+       jl   _163a                                          ; JR C,$162C / JR $163A; not hot
+       movb @bytes+>02,@alert_level                        ; LD A,$02 / LD ($E90C),A; alert level 2
+       jmp  _163a                                          ; JR $163A          ; 
+drive_repaired_supernova_warning:                          ; >162e
+       movb @witchspace_kills_needed,r0                    ; LD A,($EEC2) / OR A; ships still to kill?
+       jne  _163a                                          ; JR NZ,$163A       ; some left
+       li   hl,msg_drive_repaired                          ; LD HL,$1BD9       ; "Drive repaired"
+       bl   @show_view_message_if_free                     ; CALL $39E9        ; 
+_163a:                                                     ; >163a
+       movb @mission_state,a                               ; LD A,($E93D)      ; 
+       cb   a,@bytes+>22                                   ; CP $22            ; 
+       jeq  _1645                                          ; JR Z,$1645        ; the sun is about to go supernova...
+       cb   a,@bytes+>33                                   ; CP $33            ; 
+       jne  _15e7_end                                      ; JR NZ,$1650       ; 
+_1645:                                                     ; >1645
+       li   hl,msg_danger_supernova                        ; LD HL,$1B86       ; "Danger: Supernova!"
+       bl   @show_view_message_if_free                     ; CALL $39E9        ; 
+       movb @bytes+>02,@alert_level                        ; LD A,$02 / LD ($E90C),A; alert level 2
+_15e7_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Show the hyperspace countdown
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called every frame by the main loop (#R$13FD). While a hyperspace
+* countdown is running (#R$E91B), formats the seconds left into the buffer
+* at #R$1B57 (#R$3675), which follows "Countdown:" (#R$1B4D), and shows it:
+* over the space view if it's showing (#R$E903), otherwise on the message
+* line when the number changes ($1670).
+* .
+* At $1670, when the number of seconds left (#R$E91B) has changed since
+* last time (#R$E91D), clears the message line (#R$3955) and prints
+* "Countdown:" and the seconds.
+* TI: process_frame only calls this while a countdown is running.
+show_countdown:                                            ; >1651
+       .proc                                               ;                   ; 
+       movb @hyperspace_countdown_inner,r0                 ; LD A,($E91B) / OR A; A = seconds left
+       jeq  _1651_end                                      ; RET Z             ; no countdown
+       li   ix,countdown_digit_buffer                      ; LD IX,$1B57       ; the digits buffer
+       movb @hyperspace_countdown_inner,@c                 ; LD A,($E91B) / LD C,A; C = seconds left
+       sb   a,a                                            ; XOR A             ; 
+       clr  hl                                             ; SBC HL,HL         ; 
+       bl   @format_number                                 ; CALL $3675        ; format them
+       movb @space_view_showing,r0                         ; LD A,($E903) / OR A; space view showing?
+       jeq  show_countdown_message_line                    ; JR Z,$1670        ; no space view
+       li   hl,msg_countdown                               ; LD HL,$1B4D       ; "Countdown:" and the digits
+       bl   @show_view_message                             ; JP $39C8          ; show it
+       jmp  _1651_end                                      ;                   ; 
+show_countdown_message_line:                               ; >1670
+       cb   @hyperspace_countdown_inner,@countdown_shown   ; LD A,($E91B) / LD HL,$E91D / CP (HL); 
+       jeq  _1651_end                                      ; RET Z             ; not changed
+       movb @hyperspace_countdown_inner,@countdown_shown   ; LD (HL),A         ; 
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       bl   @ti_wait_frame                                 ; HALT              ; 
+       li   hl,msg_countdown                               ; LD HL,$1B4D       ; "Countdown:" and the digits
+       bl   @rst_08_target_print_tokenised_string          ; JP $357A          ; print it
+_1651_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Show a message
+* 
+* Used by the routine at #R$88AC.
+* .
+* With a space view showing (#R$E903), shows the message at HL over it
+* (#R$39C8); otherwise on the message line for a while (#R$3955,
+* #R$5FFB).
+* 
+* I:HL The message
+show_message_anywhere:                                     ; >1683
+       .proc                                               ;                   ; 
+       movb @space_view_showing,r0                         ; LD A,($E903) / OR A; space view showing?
+       jeq  _168a                                          ; JP NZ,$39C8       ; 
+       bl   @show_view_message                             ;                   ; yes - over the space view
+       jmp  _1683_end                                      ;                   ; 
+_168a:                                                     
+       .push hl                                            ; PUSH HL           ; 
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       .pop hl                                             ; POP HL            ; 
+       bl   @show_message                                  ; JP $5FFB          ; show it for a while
+_1683_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Show a message in the space view, unless one is showing
+* 
+* Used by the routines at #R$13FD, #R$1577 and #R$15E7.
+* .
+* Does nothing while the message timer (#R$E919) is running; otherwise
+* #R$39C8.
+* 
+* I:HL The message
+show_view_message_if_free:                                 ; >39e9
+       movb @message_timer,r0                              ; LD A,($E919) / OR A; a message showing?
+       jne  _39e9_end                                      ; RET NZ            ; yes
+       b    @show_view_message                             ; JP $39C8          ; no - show this one
+_39e9_end:                                                 
+       rt                                                  ;                   ; 
+
+********************************************************************************
+* Key 'H': hyperspace
+* 
+* Reached via the key table at #R$419B. Doesn't work while docked
+* (#R$6DCF), while a jump is already counting down (#R$E91B), or in
+* witchspace until enough Thargoids have been destroyed (#R$EEC2). On a
+* chart (#R$E902 = 4 or 6), first selects the system nearest the cursor.
+* Then shows "Select System!" if no system is selected (#R$E91A) or it's
+* the current one (unless in witchspace), and "Beyond Range!" if there
+* isn't enough fuel (#R$F775) for the distance (#R$6141). Otherwise, at
+* $8910, starts a 10-second countdown (#R$E91B, #R$E91C) to the jump
+* (#R$894D), remembering its fuel cost ($E87F).
+key_handler_h:                                             ; >88ac
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; do nothing if docked
+       movb @hyperspace_countdown_inner,r0                 ; LD A,($E91B) / OR A; 
+       jne  _88ac_end                                      ; JP NZ,$16FE       ; already counting down (TI: no beep yet)
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; 
+       jeq  _88c3                                          ; JR Z,$88C3        ; not in witchspace
+       movb @witchspace_kills_needed,r0                    ; LD A,($EEC2) / OR A; kills still needed?
+       jne  _88ac_end                                      ; JP NZ,$16FE       ; hyperspace not working yet
+_88c3:                                                     ; >88c3
+       movb @hyperspace_target_selected,r0                 ; LD A,($E91A) / OR A; 
+       jne  _88d2                                          ; JR NZ,$88D2       ; 
+_88c9:                                                     ; >88c9
+       li   hl,msg_select_system                           ; CALL $16FE / LD HL,$8C3C; "Select System!" (TI: no beep yet)
+       bl   @show_message_anywhere                         ; JP $1683          ; show it
+       jmp  _88ac_end                                      ;                   ; 
+_88d2:                                                     ; >88d2
+       cb   @current_screen,@bytes+>06                     ; LD A,($E902) / CP $06; 
+       jne  _88e1                                          ; JR NZ,$88E1       ; 
+       .far_call code_bank_9_select,local_chart_select     ; CALL $538B        ; on the local chart: select the system
+       .far_call code_bank_9_select,local_chart_cursor_to_selected; CALL $53ED        ; nearest the cursor
+       jmp  _88eb                                          ; JR $88EB          ; 
+_88e1:                                                     ; >88e1
+       cb   @current_screen,@bytes+>04                     ; CP $04            ; 
+       jne  _88eb                                          ; JR NZ,$88EB       ; 
+       .far_call code_bank_9_select,galactic_chart_select  ; CALL $5314        ; on the galactic chart: select the system
+       .far_call code_bank_9_select,galactic_chart_cursor_to_selected; CALL $53FD        ; nearest the cursor
+_88eb:                                                     ; >88eb
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; 
+       jne  _88fa                                          ; JR NZ,$88FA       ; in witchspace - any system will do
+       cb   @selected_system,@current_system               ; LD A,($E72B) / LD HL,$EB67 / CP (HL); the current system?
+       jeq  _88c9                                          ; JR Z,$88C9        ; yes - "Select System!"
+_88fa:                                                     ; >88fa
+       bl   @distance_to_selected_system                   ; CALL $6141        ; HL = fuel needed
+       clr  r0                                             ; EX DE,HL / LD HL,($F775); 
+       movb @fuel_level,r0                                 ; XOR A / LD H,A    ; 
+       swpb r0                                             ;                   ; R0 = fuel
+       c    r0,hl                                          ; SBC HL,DE         ; enough fuel?
+       jhe  _8910                                          ; JR NC,$8910       ; yes
+       li   hl,msg_beyond_range                            ; CALL $16FE / LD HL,$8C4A; no - "Beyond Range!" (TI: no beep yet)
+       bl   @show_message_anywhere                         ; JP $1683          ; show it
+       jmp  _88ac_end                                      ;                   ; 
+_8910:                                                     ; >8910
+       movb @l,@hyperspace_fuel_cost                       ; LD A,E / LD ($E87F),A; the jump's fuel cost
+       movb @bytes+>32,@hyperspace_countdown_outer         ; LD A,$32 / LD ($E91C),A; 50 frames per second
+       movb @bytes+>0a,@hyperspace_countdown_inner         ; LD A,$0A / LD ($E91B),A; 10 seconds
+       sb   @countdown_shown,@countdown_shown              ; XOR A / LD ($E91D),A; 
+       sb   @galactic_jump_flag,@galactic_jump_flag        ; LD ($E925),A      ; not a galactic jump
+_88ac_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Key 'G': galactic hyperspace
+* 
+* Reached via the key table at #R$419B. Needs a galactic hyperdrive
+* (#R$F780), which is used up by the jump (#R$894D), and not to be docked
+* (#R$6DCF) or already counting down (#R$E91B). Starts a 30-second
+* countdown to a jump that costs no fuel, flagged as galactic (#R$E925).
+key_handler_g:                                             ; >8926
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; do nothing if docked
+       movb @galactic_drive_fitted,r0                      ; LD A,($F780) / OR A; 
+       jeq  _8926_end                                      ; JP Z,$16FE        ; no galactic hyperdrive (TI: no beep yet)
+       movb @hyperspace_countdown_inner,r0                 ; LD A,($E91B) / OR A; 
+       jne  _8926_end                                      ; JP NZ,$16FE       ; already counting down
+       sb   @countdown_shown,@countdown_shown              ; XOR A / LD ($E91D),A; 
+       sb   @hyperspace_fuel_cost,@hyperspace_fuel_cost    ; LD ($E87F),A      ; no fuel cost
+       movb one,@galactic_jump_flag                        ; INC A / LD ($E925),A; a galactic jump
+       movb @bytes+>32,@hyperspace_countdown_outer         ; LD A,$32 / LD ($E91C),A; 50 frames per second
+       movb @bytes+>1e,@hyperspace_countdown_inner         ; LD A,$1E / LD ($E91B),A; 30 seconds
+_8926_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Hyperspace jump
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called every frame by the main loop (#R$13FD); does nothing until the
+* countdown started by 'H' (#R$88AC) or 'G' (#R$8926) has run out
+* (#R$E920, set by #R$7202). Then updates the mission state (#R$8AC8),
+* stops the ship and leaves witchspace and the safe zone, and shows the
+* hyperspace tunnel: "Hyperdrive Engaged" over stardust streaks
+* (#R$872E) that get longer, in colours that cycle, for about 110
+* frames.
+* .
+* There's a 12/256 chance of a drive malfunction, which puts the ship in
+* witchspace (#R$EEC1). A galactic jump (#R$E925) uses up the galactic
+* hyperdrive (#R$F780), moves on to the next galaxy (#R$EB66, rotating
+* the galaxy seeds at $E711) and arrives at the system nearest the
+* middle of the chart (#R$5325); and in mission 1, state $12, starts the
+* Constrictor's trail (#R$EFA2, #R$EFA3).
+* .
+* In witchspace ($8A0E): the ship is halfway between the two systems
+* ($EEC3/$EEC4); the kills needed before hyperspace works again
+* (#R$EEC2) and the number of Thargoids (#R$EEC5) are set; the object
+* table is cleared; "Drive malfunction!" is shown, and only half the
+* fuel is used.
+* .
+* Otherwise ($8A4D): outside the first galaxy, counts the jumps to the
+* next mission (#R$E93B, #R$908C); then arrives in the selected system
+* (#R$EB67), building its market (#R$4BA8) and placing the planet, sun
+* and station (#R$8C94).
+* .
+* Either way ($8A76): the legal status (#R$EB65) is halved, the fuel
+* used, and the gauges redrawn. Finally, at the start of mission 3
+* (state $30), a "Fuel Leak!" drains all the fuel (see #R$909F).
+* TI: process_frame only calls this once the countdown has run out.
+hyperspace_jump:                                           ; >894d
+       .proc                                               ;                   ; 
+       movb @hyperspace_trigger,r0                         ; LD A,($E920) / OR A; 
+       jne  _8952                                          ; RET Z             ; not time yet
+       .endproc                                            ;                   ; 
+_8952:                                                     
+       bl   @mission_on_hyperspace                         ; CALL $8AC8        ; update the mission state
+       .far_call code_bank_12_select,stop_roll_and_pitch   ; CALL $1A7D        ; stop any roll and pitch
+       bl   @switch_to_front_view                          ; CALL $64A1        ; switch to the front view
+       bl   @stop_ship                                     ; CALL $8B7B        ; bring the speed down to 0
+       sb   @hyperspace_trigger,@hyperspace_trigger        ; XOR A / LD ($E920),A; 
+       sb   @in_witchspace,@in_witchspace                  ; LD ($EEC1),A      ; out of witchspace
+       sb   @alert_level,@alert_level                      ; LD ($E90C),A      ; alert level 0
+       sb   @station_in_range,@station_in_range            ; LD ($EB05),A      ; out of the safe zone
+       movb one,@jump_in_progress                          ; LD A,$01 / LD ($E722),A; stardust: hyperspace streaks
+       movb one,@stardust_passes                           ; LD ($E723),A      ; the passes per frame, starting at 1
+       movb one,@stardust_passes_countdown                 ; LD ($E87B),A      ; 
+       movb @bytes+>0a,@stardust_passes_interval           ; LD A,$0A / LD ($E87C),A; 
+       movb @bytes+>21,@hyperspace_flash_colour            ; LD A,$21 / LD ($E880),A; the first colour
+* TI: no sound effect 12 (#R$7468), as the sound effects aren't converted yet
+_8985:                                                     ; >8985
+       .push bc                                            ; PUSH BC           ; 
+       bl   @clear_space_view                              ; CALL $388F        ; clear the space view
+       li   hl,msg_hyperdrive_engaged                      ; LD HL,$8C57       ; "Hyperdrive Engaged"
+       bl   @show_view_message                             ; CALL $39C8        ; print it
+       bl   @update_stardust                               ; CALL $872E        ; draw the stardust streaks
+       bl   @copy_space_view                               ; CALL $3846        ; copy the space view to the screen
+       movb @hyperspace_flash_colour,a                     ; LD A,($E880)      ; 
+       ab   @bytes+>10,a                                   ; ADD A,$10         ; 
+       jnc  _899e                                          ; JR NC,$899E       ; 
+       movb @bytes+>21,a                                   ; LD A,$21          ; wrap the colour back to $21
+_899e:                                                     ; >899e
+       movb a,@hyperspace_flash_colour                     ; LD ($E880),A      ; 
+       bl   @colour_space_view                             ; CALL $3A4D        ; recolour with it
+       .pop bc                                             ; POP BC            ; 
+       cb   @stardust_passes,@bytes+>07                    ; LD A,($E723) / CP $07; 
+       jhe  _89ae                                          ; JR NC,$89AE       ; 7 passes - let B count down
+       movb @bytes+>3c,b                                   ; LD B,$3C          ; otherwise another 60 passes
+_89ae:                                                     ; >89ae
+       sb   one,b                                          ; DJNZ $8985        ; 
+       jne  _8985                                          ;                   ; 
+       bl   @random_byte                                   ; CALL $2176        ; 
+       cb   a,@bytes+>0c                                   ; CP $0C            ; 
+       jhe  _89c0                                          ; JR NC,$89C0       ; no malfunction
+       movb @b255,@in_witchspace                           ; LD A,$FF / LD ($EEC1),A; 12/256 chance: witchspace
+       movb @bytes+>51,a                                   ; LD A,$51          ; in witchspace colours
+       jmp  _89c2                                          ; JR $89C2          ; 
+_89c0:                                                     ; >89c0
+       movb @bytes+>a1,a                                   ; LD A,$A1          ; 
+_89c2:                                                     ; >89c2
+       bl   @colour_space_view                             ; CALL $3A4D        ; recolour with A
+       sb   @message_timer,@message_timer                  ; XOR A / LD ($E919),A; 
+       bl   @tunnel_rings                                  ; CALL $6CB2        ; flash the dashboard
+       movb @galactic_jump_flag,r0                         ; LD A,($E925) / OR A; 
+       jeq  _8a05                                          ; JR Z,$8A05        ; not a galactic jump
+       sb   @galactic_drive_fitted,@galactic_drive_fitted  ; XOR A / LD ($F780),A; the galactic hyperdrive is used up
+       movb @current_galaxy,r0                             ; LD A,($EB66)      ; 
+       ab   one,r0                                         ; INC A             ; 
+       andi r0,>0700                                       ; AND $07           ; 
+       movb r0,@current_galaxy                             ; LD ($EB66),A      ; the next galaxy (0-7)
+       li   hl,galaxy_seeds                                ; LD HL,$E711       ; the galaxy seeds
+       movb @bytes+>06,b                                   ; LD B,$06          ; 
+_89e4:                                                     ; >89e4
+       movb *hl,r0                                         ; RLC (HL)          ; 
+       movb *hl,@r0lb                                      ;                   ; 
+       sla  r0,1                                           ;                   ; rotate them
+       movb r0,*hl+                                        ; INC HL            ; 
+       sb   one,b                                          ; DJNZ $89E4        ; 
+       jne  _89e4                                          ;                   ; 
+       li   bc,>6060                                       ; LD BC,$6060       ; the middle of the chart
+       .far_call code_bank_9_select,nearest_and_furthest_systems; CALL $5325        ; find the system nearest to it
+       cb   @mission_state,@bytes+>12                      ; LD A,($E93D) / CP $12; 
+       jne  _8a05                                          ; JR NZ,$8A05       ; not following the Constrictor
+       ab   one,@mission_state                             ; INC A / LD ($E93D),A; state $13
+       movb @selected_system,@mission_system               ; LD A,($E72B) / LD ($EFA2),A; the Constrictor's trail starts at the selected system
+       movb @bytes+>05,@constrictor_trail_count            ; LD A,$05 / LD ($EFA3),A; and is five systems long
+_8a05:                                                     ; >8a05
+       .far_call code_bank_10_select,reset_flight          ; CALL $707D        ; reset the flight variables
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; 
+       jeq  _8a4d                                          ; JR Z,$8A4D        ; no malfunction
+       movb @selected_system,a                             ; LD DE,($F760) / LD A,($E72B); 
+       bl   @generate_system                               ; CALL $4C9B        ; generate the selected system
+       clr  r0                                             ; LD BC,($F751) / LD A,C / ADD A,E / RR A; 
+       movb @system_x,r0                                   ;                   ; 
+       srl  r0,8                                           ;                   ; 
+       clr  r1                                             ;                   ; 
+       movb @current_system_x,r1                           ;                   ; 
+       srl  r1,8                                           ;                   ; 
+       a    r1,r0                                          ;                   ; 
+       srl  r0,1                                           ;                   ; 
+       swpb r0                                             ;                   ; 
+       movb r0,@witchspace_position                        ; LD ($EEC3),A      ; witchspace is halfway between them
+       clr  r0                                             ; LD A,B / ADD A,D / RR A; 
+       movb @system_x+1,r0                                 ;                   ; 
+       srl  r0,8                                           ;                   ; 
+       clr  r1                                             ;                   ; 
+       movb @current_system_x+1,r1                         ;                   ; 
+       srl  r1,8                                           ;                   ; 
+       a    r1,r0                                          ;                   ; 
+       srl  r0,1                                           ;                   ; 
+       swpb r0                                             ;                   ; 
+       movb r0,@witchspace_position_y                      ; LD ($EEC4),A      ; 
+       movb @combat_rank,a                                 ; LD A,($EB12)      ; 
+       ab   one,a                                          ; INC A             ; 
+       ab   a,a                                            ; ADD A,A           ; 
+       movb a,@witchspace_kills_needed                     ; LD ($EEC2),A      ; kills needed: (rank + 1) * 2
+       clr  r0                                             ; LD A,($EB65) / RLCA / RLCA / AND $03; 
+       movb @legal_status,r0                               ;                   ; 
+       srl  r0,14                                          ;                   ; 
+       inc  r0                                             ; INC A             ; 
+       swpb r0                                             ;                   ; 
+       movb r0,@witchspace_thargoids                       ; LD ($EEC5),A      ; Thargoids: 1-4
+       bl   @clear_all_ship_slots                          ; CALL $28D4        ; clear the object table
+       li   hl,msg_drive_malfunction                       ; LD HL,$8C73       ; "Drive malfunction!"
+       bl   @show_view_message                             ; CALL $39C8        ; show it
+       movb @hyperspace_fuel_cost,r0                       ; LD HL,$E87F / SRL (HL); 
+       srl  r0,1                                           ;                   ; 
+       movb r0,@hyperspace_fuel_cost                       ;                   ; half the fuel
+       jmp  _8a76                                          ; JR $8A76          ; 
+_8a4d:                                                     ; >8a4d
+* TI: counting the jumps to the next mission ($8A4D-$8A61, #R$908C) isn't
+* converted yet.
+       bl   @random_byte                                   ; CALL $2176        ; 
+       movb a,@market_price_roll                           ; LD ($EFAA),A      ; seed the market prices
+       movb @selected_system,@current_system               ; LD A,($E72B) / LD ($EB67),A; arrive at the selected system
+       bl   @arrive_in_system                              ; CALL $4BA8        ; build its market
+       bl   @place_planet_station_sun                      ; CALL $8C94        ; place the planet, sun and station
+_8a76:                                                     ; >8a76
+       sb   @hyperspace_target_selected,@hyperspace_target_selected; XOR A / LD ($E91A),A; no system selected
+       movb @legal_status,r0                               ; LD HL,$EB65 / SRL (HL); 
+       srl  r0,1                                           ;                   ; 
+       movb r0,@legal_status                               ;                   ; halve the legal status
+       sb   @hyperspace_fuel_cost,@fuel_level              ; LD A,($F775) / LD HL,$E87F / SUB (HL) / LD ($F775),A; use the fuel
+       bl   @redraw_all_dashboard_gauges                   ; CALL $6433        ; redraw the gauges
+       cb   @mission_state,@bytes+>30                      ; LD A,($E93D) / CP $30; 
+       jne  _894d_end                                      ; RET NZ            ; no fuel leak
+       bl   @clear_space_view                              ; CALL $388F        ; mission 3: a fuel leak - clear the space view
+       movb @bytes+>f8,a                                   ; LD A,$F8          ; 
+       bl   @colour_space_view                             ; CALL $3A4D        ; colour its top row white on red
+       li   hl,msg_fuel_leak                               ; LD HL,$8C69       ; "Fuel Leak!"
+       bl   @show_view_message                             ; CALL $39C8        ; 
+       bl   @copy_space_view                               ; CALL $3846        ; 
+       movb @bytes+>46,a                                   ; LD A,$46          ; 
+       sb   @fuel_level,a                                  ; LD HL,$F775 / SUB (HL); 
+       .push af                                            ; PUSH AF           ; 
+_8aaa:                                                     ; >8aaa
+       movb @fuel_level,r0                                 ; LD HL,$F775 / LD A,(HL) / OR A; 
+       jeq  _8ab9                                          ; JR Z,$8AB9        ; 
+       sb   one,@fuel_level                                ; DEC (HL)          ; drain the fuel gauge by 1
+       bl   @draw_fuel_gauge                               ; CALL $6AAD        ; redraw the fuel gauge
+       bl   @ti_wait_frame                                 ; HALT              ; 
+       bl   @ti_wait_frame                                 ; HALT              ; 
+       jmp  _8aaa                                          ; JR $8AAA          ; 
+_8ab9:                                                     ; >8ab9
+       .pop bc                                             ; POP BC            ; 
+_8aba:                                                     ; >8aba
+       bl   @ti_wait_frame                                 ; HALT x 3          ; 
+       bl   @ti_wait_frame                                 ;                   ; 
+       bl   @ti_wait_frame                                 ;                   ; 
+       sb   one,b                                          ; DJNZ $8ABA        ; wait
+       jne  _8aba                                          ;                   ; 
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); state $31
+       movb @bytes+>a1,a                                   ; LD A,$A1          ; 
+       bl   @colour_space_view                             ; JP $3A4D          ; normal colours
+_894d_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Missions: update the mission state on a hyperspace jump
+* 
+* Used by the routine at #R$894D.
+* .
+* Called by #R$894D. In mission 1, state $14 goes back to $13 (on the
+* Constrictor's trail, see #R$91AA) and $18 to $17 (the Constrictor
+* follows the player to the next system). Mission 3 ends (state 0),
+* unless the player has taken the refugees (state $33), when it moves on
+* to state $34 (#R$90FB). In mission 4 the Cougar appears again in the
+* next system (state $40, see #R$2B24). In mission 5, state $51 becomes
+* $52: the system arrived at has been invaded by the Thargoids
+* (#R$9220).
+mission_on_hyperspace:                                     ; >8ac8
+       movb @mission_state,a                               ; LD A,($E93D) / OR A; 
+       jeq  _8aff                                          ; RET Z             ; no mission
+       cb   a,@bytes+>14                                   ; CP $14            ; 
+       jeq  _8ad5                                          ; JR Z,$8AD5        ; 
+       cb   a,@bytes+>18                                   ; CP $18            ; 
+       jne  _8ada                                          ; JR NZ,$8ADA       ; neither $14 nor $18
+_8ad5:                                                     ; >8ad5
+       sb   one,@mission_state                             ; DEC A / LD ($E93D),A; $14 -> $13, $18 -> $17
+       rt                                                  ; RET               ; 
+_8ada:                                                     ; >8ada
+       movb a,@c                                           ; LD C,A            ; 
+       andi a,>f000                                        ; AND $F0           ; A = mission * 16
+       cb   a,@bytes+>30                                   ; CP $30            ; 
+       jne  _8aee                                          ; JR NZ,$8AEE       ; not mission 3
+       sb   @mission_state,@mission_state                  ; XOR A             ; mission 3 ends...
+       cb   @c,@bytes+>33                                  ; LD A,C / CP $33   ; 
+       jne  _8aff                                          ; JR NZ,$8AE9       ; 
+       movb @bytes+>34,@mission_state                      ; INC A / LD ($E93D),A; ...unless the refugees are on board: $33 -> $34
+       rt                                                  ; RET               ; 
+_8aee:                                                     ; >8aee
+       cb   a,@bytes+>40                                   ; CP $40            ; 
+       jne  _8af6                                          ; JR NZ,$8AF6       ; not mission 4
+       movb a,@mission_state                               ; LD ($E93D),A      ; mission 4: back to $40 (the Cougar appears again)
+       rt                                                  ; RET               ; 
+_8af6:                                                     ; >8af6
+       cb   @c,@bytes+>51                                  ; LD A,C / CP $51   ; 
+       jne  _8aff                                          ; JR NZ,$8AFF       ; 
+       movb @bytes+>52,@mission_state                      ; INC A / LD ($E93D),A; $51 -> $52: an invaded system
+_8aff:                                                     ; >8aff
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Stop the ship
+* 
+* Used by the routines at #R$86E6 and #R$894D.
+* .
+* Brings the speed (#R$F814) down to 0 one step at a time (#R$699C),
+* without redrawing the speed gauge each time (#R$E92B); $8B8A turns the
+* redrawing back on. Used for hyperspace (#R$894D) and the Torus Jump Drive
+* (#R$86E6).
+stop_ship:                                                 ; >8b7b
+       .proc                                               ;                   ; 
+       sb   @redraw_speed_gauge,@redraw_speed_gauge        ; XOR A / LD ($E92B),A; don't redraw the speed gauge
+_8b7f:                                                     ; >8b7f
+       movb @speed_gauge_value,r0                          ; LD A,($F814) / OR A; 
+       jeq  stop_ship_2                                    ; JR Z,$8B8A        ; stopped
+       bl   @speed_down                                    ; CALL $699C        ; slow down
+       jmp  _8b7f                                          ; JR $8B7F          ; 
+stop_ship_2:                                               ; >8b8a
+       sb   one,@redraw_speed_gauge                        ; LD HL,$E92B / DEC (HL); redraw the speed gauge again
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Place the planet, the space station and the sun
+* 
+* Used by the routine at #R$894D.
+* .
+* Clears the object table (#R$28D4). Puts the planet (ship type $64,
+* handler type 0, speed 0) in slot 0, $5FB4 (about 24500) from the player
+* in a random direction (#R$8F25), picking again until its z is at least
+* $1D4C. At $8CB1, the space station (ship type 1, handler type 2) goes
+* $1D4C (about 7500) from the planet in a random direction, pointing at it
+* (#R$8D8E), picking again while it's closer to the player than $5FB4
+* (#R$883D). The sun (ship type $65) goes opposite the station, at minus
+* its position. Ship types $64 and $65 are drawn as a circle (#R$3D0E) and
+* a filled disc (#R$3DF4) by #R$4A86.
+place_planet_station_sun:                                  ; >8c94
+       .proc                                               ;                   ; 
+       bl   @clear_all_ship_slots                          ; CALL $28D4        ; clear the object table
+       movb @bytes+>0d,@object_status_byte                 ; LD A,$0D / LD ($F7CD),A; status: in use, can't be shot, no collisions
+_8c9c:                                                     ; >8c9c
+       li   hl,>5fb4                                       ; LD HL,$5FB4       ; about 24500 away...
+       .far_call code_bank_11_select,random_point          ; SCF / CALL $8F25  ; ...in any direction (HL = z)
+       mov  hl,hl                                          ; BIT 7,H           ; 
+       jlt  _8c9c                                          ; JR NZ,$8CAF       ; behind the player - again
+       ai   hl,->1d4c                                      ; LD DE,$E2B4 / ADC HL,DE; 
+       jlt  _8c9c                                          ; JP P,$8CB1        ; z under 7500 - again
+place_planet_station_and_sun:                              ; >8cb1
+       sb   @handler_type,@handler_type                    ; LD A,$00 / LD ($F7EE),A; handler type 0
+       movb @bytes+>64,@ship_type                          ; LD A,$64 / LD ($F7E7),A; ship type $64: the planet
+       sb   @object_speed,@object_speed                    ; XOR A / LD ($F7E6),A; speed 0
+       bl   @add_object                                    ; CALL $3037        ; add the planet (slot 0)
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+_8cc7:                                                     ; >8cc7
+       li   hl,>1d4c                                       ; LD HL,$1D4C       ; about 7500 from the planet...
+       .far_call code_bank_11_select,random_point          ; SCF / CALL $8F25  ; ...in any direction
+       .far_call code_bank_11_select,point_at_player       ; CALL $8D8E        ; point it at the planet
+       movb @ship_object_table+1,r0                        ; LD BC,($EBA1)     ; add the planet's position
+       movb @ship_object_table+2,@r0lb                     ;                   ; (TI: big-endian, at an odd address)
+       a    r0,@object_position_x                          ; LD HL,($F7CE) / ADD HL,BC / LD ($F7CE),HL; 
+       movb @ship_object_table+3,r0                        ; LD BC,($EBA3)     ; 
+       movb @ship_object_table+4,@r0lb                     ;                   ; 
+       a    r0,@object_position_y                          ; LD HL,($F7D0) / ADD HL,BC / LD ($F7D0),HL; 
+       movb @ship_object_table+5,r0                        ; LD BC,($EBA5)     ; 
+       movb @ship_object_table+6,@r0lb                     ;                   ; 
+       a    r0,@object_position_z                          ; LD HL,($F7D2) / ADD HL,BC / LD ($F7D2),HL; 
+       bl   @work_out_distance                             ; CALL $883D        ; work out its distance
+       ci   hl,>5fb4                                       ; LD DE,$5FB4 / SBC HL,DE; at least 24500 from the player?
+       jl   _8cc7                                          ; JR C,$8CC7        ; too close - again
+       movb one,@ship_type                                 ; LD A,$01 / LD ($F7E7),A; ship type 1: the station
+       movb @bytes+>02,@handler_type                       ; LD A,$02 / LD ($F7EE),A; handler type 2
+       bl   @add_object                                    ; CALL $3037        ; add the station
+       movb @bytes+>0d,@object_status_byte                 ; LD A,$0D / LD ($F7CD),A; status: in use, can't be shot, no collisions
+       neg  @object_position_x                             ; LD HL,$F7CE / LD B,$03 / XOR A / SUB (HL) ...; negate the position...
+       neg  @object_position_y                             ;                   ; 
+       neg  @object_position_z                             ;                   ; ...to put the sun opposite the station
+       sb   @handler_type,@handler_type                    ; LD A,$00 / LD ($F7EE),A; handler type 0
+       movb @bytes+>65,@ship_type                          ; LD A,$65 / LD ($F7E7),A; ship type $65: the sun
+       bl   @add_object                                    ; JP $3037          ; add the sun
+       .endproc                                            ;                   ; 
+
+rom_bank_13_end:
+       equ  $
+       bss  >8000-$

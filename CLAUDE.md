@@ -104,11 +104,11 @@ words. A single-byte access to
 - **Code in ROM banks**: `program.a99` holds the whole program and is assembled once per output: by `elite.a99` with
   RAM real (`aorg`) and the code banks `dorg`, and by `code-bank-N.a99` with only bank N real, so RAM and the banks
   can use each other's labels. Banks 7-12 (`code_bank_N_select`, at >6000 + 2N) hold code - 7 the docked screens, 8 the data on system screen,
-  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`), 11 the flight logic `process_frame` calls with `.far_call` (collisions, docking, the safe zone, spawning, the object handlers and steering), 12 more of it (scooping, destroying objects, explosions, the score, the lasers, recharging, the missile, ECM, energy bomb and escape capsule keys); call into it with `.far_call`. Code in a bank may
+  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`), 11 the flight logic `process_frame` calls with `.far_call` (collisions, docking, the safe zone, spawning, the object handlers and steering), 12 more of it (scooping, destroying objects, explosions, the score, the lasers, recharging, the missile, ECM, energy bomb and escape capsule keys, the altitude and cabin temperature, death and the death scene); call into it with `.far_call`. Code in a bank may
   read RAM, the math tables and its own bank only. As a pilot, bank 7 holds the status page (`status_page`,
   `print_commander_name` and their own text and data); the routines and text other screens share (printing,
   number formatting, system names, clearing the page) are in RAM. 'N' on the title screen shows it, and 'Y' the
-  commander menu (also in bank 7); then the main loop (`main_loop_wait_tick`) runs - in flight it calls `process_frame` (RAM; so far only the stardust, moving, rotating and drawing the objects) - dispatching keys
+  commander menu (also in bank 7); then the main loop (`main_loop_wait_tick`) runs - in flight it calls `process_frame` (RAM), and when the game is over it shows the death scene and goes back to the title screen - dispatching keys
   through a TI `key_table` of `data key*256,bank select,handler` entries (only the converted handlers, called
   with `far_call_r0_r1`). Add a screen's key there when it's converted.
 - **ROM banks** (`src/rom-banks/`): every data bank starts with the math tables (`math-tables.a99`) at `>6040`,

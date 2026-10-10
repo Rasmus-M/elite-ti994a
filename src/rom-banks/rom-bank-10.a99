@@ -698,6 +698,36 @@ station_launch_orientation:                                ; >9080
        byte >00,>00,>00,>00,>40,>00                               ; nose vector
 
 
+********************************************************************************
+* Fill the explosion random numbers
+*
+* TI: step 8 of the one-time startup code (#R$6F9F), called once by the
+* entry point: fills the 100 words at #R$EEC6 (little-endian, as #R$47A1
+* reads them) with random entries from the log table (#R$0800), each with a
+* random sign (bit 6 of the high byte, as #R$1FCF).
+fill_explosion_random_numbers:
+       .proc                                               ;                   ; 
+       li   hl,explosion_random_numbers                    ; LD HL,$EEC6       ; 
+       movb @bytes+>64,b                                   ; LD B,$64          ; 100 words
+fill_explosion_random_numbers_1:                           ; >7015
+       bl   @random_byte                                   ; CALL $2176        ; A = a random byte
+       clr  r1                                             ; LD L,A / XOR A    ; 
+       movb a,r1                                           ; SLA L / ADC A,$08 ; 
+       srl  r1,7                                           ; LD H,A            ; R1 = A * 2
+       mov  @log_table(r1),de                              ; LD E,(HL) / INC L / LD D,(HL); DE = that log table entry
+       bl   @random_byte                                   ; CALL $2176        ; a second random byte, for the sign
+       jgt  fill_explosion_random_numbers_2                ; OR A / JP P,$702C ; positive - keep the sign
+       jeq  fill_explosion_random_numbers_2                ;                   ; 
+       socb @bit6,d                                        ; SET 6,D           ; negative
+fill_explosion_random_numbers_2:                           ; >702c
+       swpb de                                             ; LD (HL),E / INC HL; (little-endian)
+       movb de,*hl+                                        ;                   ; 
+       swpb de                                             ; LD (HL),D / INC HL; 
+       movb de,*hl+                                        ;                   ; 
+       sb   one,b                                          ; DJNZ $7015        ; 
+       jne  fill_explosion_random_numbers_1                ;                   ; 
+       .endproc                                            ;                   ; 
+
 rom_bank_10_end:
        equ  $
        bss  >8000-$

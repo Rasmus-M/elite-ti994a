@@ -2,6 +2,7 @@
        lwpi wrksp
        bl   @ti_setup_environment
        .select_bank code_bank_10_select ; the title screen is in ROM bank 10
+       bl   @fill_explosion_random_numbers ; (from the MSX's one-time startup code, #R$6F9F)
        b    @title_screen
 
        copy "ti-routines.a99"

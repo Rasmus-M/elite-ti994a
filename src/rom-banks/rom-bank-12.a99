@@ -1282,6 +1282,301 @@ missile_launch_start:                                      ; >3429
        data >4000,>0000,>0000                                     ; side vector
        data >0000,>0000,>4000                                     ; nose vector
 
+********************************************************************************
+* Update the altitude and cabin temperature gauges, then maybe scoop fuel
+* 
+* Used by the routine at #R$13FD.
+* .
+* Quantizes the distance from the planet ($E727, offset +1000) via
+* #R$15CB into #R$F812 (the altitude gauge), redrawing it with #R$6AC4
+* only when it changes. Does the same for the distance from the sun
+* (#R$E725, offset +2048, then negated and rebiased by $18) into #R$F811
+* (the cabin temperature gauge, which rises as the sun gets closer),
+* redrawn via #R$6AD0. If #R$F811 is then below $15 (21), stops there. Otherwise, only with #R$F77B (the Fuel Scoop, see
+* #R$F775's own header for the equipment array) fitted and #R$F814 at
+* least $0F: bumps #R$F775 (fuel) up
+* by one tenth-of-a-light-year (capped at 70 - a no-op once full),
+* redraws the fuel dial (#R$6AAD) and prints "Fuel Scoop Activated"
+* ($1B59) - the sun-scooping mechanic, gated on being close enough to
+* the sun (#R$F811 high) and going fast enough (speed #R$F814).
+update_altitude_and_temperature:                           ; >1577
+       .proc                                               ;                   ; 
+       movb @planet_distance+1,hl                          ; LD HL,($E727)     ; HL = distance from the planet
+       movb @planet_distance,@l                            ;                   ; 
+       ai   hl,1000                                        ; LD DE,$03E8 / ADD HL,DE; + 1000
+       li   bc,>04e0                                       ; LD BC,$04E0       ; B = shift count, C = mask
+       li   de,>f000                                       ; LD DE,$F000       ; DE = -4096, the baseline
+       bl   @distance_to_gauge                             ; CALL $15CB        ; A = the altitude (0-24)
+       cb   a,@altitude_gauge                              ; LD HL,$F812 / CP (HL); changed?
+       jeq  _158f                                          ; LD (HL),A / CALL NZ,$6AC4; 
+       movb a,@altitude_gauge                              ;                   ; yes - store it...
+       bl   @draw_altitude                                 ;                   ; ...and redraw the gauge
+_158f:                                                     ; >158f
+       movb @sun_distance+1,hl                             ; LD HL,($E725)     ; HL = distance from the sun
+       movb @sun_distance,@l                               ;                   ; 
+       li   bc,>03f0                                       ; LD BC,$03F0       ; B = shift count, C = mask
+       li   de,>f800                                       ; LD DE,$F800       ; DE = -2048, the baseline
+       bl   @distance_to_gauge                             ; CALL $15CB        ; A = 0-24
+       movb @bytes+>18,r0                                  ; SUB $18 / NEG     ; 
+       sb   a,r0                                           ;                   ; 24 - that: the cabin temperature
+       cb   r0,@cabin_temperature                          ; LD HL,$F811 / CP (HL); changed?
+       jeq  _15a7                                          ; LD (HL),A / CALL NZ,$6AD0; 
+       movb r0,@cabin_temperature                          ;                   ; yes - store it...
+       bl   @draw_cabin_temperature                        ;                   ; ...and redraw the gauge
+_15a7:                                                     ; >15a7
+       cb   @cabin_temperature,@bytes+>15                  ; LD A,($F811) / CP $15; 21 or more?
+       jl   _1577_end                                      ; RET C             ; no
+       movb @item_fuel_scoop,r0                            ; LD A,($F77B) / OR A; a fuel scoop?
+       jeq  _1577_end                                      ; RET Z             ; no
+       cb   @speed_gauge_value,@bytes+>0f                  ; LD A,($F814) / CP $0F; speed 15 or more?
+       jl   _1577_end                                      ; RET C             ; no
+       cb   @fuel_level,@bytes+>46                         ; LD A,($F775) / CP $46; full (70)?
+       jeq  _1577_end                                      ; RET Z             ; yes
+       ab   one,@fuel_level                                ; INC A / LD ($F775),A; scoop 0.1 light years
+       bl   @draw_fuel_gauge                               ; CALL $6AAD        ; redraw the fuel gauge
+       movb @message_timer,r0                              ; LD HL,$1B59 / JP $39E9; (TI: #R$39E9 inline) a message showing?
+       jne  _1577_end                                      ;                   ; yes
+       li   hl,msg_fuel_scoop_activated                    ;                   ; no - "Fuel Scoop Activated"
+       bl   @show_view_message                             ;                   ; 
+_1577_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Convert a distance into a dashboard gauge value
+* 
+* Used by the routine at #R$1577.
+* .
+* Used by #R$1577 for the altitude and cabin temperature gauges. Returns
+* (HL - baseline) * 24 / 2^B / 256, which is 0-24 for a distance from the
+* baseline to twice the baseline: 0 for a distance below the baseline (at
+* $15D2), and 24 for one with any of C's bits set in its high byte.
+* 
+* I:B Shift count (so that twice the baseline gives 24)
+* I:C Mask for the high byte of a distance that's out of range
+* I:DE Baseline (negated)
+* I:HL Distance
+* O:A The gauge value (0-24)
+* TI: works out (HL - baseline) * 24 / 2^(8 + B) with MPY and one shift.
+distance_to_gauge:                                         ; >15cb
+       movb @c,r0                                          ; LD A,H / AND C    ; 
+       inv  r0                                             ;                   ; 
+       movb hl,r1                                          ;                   ; 
+       szcb r0,r1                                          ;                   ; R1 = the high byte's bits in C
+       jeq  subtract_baseline_then_scale                   ; JR Z,$15D2        ; in range
+       movb @bytes+>18,a                                   ; LD A,$18          ; out of range: 24
+       rt                                                  ; RET               ; 
+subtract_baseline_then_scale:                              ; >15d2
+       a    de,hl                                          ; ADD HL,DE         ; HL -= the baseline
+       joc  scale_remainder_by_1_5                         ; JR C,$15D7        ; 
+       sb   a,a                                            ; XOR A             ; below it: 0
+       rt                                                  ; RET               ; 
+scale_remainder_by_1_5:                                    ; >15d7
+       li   r0,24                                          ; ADD HL,HL x 3 / ... / ADD HL,DE; R0:R1 = HL * 24
+       mpy  hl,r0                                          ;                   ; 
+       srl  r1,8                                           ;                   ; 
+       sla  r0,8                                           ;                   ; 
+       soc  r0,r1                                          ;                   ; R1 = HL * 24 / 256
+       movb b,r0                                           ; SRL A / RR H / DJNZ $15DF; 
+       srl  r0,8                                           ;                   ; R0 = B
+       srl  r1,0                                           ;                   ; / 2^B
+       swpb r1                                             ;                   ; 
+       movb r1,a                                           ; LD A,H            ; 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Check whether the ship has been destroyed, crashed or burned up
+* 
+* Used by the routine at #R$13FD.
+* .
+* Called every frame by the main loop's per-frame pass (#R$13FD). Ends the
+* game (($F749) = $FF, with the cause in ($F74A)) if the altitude gauge
+* ($F812) has reached 0 (crashed into the planet: cause 0), the energy
+* banks ($F817) are empty (destroyed: cause 1, via $16C9), or the cabin
+* temperature ($F811) is at its maximum of 24 (burned up: cause 2, via
+* $16D4).
+* .
+* At $16DE, stores the flag and the cause.
+check_for_death:                                           ; >16ba
+       movb @altitude_gauge,r0                             ; LD A,($F812) / OR A; 
+       jne  check_for_death_energy                         ; JR NZ,$16C9       ; altitude not zero
+       li   r0,>ff00                                       ; LD BC,$00FF       ; crashed: cause 0
+       jmp  _16de                                          ; JR $16DE          ; 
+check_for_death_energy:                                    ; >16c9
+       movb @energy_gauge,r0                               ; LD A,($F817) / OR A; 
+       jne  check_for_death_heat                           ; JR NZ,$16D4       ; energy left
+       li   r0,>ff01                                       ; LD BC,$01FF       ; destroyed: cause 1
+       jmp  _16de                                          ; JR $16DE          ; 
+check_for_death_heat:                                      ; >16d4
+       cb   @cabin_temperature,@bytes+>18                  ; LD A,($F811) / CP $18; 
+       jne  _16ba_end                                      ; JR NZ,$16DE       ; not too hot
+       li   r0,>ff02                                       ; LD BC,$02FF       ; burned up: cause 2
+_16de:                                                     ; >16de
+       movb r0,@game_over                                  ; LD ($F749),BC     ; the game-over flag...
+       swpb r0                                             ;                   ; 
+       movb r0,@game_over_cause                            ;                   ; ...and the cause
+_16ba_end:                                                 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Death scene
+* 
+* Used by the routine at #R$0106.
+* .
+* Called by the main loop (#R$0106) when the game is over because the ship
+* was destroyed, crashed into the planet or burned up in the sun (($F74A)
+* = 0-2, see #R$16BA), but not when the player quit (($F74A) = 3).
+* .
+* Switches to the front view and clears the object table. Adds four
+* pieces of debris ("Platlet", ship type 7) at a distance of 200, each
+* at a random orientation, then two explosions (handler type 1, see
+* #R$2556) at distances of 250 and 150, and plays sound effect 2
+* (the explosion). Then, each frame, runs each object's handler
+* and draws it, with "Game Over" underneath (the debris slowing down
+* every 4th frame), and gives the space
+* view random colours on the first frame (#R$180B). Stops once the last
+* explosion's 64-frame countdown has run out and it has been removed.
+death_scene:                                               ; >1703
+       .proc                                               ;                   ; 
+       sb   @docked,@docked                                ; XOR A / LD ($E90A),A; not docked
+       bl   @switch_to_front_view                          ; CALL $64A1        ; switch to the front view
+       movb @bytes+>e4,@message_row                        ; LD A,$E4 / LD ($E92C),A; messages at the bottom of the view
+       bl   @clear_all_ship_slots                          ; CALL $28D4        ; clear the object table
+       movb one,@object_status_byte                        ; LD A,$01 / LD ($F7CD),A; status: in use
+       movb one,@object_speed                              ; LD ($F7E6),A      ; 
+       movb one,@death_scene_colours_flag                  ; LD ($E945),A      ; random colours on the first frame
+       sb   @handler_type,@handler_type                    ; LD A,$00 / LD ($F7EE),A; handler type 0 for the debris
+       movb @bytes+>07,@ship_type                          ; LD A,$07 / LD ($F7E7),A; ship type 7 (Platlet)
+       movb @bytes+>04,b                                   ; LD B,$04          ; 4 pieces of debris
+_1729:                                                     ; >1729
+       .push bc                                            ; PUSH BC           ; 
+       clr  @object_position_x                             ; LD HL,$0000 / LD ($F7CE),HL; 
+       clr  @object_position_y                             ; LD ($F7D0),HL     ; X = Y = 0
+       li   r0,200                                         ; LD HL,$00C8       ; 
+       mov  r0,@object_position_z                          ; LD ($F7D2),HL     ; Z = 200
+       li   de,nose_vector                                 ; LD DE,$F7DA       ; DE -> the nose vector
+       movb @bytes+>03,b                                   ; LD B,$03          ; 3 words
+_173e:                                                     ; >173e
+       bl   @random_byte                                   ; CALL $2176        ; fill it with random values
+       movb a,@1(de)                                       ; LD (DE),A / INC DE; (TI: big-endian, the low byte second)
+       bl   @random_byte                                   ; CALL $2176        ; 
+       andi a,>bf00                                        ; AND $BF           ; clear bit 6
+       movb a,*de                                          ; LD (DE),A / INC DE; 
+       inct de                                             ;                   ; 
+       sb   one,b                                          ; DJNZ $173E        ; 
+       jne  _173e                                          ;                   ; 
+       socb @bit7,@nose_vector_z                           ; DEC DE / EX DE,HL / SET 7,(HL); make the last component negative
+       .far_call code_bank_11_select,orientation_from_nose ; CALL $8E62        ; work out the other axes
+       movb @bytes+>fa,@object_speed                       ; LD A,$FA / LD ($F7E6),A; speed $FA
+       bl   @move_object                                   ; CALL $866D x 3    ; move it forward three times
+       bl   @move_object                                   ;                   ; 
+       bl   @move_object                                   ;                   ; 
+       li   r1,>8000                                       ; LD DE,$F7DB / LD B,$03; 
+       a    r1,@nose_vector                                ; LD A,(DE) / XOR $80 / LD (DE),A; negate the vector
+       a    r1,@nose_vector_y                              ;                   ; 
+       a    r1,@nose_vector_z                              ;                   ; 
+       .far_call code_bank_11_select,orientation_from_nose ; CALL $8E62        ; work out the other axes again
+       bl   @add_object                                    ; CALL $3037        ; add the piece to the object table
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $1729        ; next piece
+       jne  _1729                                          ;                   ; 
+       clr  @object_position_x                             ; LD HL,$0000 / LD ($F7CE),HL; 
+       clr  @object_position_y                             ; LD ($F7D0),HL     ; X = Y = 0
+       li   r0,250                                         ; LD HL,$00FA       ; 
+       mov  r0,@object_position_z                          ; LD ($F7D2),HL     ; Z = 250
+       sb   @object_speed,@object_speed                    ; XOR A / LD ($F7E6),A; 
+       movb @bytes+>40,@handler_countdown                  ; LD A,$40 / LD ($F7EF),A; explosion lasts 64 frames
+       movb @b255,@per_type_parameter_block                ; LD A,$FF / LD ($F7F0),A; (see #R$2556)
+       movb one,@handler_type                              ; LD A,$01 / LD ($F7EE),A; handler type 1: explosion
+       movb @bytes+>02,b                                   ; LD B,$02          ; 2 explosions
+_179b:                                                     ; >179b
+       .push bc                                            ; PUSH BC           ; 
+       bl   @add_object                                    ; CALL $3037        ; add one to the object table
+       li   r0,-100                                        ; LD HL,($F7D2) / LD DE,$FF9C / ADD HL,DE; 
+       a    r0,@object_position_z                          ; LD ($F7D2),HL     ; Z -= 100
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $179B        ; 
+       jne  _179b                                          ;                   ; 
+* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
+_17b1:                                                     ; >17b1
+       bl   @clear_space_view                              ; CALL $388F        ; next frame: clear the space view
+       li   hl,ship_object_table                           ; LD HL,$EBA0       ; 
+       movb @bytes+>06,b                                   ; LD B,$06          ; 6 objects
+_17b9:                                                     ; >17b9
+       .push bc                                            ; PUSH BC           ; 
+       .push hl                                            ; PUSH HL           ; 
+       li   de,object_status_byte                          ; LD DE,$F7CD       ; 
+       li   bc,>0028                                       ; LD BC,$0028       ; 
+       .ldir                                               ; LDIR              ; copy the object's record to the workspace
+       bl   @get_blueprint_data                            ; CALL $16E3        ; set it up for its ship type
+       bl   @work_out_distance                             ; CALL $883D        ; work out its distance
+       cb   @handler_type,one                              ; LD A,($F7EE) / CP $01; 
+       jeq  _17dd                                          ; JR Z,$17DD        ; explosion - skip this
+       ab   one,@handler_countdown                         ; LD HL,$F7EF / INC (HL); 
+       movb @handler_countdown,r0                          ; LD A,(HL)         ; 
+       andi r0,>0300                                       ; AND $03           ; 
+       jne  _17dd                                          ; JR NZ,$17DD       ; 
+       sb   one,@object_speed                              ; LD HL,$F7E6 / DEC (HL); debris: slow down every 4th frame
+_17dd:                                                     ; >17dd
+       .far_call code_bank_11_select,run_object_handler    ; CALL $2528        ; run its handler (#R$2556 for the explosions)
+       bl   @draw_object                                   ; CALL $422E        ; draw it
+       bl   @move_object                                   ; CALL $866D        ; move it forward
+       .pop de                                             ; POP DE            ; DE = this slot's address again
+       li   hl,object_status_byte                          ; LD HL,$F7CD       ; 
+       li   bc,>0028                                       ; LD BC,$0028       ; 
+       .ldir                                               ; LDIR              ; copy the record back
+       mov  de,hl                                          ; EX DE,HL          ; HL -> the next slot
+       .pop bc                                             ; POP BC            ; 
+       sb   one,b                                          ; DJNZ $17B9        ; next object
+       jne  _17b9                                          ;                   ; 
+       li   hl,msg_game_over_1b7d                          ; LD HL,$1B7D       ; 
+       bl   @show_view_message                             ; CALL $39C8        ; "Game Over"
+       bl   @copy_space_view                               ; CALL $3846        ; copy the space view to the screen
+       movb @death_scene_colours_flag,r0                   ; LD A,($E945) / OR A; 
+       jeq  _1803                                          ; CALL NZ,$180B     ; 
+       bl   @death_scene_colours                           ;                   ; first frame: random colours
+_1803:                                                     ; >1803
+       movb @object_status_byte,r0                         ; LD A,($F7CD) / BIT 0,A; the last explosion
+       andi r0,>0100                                       ;                   ; 
+       jne  _17b1                                          ; JR NZ,$17B1       ; still there - next frame
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Death scene: give the space view random colours
+* 
+* Used by the routine at #R$1703.
+* .
+* Called once, on the first frame of the death scene (#R$1703). Fills the
+* space view's part of the colour table (from $2128, 14 character rows of
+* 176 bytes) with random foreground colours (2-15) on black, using the R
+* register as a source of noise.
+* TI: the colours come from random_byte, as there is no R register.
+death_scene_colours:                                       ; >180b
+       .proc                                               ;                   ; 
+       sb   @death_scene_colours_flag,@death_scene_colours_flag; XOR A / LD ($E945),A; clear the flag
+       li   hl,color_table+>0128+>4000                     ; LD HL,$2128       ; the colour table at row 1, column 5 (to write)
+       movb @bytes+>0e,@c                                  ; LD C,$0E          ; 14 rows
+_1814:                                                     ; >1814
+       bl   @ti_poll_vblank                                ; DI                ; (TI: not between the two address bytes)
+       swpb hl                                             ; LD A,L / OUT ($99),A; 
+       movb hl,@vdpwa                                      ;                   ; 
+       swpb hl                                             ;                   ; 
+       movb hl,@vdpwa                                      ; LD A,H / OR $40 / OUT ($99),A; point the VDP at the row
+       movb @bytes+>b0,b                                   ; LD B,$B0          ; 176 bytes (22 characters)
+_181f:                                                     ; >181f
+       bl   @random_byte                                   ; LD A,R            ; a random colour...
+       andi a,>0f00                                        ; AND $0F           ; 
+       cb   a,@bytes+>02                                   ; CP $02            ; 
+       jl   _181f                                          ; JR C,$181F        ; ...from 2 to 15
+       sla  a,4                                            ; ADD A,A x 4       ; 
+       ori  a,>0100                                        ; OR $01            ; on black
+       movb a,@vdpwd                                       ; OUT ($98),A       ; write it
+       sb   one,b                                          ; DJNZ $181F        ; 
+       jne  _181f                                          ;                   ; 
+       ai   hl,>0100                                       ; INC H             ; next row
+       sb   one,@c                                         ; DEC C             ; 
+       jne  _1814                                          ; JR NZ,$1814       ; 
+       .endproc                                            ; RET               ; 
+
 rom_bank_12_end:
        equ  $
        bss  >8000-$

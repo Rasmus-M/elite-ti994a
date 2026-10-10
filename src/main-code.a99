@@ -5,9 +5,9 @@
 * a game has started. Counts the pass (#R$F746), restarts the frame timing
 * (#R$F748), and reads the controls and keys (#R$401C).
 * .
-* TI: polls for VBlank first (interrupts are off). In flight it would run the
-* per-frame pass (#R$13FD) in flight; going back to the title screen when the
-* game is over (#R$F749) isn't converted yet.
+* TI: polls for VBlank first (interrupts are off). In flight it runs the
+* per-frame pass (#R$13FD), and it goes back to the title screen when the game
+* is over (#R$F749).
 main_loop_wait_tick:                                       ; >010f
        movb @main_loop_tick_counter+1,hl                   ; LD HL,($F746)     ; 
        movb @main_loop_tick_counter,@l                     ;                   ; 
@@ -18,10 +18,21 @@ main_loop_wait_tick:                                       ; >010f
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
        bl   @read_controls                                 ; CALL $401C        ; 
        movb @docked,a                                      ; LD A,($E90A)      ; docked?
-       jne  main_loop_wait_tick                            ; OR A              ; 
+       jne  !                                              ; OR A              ; 
        bl   @process_frame                                 ; CALL Z,$13FD      ; no - run the per-frame pass
-* TI: the game over check ($0124) isn't converted yet.
-       jmp  main_loop_wait_tick                            ; JR Z,$010F        ; loop
+!
+       movb @game_over,a                                   ; LD A,($F749) / OR A; 
+       jeq  main_loop_wait_tick                            ; JR Z,$010F        ; loop until the game is over
+       sb   @alert_level,@alert_level                      ; XOR A / LD ($E90C),A; 
+       sb   @mission_state,@mission_state                  ; LD ($E93D),A      ; 
+       blwp @music_stop_vector                             ; CALL $7438        ; stop the sound
+       cb   @game_over_cause,@bytes+>03                    ; LD A,($F74A) / CP $03; 
+       jeq  !                                              ; CALL NZ,$1703     ; 
+       .far_call code_bank_12_select,death_scene           ;                   ; show the death scene, unless the player quit
+!
+       sb   @game_over,@game_over                          ; XOR A / LD ($F749),A; clear the game-over flag
+       .select_bank code_bank_10_select                    ; JP $010C          ; back to the title screen (in ROM bank 10)
+       b    @title_screen                                  ;                   ; 
 
 ********************************************************************************
 * Market prices
@@ -308,11 +319,12 @@ _150b:                                                     ; >150b
        movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; 
        jne  _1517                                          ; JR NZ,$1517       ; drive malfunction - skip the two gauge updates
        .far_call code_bank_11_select,check_safe_zone       ; CALL $1549        ; update the space station safe-zone flag
-* TI: not converted yet: the altitude and cabin temperature (#R$1577).
+       .far_call code_bank_12_select,update_altitude_and_temperature; CALL $1577        ; update the altitude and cabin temperature, fuel scoop
 _1517:                                                     ; >1517
        .far_call code_bank_11_select,spawn_ships           ; CALL $2B05        ; spawn new ships
-* TI: not converted yet: the alert level (#R$15E7), death (#R$16BA) and
-* hyperspace (#R$894D).
+* TI: not converted yet: the alert level (#R$15E7).
+       .far_call code_bank_12_select,check_for_death       ; CALL $16BA        ; check for death
+* TI: not converted yet: hyperspace (#R$894D).
        movb @ecm_countdown,r0                              ;                   ; (TI: only while the ECM is on)
        jeq  !                                              ;                   ; 
        .far_call code_bank_12_select,ecm_active            ; CALL $323C        ; run the ECM
@@ -387,9 +399,19 @@ bp_name_buffer:
        even
 
 ********************************************************************************
+* The message "Fuel Scoop Activated"
+msg_fuel_scoop_activated:                                  ; >1b59
+       text 'Fuel Scoop Activate',>e4                             ; 
+
+********************************************************************************
 * The message "Capsule released"
 msg_capsule_released:                                      ; >1b6d
        text 'Capsule release',>e4                                 ; 
+
+********************************************************************************
+* The message "Game Over"
+msg_game_over_1b7d:                                        ; >1b7d
+       text 'Game Ove',>f2                                        ; 
 
 ********************************************************************************
 * The message "Malfunction!!!"
@@ -5813,10 +5835,10 @@ draw_explosion:                                            ; >4aec
        srl  r1,7                                           ; ADD A,A           ; A *= 2 - 2 bytes per entry
        andi r1,>01fe                                       ;                   ; 
        ai   r1,log_table                                   ; ADC A,$08         ; HL -> the entry in the log table
-       mov  r1,hl                                          ;                   ; 
-       li   de,perentry_loop_pointer                       ; LD DE,$EB90       ; DE -> $EB90, #R$47A1's pointer input
-       .ldi                                                ; LDI               ; copy the entry's first byte to $EB90 (BC isn't set up first - each LDI just decrements whatever BC the caller left)
-       .ldi                                                ; LDI               ; copy the entry's second byte to $EB91 (same - BC is now that caller value minus 2, unused as a counter)
+       mov  *r1,r0                                         ; LD DE,$EB90 / LDI x 2; R0 = the entry (TI: log_table is big-endian)...
+       movb r0,@perentry_loop_pointer+1                    ;                   ; ...stored little-endian at $EB90 for #R$47A1
+       swpb r0                                             ;                   ; 
+       movb r0,@perentry_loop_pointer                      ;                   ; 
        li   hl,explosion_random_numbers                    ; LD HL,$EEC6       ; HL = $EEC6 - the list #R$47A1 walks
        movb hl,@explosion_random_pointer+1                 ; LD ($E6DE),HL     ; store it to $E6DE
        movb @l,@explosion_random_pointer                   ;                   ;

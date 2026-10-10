@@ -309,6 +309,23 @@ ti_poll_vblank_3:
        jne  ti_poll_vblank_4
        movb @b255,@hyperspace_trigger  ; time to jump
 ti_poll_vblank_4:
+       sb   one,@ef95_clock_divider    ; tick the clock (#R$729D): a whole second?
+       jne  ti_poll_vblank_5           ; no
+       movb @bytes+>32,@ef95_clock_divider ; 50 frames until the next second
+       ab   one,@game_clock            ; one more second
+       cb   @game_clock,@bytes+>3c
+       jne  ti_poll_vblank_5
+       sb   @game_clock,@game_clock
+       ab   one,@game_clock+1          ; one more minute
+       cb   @game_clock+1,@bytes+>3c
+       jne  ti_poll_vblank_5
+       sb   @game_clock+1,@game_clock+1
+       ab   one,@game_clock+2          ; one more hour
+       cb   @game_clock+2,@bytes+>18
+       jne  ti_poll_vblank_5
+       sb   @game_clock+2,@game_clock+2
+       ab   one,@game_clock+3          ; one more day
+ti_poll_vblank_5:
        blwp @music_tick_vector
        blwp @chart_cursor_vector       ; move the chart cursor (#R$73BA)
        blwp @keyboard_vector           ; read the keyboard (#R$347A)

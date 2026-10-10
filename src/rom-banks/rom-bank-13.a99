@@ -565,6 +565,75 @@ _8cc7:                                                     ; >8cc7
        bl   @add_object                                    ; JP $3037          ; add the sun
        .endproc                                            ;                   ; 
 
+********************************************************************************
+* Key F5: show the game time, score and credits in turn
+* 
+* Reached via the key table at #R$419B; only in flight (#R$6DCF). Each
+* press shows the next of six messages in the space view (#R$E8F3): the
+* game time (#R$F742: days, hours and minutes, zero-padded), the score
+* (at $1AD6, #R$EB13), and the four lines of credits (at $1AED, #R$1C42).
+* They're shown for 30 frames, rather than the usual 10 (#R$E919).
+key_f5_info:                                               ; >1a8a
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; refuse if docked
+       movb @info_sub_page_index_key84_handler,a           ; LD A,($E8F3) / OR A; A = the message to show next
+       jne  key_f5_score                                   ; JR NZ,$1AD6       ; not the game time
+       movb @bytes+>30,@number_fill_char                   ; LD A,$30 / LD ($EF96),A; pad with '0'
+       li   ix,game_time_digits                            ; LD IX,$1BB1       ; IX -> the digits
+       movb @game_clock+3,@c                               ; LD A,($F745) / LD C,A; the days
+       clr  hl                                             ; LD HL,$0000       ; 
+       movb @bytes+>82,a                                   ; LD A,$82          ; two digits
+       bl   @format_number                                 ; CALL $3675        ; 
+       szcb @bit7,@-1(ix)                                  ; RES 7,(IX-$01)    ; not the end of the message
+       inc  ix                                             ; INC IX            ; skip the ':'
+       movb @game_clock+2,@c                               ; LD A,($F744) / LD C,A; the hours
+       clr  hl                                             ; LD HL,$0000       ; 
+       movb @bytes+>82,a                                   ; LD A,$82          ; 
+       bl   @format_number                                 ; CALL $3675        ; 
+       szcb @bit7,@-1(ix)                                  ; RES 7,(IX-$01)    ; 
+       inc  ix                                             ; INC IX            ; 
+       movb @game_clock+1,@c                               ; LD A,($F743) / LD C,A; the minutes
+       clr  hl                                             ; LD HL,$0000       ; 
+       movb @bytes+>82,a                                   ; LD A,$82          ; 
+       bl   @format_number                                 ; CALL $3675        ; 
+       movb @bytes+>20,@number_fill_char                   ; LD A,$20 / LD ($EF96),A; pad with spaces again
+       li   hl,msg_game_time                               ; LD HL,$1BA6       ; "Game Time: dd:hh:mm"
+       jmp  _1afa                                          ; JR $1AFA          ; 
+key_f5_score:                                              ; >1ad6
+       sb   one,a                                          ; DEC A             ; 
+       jne  key_f5_credits                                 ; JR NZ,$1AED       ; not the score
+       movb @score,@c                                      ; LD A,($EB13) / LD C,A; C:HL = the score
+       movb @score_1+1,hl                                  ; LD HL,($EB14)     ; 
+       movb @score_1,@l                                    ;                   ; 
+       sb   a,a                                            ; XOR A             ; 
+       li   ix,score_digits                                ; LD IX,$1BCF       ; IX -> the digits
+       bl   @format_number                                 ; CALL $3675        ; 
+       li   hl,msg_score                                   ; LD HL,$1BC8       ; "Score: n"
+       jmp  _1afa                                          ; JR $1AFA          ; 
+key_f5_credits:                                            ; >1aed
+       sb   one,a                                          ; DEC A             ; 0-3
+       clr  r1                                             ; ADD A,A / LD C,A / LD B,$00; 
+       movb a,r1                                           ;                   ; 
+       srl  r1,7                                           ;                   ; 
+       mov  @credits_screen_message_pointer_table_4(r1),hl ; LD HL,$1C42 / ADD HL,BC / LD A,(HL) / INC HL / LD H,(HL) / LD L,A; this credits message
+_1afa:                                                     ; >1afa
+       bl   @show_view_message                             ; CALL $39C8        ; show it
+       movb @bytes+>9e,@message_timer                      ; LD A,$9E / LD ($E919),A; for 30 frames
+       ab   one,@info_sub_page_index_key84_handler         ; LD HL,$E8F3 / INC (HL); the next message next time...
+       cb   @info_sub_page_index_key84_handler,@bytes+>06  ; LD A,(HL) / SUB $06; 
+       jne  _1a8a_end                                      ; JR NZ,$1B0C       ; 
+       sb   @info_sub_page_index_key84_handler,@info_sub_page_index_key84_handler; LD (HL),A         ; ...after the sixth, the first
+_1a8a_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Credits-screen message pointers
+* 
+* The addresses of the four credits messages - #R$1C03, #R$1C13, #R$1C24 and
+* #R$1C34 - which #R$1A8A shows when the player presses 1-4.
+credits_screen_message_pointer_table_4:                    ; >1c42
+       data msg_version_1_0_1987,msg_msx_conversion,msg_rob_nicholson,msg_mr_micro_ltd; 
+
 rom_bank_13_end:
        equ  $
        bss  >8000-$

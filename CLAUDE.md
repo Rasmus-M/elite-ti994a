@@ -104,7 +104,7 @@ words. A single-byte access to
 - **Code in ROM banks**: `program.a99` holds the whole program and is assembled once per output: by `elite.a99` with
   RAM real (`aorg`) and the code banks `dorg`, and by `code-bank-N.a99` with only bank N real, so RAM and the banks
   can use each other's labels. Banks 7-13 (`code_bank_N_select`, at >6000 + 2N) hold code - 7 the docked screens, 8 the data on system screen,
-  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`), 11 the flight logic `process_frame` calls with `.far_call` (collisions, docking, the safe zone, spawning, the object handlers and steering), 12 more of it (scooping, destroying objects, explosions, the score, the lasers, recharging, the missile, ECM, energy bomb and escape capsule keys, the altitude and cabin temperature, death and the death scene), 13 hyperspace (H, G, the countdown, the jump and witchspace) and the alert level; call into it with `.far_call`. Code in a bank may
+  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`), 11 the flight logic `process_frame` calls with `.far_call` (collisions, docking, the safe zone, spawning, the object handlers and steering), 12 more of it (scooping, destroying objects, explosions, the score, the lasers, recharging, the missile, ECM, energy bomb and escape capsule keys, the altitude and cabin temperature, death and the death scene), 13 hyperspace (H, G, the countdown, the jump and witchspace), the alert level and F5; call into it with `.far_call`. Code in a bank may
   read RAM, the math tables and its own bank only. As a pilot, bank 7 holds the status page (`status_page`,
   `print_commander_name` and their own text and data); the routines and text other screens share (printing,
   number formatting, system names, clearing the page) are in RAM. 'N' on the title screen shows it, and 'Y' the
@@ -123,7 +123,7 @@ words. A single-byte access to
   only for their labels (`main_program` is defined); banks 5 and 6 then reserve the tables' space with `bss`.
 - Interrupts stay disabled (`limi 0` once at startup); the converted `DI`/`EI` are commented out. Instead,
   `ti_poll_vblank` (`music-player.a99`) reads the VDP status and, on a new frame, does the MSX VBlank handler's
-  work: it counts the frame (`vblank_frame_counter`, `vblank_subtick_counter`), plays a tick of the music and reads
+  work: it counts the frame (`vblank_frame_counter`, `vblank_subtick_counter`), counts down the ECM and hyperspace, ticks the game clock, plays a tick of the music and reads
   the keyboard (`ti_read_keyboard`: each new key press's character goes to `pending_debounced_keypress_byte_status`). It
   ignores every sixth frame, to keep the MSX's 50 Hz timing. It changes no registers, but must be called at least
   once a frame (it's in `clear_space_view`, `copy_space_view`, `draw_object`'s face loop and after each edge) and

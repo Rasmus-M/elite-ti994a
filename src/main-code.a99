@@ -447,14 +447,55 @@ msg_malfunction:                                           ; >1b98
        text 'Malfunction!!',>a1                                   ; 
 
 ********************************************************************************
+* The message "Game Time: dd:hh:mm"
+* 
+* Shown by #R$1A8A, which first formats the days, hours and minutes of the
+* game time (#R$F742) into the digits at $1BB1. The last digit ends the
+* message (#R$3675 sets its bit 7).
+msg_game_time:                                             ; >1ba6
+       text 'Game Time: '                                         ; 
+game_time_digits:                                          ; >1bb1
+       text '00:00:00'                                            ; days, hours, minutes
+
+********************************************************************************
 * The message "Cargo lost"
 msg_cargo_lost:                                            ; >1bb9
        text 'Cargo los',>f4                                       ; 
 
 ********************************************************************************
+* The message "Score: " and its digits
+* 
+* Shown by #R$1A8A, which first formats the score (#R$EB13) into the digits
+* at $1BCF. The last digit ends the message (#R$3675 sets its bit 7).
+msg_score:                                                 ; >1bc8
+       text 'Score: '                                             ; 
+score_digits:                                              ; >1bcf
+       byte >00,>00,>00,>00,>00,>00,>00,>00,>00,>00               ; the digits
+
+********************************************************************************
 * The message "Drive repaired"
 msg_drive_repaired:                                        ; >1bd9
        text 'Drive repaire',>e4                                   ; 
+
+********************************************************************************
+* The message "Version 1.0 1987"
+msg_version_1_0_1987:                                      ; >1c03
+       text 'Version 1.0 198',>b7                                 ; 
+
+********************************************************************************
+* The message "MSX Conversion by"
+msg_msx_conversion:                                        ; >1c13
+       text 'MSX Conversion b',>f9                                ; 
+
+********************************************************************************
+* The message "Rob Nicholson of"
+msg_rob_nicholson:                                         ; >1c24
+       text 'Rob Nicholson o',>e6                                 ; 
+
+********************************************************************************
+* The message "Mr. Micro Ltd."
+msg_mr_micro_ltd:                                          ; >1c34
+       text 'Mr. Micro Ltd',>ae                                   ; 
 
 ********************************************************************************
 * The message "Load New Commander ?"
@@ -4361,6 +4402,7 @@ key_table:                                                 ; >419b
        data >1b00,code_bank_12_select,key_escape_capsule          ; Esc (FCTN-9): escape capsule (#R$19FC)
        data >4800,code_bank_13_select,key_handler_h               ; 'H': hyperspace (#R$88AC)
        data >4700,code_bank_13_select,key_handler_g               ; 'G': galactic hyperspace (#R$8926)
+       data >8400,code_bank_13_select,key_f5_info                 ; F5 (FCTN-5): game time, score and credits (#R$1A8A)
        data 0                                                     ; end of the table
 
 ********************************************************************************

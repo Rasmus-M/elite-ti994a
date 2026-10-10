@@ -233,8 +233,15 @@ build_object_description_words:                            ; >60f8
 * Data on System screen as showing (#R$E902 = 1).
 key_data_on_system:                                        ; >6164
        .proc                                               ;                   ; 
-* TI: the mission 1 checks (states $11 and $13, #R$9190, #R$91AA) aren't
-* converted yet; neither can happen before the missions are.
+       cb   @mission_state,@bytes+>11                      ; LD A,($E93D) / CP $11; mission 1, state $11?
+       jne  key_data_on_system_2                           ; JR NZ,$6170       ; no
+       .far_call code_bank_13_select,constrictor_at_research_centre; CALL $9190        ; at the research centre? (in ROM bank 13)
+       jmp  key_data_on_system_2a                          ; JR $6175          ; 
+key_data_on_system_2:                                      ; >6170
+       cb   @mission_state,@bytes+>13                      ; CP $13            ; mission 1, state $13?
+       jne  key_data_on_system_2a                          ; CALL Z,$91AA      ; 
+       .far_call code_bank_13_select,constrictor_trail     ;                   ; on the Constrictor's trail? (in ROM bank 13)
+key_data_on_system_2a:                                     ; >6175
        cb   @current_screen,one                            ; LD A,($E902) / CP $01; Data on System showing?
        jne  _617b                                          ; RET Z             ; yes - nothing to do
        .endproc                                            ;                   ; 

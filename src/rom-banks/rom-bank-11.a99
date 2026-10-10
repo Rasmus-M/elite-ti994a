@@ -75,7 +75,7 @@ _1881:                                                     ; >1881
        sb   @alert_level,@alert_level                      ; LD ($E90C),A      ; alert level 0
        seto r0                                             ; LD A,$FF          ; 
        movb r0,@docked                                     ; LD ($E90A),A      ; docked
-* TI: the mission events (#R$1896) aren't converted yet.
+       .far_call code_bank_13_select,mission_on_docking    ; CALL $1896        ; check for mission events (in ROM bank 13)
        .far_call code_bank_7_select,status_page            ; JP $6276          ; show the status page
        .endproc                                            ;                   ; 
 

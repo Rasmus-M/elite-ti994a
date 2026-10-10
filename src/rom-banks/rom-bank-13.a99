@@ -393,8 +393,15 @@ _8a05:                                                     ; >8a05
        movb r0,@hyperspace_fuel_cost                       ;                   ; half the fuel
        jmp  _8a76                                          ; JR $8A76          ; 
 _8a4d:                                                     ; >8a4d
-* TI: counting the jumps to the next mission ($8A4D-$8A61, #R$908C) isn't
-* converted yet.
+       movb @current_galaxy,r0                             ; LD A,($EB66) / OR A; the first galaxy?
+       jeq  _8a64                                          ; JR Z,$8A64        ; yes - no missions
+       movb @mission_state,r0                              ; LD A,($E93D) / OR A; a mission under way?
+       jne  _8a64                                          ; JR NZ,$8A64       ; yes
+       sb   one,@jumps_to_next_mission                     ; LD HL,$E93B / DEC (HL); one fewer jump to the next mission
+       jne  _8a64                                          ; JR NZ,$8A64       ; not yet zero
+       movb @bytes+>40,@jumps_to_next_mission              ; LD (HL),$40       ; 64 jumps until the next one
+       bl   @start_next_mission                            ; CALL $908C        ; start the next mission
+_8a64:                                                     ; >8a64
        bl   @random_byte                                   ; CALL $2176        ; 
        movb a,@market_price_roll                           ; LD ($EFAA),A      ; seed the market prices
        movb @selected_system,@current_system               ; LD A,($E72B) / LD ($EB67),A; arrive at the selected system
@@ -633,6 +640,682 @@ _1a8a_end:
 * #R$1C34 - which #R$1A8A shows when the player presses 1-4.
 credits_screen_message_pointer_table_4:                    ; >1c42
        data msg_version_1_0_1987,msg_msx_conversion,msg_rob_nicholson,msg_mr_micro_ltd; 
+
+********************************************************************************
+* Missions: check for mission events on docking
+* 
+* Used by the routine at #R$1873.
+* .
+* Called by #R$1873 on docking. Depending on the mission state (#R$E93D):
+* $10 or $20 shows the briefing for mission 1 (the stolen Constrictor) or 2
+* (the Thargoid documents) (#R$9120); in state $15, docking at the system
+* the Constrictor was last heard of (#R$EFA2) moves on to state $16.
+* .
+* At $18B4, docking in state $18 - with the Constrictor still at large -
+* goes back to state $17, so that it appears again on launching. At $18BD,
+* in state $19 (the Constrictor destroyed) pays the reward (#R$91F0); in
+* state $21, docking at the naval base (#R$EFA2) delivers the Thargoid
+* documents (#R$91DB). At $18D1, state $31 shows the supernova briefing
+* (#R$909F), $34 completes that mission (#R$90FB), $50 shows the Thargoid
+* base briefing (#R$9220), and $53 - the Thargoid base destroyed - its
+* reward (#R$920F).
+mission_on_docking:                                        ; >1896
+       .proc                                               ;                   ; 
+       movb @mission_state,a                               ; LD A,($E93D)      ; A = the current state
+       cb   a,@bytes+>10                                   ; CP $10            ; 
+       jeq  mission_on_docking_briefing                    ; JP Z,$9120        ; mission 1: the Constrictor briefing
+       cb   a,@bytes+>20                                   ; CP $20            ; 
+       jne  mission_on_docking_1                           ; JP Z,$9120        ; mission 2: the Thargoid documents briefing
+mission_on_docking_briefing:                               
+       bl   @mission_briefing                              ;                   ; 
+       jmp  _1896_end                                      ;                   ; 
+mission_on_docking_1:                                      
+       cb   a,@bytes+>15                                   ; CP $15            ; 
+       jne  mission_on_docking_2                           ; JR NZ,$18B4       ; 
+       cb   @current_system,@mission_system                ; LD A,($EB67) / LD HL,$EFA2 / CP (HL); the Constrictor's system?
+       jne  _1896_end                                      ; RET NZ            ; no
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); state $16: the Constrictor is here
+       jmp  _1896_end                                      ; RET               ; 
+mission_on_docking_2:                                      ; >18b4
+       cb   a,@bytes+>18                                   ; CP $18            ; state $18?
+       jne  mission_on_docking_3                           ; JR NZ,$18BD       ; 
+       sb   one,@mission_state                             ; DEC A / LD ($E93D),A; the Constrictor appears again
+       jmp  _1896_end                                      ; RET               ; 
+mission_on_docking_3:                                      ; >18bd
+       cb   a,@bytes+>19                                   ; CP $19            ; state $19?
+       jne  mission_on_docking_3a                          ; JP Z,$91F0        ; 
+       bl   @constrictor_reward                            ;                   ; the Constrictor destroyed: the reward
+       jmp  _1896_end                                      ;                   ; 
+mission_on_docking_3a:                                     
+       cb   a,@bytes+>21                                   ; CP $21            ; state $21?
+       jne  mission_on_docking_4                           ; JR NZ,$18D1       ; 
+       cb   @current_system,@mission_system                ; LD A,($EB67) / LD HL,$EFA2 / CP (HL); the naval base?
+       jne  _1896_end                                      ; RET NZ            ; no
+       bl   @documents_delivered                           ; JP $91DB          ; the documents delivered
+       jmp  _1896_end                                      ;                   ; 
+mission_on_docking_4:                                      ; >18d1
+       cb   a,@bytes+>31                                   ; CP $31            ; state $31?
+       jne  mission_on_docking_5                           ; JP Z,$909F        ; 
+       bl   @supernova_briefing                            ;                   ; mission 3: the supernova briefing
+       jmp  _1896_end                                      ;                   ; 
+mission_on_docking_5:                                      
+       cb   a,@bytes+>34                                   ; CP $34            ; state $34?
+       jne  mission_on_docking_6                           ; JP Z,$90FB        ; 
+       bl   @supernova_complete                            ;                   ; the refugees delivered
+       jmp  _1896_end                                      ;                   ; 
+mission_on_docking_6:                                      
+       cb   a,@bytes+>50                                   ; CP $50            ; state $50?
+       jne  mission_on_docking_7                           ; JP Z,$9220        ; 
+       bl   @thargoid_base_briefing                        ;                   ; mission 5: the Thargoid base briefing
+       jmp  _1896_end                                      ;                   ; 
+mission_on_docking_7:                                      
+       cb   a,@bytes+>53                                   ; CP $53            ; state $53?
+       jne  _1896_end                                      ; JP Z,$920F        ; 
+       bl   @thargoid_base_reward                          ;                   ; the Thargoid base destroyed: the reward
+_1896_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Block until a key action is polled, consuming it (no cursor blink)
+* 
+* Used by the routines at #R$922D and #R$A3E0.
+* .
+* Simpler than #R$35E7: no cursor to blink, just busy-waits on #R$E8F5
+* (the polled action code, see #R$347A) until it's nonzero, consumes
+* it, and plays the click (#R$7468) before returning it.
+* 
+* O:A The polled action code
+* TI: polls for VBlank (which reads the keyboard) while waiting.
+block_until_key_action_no_cursor:                          ; >3a3c
+       .proc                                               ;                   ; 
+_3a3f:                                                     ; >3a3f
+       bl   @ti_poll_vblank                                ;                   ; 
+       movb @pending_debounced_keypress_byte_status,a      ; LD HL,$E8F5 / LD A,(HL) / OR A; 
+       jeq  _3a3f                                          ; JR Z,$3A3F        ; nothing yet - keep waiting
+       sb   @pending_debounced_keypress_byte_status,@pending_debounced_keypress_byte_status; LD (HL),$00       ; consume it
+* TI: no click (sound effect 0, #R$7468), as the sound effects aren't converted yet
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Pick a random system near the current one
+* 
+* Used by the routine at #R$91AA.
+* .
+* Scans (#R$502C, mode 0) for systems near the current one's
+* coordinates ($F760), then repeatedly picks a random entry from the
+* results (#R$2176 scaled by the count at #R$E832, via #R$1F60) until
+* it finds one that isn't the current system (#R$EB67), storing
+* its index in #R$EFA2: the next system on the Constrictor's trail
+* (mission 1).
+pick_random_nearby_system_not_target:                      ; >50aa
+       .proc                                               ;                   ; 
+       movb @current_system_x+1,hl                         ; LD HL,($F760)     ; the current system's coordinates
+       movb @current_system_x,@l                           ;                   ; 
+       sb   a,a                                            ; XOR A             ; just list the systems
+       .far_call code_bank_9_select,scan_systems_in_box_around_origin; CALL $502C        ; find the nearby systems
+_50b1:                                                     ; >50b1
+       bl   @random_byte                                   ; CALL $2176        ; 
+       movb a,@e                                           ; LD E,L            ; (TI: the random byte)
+       movb @nearby_systems_count,a                        ; LD A,($E832)      ; the number of systems found
+       bl   @multiply_a_e_16bit                            ; CALL $1F60        ; 
+       movb h,@l                                           ; LD L,H            ; 
+       sb   h,h                                            ; LD H,$00          ; HL = a random index
+       movb @chart_system_list(hl),a                       ; LD DE,($EFA4) / ADD HL,DE / LD A,(HL); that system (TI: chart_system_list)
+       cb   a,@current_system                              ; LD HL,$EB67 / CP (HL); the current system?
+       jeq  _50b1                                          ; JR Z,$50B1        ; yes - pick again
+       movb a,@mission_system                              ; LD ($EFA2),A      ; the next system on the trail
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Missions: start the next mission
+* 
+* Used by the routine at #R$894D.
+* .
+* Called by #R$894D every 64 hyperspace jumps while no mission is under
+* way (outside the first galaxy). Sets the mission state (#R$E93D) to
+* the start of the next mission (#R$E93C): $10, $20, $30, $40 and $50 for
+* missions 1-5 (the default commander starts with mission 1, see
+* #R$7172); after the last it does nothing.
+start_next_mission:                                        ; >908c
+       movb @next_mission,a                                ; LD A,($E93C)      ; A = the next mission
+       cb   a,@bytes+>06                                   ; CP $06            ; 
+       jeq  _908c_end                                      ; RET Z             ; all missions done
+       ab   one,@next_mission                              ; INC A / LD ($E93C),A; 
+       andi a,>ff00                                        ; DEC A             ; 
+       sla  a,4                                            ; ADD A,A x 4       ; 
+       movb a,@mission_state                               ; LD ($E93D),A      ; mission state = mission * 16
+_908c_end:                                                 
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Mission 3: the supernova briefing
+* 
+* Used by the routine at #R$1896.
+* .
+* Shown on docking in the system whose sun is about to go supernova (state
+* $31, after the fuel leak, see #R$894D). Moves on to state $32, dumps the
+* cargo (#R$9237), and asks the player to take refugees ("Our sun is going
+* supernova!"). Accepting goes on to $90B8. Declining shows a curse and
+* leaves the state at $32: the sun still approaches (#R$883D), and the
+* mission ends at the next hyperspace jump (#R$8AC8) without a reward.
+* .
+* At $90B8, fills the hold's free space with refugees (the cargo entry at
+* #R$EB5D), moves on to state $33 - in which the sun gets closer
+* (#R$883D) until the player hyperspaces out - and thanks the player. The
+* entry at $90CD shows the message at HL, then waits for a key (#R$922D).
+supernova_briefing:                                        ; >909f
+       .proc                                               ;                   ; 
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); state $32
+       .far_call code_bank_11_select,clear_cargo_hold      ; CALL $9237        ; dump the cargo
+       li   hl,msg_supernova_briefing                      ; LD HL,$9272       ; "Our sun is going supernova!..."
+       bl   @show_mission_screen                           ; CALL $90D3        ; 
+       .far_call code_bank_7_select,confirm_prompt_yn      ; CALL $3815        ; wait for Y or N
+       cb   a,@bytes+>59                                   ; CP $59            ; 'Y'?
+       jeq  supernova_take_refugees                        ; JR Z,$90B8        ; accepted
+       li   hl,msg_supernova_declined                      ; LD HL,$93FD       ; "We hope you die a horribly long..."
+       jmp  _90cd                                          ; JR $90CD          ; 
+supernova_take_refugees:                                   ; >90b8
+       bl   @work_out_free_space                           ; CALL $63BA        ; work out the hold's free space
+       li   hl,free_space                                  ; LD HL,$EB61       ; 
+       li   de,cargo_refugees                              ; LD DE,$EB5D       ; refugees fill it
+       li   bc,>0004                                       ; LD BC,$0004       ; 
+       .ldir                                               ; LDIR              ; 
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); state $33
+       li   hl,msg_supernova_accepted                      ; LD HL,$935A       ; "Thank you! ... drop us off at the nearest system"
+_90cd:                                                     ; >90cd
+       bl   @show_mission_screen                           ; CALL $90D3        ; show it
+       bl   @mission_wait_key                              ; JP $922D          ; 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Missions: show a mission screen
+* 
+* Used by the routines at #R$909F, #R$90FB, #R$9120, #R$9190, #R$91AA, #R$91DB,
+* #R$91F0, #R$920F and #R$9220.
+* .
+* Clears the screen and draws a frame with "Mission No." and the mission
+* number (the high nibble of the mission state, #R$E93D), "Attn:
+* Commander" and the commander's name (#R$EB06), then the message at HL.
+* The messages are printed with RST $20, which handles their embedded
+* control codes (position and colour).
+* 
+* I:HL The message
+show_mission_screen:                                       ; >90d3
+       .proc                                               ;                   ; 
+       .push hl                                            ; PUSH HL           ; save the message
+       bl   @hide_sprites_clear_page                       ; CALL $608C        ; hide the sprites
+       li   ix,mission_screen_frame                        ; LD IX,$9267       ; 
+       bl   @rst_28_target_draw_list_tile                  ; CALL $36F1        ; draw a frame
+       li   hl,mission_no_text                             ; LD HL,$9245       ; "Mission No."
+       .rst >20                                            ; RST $20           ; 
+       movb @mission_state,a                               ; LD A,($E93D)      ; 
+       srl  a,4                                            ; RRA x 4 / AND $0F ; 
+       andi a,>0f00                                        ;                   ; 
+       movb a,@c                                           ; LD C,A            ; C = the mission number
+       sb   a,a                                            ; XOR A             ; 
+       clr  hl                                             ; SBC HL,HL         ; 
+       .rst >18                                            ; RST $18           ; print it
+       li   hl,attn_commander_text                         ; LD HL,$9254       ; "Attn: Commander"
+       .rst >20                                            ; RST $20           ; 
+       li   hl,commander_name                              ; LD HL,$EB06       ; 
+       .rst >08                                            ; RST $08           ; the commander's name
+       .pop hl                                             ; POP HL            ; the message
+       .rst >20                                            ; RST $20           ; print it
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Mission 3: the refugees delivered
+* 
+* Used by the routine at #R$1896.
+* .
+* On docking in another system (state $34, see #R$8AC8): thanks the
+* player, unloads the refugees (#R$EB5D), and puts 50 grams of gem-stones
+* in the hold (#R$EB55, from #R$9A46). The mission is over.
+supernova_complete:                                        ; >90fb
+       .proc                                               ;                   ; 
+       li   hl,msg_supernova_complete                      ; LD HL,$92E3       ; "TASK COMPLETE - CONGRATULATIONS..."
+       bl   @show_mission_screen                           ; CALL $90D3        ; 
+       sb   @cargo_refugees,@cargo_refugees                ; LD HL,$EB5D / LD (HL),$00; unload the refugees
+       sb   @cargo_refugees+1,@cargo_refugees+1            ; LD DE,$EB5E / LD BC,$0003 / LDIR; 
+       sb   @cargo_refugees+2,@cargo_refugees+2            ;                   ; 
+       sb   @cargo_refugees+3,@cargo_refugees+3            ;                   ; 
+       li   hl,mission_3_gem_stones                        ; LD HL,$9A46       ; 
+       li   de,cargo_gem_stones                            ; LD DE,$EB55       ; load the gem-stones
+       li   bc,>0004                                       ; LD BC,$0004       ; 
+       .ldir                                               ; LDIR              ; 
+       sb   @mission_state,@mission_state                  ; XOR A / LD ($E93D),A; no mission
+       bl   @mission_wait_key                              ; JP $922D          ; 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Missions 1 and 2: the briefing
+* 
+* Used by the routine at #R$1896.
+* .
+* Shown on docking in state $10 or $20. For mission 1 first shows the
+* Constrictor on the title screen until a key is pressed (#R$1C5C). Then
+* picks the system furthest from the current one (#R$5325) - the navy
+* research centre the Constrictor was stolen from (mission 1), or the naval
+* base the Thargoid documents must be taken to (mission 2) - and remembers
+* it (#R$EFA2). Shows the briefing with that system's name and asks the
+* player to accept the mission: 'N' ends it.
+* .
+* At $916C, moves on to state $11 (mission 1: go to the research centre) or
+* $21 (mission 2: carry the documents to the naval base, which also sets
+* #R$F785), and (at $917D) shows the follow-up message with the system's
+* name.
+mission_briefing:                                          ; >9120
+       .proc                                               ;                   ; 
+       cb   @mission_state,@bytes+>10                      ; LD A,($E93D) / CP $10; mission 1?
+       jne  _912e                                          ; JR NZ,$912E       ; 
+       .far_call code_bank_10_select,title_screen_for_mission; CALL $1C5C        ; show the Constrictor
+       sb   @e940_gate_flag,@e940_gate_flag                ; XOR A / LD ($E940),A; 
+_912e:                                                     ; >912e
+       movb @current_system_x+1,b                          ; LD BC,($F760)     ; the current system's coordinates
+       movb @current_system_x,@c                           ;                   ; 
+       .far_call code_bank_9_select,nearest_and_furthest_systems; CALL $5325        ; find the furthest system
+       movb a,@mission_system                              ; LD ($EFA2),A      ; the mission's system
+       li   hl,empty_mission_message                       ; LD HL,$9A4A       ; no message
+       bl   @show_mission_screen                           ; CALL $90D3        ; show the mission screen
+       li   bc,>0f0b                                       ; LD BC,$0F0B       ; where the system's name goes
+       li   hl,msg_constrictor_briefing                    ; LD HL,$9483       ; "A prototype of the new military ship, the CONSTRICTOR..."
+       cb   @mission_state,@bytes+>20                      ; LD A,($E93D) / CP $20; mission 2?
+       jne  _9151                                          ; JR NZ,$9151       ; 
+       li   bc,>050b                                       ; LD BC,$050B       ; 
+       li   hl,msg_documents_briefing                      ; LD HL,$96DA       ; "The navy has managed to obtain blueprints of a Thargoid..."
+_9151:                                                     ; >9151
+       .push hl                                            ; PUSH HL           ; 
+       bl   @set_cursor_position                           ; CALL $3548        ; position the cursor
+       movb @mission_system,a                              ; LD A,($EFA2)      ; 
+       bl   @generate_system_name                          ; CALL $4CAF        ; 
+       li   hl,text_buffer                                 ; LD HL,$E717       ; 
+       .rst >08                                            ; RST $08           ; print the system's name
+       .pop hl                                             ; POP HL            ; 
+       .rst >20                                            ; RST $20           ; print the briefing
+       .far_call code_bank_7_select,confirm_prompt_yn      ; CALL $3815        ; wait for Y or N
+       cb   a,@bytes+>4e                                   ; SUB $4E           ; 'N'?
+       jne  mission_accept                                 ; JR NZ,$916C       ; accepted
+       sb   @mission_state,@mission_state                  ; LD ($E93D),A      ; declined: no mission
+       jmp  _9120_end                                      ; RET               ; 
+mission_accept:                                            ; >916c
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); the next state
+       cb   @mission_state,@bytes+>21                      ; LD A,($E93D) / CP $21; mission 2?
+       jne  continue_916c_show_followup_message            ; JR NZ,$917D       ; 
+       movb one,@carrying_documents                        ; LD A,$01 / LD ($F785),A; carrying the Thargoid documents
+       jmp  _9120_end                                      ; RET               ; 
+continue_916c_show_followup_message:                       ; >917d
+       li   hl,msg_report_to_station                       ; LD HL,$955F       ; "Report to the station at..."
+       bl   @show_mission_screen                           ; CALL $90D3        ; 
+       movb @mission_system,a                              ; LD A,($EFA2)      ; 
+       bl   @generate_system_name                          ; CALL $4CAF        ; 
+       li   hl,text_buffer                                 ; LD HL,$E717       ; 
+       .rst >08                                            ; RST $08           ; print the system's name
+       bl   @mission_wait_key                              ; JP $922D          ; 
+_9120_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Mission 1: arrive at the research centre
+* 
+* Used by the routine at #R$6164.
+* .
+* Called by 'Data on System' (#R$6164) in state $11. If the player is at
+* the research centre (#R$EFA2), shows "Intelligence reports that the
+* Constrictor made a galactic jump out of this system" and moves on to
+* state $12 - until the player makes a galactic jump too (#R$894D).
+constrictor_at_research_centre:                            ; >9190
+       .proc                                               ;                   ; 
+       movb @docked,r0                                     ; LD A,($E90A) / OR A; docked?
+       jeq  _9190_end                                      ; RET Z             ; no
+       cb   @current_system,@mission_system                ; LD A,($EB67) / LD HL,$EFA2 / CP (HL); the research centre?
+       jne  _9190_end                                      ; RET NZ            ; no
+       li   hl,msg_constrictor_jumped                      ; LD HL,$9593       ; "...the Constrictor made a galactic jump..."
+       bl   @show_mission_screen                           ; CALL $90D3        ; 
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); state $12
+       bl   @mission_wait_key                              ; JP $922D          ; 
+_9190_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Mission 1: follow the Constrictor's trail
+* 
+* Used by the routine at #R$6164.
+* .
+* Called by 'Data on System' (#R$6164) in state $13. If the player is at
+* the system the Constrictor was last heard of (#R$EFA2), moves on to
+* state $14 and picks the next system on its trail, somewhere nearby
+* (#R$50AA): "the Constrictor left this system, destination is system of
+* ...". After five systems (#R$EFA3) moves on to state $15, and the
+* Constrictor is waiting in the last one (#R$1896). State $14 goes back
+* to $13 at the next hyperspace jump (#R$8AC8).
+constrictor_trail:                                         ; >91aa
+       .proc                                               ;                   ; 
+       movb @docked,r0                                     ; LD A,($E90A) / OR A; docked?
+       jeq  _91aa_end                                      ; RET Z             ; no
+       cb   @current_system,@mission_system                ; LD A,($EB67) / LD HL,$EFA2 / CP (HL); on the trail?
+       jne  _91aa_end                                      ; RET NZ            ; no
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); state $14
+       bl   @pick_random_nearby_system_not_target          ; CALL $50AA        ; the next system on the trail
+       li   hl,msg_constrictor_trail                       ; LD HL,$95F6       ; "...the Constrictor left this system, destination is..."
+       bl   @show_mission_screen                           ; CALL $90D3        ; 
+       movb @mission_system,a                              ; LD A,($EFA2)      ; 
+       bl   @generate_system_name                          ; CALL $4CAF        ; 
+       li   hl,text_buffer                                 ; LD HL,$E717       ; 
+       .rst >08                                            ; RST $08           ; print the next system's name
+       sb   one,@constrictor_trail_count                   ; LD HL,$EFA3 / DEC (HL); one fewer system to go
+       jne  _91d8                                          ; JR NZ,$91D8       ; 
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); state $15: the Constrictor is in the next one
+_91d8:                                                     ; >91d8
+       bl   @mission_wait_key                              ; JP $922D          ; 
+_91aa_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Mission 2: the Thargoid documents delivered
+* 
+* Used by the routine at #R$1896.
+* .
+* Thanks the player and fits a naval energy unit (#R$F77E = 2). The
+* mission is over.
+documents_delivered:                                       ; >91db
+       .proc                                               ;                   ; 
+       li   hl,msg_documents_reward                        ; LD HL,$97E2       ; "We are (again) forever in your debt..."
+       bl   @show_mission_screen                           ; CALL $90D3        ; 
+       movb @bytes+>02,@item_energy_unit                   ; LD A,$02 / LD ($F77E),A; fit a naval energy unit
+       sb   @mission_state,@mission_state                  ; XOR A / LD ($E93D),A; no mission
+       sb   @carrying_documents,@carrying_documents        ; LD ($F785),A      ; no longer carrying the documents
+       bl   @mission_wait_key                              ; JP $922D          ; 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Mission 1: the reward
+* 
+* Used by the routine at #R$1896.
+* .
+* Thanks the player for destroying the Constrictor and pays 10,000
+* credits (100000 in tenths of a credit, see #R$EB16). The mission is
+* over.
+constrictor_reward:                                        ; >91f0
+       .proc                                               ;                   ; 
+       li   hl,msg_constrictor_reward                      ; LD HL,$9666       ; "The Navy are forever in your debt..."
+       bl   @show_mission_screen                           ; CALL $90D3        ; 
+       movb @cash_1,r0                                     ; LD HL,($EB16) / LD A,($EB18); the cash...
+       movb @player_cash,@r0lb                             ;                   ; 
+       ai   r0,>86a0                                       ; LD DE,$86A0 / ADD HL,DE / ADC A,$01; ...plus 100000 (10000.0 credits)
+       jnc  constrictor_reward_1                           ;                   ; 
+       ab   one,@cash_2                                    ;                   ; 
+constrictor_reward_1:                                      
+       ab   one,@cash_2                                    ;                   ; 
+       movb r0,@cash_1                                     ; LD ($EB16),HL / LD ($EB18),A; 
+       movb @r0lb,@player_cash                             ;                   ; 
+       sb   @mission_state,@mission_state                  ; XOR A / LD ($E93D),A; no mission
+       bl   @mission_wait_key                              ; JP $922D          ; 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Mission 5: the reward
+* 
+* Used by the routine at #R$1896.
+* .
+* Thanks the player for destroying the Thargoid base and fits the ECM
+* jammer, activated by the L key (#R$F783). The mission is over.
+thargoid_base_reward:                                      ; >920f
+       .proc                                               ;                   ; 
+       li   hl,msg_thargoid_base_reward                    ; LD HL,$997A       ; "Thanks for destroying the Thargoid base..."
+       bl   @show_mission_screen                           ; CALL $90D3        ; 
+       sb   @mission_state,@mission_state                  ; XOR A / LD ($E93D),A; no mission
+       movb one,@ecm_jammer_fitted                         ; INC A / LD ($F783),A; fit the ECM jammer
+       bl   @mission_wait_key                              ; JP $922D          ; 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Mission 5: the briefing
+* 
+* Used by the routine at #R$1896.
+* .
+* Warns that a nearby system has been invaded by the Thargoids, and moves
+* on to state $51. At the next hyperspace jump (#R$8AC8) the state
+* becomes $52: the system arrived at has been invaded - its space station
+* launches Thargoids instead of police (#R$315C), can't be docked with
+* (#R$1692, #R$8755), and can be destroyed (#R$291E).
+thargoid_base_briefing:                                    ; >9220
+       .proc                                               ;                   ; 
+       li   hl,msg_thargoid_base_briefing                  ; LD HL,$98B4       ; "Intellegence reports that a nearby system has been invaded..."
+       bl   @show_mission_screen                           ; CALL $90D3        ; 
+       ab   one,@mission_state                             ; LD HL,$E93D / INC (HL); state $51
+       bl   @mission_wait_key                              ; JP $922D          ; 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Missions: wait for a key and go back
+* 
+* Used by the routines at #R$909F, #R$90FB, #R$9120, #R$9190, #R$91AA, #R$91DB,
+* #R$91F0, #R$920F and #R$9220.
+* .
+* Prints "Press any key to continue.", waits for a key (#R$3A3C) and
+* clears the message line (#R$3955).
+mission_wait_key:                                          ; >922d
+       .proc                                               ;                   ; 
+       li   hl,msg_press_any_key                           ; LD HL,$933D       ; "Press any key to continue."
+       .rst >20                                            ; RST $20           ; 
+       bl   @block_until_key_action_no_cursor              ; CALL $3A3C        ; wait for a key
+       bl   @clear_message_line                            ; JP $3955          ; 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Mission screen: "Mission No."
+* 
+* The first line of every mission screen, printed by #R$90D3 (RST $20) and
+* followed by the mission number. Like all the mission messages, it is a list
+* of (column, row, string) records ending with $FF (see #R$3596).
+mission_no_text:                                           ; >9245
+       text >0e,>01,'Mission No.',>a0
+       byte >FF
+
+********************************************************************************
+* Mission screen: "Attn: Commander"
+* 
+* Printed by #R$90D3 (RST $20) and followed by the commander's name.
+attn_commander_text:                                       ; >9254
+       text >05,>04,'Attn: Commander',>a0
+       byte >FF
+
+********************************************************************************
+* Mission screen frame
+* 
+* Two (RST $28) rectangles that #R$90D3 draws on every mission screen (see
+* #R$36F1).
+mission_screen_frame:                                      ; >9267
+       byte >0E,>01,>0D,>01,>71
+       byte >05,>04,>20,>01,>D1
+       byte >FF
+
+********************************************************************************
+* Mission 3: the briefing
+* 
+* Shown by #R$909F.
+msg_supernova_briefing:                                    ; >9272
+       text >05,>08,'Our sun is going supernova',>a1
+       text >05,>0a,'You are advised to hyper-spac',>e5
+       text >05,>0b,'out of this system immediately',>a1
+       text >05,>16,'Will you help u',>f3
+       byte >FF
+
+********************************************************************************
+* Mission 3: task complete
+* 
+* Shown by #R$90FB. The last line, at $933D, is also printed on its own by
+* #R$922D.
+msg_supernova_complete:                                    ; >92e3
+       text >05,>08,'TASK COMPLETE - CONGRATULATION',>d3
+       text >05,>0a,'Thanks for saving us. Pleas',>e5
+       text >05,>0b,'accept some precious gem',>f3
+msg_press_any_key:                                         ; >933d
+       text >05,>16,'Press any key to continue',>ae
+       byte >FF
+
+********************************************************************************
+* Mission 3: the refugees taken on
+* 
+* Shown by #R$909F when the player agrees to help.
+msg_supernova_accepted:                                    ; >935a
+       text >05,>06,'Thank you',>a1
+       text >05,>08,'I''m afraid that we''ve had t',>ef
+       text >05,>09,'dump any cargo you had to ge',>f4
+       text >05,>0a,'all of us refugees in. If yo',>f5
+       text >05,>0b,'just drop us off at the neares',>f4
+       text >05,>0c,'system, that''ll be fin',>e5
+       byte >FF
+
+********************************************************************************
+* Mission 3: declined
+* 
+* Shown by #R$909F when the player refuses.
+msg_supernova_declined:                                    ; >93fd
+       text >05,>09,'We hope you die a horribly lon',>e7
+       text >05,>0a,'lingering death at the hands o',>e6
+       text >05,>0b,'a slimey green lobstoid i',>e6
+       text >05,>0c,'you''re not blown to bits by ou',>f2
+       text >05,>0d,'sun',>a1
+       byte >FF
+
+********************************************************************************
+* Mission 1: the briefing
+* 
+* Shown by #R$9120, which prints the name of the system with the research
+* centre after "centre at", at column 15, row 11.
+msg_constrictor_briefing:                                  ; >9483
+       text >05,>08,'A prototype of the new militar',>f9
+       text >05,>09,'ship, the CONSTRICTOR, has bee',>ee
+       text >05,>0a,'stolen from the navy researc',>e8
+       text >05,>0b,'centre a',>f4
+       text >05,>0d,'Due to the capabilities of thi',>f3
+       text >05,>0e,'ship, it must be destroye',>e4
+       text >05,>0f,'before falling into enemy hands',>ae
+       text >05,>16,'Accept missio',>ee
+       byte >FF
+
+********************************************************************************
+* Missions 1 and 2: report to the station
+* 
+* Shown by #R$9120 once a mission is accepted, followed by the name of the
+* system (#R$EFA2) - which is why the second line is printed last.
+msg_report_to_station:                                     ; >955f
+       text >05,>0b,'for mission briefing.',>ae
+       text >05,>0a,'Report to the station at',>a0
+       byte >FF
+
+********************************************************************************
+* Mission 1: the Constrictor has left the galaxy
+* 
+* Shown by #R$9190.
+msg_constrictor_jumped:                                    ; >9593
+       text >05,>0a,'Intelligence reports that th',>e5
+       text >05,>0b,'Constrictor made a galactic jum',>f0
+       text >05,>0c,'out of this system a while ago',>ae
+       byte >FF
+
+********************************************************************************
+* Mission 1: the Constrictor's trail
+* 
+* Shown by #R$91AA, followed by the name of the next system on the trail.
+msg_constrictor_trail:                                     ; >95f6
+       text >05,>0a,'Intelligence reports that afte',>f2
+       text >05,>0b,'causing havoc, the Constricto',>f2
+       text >05,>0c,'left this system, destination i',>f3
+       text >05,>0d,'system of',>a0
+       byte >FF
+
+********************************************************************************
+* Mission 1: the reward
+* 
+* Shown by #R$91F0.
+msg_constrictor_reward:                                    ; >9666
+       text >05,>09,'The Navy are forever in you',>f2
+       text >05,>0a,'debt, oh mighty trade',>f2
+       text >05,>0c,'Please accept a reward for you',>f2
+       text >05,>0d,'trouble of 10,000 credits',>ae
+       byte >FF
+
+********************************************************************************
+* Mission 2: the briefing
+* 
+* Shown by #R$9120, which prints the name of the system with the naval base at
+* column 5, row 11.
+msg_documents_briefing:                                    ; >96da
+       text >05,>07,'The navy has managed to obtai',>ee
+       text >05,>08,'blueprints of a Thargoid battl',>e5
+       text >05,>09,'ship. These documents need to b',>e5
+       text >05,>0a,'taken to the main naval base a',>f4
+       text >05,>0d,'The enemy is unaware that w',>e5
+       text >05,>0e,'have these documents, so th',>e5
+       text >05,>0f,'journey should be without an',>f9
+       text >05,>10,'unfriendly encounters',>ae
+       text >05,>16,'Accept missio',>ee
+       byte >FF
+
+********************************************************************************
+* Mission 2: the reward
+* 
+* Shown by #R$91DB.
+msg_documents_reward:                                      ; >97e2
+       text >05,>08,'We are (again) forever in you',>f2
+       text >05,>09,'debt for bringing these ver',>f9
+       text >05,>0a,'important documents to us. A',>f3
+       text >05,>0b,'a reward, we have fitted you',>f2
+       text >05,>0c,'ship with naval energy unit',>ae
+       text >05,>0e,'P.S. sorry about the securit',>f9
+       text >05,>0f,'leak to the Thargoids',>a1
+       byte >FF
+
+********************************************************************************
+* Mission 5: the briefing
+* 
+* Shown by #R$9220.
+msg_thargoid_base_briefing:                                ; >98b4
+       text >05,>08,'Intellegence reports that ',>e1
+       text >05,>09,'nearby system has been invade',>e4
+       text >05,>0a,'by Thargoid ships and that th',>e5
+       text >05,>0b,'space station is under attack. W',>e5
+       text >05,>0c,'suggest that you destroy th',>e5
+       text >05,>0d,'space station and don''t try t',>ef
+       text >05,>0e,'dock',>ae
+       byte >FF
+
+********************************************************************************
+* Mission 5: the reward
+* 
+* Shown by #R$920F.
+msg_thargoid_base_reward:                                  ; >997a
+       text >05,>08,'Thanks for destroying th',>e5
+       text >05,>09,'Thargoid base. A new device wa',>f3
+       text >05,>0a,'salvaged from a Thargoid shi',>f0
+       text >05,>0b,'which we have fitted to you',>f2
+       text >05,>0c,'Cobra. The device appears to ja',>ed
+       text >05,>0d,'ECM broadcasts and is activate',>e4
+       text >05,>0e,'by the L key',>ae
+       byte >FF
+
+********************************************************************************
+* Mission 3 reward: 50 grams of gem-stones
+* 
+* When the player delivers the refugees, #R$90FB copies these 4 bytes into
+* the hold's gem-stones (#R$EB55), replacing any the player already had
+* rather than adding to them.
+mission_3_gem_stones:                                      ; >9a46
+       byte >32,>00,>00,>00                                          ; 50 grams
+
+********************************************************************************
+* Empty message for the mission 1 and 2 briefings
+* 
+* #R$9120 passes this to #R$90D3 as the message to show on the mission
+* screen. #R$90D3 prints it with RST $20 (#R$3596), whose list ends at the
+* first record with a negative column byte - this one - so all it shows is
+* the frame and the header. #R$9120 then prints the briefing itself: the
+* name of the system it has picked, followed by #R$9483 (mission 1) or
+* #R$96DA (mission 2).
+empty_mission_message:                                     ; >9a4a
+       byte >FF                                                      ; the end of the list
 
 rom_bank_13_end:
        equ  $

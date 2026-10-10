@@ -728,6 +728,17 @@ fill_explosion_random_numbers_2:                           ; >702c
        jne  fill_explosion_random_numbers_1                ;                   ; 
        .endproc                                            ;                   ; 
 
+********************************************************************************
+* Show the mission 1 briefing's Constrictor
+*
+* TI: for #R$9120 (in ROM bank 13), which calls the title screen (#R$1C5C) to
+* show the Constrictor: in mission state $10 the title screen returns (with
+* .ret) when a key is pressed.
+title_screen_for_mission:
+       .proc                                               ;                   ; 
+       .call @title_screen                                 ; CALL $1C5C        ; 
+       .endproc                                            ;                   ; 
+
 rom_bank_10_end:
        equ  $
        bss  >8000-$

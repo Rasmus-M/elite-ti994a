@@ -6,6 +6,7 @@ xas99.py src/code-bank-8.a99 -B -q -R -o bin/bank8.bin
 xas99.py src/code-bank-9.a99 -B -q -R -o bin/bank9.bin
 xas99.py src/code-bank-10.a99 -B -q -R -o bin/bank10.bin
 xas99.py src/code-bank-11.a99 -B -q -R -o bin/bank11.bin
+xas99.py src/code-bank-12.a99 -B -q -R -o bin/bank12.bin
 
 xas99.py src/rom-banks/rom-bank-4.a99 -B -q -R -o bin/bank4.bin
 xas99.py src/rom-banks/rom-bank-5.a99 -B -q -R -o bin/bank5.bin
@@ -22,7 +23,7 @@ copy /b bin\elite8.bin ^
     + bin\bank9.bin ^
     + bin\bank10.bin ^
     + bin\bank11.bin ^
-    + empty.bin ^
+    + bin\bank12.bin ^
     + empty.bin ^
     + empty.bin ^
     + empty.bin ^

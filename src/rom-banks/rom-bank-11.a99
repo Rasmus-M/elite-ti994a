@@ -247,6 +247,12 @@ _2532:                                                     ; >2532
        mov  @object_handler_table(r1),r1                   ; LD BC,$288D / ADD HL,BC / LD A,(HL) ...; R1 = this type's handler
        b    *r1                                            ; JP (HL)           ; jump to the handler
 
+* TI: the explosion handler (#R$2556) is in bank 12
+handler_explosion_bank_11:
+       .proc                                               ;                   ; 
+       .far_call code_bank_12_select,handler_explosion     ;                   ; 
+       .endproc                                            ;                   ; 
+
 ********************************************************************************
 * Handler types 0 and 13: nothing to do (#R$254B; TI: separate from #R$2542)
 handler_none:                                              ; >254b
@@ -275,10 +281,10 @@ _2551:                                                     ; >2551
 * 15 is the Cobra left behind by the escape capsule (#R$19FC); the rest
 * are ships' tactics, from attacking to turning away and leaving.
 * TI: only the handlers converted so far; the others do nothing yet (the
-* explosion and the missiles).
+* missiles).
 object_handler_table:                                      ; >288d
        data handler_none                                          ; 0: none
-       data handler_none                                          ; 1: explosion (#R$2556, not converted yet)
+       data handler_explosion_bank_11                             ; 1: explosion (#R$2556, in bank 12)
        data handler_space_station                                 ; 2: space station
        data handler_none                                          ; 3: the player's missile (#R$25B9, not converted yet)
        data handler_turn_then_leave                               ; 4: turn away, then leave
@@ -329,16 +335,20 @@ check_collision:                                           ; >8755
        .proc                                               ;                   ; 
        movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
        cb   a,@bytes+>02                                   ; CP $02            ; 
-       jeq  _8755_end                                      ; RET Z             ; a missile
+       jeq  _8755_exit                                     ; RET Z             ; a missile
        cb   a,@bytes+>1e                                   ; CP $1E            ; 
-       jeq  _8755_end                                      ; RET Z             ; the Cougar
+       jeq  _8755_exit                                     ; RET Z             ; the Cougar
        cb   @handler_type,one                              ; LD A,($F7EE) / CP $01; 
-       jeq  _8755_end                                      ; RET Z             ; an explosion
+       jeq  _8755_exit                                     ; RET Z             ; an explosion
        movb @object_status_byte,r0                         ; LD A,($F7CD) / AND $08; 
        czc  @bit3,r0                                       ;                   ; 
-       jne  _8755_end                                      ; RET NZ            ; already exploding
+       jne  _8755_exit                                     ; RET NZ            ; already exploding
        movb @flight_controls_off,r0                        ; LD A,($EF8E) / OR A; flight controls off?
-       jne  _8755_end                                      ; RET NZ            ; yes - no collisions
+       jne  _8755_exit                                     ; RET NZ            ; yes - no collisions
+       jmp  check_collision_1                              ;                   ; 
+_8755_exit:
+       .endproc                                            ;                   ; 
+check_collision_1:
        movb @object_distance+1,r1                          ; LD DE,($EB8E)     ; R1 = the object's distance
        movb @object_distance,@r1lb                         ;                   ; 
        clr  r0                                             ; LD HL,($F805) / LD H,$00; R0 = its size
@@ -353,12 +363,37 @@ check_collision:                                           ; >8755
        cb   @ship_type,one                                 ; LD A,($F7E7) / CP $01; 
        jeq  check_docking                                  ; JR Z,$87DD        ; the station: check for docking
 _878f:                                                     ; >878f
-* TI: scooping (#R$8BA6) and colliding with anything but the station aren't
-* converted yet.
+       movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
+       cb   a,@bytes+>03                                   ; CP $03            ; 
+       jeq  _879e                                          ; JR Z,$879E        ; cargo canister
+       cb   a,@bytes+>05                                   ; CP $05            ; 
+       jeq  _879e                                          ; JR Z,$879E        ; escape capsule
+       cb   a,@bytes+>06                                   ; CP $06            ; 
+       jne  _87a2                                          ; JR NZ,$87A2       ; not a Thargon either
+_879e:                                                     ; >879e
+       .far_call code_bank_12_select,scoop_object          ; CALL $8BA6        ; scoop it?
+       joc  _8755_end                                      ; RET C             ; scooped
+_87a2:                                                     ; >87a2
        cb   @ship_type,one                                 ; LD A,($F7E7) / CP $01; 
-       jne  _8755_end                                      ; JR Z,$87CF        ; the station itself doesn't lose energy
+       jeq  _87cf                                          ; JR Z,$87CF        ; the station itself doesn't lose energy
+       movb @object_energy,a                               ; LD A,($F7E9)      ; A = the object's energy
+       sb   @bytes+>32,a                                   ; SUB $32           ; minus 50
+       movb a,@object_energy                               ; LD ($F7E9),A      ; (MOVB leaves the carry alone)
+       joc  _87cf                                          ; JR NC,$87CF       ; still some left
+       socb @bit6,@object_status_byte                      ; LD IX,$F7CD / SET 6,(IX+$00); no bounty for it
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@legal_status_exempt                        ; LD ($EFA1),A      ; destroying it doesn't affect the legal status
+       li   ix,object_status_byte                          ;                   ; 
+       .far_call code_bank_12_select,destroy_object        ; CALL $31AD        ; destroy it
+       ab   one,@legal_status_exempt                       ; LD HL,$EFA1 / INC (HL); 
+       bl   @cancel_missile_lock_on_object                 ; CALL $30EA        ; cancel any missile lock on it
+* TI: no sound effect 2 (#R$7468), as the sound effects aren't converted yet
 _87cf:                                                     ; >87cf
-       movb @bytes+>14,a                                   ; LD A,$14          ; damage 20
+       movb @bytes+>14,a                                   ; LD A,$14          ; damage 20...
+       cb   @ship_type,@bytes+>1f                          ; LD A,($F7E7) / CP $1F; the Constrictor?
+       jne  _87da                                          ; JR NZ,$87DA       ; 
+       movb @b255,a                                        ; LD A,$FF          ; ...or $FF for the Constrictor
+_87da:                                                     ; >87da
        .pop r11                                            ;                   ; 
        b    @damage_shields                                ; JP $193F          ; damage the player's shields
 check_docking:                                             ; >87dd

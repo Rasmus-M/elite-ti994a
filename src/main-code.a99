@@ -1457,6 +1457,25 @@ rotation_30_degrees:                                       ; >2522
        byte >00,>00,>20                                              ; sin 30 degrees
 
 ********************************************************************************
+* The message "Bounty: ... credits"
+* 
+* Shown by #R$2556 when a ship with a bounty is destroyed, after
+* formatting the bounty into the digits at $28B4 (#R$3675, which sets bit
+* 7 of the last digit; #R$2556 clears it again so that the message runs
+* on into " credits").
+msg_bounty:                                                ; >28ad
+       text 'Bounty:'                                             ; 
+bounty_digit_buffer:                                       ; >28b4
+       byte >00,>00,>00,>00,>00                                   ; the digits
+msg_credits:                                               ; >28b9
+       text ' credit',>f3                                         ; 
+
+********************************************************************************
+* The message "No bounty!"
+msg_no_bounty:                                             ; >28c1
+       text 'No bounty',>a1                                       ; 
+
+********************************************************************************
 * Clear the object table
 * 
 * Used by the routines at #R$1703, #R$1E01, #R$894D, #R$8C94 and #R$8D2A.
@@ -1659,6 +1678,11 @@ msg_target_lost:                                           ; >337d
 * The message "Condition RED!"
 msg_condition_red:                                         ; >3388
        text 'Condition RED',>a1                                   ; 
+
+********************************************************************************
+* The message "Right On Commander"
+msg_right_commander:                                       ; >3396
+       text 'Right On Commande',>f2                               ; 
 
 ********************************************************************************
 * RST $00 target: print character A
@@ -9737,6 +9761,11 @@ _8b6f:                                                     ; >8b6f
        jmp  _8b6f                                          ; JR $8B6F          ; 
 _8b66_end:                                                 
        rt                                                  ;                   ; 
+
+********************************************************************************
+* The message "Cloaking device"
+msg_cloaking_device_8c85:                                  ; >8c85
+       text 'Cloaking devic',>e5                                  ; 
 
 ********************************************************************************
 * Unpack the commander file

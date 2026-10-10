@@ -1,0 +1,326 @@
+* ROM bank 12: the math tables, and code: more of the flight logic
+* Assembled for real by code-bank-12.a99, and DORG in the other builds for its labels
+       .ifdef code_bank_12
+       aorg >6000
+       .else
+       dorg >6000
+       .endif
+       bss  >40
+       .ifdef code_bank_12
+       bcopy "../../bin/math-tables.bin" ; the math tables, as in the other banks
+       .else
+       bss  math_tables_end-math_tables
+       .endif
+
+* More of the flight logic (TI: called with .far_call): scooping, destroying
+* objects, explosions and the score
+
+********************************************************************************
+* Handler type 1: explosion
+* 
+* Counts ($F7EF) down; until it runs out, adds ($F7EF) / 8 to ($F7F0) each
+* frame (up to $FF) - or subtracts it (at $2573) once the game is over
+* (#R$F749), as in the death scene (#R$1703).
+* .
+* When the count runs out (at $2578), removes the object (#R$30A9). Then,
+* unless bit 6 of its status byte (#R$F7CD) says there's no bounty for it
+* (because it was destroyed by a collision, the ECM or the energy bomb, or
+* is a missile or cargo), shows the bounty for it (($F80B), in tenths of a
+* credit: "Bounty: <n> credits", #R$28AD) and adds it to the cash (#R$EB16)
+* - or shows "No bounty!" (at $25B3) if it's 0.
+handler_explosion:                                         ; >2556
+       .proc                                               ;                   ; 
+       sb   one,@handler_countdown                         ; LD HL,$F7EF / DEC (HL); count down
+       jeq  deactivate_and_award_bounty                    ; JR Z,$2578        ; run out - remove the object, pay the bounty
+       movb @handler_countdown,r0                          ; LD A,(HL)         ; 
+       srl  r0,3                                           ; RRA x 3           ; 
+       andi r0,>1f00                                       ; AND $1F           ; 
+       movb r0,@c                                          ; LD C,A            ; C = countdown / 8
+       movb @per_type_parameter_block,a                    ; LD A,($F7F0)      ; 
+       movb @game_over,r0                                  ; LD A,($F749) / OR A; game over?
+       jne  step_f7f0_down_by_c                            ; JR NZ,$2573       ; yes - subtract instead
+       ab   @c,a                                           ; ADD A,C           ; 
+       jnc  _2574                                          ; JR NC,$2571       ; 
+       movb @b255,a                                        ; LD A,$FF          ; (up to $FF)
+       jmp  _2574                                          ; JR $2574          ; 
+step_f7f0_down_by_c:                                       ; >2573
+       sb   @c,a                                           ; SUB C             ; 
+_2574:                                                     ; >2574
+       movb a,@per_type_parameter_block                    ; LD ($F7F0),A      ; store it back
+       jmp  _2556_end                                      ; RET               ; 
+deactivate_and_award_bounty:                               ; >2578
+       .far_call code_bank_11_select,remove_object         ; CALL $30A9        ; deactivate the current object
+       movb @object_status_byte,r0                         ; LD A,($F7CD) / AND $40; no bounty for it (bit 6)?
+       czc  @bit6,r0                                       ;                   ; 
+       jne  _2556_end                                      ; RET NZ            ; none - done
+       movb @bp_bounty+1,hl                                ; LD HL,($F80B)     ; the bounty
+       movb @bp_bounty,@l                                  ;                   ; 
+       mov  hl,hl                                          ; LD A,H / OR L     ; zero?
+       jeq  print_no_bounty                                ; JR Z,$25B3        ; yes - "No bounty!"
+       movb @l,@c                                          ; LD C,L            ; C = the bounty's low byte
+       movb h,@l                                           ; LD L,H            ; 
+       sb   h,h                                            ; LD H,$00          ; 
+       movb @bytes+>c5,a                                   ; LD A,$C5          ; pad to width 5, with a decimal point
+       li   ix,bounty_digit_buffer                         ; LD IX,$28B4       ; IX -> the digits
+       bl   @format_number                                 ; CALL $3675        ; format the bounty
+       szcb @bit7,@-1(ix)                                  ; RES 7,(IX-$01)    ; so that " credits" follows
+       li   hl,msg_bounty                                  ; LD HL,$28AD       ; "Bounty: <n> credits"
+       bl   @show_view_message                             ; CALL $39C8        ; 
+       movb @player_cash+1,r0                              ; LD HL,($EB16) / LD A,($EB18); add it to the cash...
+       movb @player_cash,@r0lb                             ;                   ; 
+       movb @bp_bounty+1,r1                                ; LD DE,($F80B)     ; 
+       movb @bp_bounty,@r1lb                               ;                   ; 
+       a    r1,r0                                          ; ADD HL,DE         ; 
+       movb r0,@player_cash+1                              ; LD ($EB16),HL     ; 
+       movb @r0lb,@player_cash                             ;                   ; 
+       jnc  _2556_end                                      ; ADC A,$00         ; 
+       ab   one,@cash_2                                    ; LD ($EB18),A      ; ...with the carry
+       jmp  _2556_end                                      ; RET               ; 
+print_no_bounty:                                           ; >25b3
+       li   hl,msg_no_bounty                               ; LD HL,$28C1       ; "No bounty!"
+       bl   @show_view_message                             ; JP $39C8          ; 
+_2556_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Destroy an object
+* 
+* Used by the routines at #R$25B9, #R$2618, #R$28F6, #R$323C, #R$329E and
+* #R$8755.
+* .
+* Turns the object record at IX into an explosion: handler type 1
+* (#R$2556) with a 64-frame countdown and an initial ($F7F0) of 40, speed
+* 0, and bits 2 and 3 of its status byte set (bit 3 marks it as
+* exploding, see #R$323C). Sets #R$E869 to say something was destroyed,
+* and adds the object's value to the score (#R$32E7). Unless ($EFA1) is
+* set, destroying a trader or a police ship (class 0 or $10 in its
+* blueprint's byte $12) worsens the player's legal status (#R$EB65) by
+* 64. Destroying a Thargoid (ship type $13) also sends its Thargons
+* (type 6, whose byte $1E holds the Thargoid's slot number) away, by
+* switching them to handler type 12 (#R$27F4).
+* .
+* Called for the player's missile hitting its target (#R$25FF), a
+* missile hitting the player (#R$2618), the ECM destroying missiles
+* (#R$323C), the energy bomb (#R$329E), and from #R$291E and #R$8755.
+* 
+* I:IX Pointer to the object's record
+* TI: reads the blueprint through blueprint_byte, and the score value is
+* passed to #R$32E7 in HL.
+destroy_object:                                            ; >31ad
+       .proc                                               ;                   ; 
+       .push bc                                            ; PUSH BC           ; 
+       .push de                                            ; PUSH DE           ; 
+       .push hl                                            ; PUSH HL           ; 
+       .push ix                                            ; PUSH IX           ; 
+       movb @bytes+>40,@>22(ix)                            ; LD (IX+$22),$40   ; explosion countdown: 64 frames
+       movb @bytes+>28,@>23(ix)                            ; LD (IX+$23),$28   ; ($F7F0) = 40
+       sb   @>19(ix),@>19(ix)                              ; LD (IX+$19),$00   ; speed 0
+       movb one,@>21(ix)                                   ; LD (IX+$21),$01   ; handler type 1: explosion
+       socb @bit2,*ix                                      ; SET 2,(IX+$00)    ; 
+       socb @bit3,*ix                                      ; SET 3,(IX+$00)    ; exploding
+       seto r0                                             ; LD A,$FF          ; 
+       movb r0,@something_destroyed                        ; LD ($E869),A      ; something was destroyed
+       movb @>1a(ix),a                                     ; LD A,(IX+$1A) / CALL $2FE9; the score value (bytes $18-$19 of the blueprint)
+       li   r2,>19                                         ;                   ; 
+       bl   @blueprint_byte                                ;                   ; 
+       .push a                                             ;                   ; 
+       movb @>1a(ix),a                                     ;                   ; 
+       li   r2,>18                                         ;                   ; 
+       bl   @blueprint_byte                                ;                   ; 
+       .pop hl                                             ;                   ; 
+       movb a,@l                                           ;                   ; 
+       bl   @add_score                                     ; CALL $32E7        ; add it to the score
+       movb @legal_status_exempt,r0                        ; LD A,($EFA1) / OR A; 
+       jne  _31f4                                          ; JR NZ,$31F4       ; legal status unaffected
+       movb @>1a(ix),a                                     ; LD A,(IY+$12)     ; 
+       li   r2,>12                                         ;                   ; 
+       bl   @blueprint_byte                                ;                   ; 
+       andi a,>1c00                                        ; AND $1C           ; A = its class
+       jeq  _31e9                                          ; JR Z,$31E9        ; a trader
+       cb   a,@bytes+>10                                   ; CP $10            ; 
+       jne  _31f4                                          ; JR NZ,$31F4       ; not police either
+_31e9:                                                     ; >31e9
+       ab   @bytes+>40,@legal_status                       ; LD A,($EB65) / ADD A,$40; legal status += 64...
+       jnc  _31f4                                          ; JR NC,$31F1       ; 
+       seto r0                                             ; SBC A,A           ; ...up to $FF
+       movb r0,@legal_status                               ; LD ($EB65),A      ; 
+_31f4:                                                     ; >31f4
+       cb   @>1a(ix),@bytes+>13                            ; LD A,(IX+$1A) / CP $13; a Thargoid?
+       jne  _321d                                          ; JR NZ,$321D       ; no
+       li   ix,ship_object_table                           ; LD IX,$EBA0       ; IX -> the object table
+       movb @current_slot,@c                               ; LD A,($E911) / LD C,A; C = the Thargoid's slot
+       movb @bytes+>14,b                                   ; LD B,$14          ; 20 slots
+_3208:                                                     ; >3208
+       cb   @>1a(ix),@bytes+>06                            ; LD A,(IX+$1A) / CP $06; a Thargon?
+       jne  _3219                                          ; JR NZ,$3219       ; 
+       cb   @>1e(ix),@c                                    ; LD A,(IX+$1E) / CP C; one of this Thargoid's?
+       jne  _3219                                          ; JR NZ,$3219       ; 
+       movb @bytes+>0c,@>21(ix)                            ; LD (IX+$21),$0C   ; yes - send it away (handler type 12)
+_3219:                                                     ; >3219
+       ai   ix,>0028                                       ; LD DE,$0028 / ADD IX,DE; 
+       sb   one,b                                          ; DJNZ $3208        ; next slot
+       jne  _3208                                          ;                   ; 
+_321d:                                                     ; >321d
+       .pop ix                                             ; POP IX            ; 
+       .pop hl                                             ; POP HL            ; 
+       .pop de                                             ; POP DE            ; 
+       .pop bc                                             ; POP BC            ; 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Add to the score, and promote the player's combat rank
+* 
+* Used by the routine at #R$31AD.
+* .
+* Called by #R$31AD when an object is destroyed. Adds its score value
+* (bytes $18-$19 of its blueprint, see #R$A817) to the 24-bit score
+* (#R$EB13). If that reaches the threshold for the next rank (#R$336D), the
+* combat rank (#R$EB12) goes up and "Right On Commander" is shown;
+* otherwise $331B.
+* .
+* At $331B, counts the kills that don't bring a promotion (#R$E930), and
+* shows "Right On Commander" every 256 of them - as BBC Elite does every
+* 256 kills. The entry at $3320 shows the message.
+* 
+* I:IY Pointer to the object's blueprint
+* TI: the score value is in HL rather than read through IY.
+add_score:                                                 ; >32e7
+       movb @score+1,r0                                    ; LD HL,($EB13)     ; R1:R0 = the score (24 bits)
+       movb @score,@r0lb                                   ;                   ; 
+       clr  r1                                             ; LD A,($EB15)      ; 
+       movb @score_2,r1                                    ;                   ; 
+       swpb r1                                             ;                   ; 
+       a    hl,r0                                          ; LD E,(IY+$18) / LD D,(IY+$19) / ADD HL,DE; add the value
+       jnc  _32e7_1                                        ; ADC A,$00         ; 
+       inc  r1                                             ;                   ; 
+_32e7_1:                                                   
+       movb r0,@score+1                                    ; LD ($EB13),HL     ; 
+       movb @r0lb,@score                                   ;                   ; 
+       swpb r1                                             ;                   ; 
+       movb r1,@score_2                                    ; LD ($EB15),A      ; 
+       movb r0,@r1lb                                       ;                   ; R1 = the score / 256
+       clr  r2                                             ; LD A,($EB12) / ADD A,A / LD E,A / LD D,$00; 
+       movb @combat_rank,r2                                ;                   ; 
+       srl  r2,7                                           ; LD HL,$336D / ADD HL,DE; 
+       c    r1,@combat_rank_thresholds(r2)                 ; LD E,$00 / LD D,(HL) / INC HL / LD C,(HL) / SBC HL,DE / SBC A,C; reached the next rank's threshold?
+       jl   right_on_commander                             ; JR C,$331B        ; not yet
+       ab   one,@combat_rank                               ; LD HL,$EB12 / INC (HL); promotion
+       jmp  _3320                                          ; JR $3320          ; "Right On Commander"
+right_on_commander:                                        ; >331b
+       ab   one,@kill_count                                ; LD HL,$E930 / INC (HL); one more kill
+       jne  _32e7_end                                      ; RET NZ            ; not a multiple of 256
+_3320:                                                     ; >3320
+       li   hl,msg_right_commander                         ; LD HL,$3396       ; "Right On Commander"
+       b    @show_view_message                             ; JP $39C8          ; display it
+_32e7_end:                                                 
+       rt                                                  ;                   ; 
+
+********************************************************************************
+* Combat rank thresholds
+* 
+* The score (#R$EB13) needed for each promotion (#R$32E7): the middle and
+* high bytes of a 24-bit number (the low byte being 0).
+* TI: the high and middle bytes of the score needed, as big-endian words.
+combat_rank_thresholds:                                    ; >336d
+       data >0008                                                 ; 2048: Mostly Harmless
+       data >0010                                                 ; 4096: Poor
+       data >0020                                                 ; 8192: Average
+       data >0040                                                 ; 16384: Above average
+       data >0080                                                 ; 32768: Competent
+       data >0200                                                 ; 131072: Dangerous
+       data >0a00                                                 ; 655360: Deadly
+       data >1900                                                 ; 1638400: E-L-I-T-E
+
+********************************************************************************
+* Scoop an object
+* 
+* Used by the routine at #R$8755.
+* .
+* Part of #R$8755, for a cargo canister, escape capsule or Thargon. It's
+* scooped if fuel scoops are fitted (#R$F77B) and it's in front of the ship
+* and below it (the signs of its Z and Y coordinates): if its cargo type
+* (#R$F7EC) is negative it's the cloaking device ($F784, from the Cougar,
+* see #R$8DB9), otherwise 1-4 units of that cargo ($8BC7).
+* .
+* At $8BC7, takes on a random 1-4 units of cargo type A - fewer if the hold
+* hasn't room for them (#R$63BA, #R$63E0), none if it has no room at all.
+* .
+* At $8BF9, adds C units of the cargo to the hold (#R$EB19) and announces
+* it by name. The entry at $8C2F announces the message at HL, removes the
+* object (#R$30A9) and plays the scooping sound.
+* 
+* O:F Carry set if it has been scooped
+* TI: returns the carry with .retc and .retnc.
+scoop_object:                                              ; >8ba6
+       .proc                                               ;                   ; 
+       movb @item_fuel_scoop,r0                            ; LD A,($F77B) / OR A; 
+       jeq  _8ba6_no                                       ; RET Z             ; no fuel scoops
+       movb @object_z_sign,r0                              ; LD A,($F7D3) / OR A; 
+       jlt  _8ba6_no                                       ; RET M             ; behind the ship
+       movb @position_y_hi,r0                              ; LD A,($F7D1) / OR A; 
+       jgt  _8ba6_no                                       ; RET P             ; above the ship
+       jeq  _8ba6_no                                       ;                   ; 
+       movb @cargo_type,a                                  ; LD A,($F7EC) / OR A; 
+       jgt  scoop_cargo                                    ; JP P,$8BC7        ; ordinary cargo
+       jeq  scoop_cargo                                    ;                   ; 
+       movb one,@cloaking_device_fitted                    ; LD A,$01 / LD ($F784),A; the cloaking device
+       li   hl,msg_cloaking_device_8c85                    ; LD HL,$8C85       ; "Cloaking device"
+       jmp  scoop_announce                                 ; JP $8C2F          ; 
+scoop_cargo:                                               ; >8bc7
+       clr  r1                                             ; ADD A,A / ADD A,A / LD E,A / LD D,$00; 
+       movb a,r1                                           ;                   ; 
+       srl  r1,6                                           ;                   ; R1 = cargo type * 4
+       movb @market_units(r1),a                            ; LD HL,$F78B / ADD HL,DE / LD A,(HL); its units
+       bl   @unit_size                                     ; CALL $639C        ; HL -> the size of a unit
+       .push hl                                            ; LD ($E87D),HL     ; (TI: on the stack)
+       bl   @random_byte                                   ; LD A,R            ; (TI: a random byte for the R register)
+       andi a,>0300                                        ; AND $03           ; 
+       ab   one,a                                          ; INC A             ; 
+       clr  bc                                             ; LD B,$00          ; 
+       movb a,@c                                           ; LD C,A            ; BC = a random quantity, 1-4
+_8bdf:                                                     ; >8bdf
+       .push bc                                            ; PUSH BC / PUSH BC ; 
+       bl   @work_out_free_space                           ; CALL $63BA        ; the hold's free space
+       mov  @-2(sp),bc                                     ; POP BC            ; 
+       mov  @-4(sp),hl                                     ; LD HL,($E87D)     ; 
+       bl   @take_off_free_space                           ; CALL $63E0        ; room for this many?
+       .pop bc                                             ; POP BC            ; 
+       movb @free_space_hi,r0                              ; LD A,($EB64) / OR A; 
+       jgt  scoop_into_hold                                ; JP P,$8BF9        ; yes - add them to the hold
+       jeq  scoop_into_hold                                ;                   ; 
+       dec  bc                                             ; DEC BC            ; no - one fewer
+       jne  _8bdf                                          ; LD A,B / OR C / JR NZ,$8BDF; 
+       dect sp                                             ;                   ; (drop the size)
+_8ba6_no:                                                  
+       .retnc                                              ; RET               ; none fit - not scooped
+scoop_into_hold:                                           ; >8bf9
+       movb @cargo_type,r1                                 ; LD A,($F7EC) / ADD A,A / ADD A,A / LD E,A / LD D,$00; 
+       srl  r1,6                                           ;                   ; 
+       li   de,cargo_hold                                  ; LD HL,$EB19 / ADD HL,DE / EX DE,HL; DE -> its place in the hold
+       a    r1,de                                          ;                   ; 
+       .pop hl                                             ; LD HL,($E87D)     ; HL -> the size of a unit
+       movb @c,a                                           ; LD A,C            ; 
+       .push a                                             ; PUSH AF           ; the quantity
+_8c08:                                                     ; >8c08
+       bl   @add_4byte_de_hl                               ; CALL $21C4        ; one more unit
+       sb   one,@c                                         ; DEC C             ; 
+       jne  _8c08                                          ; JR NZ,$8C08       ; 
+       movb @cargo_type,r1                                 ; LD A,($F7EC) / ADD A,A / ADD A,A; 
+       srl  r1,6                                           ;                   ; 
+       li   ix,market                                      ; LD DE,$F789 / ADD IX,DE; IX -> its entry in the market
+       a    r1,ix                                          ;                   ; 
+       .pop a                                              ; POP AF            ; A = the quantity
+       bl   @illegal_goods                                 ; CALL $63AA        ; worsen the legal status for illegal goods
+       movb @cargo_type,a                                  ; LD A,($F7EC)      ; 
+       li   hl,msg_food                                    ; LD HL,$0D9F       ; the names of the goods
+       bl   @skip_tokenised_strings_advancing_hl_past      ; CALL $358D        ; HL -> this one's
+scoop_announce:                                            ; >8c2f
+       bl   @show_view_message                             ; CALL $39C8        ; announce it
+       .far_call code_bank_11_select,remove_object         ; CALL $30A9        ; remove the object
+* TI: no sound effect 13 (#R$7468), as the sound effects aren't converted yet
+       .retc                                               ; SCF / RET         ; scooped
+
+
+rom_bank_12_end:
+       equ  $
+       bss  >8000-$

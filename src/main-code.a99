@@ -244,7 +244,11 @@ _1409:                                                     ; >1409
        .far_call code_bank_13_select,show_countdown        ; CALL $1651        ; show the hyperspace countdown
 !
        bl   @settle_roll_pitch                             ; CALL $6BE1        ; stop the roll and pitch if their keys are released
-* TI: not converted yet: the cloaking device and the jammer ($140F-$1434).
+       movb @cloaking_active_flag,r0                       ;                   ; (TI: only while the cloaking device...)
+       socb @jammer_active_flag,r0                         ;                   ; (...or the jammer is on)
+       jeq  !                                              ;                   ; 
+       .far_call code_bank_13_select,cloak_and_jammer_frame;                   ; the cloaking device and the jammer ($140F-$1434)
+!
 * TI: no waiting for the VBlank handler to draw the scanner ($1437-$143C), as
 * it is drawn at the end of this pass (#R$8380).
        sb   @scanner_queue_count,@scanner_queue_count      ; LD ($E948),A      ; empty the scanner queue: no records...
@@ -480,6 +484,16 @@ score_digits:                                              ; >1bcf
 * The message "Drive repaired"
 msg_drive_repaired:                                        ; >1bd9
        text 'Drive repaire',>e4                                   ; 
+
+********************************************************************************
+* The message "Cloaking active"
+msg_cloaking_active:                                       ; >1be7
+       text 'Cloaking activ',>e5                                  ; 
+
+********************************************************************************
+* The message "Jammer active"
+msg_jammer_active:                                         ; >1bf6
+       text 'Jammer activ',>e5                                    ; 
 
 ********************************************************************************
 * The message "Version 1.0 1987"
@@ -4416,6 +4430,9 @@ key_table:                                                 ; >419b
        data >4700,code_bank_13_select,key_handler_g               ; 'G': galactic hyperspace (#R$8926)
        data >8400,code_bank_13_select,key_f5_info                 ; F5 (FCTN-5): game time, score and credits (#R$1A8A)
        data >4300,code_bank_12_select,key_handler_c               ; 'C': docking computer (#R$1692)
+       data >4900,code_bank_13_select,key_handler_i               ; 'I': identify the target (#R$1B0D)
+       data >5900,code_bank_13_select,key_handler_y               ; 'Y': cloaking device on/off (#R$1B13)
+       data >4c00,code_bank_13_select,key_handler_l               ; 'L': ECM jammer on/off (#R$1B25)
        data 0                                                     ; end of the table
 
 ********************************************************************************

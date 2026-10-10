@@ -1317,6 +1317,75 @@ mission_3_gem_stones:                                      ; >9a46
 empty_mission_message:                                     ; >9a4a
        byte >FF                                                      ; the end of the list
 
+********************************************************************************
+* The cloaking device and the ECM jammer in the main loop
+*
+* TI: $140F-$1434 of the main loop (#R$13FD), in ROM bank 13. process_frame
+* only calls it while one of them is on.
+cloak_and_jammer_frame:                                    ; >140f
+       .proc                                               ;                   ; 
+       movb @main_loop_tick_counter,r0                     ; LD A,($F746) / RRA; odd frame?
+       czc  one,r0                                         ;                   ; 
+       jeq  _140f_end                                      ; JR NC,$1437       ; no - skip the cloak and jammer checks
+       movb @cloaking_active_flag,r0                       ; LD A,($EF9F) / OR A; cloaking device on?
+       jeq  _1426                                          ; JR Z,$1426        ; no - check the jammer
+       movb one,b                                          ; LD B,$01          ; 
+       .far_call code_bank_11_select,decay_counter_f817    ; CALL $19EC        ; drain the energy banks by 1
+       li   hl,msg_cloaking_active                         ; LD HL,$1BE7       ; "Cloaking active"
+       bl   @show_view_message_if_free                     ; CALL $39E9        ; show it unless another message is on screen
+_1426:                                                     ; >1426
+       movb @jammer_active_flag,r0                         ; LD A,($EFA8) / OR A; jammer on?
+       jeq  _140f_end                                      ; JR Z,$1437        ; no
+       movb one,b                                          ; LD B,$01          ; 
+       .far_call code_bank_11_select,decay_counter_f817    ; CALL $19EC        ; drain the energy banks by 1
+       li   hl,msg_jammer_active                           ; LD HL,$1BF6       ; "Jammer active"
+       bl   @show_view_message_if_free                     ; CALL $39E9        ; show it unless another message is on screen
+_140f_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Key 'I': identify the target
+* 
+* Reached via the key table at #R$419B. The next object in the laser
+* sights has its name shown (#R$EF9D, #R$4735).
+key_handler_i:                                             ; >1b0d
+       movb @b255,@identify_target                         ; LD A,$FF / LD ($EF9D),A; the next object in the sights is identified (#R$4735)
+       rt                                                  ; RET               ; 
+
+********************************************************************************
+* Key 'Y': turn the cloaking device on or off
+* 
+* Reached via the key table at #R$419B. Beeps if no cloaking device is
+* fitted (#R$F784); otherwise, if docked, does nothing (#R$6DCF), and in
+* flight toggles it (#R$EF9F).
+key_handler_y:                                             ; >1b13
+       .proc                                               ;                   ; 
+       movb @cloaking_device_fitted,r0                     ; LD A,($F784) / OR A; 
+       jeq  _1b13_end                                      ; JP Z,$16FE        ; no cloaking device (TI: no beep yet)
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; do nothing if docked
+       movb @cloaking_active_flag,r0                       ; LD A,($EF9F)      ; 
+       inv  r0                                             ; CPL               ; 
+       movb r0,@cloaking_active_flag                       ; LD ($EF9F),A      ; toggle the cloaking device
+_1b13_end:                                                 
+       .endproc                                            ; RET               ; 
+
+********************************************************************************
+* Key 'L': turn the ECM jammer on or off
+* 
+* Reached via the key table at #R$419B. If docked, does nothing
+* (#R$6DCF); beeps if no ECM jammer is fitted (#R$F783); otherwise toggles
+* it (#R$EFA8).
+key_handler_l:                                             ; >1b25
+       .proc                                               ;                   ; 
+       bl   @refuse_if_docked                              ; CALL $6DCF        ; do nothing if docked
+       movb @ecm_jammer_fitted,r0                          ; LD A,($F783) / OR A; 
+       jeq  _1b25_end                                      ; JP Z,$16FE        ; no ECM jammer (TI: no beep yet)
+       movb @jammer_active_flag,r0                         ; LD A,($EFA8)      ; 
+       inv  r0                                             ; CPL               ; 
+       movb r0,@jammer_active_flag                         ; LD ($EFA8),A      ; toggle the ECM jammer
+_1b25_end:                                                 
+       .endproc                                            ; RET               ; 
+
 rom_bank_13_end:
        equ  $
        bss  >8000-$

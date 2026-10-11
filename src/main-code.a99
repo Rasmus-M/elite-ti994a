@@ -3381,7 +3381,37 @@ clip_and_draw_line:                                        ; >3ac2
        ci   r0,63+64                                       ;                   ;
        jh   clip_and_draw_line_1                           ;                   ;
        b    @clip_endpoints_to_screen_space                ;                   ; all inside: draw it
+* And a quick test for a line that is all beyond one edge of the view, which
+* isn't drawn (signed comparisons of the points as they are; a point on an
+* edge is inside).
 clip_and_draw_line_1:
+       mov  @clip_point1_x,r0                              ;                   ;
+       mov  @clip_point2_x,r1                              ;                   ;
+       ci   r0,-117                                        ;                   ;
+       jgt  clip_and_draw_line_2                           ;                   ;
+       ci   r1,-116                                        ;                   ;
+       jlt  clip_and_draw_line_5                           ;                   ; both left of the view
+clip_and_draw_line_2:
+       ci   r0,118                                         ;                   ;
+       jlt  clip_and_draw_line_3                           ;                   ;
+       ci   r1,117                                         ;                   ;
+       jgt  clip_and_draw_line_5                           ;                   ; both right of it
+clip_and_draw_line_3:
+       mov  @clip_point1_y,r0                              ;                   ;
+       mov  @clip_point2_y,r1                              ;                   ;
+       ci   r0,-64                                         ;                   ;
+       jgt  clip_and_draw_line_4                           ;                   ;
+       ci   r1,-63                                         ;                   ;
+       jlt  clip_and_draw_line_5                           ;                   ; both below it
+clip_and_draw_line_4:
+       ci   r0,65                                          ;                   ;
+       jlt  clip_and_draw_line_6                           ;                   ;
+       ci   r1,64                                          ;                   ;
+       jgt  clip_and_draw_line_5                           ;                   ; both above it
+       jmp  clip_and_draw_line_6                           ;                   ;
+clip_and_draw_line_5:
+       .endproc                                            ;                   ; nothing to draw
+clip_and_draw_line_6:
        mov  @clip_point1_x,de                              ; LD DE,($EB92)     ; DE = point 1's X (biased/unbiased mix - see #R$3A72)
        ai   de,>8000                                       ; LD A,D / ADD A,$80; bias the high byte by $80 into the unsigned comparison range
        mov  de,@clip_point1_x                              ; LD D,A / LD ($EB93),A; and store it back - the high byte is biased in memory too

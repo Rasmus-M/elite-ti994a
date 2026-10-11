@@ -99,11 +99,12 @@ words. A single-byte access to
 - **Variables cleared by the MSX startup code** ($D600-$EFAA) start at 0, except the values it sets afterwards
   (see `temp-src/startup-code.a99`); values above that keep the snapshot.
 - **Scratchpad** (`equates.a99`): `pad_stack` (no longer used), then the routines `copy_to_pad` installs at startup:
-  `copy_space_view_row_pad` (`>26`), `clear_space_view_rows_pad` (`>20`) and `line_loops_pad` (`>50`), ending at
-  `pad_max` (`>83C8`), then `pad_ws` (`>83C8`-`>83E7`, overlapping GPLWS - fine while interrupts and console routines
+  `copy_space_view_row_pad` (`>26`), `clear_space_view_rows_pad` (`>20`) and `line_loops_pad` (`>48`), ending at
+  `pad_max` (`>83C0`), then `pad_ws` (`>83C0`-`>83DF`, overlapping GPLWS - fine while interrupts and console routines
   are unused): the one workspace the music, sound effects, keyboard and joystick routines share, as they never call each
   other and keep nothing in registers between calls. The slot sizes
-  are constants; update them if those routines change. Code there runs without wait states.
+  are constants; update them if those routines change. The line loops plot with a single `socb r1,*hl`; `tunnel_rings`,
+  the only thing drawn with XOR, patches that and the `sb` after it to a call of `line_xor_plot` meanwhile. Code there runs without wait states.
 - **Code in ROM banks**: `program.a99` holds the whole program and is assembled once per output: by `elite.a99` with
   RAM real (`aorg`) and the code banks `dorg`, and by `code-bank-N.a99` with only bank N real, so RAM and the banks
   can use each other's labels. Banks 7-14 (`code_bank_N_select`, at >6000 + 2N) hold code - 7 the docked screens, 8 the data on system screen,

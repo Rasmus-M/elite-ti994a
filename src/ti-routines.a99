@@ -421,7 +421,9 @@ clear_space_view_rows_end:
 *
 * The pixel loops of the line drawing (setup_bresenham_line), copied to
 * scratchpad at line_loops_pad. The rotate instructions and the plot
-* operations are patched there.
+* operations are patched there. The plot is a single SOCB to the buffer; for
+* the tunnel rings (#R$6CB2), which are drawn with XOR, it and the SB after it
+* are patched to BL @line_xor_plot (R11 is free: the loops return with .ret).
 *
 * HL: Buffer address   R0 (MSB): Error term   R1 (MSB): Pixel mask
 * R2: Column step (+1/-1)   B: Pixel count   D: dy   E: dx
@@ -438,11 +440,8 @@ line_shallow_error_term:
        ab   @e,r0                      ; Add dx back...
        ai   hl,>20                     ; ...and step a row
 line_shallow_plot:
-       movb *hl,a
-line_shallow_plot_op:
-       socb r1,a                       ; OR in the pixel (patched to XOR)
-       movb a,*hl
-       sb   one,b
+       socb r1,*hl                     ; OR in the pixel (these two instructions are patched
+       sb   one,b                      ; to a call of line_xor_plot by #R$6CB2)
        jne  line_loops
        .ret
 line_steep_loop:
@@ -457,15 +456,16 @@ line_steep_rotate:
        mov  @line_mask_wrap,r1         ; The mask wraps round...
        a    r2,hl                      ; ...and the pointer steps a byte
 line_steep_plot:
-       movb *hl,a
-line_steep_plot_op:
-       socb r1,a                       ; OR in the pixel (patched to XOR)
-       movb a,*hl
+       socb r1,*hl                     ; OR in the pixel (patched likewise)
        sb   one,b
        jne  line_steep_loop
        .ret
 line_loops_end:
        equ  $
+line_shallow_plot_op:                  ; The patched plot operations
+       equ  line_shallow_plot
+line_steep_plot_op:
+       equ  line_steep_plot
 * The loops' entry points and patched instructions in scratchpad
 line_shallow_rotate_pad:
        equ  line_loops_pad

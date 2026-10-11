@@ -3743,9 +3743,17 @@ line_rotate_right:
 line_rotate_left:
        sla  r1,1                                           ;                   ; the pixel moves left
 line_plot_or:
-       socb r1,a                                           ;                   ; 
+       socb r1,*hl                                         ;                   ; two instructions: plot the pixel and count it
+       sb   one,b                                          ;                   ;
 line_plot_xor:
-       xor  r1,a                                           ;                   ; 
+       bl   @line_xor_plot                                 ;                   ; the same with XOR (two words)
+* Plot a pixel with XOR and count it, for the line loops (#R$6CB2)
+line_xor_plot:
+       movb *hl,a                                          ;                   ;
+       xor  r1,a                                           ;                   ;
+       movb a,*hl                                          ;                   ;
+       sb   one,b                                          ;                   ; (RT leaves the status for the loop's JNE)
+       rt                                                  ;                   ;
 line_mask_wrap:
        data 0                                              ;                   ; the pixel bitmask after crossing a byte boundary
 
@@ -8519,8 +8527,10 @@ draw_gauge_tiles:                                          ; >6ca8
 tunnel_rings:                                              ; >6cb2
        .proc
        bl   @clear_space_view                              ; CALL $388F        ; clear the space view
-       mov  @line_plot_xor,@line_shallow_plot_op_pad       ; LD A,$A9          ; draw lines with XOR
-       mov  @line_plot_xor,@line_steep_plot_op_pad         ; LD ($3CA8),A      ; 
+       mov  @line_plot_xor,@line_shallow_plot_op_pad       ; LD A,$A9          ; draw lines with XOR (TI: two words each,
+       mov  @line_plot_xor+2,@line_shallow_plot_op_pad+2   ;                   ; a call of line_xor_plot)
+       mov  @line_plot_xor,@line_steep_plot_op_pad         ; LD ($3CA8),A      ;
+       mov  @line_plot_xor+2,@line_steep_plot_op_pad+2     ;                   ; 
        ;                                                   ; LD ($3CE7),A      ; 
        movb @bytes+>07,a                                   ; LD A,$07          ; 
        .sfx 7                                              ; CALL $7468        ; play the tunnel rings
@@ -8579,7 +8589,9 @@ tunnel_rings_show:                                         ; >6d0d
        movb @b255,a                                        ; LD A,$FF          ; 
        movb a,@tunnel_rings_finished                       ; LD ($E923),A      ; 
        mov  @line_plot_or,@line_shallow_plot_op_pad        ; LD A,$B1          ; draw lines with OR again
-       mov  @line_plot_or,@line_steep_plot_op_pad          ; LD ($3CA8),A      ; 
+       mov  @line_plot_or+2,@line_shallow_plot_op_pad+2    ;                   ;
+       mov  @line_plot_or,@line_steep_plot_op_pad          ; LD ($3CA8),A      ;
+       mov  @line_plot_or+2,@line_steep_plot_op_pad+2      ;                   ; 
        ;                                                   ; LD ($3CE7),A      ; 
        .endproc                                            ; RET               ; 
 

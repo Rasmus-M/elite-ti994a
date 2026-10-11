@@ -13188,6 +13188,19 @@ screen_radius:                                             ; >eb9e
        data 0
 
 ********************************************************************************
+* Enemy ECM on
+* 
+* Set by #R$25B9 when the target of the player's missile sets off its ECM,
+* so that #R$323C knows it isn't the player's ECM (and doesn't drain the
+* player's energy for it); cleared by #R$323C when the ECM finishes.
+* TI: this byte is before the object table rather than after it ($EEC0), so
+* that the table's records start at an odd address, like the object workspace
+* (#R$F7CD): their words are then at even addresses, and copying a record
+* between the two (ti_ldir) is done in words.
+enemy_ecm:                                                 ; >eec0
+       byte >00
+
+********************************************************************************
 * Ship/object table: 20 slots, 40-byte stride
 * 
 * #TABLE
@@ -13327,15 +13340,6 @@ object_slot_3:                                             ; >ec18
        byte >00,>00,>00,>00,>00,>00,>00,>00
        byte >00,>00,>00,>00,>00,>00,>00,>00
        byte >00,>00,>00,>00,>00,>00,>00,>00
-
-********************************************************************************
-* Enemy ECM on
-* 
-* Set by #R$25B9 when the target of the player's missile sets off its ECM,
-* so that #R$323C knows it isn't the player's ECM (and doesn't drain the
-* player's energy for it); cleared by #R$323C when the ECM finishes.
-enemy_ecm:                                                 ; >eec0
-       byte >00
 
 ********************************************************************************
 * In witchspace

@@ -562,15 +562,9 @@ _8cc7:                                                     ; >8cc7
        li   hl,>1d4c                                       ; LD HL,$1D4C       ; about 7500 from the planet...
        .far_call code_bank_11_select,random_point          ; SCF / CALL $8F25  ; ...in any direction
        .far_call code_bank_11_select,point_at_player       ; CALL $8D8E        ; point it at the planet
-       movb @ship_object_table+1,r0                        ; LD BC,($EBA1)     ; add the planet's position
-       movb @ship_object_table+2,@r0lb                     ;                   ; (TI: big-endian, at an odd address)
-       a    r0,@object_position_x                          ; LD HL,($F7CE) / ADD HL,BC / LD ($F7CE),HL; 
-       movb @ship_object_table+3,r0                        ; LD BC,($EBA3)     ; 
-       movb @ship_object_table+4,@r0lb                     ;                   ; 
-       a    r0,@object_position_y                          ; LD HL,($F7D0) / ADD HL,BC / LD ($F7D0),HL; 
-       movb @ship_object_table+5,r0                        ; LD BC,($EBA5)     ; 
-       movb @ship_object_table+6,@r0lb                     ;                   ; 
-       a    r0,@object_position_z                          ; LD HL,($F7D2) / ADD HL,BC / LD ($F7D2),HL; 
+       a    @planet_position,@object_position_x            ; LD BC,($EBA1) / LD HL,($F7CE) / ADD HL,BC / LD ($F7CE),HL; add the planet's position
+       a    @planet_position_y,@object_position_y          ; LD BC,($EBA3) / ...; (TI: the table's words are big-endian and at even addresses)
+       a    @planet_position_z,@object_position_z          ; LD BC,($EBA5) / ...;
        bl   @work_out_distance                             ; CALL $883D        ; work out its distance
        ci   hl,>5fb4                                       ; LD DE,$5FB4 / SBC HL,DE; at least 24500 from the player?
        jl   _8cc7                                          ; JR C,$8CC7        ; too close - again

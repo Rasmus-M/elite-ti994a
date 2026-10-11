@@ -97,7 +97,9 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
 workspace's position and orientation words (`object_position_x/_y/_z`, `side_vector*`, `nose_vector*`,
 `roof_vector*`, $F7CE-$F7E5) - and so the same words in the object table's records, which are copies of
 it, and the data copied into it (`station_launch_orientation`, `title_ship_start`,
-`title_letters_orientation`); their high-byte labels (`object_z_sign`, `position_x_hi`...) are `equ`s of the
+`title_letters_orientation`). The object table (`ship_object_table`) and `object_scratch` start at odd addresses, like
+the workspace, so a record's words are at even addresses there too and `ti_ldir` copies records in words (`enemy_ecm`,
+which follows the table on the MSX, is before it for this). The workspace's high-byte labels (`object_z_sign`, `position_x_hi`...) are `equ`s of the
 words. A single-byte access to
   one of these goes to the high byte at the label and the low byte at the label + 1. Constant tables read only by TI
   code (`log_table`, `antilog_table`) are big-endian `data`.

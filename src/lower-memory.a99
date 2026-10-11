@@ -37,14 +37,16 @@ plot_pixel_xor:
 speed_keys:
        byte 0
 
-* The working object saved by #R$3341 (TI-specific: the MSX uses $0080)
-object_scratch:
-       bss  >28
-
 * The number of pieces an asteroid breaks up into (TI-specific: the MSX
 * stores it in the asteroid blueprint, #R$2BAC, which is in ROM on the TI)
 asteroid_pieces:
        byte 0
+
+* The working object saved by #R$3341 (TI-specific: the MSX uses $0080). At an
+* odd address, like the object workspace (#R$F7CD), so that ti_ldir copies it
+* in words.
+object_scratch:
+       bss  >28
        even
 
 * Space view bitmap buffer

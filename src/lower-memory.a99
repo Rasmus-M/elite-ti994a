@@ -1,5 +1,7 @@
        limi 0
        lwpi disk_ws                    ; (a workspace outside the scratchpad)
+       li   r0,code_bank_14_select     ; (it is in ROM bank 14)
+       seto *r0
        bl   @ti_save_console_state     ; keep the scratchpad as the console left it, for the disk DSR
        lwpi wrksp
        bl   @ti_setup_environment

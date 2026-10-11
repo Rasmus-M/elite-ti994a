@@ -106,7 +106,7 @@ words. A single-byte access to
 - **Code in ROM banks**: `program.a99` holds the whole program and is assembled once per output: by `elite.a99` with
   RAM real (`aorg`) and the code banks `dorg`, and by `code-bank-N.a99` with only bank N real, so RAM and the banks
   can use each other's labels. Banks 7-14 (`code_bank_N_select`, at >6000 + 2N) hold code - 7 the docked screens, 8 the data on system screen,
-  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`), 11 the flight logic `process_frame` calls with `.far_call` (collisions, docking, the safe zone, spawning, the object handlers and steering), 12 more of it (scooping, destroying objects, explosions, the score, the lasers, recharging, the missile, ECM, energy bomb and escape capsule keys, switching views (keys 2-4 and F1-F4), the Torus jump drive (J) and the docking computer (C), freezing the game (STOP), the altitude and cabin temperature, death and the death scene), 13 hyperspace (H, G, the countdown, the jump and witchspace), the alert level, F5, the missions, and the cloaking device, ECM jammer and identify keys (Y, L, I), 14 the sound effects player; call into it with `.far_call`. Code in a bank may
+  9 the charts, 10 the title screen (entered with `.select_bank` + `b`, as it never returns) and launching (key '1', `key_handler_1`), 11 the flight logic `process_frame` calls with `.far_call` (collisions, docking, the safe zone, spawning, the object handlers and steering), 12 more of it (scooping, destroying objects, explosions, the score, the lasers, recharging, the missile, ECM, energy bomb and escape capsule keys, switching views (keys 2-4 and F1-F4), the Torus jump drive (J) and the docking computer (C), freezing the game (STOP), the altitude and cabin temperature, death and the death scene), 13 hyperspace (H, G, the countdown, the jump and witchspace), the alert level, F5, the missions, and the cloaking device, ECM jammer and identify keys (Y, L, I), 14 the sound effects player and the disk routines; call into it with `.far_call`. Code in a bank may
   read RAM, the math tables and its own bank only. As a pilot, bank 7 holds the status page (`status_page`,
   `print_commander_name` and their own text and data); the routines and text other screens share (printing,
   number formatting, system names, clearing the page) are in RAM. 'N' on the title screen shows it, and 'Y' the
@@ -144,8 +144,8 @@ words. A single-byte access to
 - **The program image** (low and high RAM) is packed into the 32K of cartridge banks 0-3 with a loader: `ea5tocart`
   prints "Cartridge full" (and leaves a broken cartridge) if it doesn't fit, so check `make.bat`'s output for that. The
   space view buffer is last in low RAM and defined with `equ`, so it isn't in the image: nothing may be assembled after
-  it. RAM itself is nearly full: about 60 bytes free in high RAM and 40 in low RAM.
-- **Disk operations** (`ti-disk.a99`, low RAM): the commander menu (bank 7) loads and saves commanders on disk where the
+  it. High RAM is nearly full (about 60 bytes free); low RAM has about 670 bytes free.
+- **Disk operations** (the routines in ROM bank 14, `rom-bank-14.a99`; their entry point `disk_entry`, which selects the bank, and their data in `ti-disk.a99`, low RAM): the commander menu (bank 7) loads and saves commanders on disk where the
   MSX uses tape: the file `DSK1.<name>`, a program file of 139 bytes (the record at #R$D606: the name and the commander
   file). Set `disk_opcode`, `disk_name` and `disk_name_length`, `blwp @disk_vector`, and check `disk_error`. The disk DSR
   needs the scratchpad as the console left it and its buffers at the top of the VDP RAM (from >37D8, starting in the
@@ -154,7 +154,7 @@ words. A single-byte access to
   around the DSR call (`ti_dsrlnk`), clears the DSR's buffers under the name table and the sprite attribute table first,
   and sets those two tables up again afterwards (so the screen is blank meanwhile). It all runs in `disk_ws`, a
   workspace in low RAM, as the main workspace is in the scratchpad. The PAB and the file's buffer are in VDP RAM at
-  >1900 and >1940. Low RAM is nearly full (about 170 bytes free).
+  >1900 and >1940.
 - **Sound effects**: a native SN76489 player in ROM bank 14 (`rom-bank-14.a99`) rather than a conversion of the MSX's
   AY-3-8910 engine (#R$7468, #R$7645): the same effects (0-13), handlers and three channels, with its state in the MSX's
   sound variables (#R$E894). Play one with `.sfx N` (a `blwp @sound_effect_vector` and the number): it runs in its own

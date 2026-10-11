@@ -144,12 +144,16 @@ words. A single-byte access to
   the docked screens in `print_char`, `generate_system` and `clear_page`, or a sound effect plays on until a screen is drawn) and
   never between the two bytes of a VDP address.
 - **The space view** is drawn in a buffer in low RAM (`space_view_buffer`, 4K) and copied to the pattern table
-  (`copy_space_view`). Copying and clearing all of it takes long, so for each of the 16 character rows `view_min` and
-  `view_max` hold the first and last character drawn in since the buffer was cleared (`view_prev_min`/`_max`: what was
-  copied last, so is on the screen): `clear_space_view` clears only those and `copy_space_view` copies only those and
-  the previous ones. So everything that writes to the buffer must mark what it covers: `view_mark_line` (lines, the
-  rectangle they're in; `draw_line_inside`, the fast path for lines that need no clipping, does the same in line), `view_mark_rows` (pixels) and inline in `draw_view_message`, `move_and_plot_stardust` and `fill_disc_row_span` (the rows of the sun's disc,
-  a native routine in low RAM where the MSX has #R$3F68). `view_mark_all` marks everything
+  (`copy_space_view`). Copying and clearing all of it takes long, so each of the 16 character rows is divided into 11
+  cells of two characters, and has a word in `view_cells` with a bit for each cell drawn in since the buffer was cleared
+  (bit 15 the first cell, bit 5 the last; `view_prev_cells`: what was copied last, so is on the screen):
+  `clear_space_view` clears only those cells and `copy_space_view` copies only those and the previous ones, a run of
+  cells at a time. So everything that writes to the buffer must mark what it covers: `view_mark_line` (lines, the
+  rectangle they're in; `draw_line_inside`, the fast path for lines that need no clipping, does the same in line), and
+  inline in `plot_single_pixel`, `move_and_plot_stardust`, `draw_view_message` and `fill_disc_row_span` (the rows of the
+  sun's disc, a native routine in low RAM where the MSX has #R$3F68). The tables `view_cell_bit`, `view_cells_from` and
+  `view_cells_to_inv` (`ti-routines.a99`) give the bit of a cell, the bits from a cell on and the bits after a cell: a
+  range is `mov @view_cells_from(first*2),r` + `szc @view_cells_to_inv(last*2),r`. `view_mark_all` marks everything
   (`enter_flight_mode`, as then neither the buffer nor the screen is known). `clear_space_view` mustn't change BC: its
   callers count with it.
 - **Rotating vertices** (`rotate_vertex`, and `face_visible` with it) is native code that multiplies with `MPY` where
@@ -162,7 +166,7 @@ words. A single-byte access to
 - **The program image** (low and high RAM) is packed into the 32K of cartridge banks 0-3 with a loader: `ea5tocart`
   prints "Cartridge full" (and leaves a broken cartridge) if it doesn't fit, so check `make.bat`'s output for that. The
   space view buffer is last in low RAM and defined with `equ`, so it isn't in the image: nothing may be assembled after
-  it. High RAM has about 830 bytes free; low RAM has about 520 bytes free.
+  it. High RAM has about 730 bytes free; low RAM has about 440 bytes free.
 - **Disk operations** (the routines in ROM bank 14, `rom-bank-14.a99`; their entry point `disk_entry`, which selects the bank, and their data in `ti-disk.a99`, low RAM): the commander menu (bank 7) loads and saves commanders on disk where the
   MSX uses tape: the file `DSK1.<name>`, a program file of 139 bytes (the record at #R$D606: the name and the commander
   file). Set `disk_opcode`, `disk_name` and `disk_name_length`, `blwp @disk_vector`, and check `disk_error`. The disk DSR

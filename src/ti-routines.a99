@@ -261,13 +261,11 @@ vsbw:
 * main-code.a99). Changes R1.
 *
 view_mark_all:
-       li   r1,15
+       li   r1,30
 view_mark_all_1:
-       sb   @view_min(r1),@view_min(r1)
-       sb   @view_prev_min(r1),@view_prev_min(r1)
-       movb @bytes+21,@view_max(r1)
-       movb @bytes+21,@view_prev_max(r1)
-       dec  r1
+       mov  @view_cells_from,@view_cells(r1); all 11 cells
+       mov  @view_cells_from,@view_prev_cells(r1)
+       dect r1
        jgt  view_mark_all_1
        jeq  view_mark_all_1
        rt
@@ -309,19 +307,17 @@ fill_disc_row_span_1:
        c    r1,r2
        jh   fill_disc_row_span_6       ; nothing to fill
        mov  r0,de
-       srl  de,3                       ; DE = the character row: mark what is drawn in
+       srl  de,2
+       andi de,>001e                   ; DE = the character row * 2: mark what is drawn in
        mov  r1,a
-       sla  a,5                        ; A (high byte) = the first character
-       cb   a,@view_min(de)
-       jhe  fill_disc_row_span_2
-       movb a,@view_min(de)
-fill_disc_row_span_2:
-       mov  r2,a
-       sla  a,5                        ; and the last
-       cb   a,@view_max(de)
-       jle  fill_disc_row_span_3
-       movb a,@view_max(de)
-fill_disc_row_span_3:
+       srl  a,3
+       andi a,>001e                    ; A = the first cell * 2
+       mov  r2,hl
+       srl  hl,3
+       andi hl,>001e                   ; HL = the last
+       mov  @view_cells_from(a),a
+       szc  @view_cells_to_inv(hl),a
+       soc  a,@view_cells(de)
        sla  r0,5
        ai   r0,space_view_buffer       ; R0 -> the row in the buffer
        mov  r1,hl
@@ -355,14 +351,19 @@ fill_disc_row_span_6:
        rt
 *// fill_disc_row_span
 
-view_min:                              ; For each character row of the space view: the first character drawn in
-       byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-view_max:                              ; and the last (before the first if there are none)
-       byte 21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21
-view_prev_min:                         ; The same for what was copied to the screen last
-       byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-view_prev_max:
-       byte 21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21
+view_cells:                            ; For each character row of the space view: the cells drawn in (see
+       data >ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0 ; view_mark_line in main-code.a99); all of them at first
+       data >ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0
+view_prev_cells:                       ; The same for what was copied to the screen last
+       data >ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0
+       data >ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0,>ffe0
+       bss  32                         ; (and, while copying, what will be)
+view_cell_bit:                         ; The bit of each of the 11 cells (two characters) of a row
+       data >8000,>4000,>2000,>1000,>0800,>0400,>0200,>0100,>0080,>0040,>0020
+view_cells_from:                       ; The bits of the cells from each cell on
+       data >ffe0,>7fe0,>3fe0,>1fe0,>0fe0,>07e0,>03e0,>01e0,>00e0,>0060,>0020
+view_cells_to_inv:                     ; The bits of the cells after each cell
+       data >7fe0,>3fe0,>1fe0,>0fe0,>07e0,>03e0,>01e0,>00e0,>0060,>0020,>0000
 
 *********************************************************************
 *

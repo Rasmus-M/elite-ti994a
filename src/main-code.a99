@@ -6501,7 +6501,7 @@ hide_few_sprites:                                          ; >6097
        movb @chart_cursor_active_flag,a                    ; LD HL,$E70B / LD A,(HL) / OR A; chart cursor on?
        jeq  _60aa                                          ; JR Z,$60AA        ; no
        sb   @chart_cursor_active_flag,@chart_cursor_active_flag; LD (HL),$00       ; turn it off
-       li   hl,>1b00                                       ; LD HL,$1B00       ; 
+       li   hl,sprite_attr_table                           ; LD HL,$1B00       ; 
        movb @bytes+>05,b                                   ; LD B,$05          ; 
        bl   @hide_sprites                                  ; CALL $3942        ; hide sprites 0-4 (#R$3942)
 _60aa:                                                     ; >60aa
@@ -6524,7 +6524,7 @@ hide_all_sprites:                                          ; >60b1
        sb   a,a                                            ; XOR A             ; 
        movb a,@scanner_queue_ready                         ; LD ($EB02),A      ; no scanner to erase (#R$EB02)
        movb @bytes+>20,b                                   ; LD B,$20          ; 32 sprites
-       li   hl,>1b00                                       ; LD HL,$1B00       ; 
+       li   hl,sprite_attr_table                           ; LD HL,$1B00       ; 
        bl   @hide_sprites                                  ; CALL $3942        ; hide them (#R$3942)
        bl   @clear_screen_draw_frame                       ; CALL $70E8        ; clear the screen and draw its frame (#R$70E8)
        bl   @clear_message_line                            ; CALL $3955        ; clear the message line
@@ -6713,19 +6713,19 @@ enter_flight_mode:                                         ; >63f1
        sb   one,a                                          ; DEC A             ; 
        movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; 
        movb a,@space_view_showing                          ; LD ($E903),A      ; space view showing
-       li   hl,>1b00                                       ; LD HL,$1B00       ; hide all 32 sprites
+       li   hl,sprite_attr_table                           ; LD HL,$1B00       ; hide all 32 sprites
        movb @bytes+>20,b                                   ; LD B,$20          ; 
 ;      limi 0                                              ; DI                ; 
        bl   @hide_sprites                                  ; CALL $3942        ; 
        movb @bytes+>80,a                                   ; LD A,$80          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
-       movb @bytes+>78,a                                   ; LD A,$78          ; 
+       movb @bytes+sprite_pattern_write_hi,a               ; LD A,$78          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $3880 (sprite patterns)
        li   hl,flight_sprite_patterns                      ; LD HL,$6EC7       ; 
        bl   @write_run_length_encoded_byte_stream          ; CALL $39B9        ; upload the missile patterns
        movb @bytes+>c0,a                                   ; LD A,$C0          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
-       movb @bytes+>78,a                                   ; LD A,$78          ; 
+       movb @bytes+sprite_pattern_write_hi,a               ; LD A,$78          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $38C0
        li   hl,compass_dot_pattern                         ; LD HL,$6ED4       ; 
        bl   @write_run_length_encoded_byte_stream          ; CALL $39B9        ; upload the compass dot pattern
@@ -8217,7 +8217,7 @@ draw_missile_indicator:                                    ; >6b6e
 ;      limi 0                                              ; DI                ; 
        movb @bytes+>10,a                                   ; LD A,$10          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; 
-       movb @bytes+>5b,a                                   ; LD A,$5B          ; 
+       movb @bytes+sprite_attr_write_hi,a                  ; LD A,$5B          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address $1B10: sprite 4's attributes
        ; EI                                                ; EI                ;
        li   bc,>b838                                       ; LD BC,$B838       ; y = $B8, x = $38
@@ -8655,7 +8655,7 @@ _6d6e:                                                     ; >6d6e
        jgt  set_up_laser                                   ; JP P,$6D82        ; there is one - set it up
        jeq  set_up_laser                                   ;                   ; 
 !
-       li   hl,>1b00                                       ; LD HL,$1B00       ; none: hide the crosshair sprites
+       li   hl,sprite_attr_table                           ; LD HL,$1B00       ; none: hide the crosshair sprites
        movb @bytes+>04,b                                   ; LD B,$04          ; 
        b    @hide_sprites_jmp                              ; JP $3942          ; 
 set_up_laser:                                              ; >6d82
@@ -8680,12 +8680,12 @@ set_up_laser:                                              ; >6d82
 ;      limi 0                                              ; DI                ; 
        sb   a,a                                            ; LD A,$00          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
-       movb @bytes+>78,a                                   ; LD A,$78          ; 
+       movb @bytes+sprite_pattern_write_hi,a               ; LD A,$78          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; ...high byte, write mode: $3800 (sprite pattern table)
        bl   @write_run_length_encoded_byte_stream          ; CALL $39B9        ; write the RLE-encoded pattern
        sb   a,a                                            ; LD A,$00          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
-       movb @bytes+>5b,a                                   ; LD A,$5B          ; 
+       movb @bytes+sprite_attr_write_hi,a                  ; LD A,$5B          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; ...high byte, write mode: $1B00 (sprite attribute table)
        li   bc,>3870                                       ; LD BC,$3870       ; initial (row, column)
        sb   d,d                                            ; LD D,$00          ; pattern/colour base
@@ -9056,7 +9056,7 @@ screen_frame:                                              ; >7161
 * Used by the routines at #R$540D and #R$7373.
 move_chart_cursor_sprite:                                  ; >73a6
        movb @bytes+>10,@vdpwa                              ; LD A,$10 / OUT ($99),A; VRAM address low byte
-       movb @bytes+>5b,@vdpwa                              ; LD A,$5B / OUT ($99),A; ...high byte, write mode: $1B10 (sprite 4's attributes)
+       movb @bytes+sprite_attr_write_hi,@vdpwa             ; LD A,$5B / OUT ($99),A; ...high byte, write mode: $1B10 (sprite 4's attributes)
        movb @chart_cursor_x+1,@vdpwd                       ; LD HL,($E709) / LD A,H / OUT ($98),A; sprite 4's Y
        movb @chart_cursor_x,@vdpwd                         ; LD A,L / OUT ($98),A; sprite 4's X
        rt                                                  ; RET               ; 
@@ -9894,7 +9894,7 @@ compass:                                                   ; >85fb
 compass_set_dot:                                           ; >8644
        movb @bytes+>18,d                                   ; LD D,$18          ; pattern $18
        movb @bytes+>20,@vdpwa                              ; LD A,$20 / OUT ($99),A; 
-       movb @bytes+>5b,@vdpwa                              ; LD A,$5B / OUT ($99),A; VRAM address $1B20: sprite 8's attributes
+       movb @bytes+sprite_attr_write_hi,@vdpwa             ; LD A,$5B / OUT ($99),A; VRAM address $1B20: sprite 8's attributes
        bl   @set_sprite                                    ; CALL $39A4        ; write Y, X, pattern and colour
 _85fb_end:                                                 
        .endproc                                            ; RET               ; 

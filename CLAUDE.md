@@ -148,4 +148,8 @@ words. A single-byte access to
 `src/elite.a99` is the top-level file: macros + equates, then `program.a99`: the data banks' labels, `aorg >2000` (low 8K RAM: `lower-memory.a99` —
 entry point, `ti-routines.a99` TI-specific hardware routines prefixed `ti_`, `ti-tables.a99`, buffers) and
 `aorg >a000` (high 24K RAM: `upper-memory.a99` → `main-code.a99`) and the code bank (`rom-bank-7.a99`). VDP table addresses are in `equates.a99`
-(screen 2 layout matching the MSX).
+(screen 2, as on the MSX but for three tables: the disk DSR keeps its buffers at the top of the VDP RAM, from >37D8, so
+the name table (>3800) and the sprite attribute table (>3B00), which are easy to set up again, are there, and the sprite
+patterns are at >1800. Use `sprite_attr_table`, `@bytes+sprite_attr_write_hi` and `@bytes+sprite_pattern_write_hi` where
+the MSX code has $1B00, $5B and $78; the MSX addresses in the comments are the MSX's. Sprite patterns 0-31 are used, and
+the font for the view messages is at >1B80->1E7F, so >1900->1B7F and >1E80->1FFF are free).

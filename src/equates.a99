@@ -111,16 +111,26 @@ r      requ 0
 **
 * VDP memory map
 *
+* As on the MSX (screen 2), but for the name table and the sprite tables: the
+* disk controller's DSR keeps its buffers at the top of the VDP RAM (from
+* >37D8), so the two tables that are easy to set up again (the name table
+* and the sprite attribute table) are there, and the sprite patterns are
+* where the MSX has those two. The MSX addresses in the comments of the
+* converted code ($1800, $1B00 and $3800) are the MSX's.
 pattern_table:                         ; Pattern table
        equ  >0000
-sprite_pattern_table:                  ; Sprite pattern table
-       equ  >3800
+sprite_pattern_table:                  ; Sprite pattern table (MSX: $3800). Patterns 0-31 are used;
+       equ  >1800                      ; the font for the view messages is at >1B80->1E7F (#R$3A03)
 color_table:                           ; Color table
        equ  >2000
-name_table:                            ; Name table 1
-       equ  >1800
-sprite_attr_table:                     ; Sprite attribute table
-       equ  >1b00
+name_table:                            ; Name table (MSX: $1800)
+       equ  >3800
+sprite_attr_table:                     ; Sprite attribute table (MSX: $1B00)
+       equ  >3b00
+sprite_pattern_write_hi:               ; The high bytes of their addresses for writing (MSX: $78 and $5B)
+       equ  sprite_pattern_table/256+>40
+sprite_attr_write_hi:
+       equ  sprite_attr_table/256+>40
 
 **
 * ROM bank selection

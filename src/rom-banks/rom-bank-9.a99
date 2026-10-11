@@ -203,11 +203,11 @@ _4d76:                                                     ; >4d76
 set_up_chart_cursor:                                       ; >4d8a
        .proc                                               ;                   ; 
        movb @bytes+>80,@vdpwa                              ; LD A,$80 / OUT ($99),A; VRAM address low byte
-       movb @bytes+>78,@vdpwa                              ; LD A,$78 / OUT ($99),A; ...high byte, write mode: $3880
+       movb @bytes+sprite_pattern_write_hi,@vdpwa          ; LD A,$78 / OUT ($99),A; ...high byte, write mode: $3880
        li   hl,chart_cursor_pattern                        ; LD HL,$5647       ; the cursor's pattern
        bl   @write_run_length_encoded_byte_stream          ; CALL $39B9        ; upload it
        movb @bytes+>10,@vdpwa                              ; LD A,$10 / OUT ($99),A; VRAM address low byte
-       movb @bytes+>5b,@vdpwa                              ; LD A,$5B / OUT ($99),A; ...high byte, write mode: $1B10
+       movb @bytes+sprite_attr_write_hi,@vdpwa             ; LD A,$5B / OUT ($99),A; ...high byte, write mode: $1B10
        li   hl,chart_cursor_attributes                     ; LD HL,$5658       ; sprite 4's attributes
        movb @bytes+>04,b                                   ; LD B,$04          ; 
        bl   @copy_to_vram                                  ; CALL $3830        ; set them
@@ -291,7 +291,7 @@ _4dee:                                                     ; >4dee
        sb   one,b                                          ; DJNZ $4DEE        ; next point
        jne  _4dee                                          ;                   ; 
        movb @zero,@vdpwa                                   ; LD A,$00 / OUT ($99),A; 
-       movb @bytes+>78,@vdpwa                              ; LD A,$78 / OUT ($99),A; VRAM address $3800: sprite patterns 0-3
+       movb @bytes+sprite_pattern_write_hi,@vdpwa          ; LD A,$78 / OUT ($99),A; VRAM address $3800: sprite patterns 0-3
        li   r2,vdpwd                                       ; LD HL,$D600 / LD DE,$0004; 
        li   ix,fuel_range_quarters                         ; LD C,$02 / LD B,$02; (TI: the 4 quarters through a table of their offsets)
 _4e29:                                                     ; >4e29
@@ -330,7 +330,7 @@ fuel_range_quarters:
 place_fuel_range_sprites:                                  ; >4e4d
        .proc                                               ;                   ; 
        movb @zero,@vdpwa                                   ; LD A,$00 / OUT ($99),A; 
-       movb @bytes+>5b,@vdpwa                              ; LD A,$5B / OUT ($99),A; VRAM address $1B00: sprite 0's attributes
+       movb @bytes+sprite_attr_write_hi,@vdpwa             ; LD A,$5B / OUT ($99),A; VRAM address $1B00: sprite 0's attributes
        sb   d,d                                            ; LD D,$00          ; pattern 0
        bl   @fuel_range_sprite_left                        ; CALL $4E86        ; C = the left column's x (#R$4E86)
        movb @bytes+>f0,b                                   ; LD B,$F0          ; 

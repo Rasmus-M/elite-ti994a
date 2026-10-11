@@ -3506,290 +3506,116 @@ clip_and_draw_line_4:
        jmp  clip_and_draw_line_6                           ;                   ;
 clip_and_draw_line_5:
        .endproc                                            ;                   ; nothing to draw
+* TI: a line that crosses an edge of the view is clipped against each of the
+* four edges in turn (clip_line_low, clip_line_high), with the point where it
+* crosses the edge worked out directly (MPY and DIV) where the MSX bisects
+* the line up to 16 times (#R$3B26-#R$3C27, which are not here). If both
+* points end up beyond the same edge, the line isn't drawn.
 clip_and_draw_line_6:
-       mov  @clip_point1_x,de                              ; LD DE,($EB92)     ; DE = point 1's X (biased/unbiased mix - see #R$3A72)
-       ai   de,>8000                                       ; LD A,D / ADD A,$80; bias the high byte by $80 into the unsigned comparison range
-       mov  de,@clip_point1_x                              ; LD D,A / LD ($EB93),A; and store it back - the high byte is biased in memory too
-       mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's Y
-       ai   hl,>8000                                       ; LD A,H / ADD A,$80; bias the high byte by $80 into the unsigned comparison range
-       mov  hl,@clip_point1_y                              ; LD H,A / LD ($EB95),A; and store it back - the high byte is biased in memory too
-       bl   @outcode                                       ; CALL $3A72        ; C = point 1's outcode (#R$3A72)
-       movb @c,a                                           ; LD A,C            ; A = that outcode
-       .ex_af_af_                                          ; EX AF,AF'         ; stash it in AF' - point 2's outcode calc below reuses A and C
-       mov  @clip_point2_x,de                              ; LD DE,($EB96)     ; DE = point 2's X
-       ai   de,>8000                                       ; LD A,D / ADD A,$80; bias the high byte by $80 into the unsigned comparison range
-       mov  de,@clip_point2_x                              ; LD D,A / LD ($EB97),A; and store it back - the high byte is biased in memory too
-       mov  @clip_point2_y,hl                              ; LD HL,($EB98)     ; HL = point 2's Y
-       ai   hl,>8000                                       ; LD A,H / ADD A,$80; bias the high byte by $80 into the unsigned comparison range
-       mov  hl,@clip_point2_y                              ; LD H,A / LD ($EB99),A; and store it back - the high byte is biased in memory too
-       bl   @outcode                                       ; CALL $3A72        ; C = point 2's outcode (#R$3A72)
-       .ex_af_af_                                          ; EX AF,AF'         ; restore point 1's outcode into A
-       movb a,b                                            ; LD B,A            ; B = point 1's outcode
-       socb @c,a                                           ; OR C              ; A = point1 OR point2 (either point's failing-boundary bits)
-       andi a,>0f00                                        ; AND $0F           ; keep only the true outcode bits (0-3)
-       jne  !                                              ; JP Z,$3C29        ; both points pass every boundary - trivially accept: go convert and draw (#R$3C29)
-       b    @clip_endpoints_to_screen_space                ;                   
-!
-       movb b,a                                            ; LD A,B            ; A = point 1's outcode again
-       movb @c,r0                                          ; AND C             ; A = point1 AND point2 (boundaries both points fail together)
-       inv  r0                                             ;                   ; 
-       szcb r0,a                                           ;                   ; 
-       andi a,>0f00                                        ; AND $0F           ; keep only the true outcode bits (0-3)
-       jeq  !                                              ; RET NZ            ; if nonzero, both points are outside on the same side - trivially reject, nothing to draw
-       .endproc                                            ;                   
-!
-       movb @c,a                                           ; LD A,C            ; A = point 2's outcode
-       andi a,>0f00                                        ; AND $0F           ; keep only the true outcode bits (0-3)
-       jne  clip_case_point2_only_outside                  ; JR NZ,$3B26       ; point 2 fails some boundary - go clip it
-       movb @c,a                                           ; LD A,C            ; point 2 is inside, so point 1 is outside; A = point 2's outcode
-       mov  de,@clip_reference_x                           ; LD ($E827),DE     ; cache point 2's (inside) coordinates to $E827/$E829 as the known-good reference
-       mov  hl,@clip_reference_y                           ; LD ($E829),HL     ; and its Y to $E829
-       .exx                                                ; EXX               ; switch to the shadow registers
-       mov  @clip_point1_x,hl                              ; LD HL,($EB92)     ; HL = point 1's (biased) X
-       mov  hl,@clip_point2_x                              ; LD ($EB96),HL     ; copy it into point 2's slot ($EB96)
-       mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's (biased) Y
-       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; copy it into point 2's slot ($EB98)
-       .exx                                                ; EXX               ; back to the main registers
-       mov  de,@clip_point1_x                              ; LD ($EB92),DE     ; overwrite point 1's slot ($EB92) with point 2's X - the outside point now lives in slot 1
-       mov  hl,@clip_point1_y                              ; LD ($EB94),HL     ; and point 1's Y slot ($EB94) with point 2's Y
-       b    @finish_clip_and_draw                          ; JP $3BDA          ; hand off to the boundary-clipping code
-clip_case_point2_only_outside:                             ; >3b26
-       movb b,a                                            ; LD A,B            ; A = point 1's masked outcode
-       andi a,>0f00                                        ; AND $0F           ; keep only the true outcode bits
-       jne  bisect_clip_both_points_outside                ; JR NZ,$3B3B       ; point 1 also fails a boundary - bisect both sides
-       movb b,a                                            ; LD A,B            ; (redundant reload)
-       mov  @clip_point1_x,hl                              ; LD HL,($EB92)     ; HL = point 1's (inside) X
-       mov  hl,@clip_reference_x                           ; LD ($E827),HL     ; cache it as the reference X
-       mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's (inside) Y
-       mov  hl,@clip_reference_y                           ; LD ($E829),HL     ; cache it as the reference Y
-       b    @finish_clip_and_draw                          ; JP $3BDA          ; go clip point 2 (still at ($EB96)/($EB98)) towards the reference
-bisect_clip_both_points_outside:                           ; >3b3b
-       movb a,b                                            ; LD B,A            ; B = point 1's masked outcode
-       movb @c,a                                           ; LD A,C            ; A = point 2's raw outcode
-       andi a,>0f00                                        ; AND $0F           ; keep only the true outcode bits
-       movb a,@c                                           ; LD C,A            ; C = point 2's masked outcode
-       .push de                                            ; PUSH DE           ; save point 2's original X (still live in DE, see I: above)
-       .push hl                                            ; PUSH HL           ; save point 2's original Y (still live in HL)
-       mov  @clip_point1_x,hl                              ; LD HL,($EB92)     ; HL = point 1's original X
-       .push hl                                            ; PUSH HL           ; save it too
-       mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's original Y
-       .push hl                                            ; PUSH HL           ; save it too
-       .push bc                                            ; PUSH BC           ; stash the two masked outcodes...
-       .exx                                                ; EXX               ; ...to move them into the shadow set
-       .pop bc                                             ; POP BC            ; shadow BC = (point 1 outcode, point 2 outcode), untouched for the rest of the loop
-       .exx                                                ; EXX               ; back to the main set
-       movb @bytes+>10,a                                   ; LD A,$10          ; 16 iterations
-       movb a,@clip_bisection_count                        ; LD ($E826),A      ; the bisection counter
-clip_bisect:                                               ; >3b53
-       mov  @clip_point1_x,hl                              ; LD HL,($EB92)     ; HL = point 1's (current) X
-       mov  @clip_point2_x,de                              ; LD DE,($EB96)     ; DE = point 2's (current) X
-       a    de,hl                                          ; ADD HL,DE         ; HL = X1+X2
-       jnc  !                                              ; RR H              ; halve the sum... (the ADD's carry is bit 16 of the sum)
-       srl  hl,1                                           ; RR L              ; 
-       ori  hl,>8000                                       ;                   ; (ORI leaves the carry from the SRL alone)
-       jmp  !!                                             ;                   ; 
-!
-       srl  hl,1                                           ;                   ; 
-!
-       jnc  _3b62                                          ; JR NC,$3B62       ; no rounding needed
-       inc  hl                                             ; INC HL            ; round the midpoint X up
-_3b62:                                                     ; >3b62
-       .ex_de_hl                                           ; EX DE,HL          ; DE = midpoint X
-       mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's (current) Y
-       mov  @clip_point2_y,bc                              ; LD BC,($EB98)     ; BC = point 2's (current) Y
-       a    bc,hl                                          ; ADD HL,BC         ; HL = Y1+Y2
-       jnc  !                                              ; RR H              ; halve... (the ADD's carry is bit 16 of the sum)
-       srl  hl,1                                           ; RR L              ; 
-       ori  hl,>8000                                       ;                   ; (ORI leaves the carry from the SRL alone)
-       jmp  !!                                             ;                   ; 
-!
-       srl  hl,1                                           ;                   ; 
-!
-       jnc  _3b72                                          ; JR NC,$3B72       ; 
-       inc  hl                                             ; INC HL            ; round the midpoint Y up
-_3b72:                                                     ; >3b72
-       bl   @outcode                                       ; CALL $3A72        ; C = the midpoint's outcode
-       movb @c,a                                           ; LD A,C            ; 
-       andi a,>0f00                                        ; AND $0F           ; keep only the true outcode bits
-       jne  bisect_test_which_endpoint_to_replace          ; JR NZ,$3BA9       ; midpoint still outside - pick which endpoint to replace
-       movb @c,a                                           ; LD A,C            ; midpoint is inside
-       mov  de,@clip_reference_x                           ; LD ($E827),DE     ; cache it as the new reference X
-       mov  hl,@clip_reference_y                           ; LD ($E829),HL     ; and reference Y
-       .exx                                                ; EXX               ; (unused since $3B4D - just scratch here)
-       .pop hl                                             ; POP HL            ; HL = point 1's ORIGINAL Y (saved at $3B49)
-       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; park it in point 2's Y slot (see prose above)
-       .pop hl                                             ; POP HL            ; HL = point 1's ORIGINAL X (saved at $3B45)
-       mov  hl,@clip_point2_x                              ; LD ($EB96),HL     ; park it in point 2's X slot
-       .push af                                            ; PUSH AF           ; save flags across the call below
-       bl   @move_point_to_edge                            ; CALL $3BE0        ; bisect the parked point (point 1's original) towards the reference
-       .pop af                                             ; POP AF            ; 
-       mov  de,@clip_point1_x                              ; LD ($EB92),DE     ; point 1's slot becomes the refined boundary crossing
-       mov  hl,@clip_point1_y                              ; LD ($EB94),HL     ; 
-       .exx                                                ; EXX               ; back to the main set
-       mov  de,@clip_reference_x                           ; LD ($E827),DE     ; re-cache the refined point as the reference too
-       mov  hl,@clip_reference_y                           ; LD ($E829),HL     ;
-       .pop hl                                             ; POP HL            ; HL = point 2's ORIGINAL Y (saved at $3B41)
-       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; restore point 2's Y slot to its true original value
-       .pop hl                                             ; POP HL            ; HL = point 2's ORIGINAL X (saved at $3B40)
-       mov  hl,@clip_point2_x                              ; LD ($EB96),HL     ; restore point 2's X slot likewise
-       jmp  finish_clip_and_draw                           ; JR $3BDA          ; finish clipping point 2's original position towards the refined reference
-bisect_test_which_endpoint_to_replace:                     ; >3ba9
-       .exx                                                ; EXX               ; switch to the shadow set (holds the two original outcodes)
-       movb a,@e                                           ; LD E,A            ; E' = the midpoint's masked outcode
-       movb @c,r0                                          ; AND C             ; A = midpoint AND point 2's outcode
-       inv  r0                                             ;                   ; 
-       szcb r0,a                                           ;                   ; 
-       jeq  bisect_replace_point1_with_midpoint            ; JR Z,$3BB8        ; no shared bits - test against point 1 instead
-       movb @e,a                                           ; LD A,E            ; A = the midpoint's masked outcode again
-       movb b,r0                                           ; AND B             ; A = midpoint AND point 1's outcode
-       inv  r0                                             ;                   ; 
-       szcb r0,a                                           ;                   ; 
-       jeq  bisect_replace_point2_with_midpoint            ; JR Z,$3BC7        ; no shared bits either - default to replacing point 2
-clip_abandon:                                              ; >3bb2
-       ai   sp,-8                                          ; LD HL,$0008 / ADD HL,SP / LD SP,HL; discard this call's 4 saved words, abandoning the clip (TI: the stack grows up)
-       .endproc                                            ; RET               ; give up without drawing
-bisect_replace_point1_with_midpoint:                       ; >3bb8
-       movb @e,a                                           ; LD A,E            ; A = the midpoint's masked outcode
-       movb b,r0                                           ; AND B             ; A = midpoint AND point 1's outcode
-       inv  r0                                             ;                   ; 
-       szcb r0,a                                           ;                   ; 
-       jeq  bisect_replace_point2_with_midpoint            ; JR Z,$3BC7        ; no shared bits - default to replacing point 2 instead
-       movb @e,b                                           ; LD B,E            ; shadow B = the midpoint's outcode, replacing point 1's for future comparisons
-       .exx                                                ; EXX               ; back to the main set
-       mov  de,@clip_point1_x                              ; LD ($EB92),DE     ; point 1's slot becomes the midpoint X
-       mov  hl,@clip_point1_y                              ; LD ($EB94),HL     ; and midpoint Y
-       jmp  _3bd0                                          ; JR $3BD0          ; join the shared loop tail
-bisect_replace_point2_with_midpoint:                       ; >3bc7
-       movb @e,@c                                          ; LD C,E            ; shadow C = the midpoint's outcode, replacing point 2's for future comparisons
-       .exx                                                ; EXX               ; back to the main set
-       mov  de,@clip_point2_x                              ; LD ($EB96),DE     ; point 2's slot becomes the midpoint X
-       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; and midpoint Y
-_3bd0:                                                     ; >3bd0
-       li   hl,clip_bisection_count                        ; LD HL,$E826       ; -> the iteration counter
-       sb   one,*hl                                        ; DEC (HL)          ; one fewer iteration left
-       jeq  !                                              ; JP NZ,$3B53       ; more to go - bisect again
-       b    @clip_bisect                                   ;                   
-!
-       b    @clip_abandon                                  ; JP $3BB2          ; exhausted - abandon the clip
-finish_clip_and_draw:                                      ; >3bda
-       bl   @move_point_to_edge                            ; CALL $3BE0        ; resolve point 2's slot down to the clip boundary
-       b    @clip_endpoints_to_screen_space                ; JP $3C29          ; convert to screen space and draw
+       li   r1,clip_point1_x                               ;                   ; the left edge: x >= -116
+       li   r2,clip_point1_y                               ;                   ;
+       li   bc,-116                                        ;                   ;
+       bl   @clip_line_low                                 ;                   ;
+       li   r1,clip_point1_x                               ;                   ; the right edge: x <= 117
+       li   r2,clip_point1_y                               ;                   ;
+       li   bc,117                                         ;                   ;
+       bl   @clip_line_high                                ;                   ;
+       li   r1,clip_point1_y                               ;                   ; the bottom edge: y >= -63
+       li   r2,clip_point1_x                               ;                   ;
+       li   bc,-63                                         ;                   ;
+       bl   @clip_line_low                                 ;                   ;
+       li   r1,clip_point1_y                               ;                   ; the top edge: y <= 64
+       li   r2,clip_point1_x                               ;                   ;
+       li   bc,64                                          ;                   ;
+       bl   @clip_line_high                                ;                   ;
+       mov  @clip_point1_x,r1                              ;                   ; both points are inside now: draw the line
+       mov  @clip_point1_y,a                               ;                   ;
+       mov  @clip_point2_x,r2                              ;                   ;
+       mov  @clip_point2_y,bc                              ;                   ;
+       b    @draw_line_inside                              ;                   ;
 
 ********************************************************************************
-* Move an outside point to the clip window's edge
-* 
-* Used by the routine at #R$3AC2.
-* .
-* If the outcode in A has any of bits 4-7 set (#R$3A72: a point exactly on
-* an edge), just returns the reference point inside the window
-* ($E827/$E829). Otherwise (at $3BEC) bisects between the reference point
-* and the outside point at $EB96/$EB98 until the midpoint lies exactly on
-* an edge, and returns that. A midpoint inside the window becomes the new
-* reference point, and one outside it (at $3C20) the new outside point.
-* There's no limit on the number of steps.
-* 
-* I:A An outcode
-* O:DE x + $8000
-* O:HL y + $8000
-move_point_to_edge:                                        ; >3be0
-       .proc
-       andi a,>f000                                        ; AND $F0           ; keep only the "exactly on boundary" bits
-       jeq  bisect_clip_single_outside_endpoint            ; JR Z,$3BEC        ; none set - go bisect
-       mov  @clip_reference_x,de                           ; LD DE,($E827)     ; already on a boundary - DE = the reference X
-       mov  @clip_reference_y,hl                           ; LD HL,($E829)     ; and reference Y
-       jmp  move_point_to_edge_exit                        ; RET               ; 
-bisect_clip_single_outside_endpoint:                       ; >3bec
-       mov  @clip_point2_x,hl                              ; LD HL,($EB96)     ; HL = the outside point's current X
-       mov  @clip_reference_x,de                           ; LD DE,($E827)     ; DE = the reference X
-       a    de,hl                                          ; ADD HL,DE         ; HL = sum
-       jnc  !                                              ; RR H              ; halve... (the ADD's carry is bit 16 of the sum)
-       srl  hl,1                                           ; RR L              ; 
-       ori  hl,>8000                                       ;                   ; (ORI leaves the carry from the SRL alone)
-       jmp  !!                                             ;                   ; 
-!
-       srl  hl,1                                           ;                   ; 
-!
-       jnc  _3bfb                                          ; JR NC,$3BFB       ; 
-       inc  hl                                             ; INC HL            ; round the midpoint X up
-_3bfb:                                                     ; >3bfb
-       .ex_de_hl                                           ; EX DE,HL          ; DE = midpoint X
-       mov  @clip_reference_y,hl                           ; LD HL,($E829)     ; HL = the reference Y
-       mov  @clip_point2_y,bc                              ; LD BC,($EB98)     ; BC = the outside point's current Y
-       a    bc,hl                                          ; ADD HL,BC         ; HL = sum
-       jnc  !                                              ; RR H              ; halve... (the ADD's carry is bit 16 of the sum)
-       srl  hl,1                                           ; RR L              ; 
-       ori  hl,>8000                                       ;                   ; (ORI leaves the carry from the SRL alone)
-       jmp  !!                                             ;                   ; 
-!
-       srl  hl,1                                           ;                   ; 
-!
-       jnc  _3c0b                                          ; JR NC,$3C0B       ; 
-       inc  hl                                             ; INC HL            ; round the midpoint Y up
-_3c0b:                                                     ; >3c0b
-       bl   @outcode                                       ; CALL $3A72        ; C = the midpoint's outcode
-       movb @c,a                                           ; LD A,C            ; 
-       andi a,>0f00                                        ; AND $0F           ; keep only the true outcode bits
-       jne  bisect_move_outside_endpoint_to_midpoint       ; JR NZ,$3C20       ; still outside - move the outside point to the midpoint and loop
-       movb @c,a                                           ; LD A,C            ; midpoint passes both true-outcode tests
-       andi a,>f000                                        ; AND $F0           ; test the "exactly on boundary" bits
-       jeq  !                                              ; RET NZ            ; on a boundary - done, DE/HL hold the midpoint
-move_point_to_edge_exit:
-       .endproc                                            ;                   
-!
-       mov  de,@clip_reference_x                           ; LD ($E827),DE     ; fully inside - it becomes the new reference X
-       mov  hl,@clip_reference_y                           ; LD ($E829),HL     ; and reference Y
-       jmp  _3c27                                          ; JR $3C27          ; loop again from the (now closer) reference
-bisect_move_outside_endpoint_to_midpoint:                  ; >3c20
-       mov  de,@clip_point2_x                              ; LD ($EB96),DE     ; the outside point's X becomes the midpoint X
-       mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; and midpoint Y
-_3c27:                                                     ; >3c27
-       jmp  bisect_clip_single_outside_endpoint            ; JR $3BEC          ; bisect again
-
-********************************************************************************
-* Convert clipped line endpoints to screen space, then set up the draw
-* [line-draw]
-* 
-* Used by the routine at #R$3AC2.
-* .
-* The entry point for actually drawing a clipped line segment: reached
-* directly from #R$3AC2 when both endpoints were trivially inside the
-* clip rectangle, or via #R$3BDA once the boundary-clipping code (the
-* #R$3B26/#R$3B3B/#R$3BEC cluster) has replaced
-* a clipped-out endpoint with the computed intersection point.
-* .
-* Converts each endpoint's raw coordinate to screen space via the same
-* $0300+$57 lookup table for the "column" axis (E and C) and a $40-value
-* flip for the "row" axis (D and B, mirroring around row $40) - then
-* falls into #R$3C48 to set up the Bresenham walk.
-* 
-* I:E The first endpoint's raw column value (via $EB96)
-* I:L The first endpoint's raw row value (via $EB98)
-* I:($EB92) The second endpoint's column-axis raw value
-* I:($EB94) The second endpoint's row-axis raw value
-clip_endpoints_to_screen_space:                            ; >3c29
-       movb @l,d                                           ; LD D,L            ; D = the first endpoint's raw row value (was in L)
-       movb @e,@l                                          ; LD L,E            ; L = the first endpoint's raw column value (was in E)
-       movb @l,r1                                          ; LD H,$03          ; R1 = the column, for the column-lookup table
-       srl  r1,8                                           ;                   ; 
-       movb @scale_3_4_table(r1),a                         ; LD A,(HL)         ; A = table[column]
-       ab   @bytes+>57,a                                   ; ADD A,$57         ; 
-       movb a,@e                                           ; LD E,A            ; E = screen-space column, first endpoint
-       movb @bytes+>40,a                                   ; LD A,$40          ; 
-       sb   d,a                                            ; SUB D             ; A = $40 - raw row (mirror around row $40)
-       movb a,d                                            ; LD D,A            ; D = screen-space row, first endpoint
-       movb @clip_point1_x+1,a                             ; LD A,($EB92)      ; A = the second endpoint's raw column value
-       movb a,@l                                           ; LD L,A            ; 
-       movb a,r1                                           ; LD A,(HL)         ; 
-       srl  r1,8                                           ;                   ; 
-       movb @scale_3_4_table(r1),a                         ;                   ; A = table[column]
-       ab   @bytes+>57,a                                   ; ADD A,$57         ; 
-       movb a,@c                                           ; LD C,A            ; C = screen-space column, second endpoint
-       movb @clip_point1_y+1,a                             ; LD A,($EB94)      ; A = the second endpoint's raw row value
-       sb   @bytes+>40,a                                   ; SUB $40           ; 
-       andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
-       neg a                                               ; NEG               ; A = $40 - raw row (same mirror, computed the other way round)
-       movb a,b                                            ; LD B,A            ; B = screen-space row, second endpoint
-       b    @setup_bresenham_line                          ; JP $3C48          ; hand off (D,E)/(B,C) to the Bresenham setup
+* TI: Clip a line against an edge of the view
+*
+* Used by #R$3AC2. The two points are four words in a row: x1, y1, x2, y2
+* (#R$EB92). If both points are beyond the edge, leaves #R$3AC2 without
+* drawing the line. If one is, moves it to where the line crosses the edge:
+* its coordinate across the edge becomes the bound, and the other one moves
+* by abs(the other point's - its own) * num / den, where num is how far it
+* is beyond the edge and den how far it is from the other point across the
+* edge (unsigned words; the quotient is at most the difference).
+*
+* I:BC The bound
+* I:R1 Pointer to point 1's coordinate across the edge (x1 or y1)
+* I:R2 Pointer to its other coordinate (y1 or x1)
+* Changes R0-R2, A, DE and HL.
+clip_line_low:                                             ; A point is beyond the edge if its coordinate is less than the bound
+       c    *r1,bc                                         ;                   ;
+       jlt  clip_line_low_1                                ;                   ; point 1 is beyond it
+       c    @4(r1),bc                                      ;                   ;
+       jlt  clip_line_low_2                                ;                   ; only point 2 is
+       rt                                                  ;                   ; neither
+clip_line_low_1:
+       c    @4(r1),bc                                      ;                   ;
+       jlt  clip_line_reject                               ;                   ; both are
+       mov  @4(r1),a                                       ;                   ;
+       s    *r1,a                                          ;                   ; A = den
+       mov  r2,hl                                          ;                   ;
+       ai   hl,4                                           ;                   ; HL -> the other point's other coordinate
+       jmp  clip_line_low_3                                ;                   ;
+clip_line_low_2:
+       ai   r1,4                                           ;                   ; R1, R2 -> point 2's coordinates, HL -> point 1's other one
+       mov  r2,hl                                          ;                   ;
+       ai   r2,4                                           ;                   ;
+       mov  @-4(r1),a                                      ;                   ;
+       s    *r1,a                                          ;                   ; A = den
+clip_line_low_3:
+       mov  bc,r0                                          ;                   ;
+       s    *r1,r0                                         ;                   ; R0 = num
+       jmp  clip_line_move                                 ;                   ;
+clip_line_high:                                            ; A point is beyond the edge if its coordinate is greater than the bound
+       c    *r1,bc                                         ;                   ;
+       jgt  clip_line_high_1                               ;                   ; point 1 is beyond it
+       c    @4(r1),bc                                      ;                   ;
+       jgt  clip_line_high_2                               ;                   ; only point 2 is
+       rt                                                  ;                   ; neither
+clip_line_high_1:
+       c    @4(r1),bc                                      ;                   ;
+       jgt  clip_line_reject                               ;                   ; both are
+       mov  *r1,a                                          ;                   ;
+       s    @4(r1),a                                       ;                   ; A = den
+       mov  r2,hl                                          ;                   ;
+       ai   hl,4                                           ;                   ; HL -> the other point's other coordinate
+       jmp  clip_line_high_3                               ;                   ;
+clip_line_high_2:
+       ai   r1,4                                           ;                   ; R1, R2 -> point 2's coordinates, HL -> point 1's other one
+       mov  r2,hl                                          ;                   ;
+       ai   r2,4                                           ;                   ;
+       mov  *r1,a                                          ;                   ;
+       s    @-4(r1),a                                      ;                   ; A = den
+clip_line_high_3:
+       mov  *r1,r0                                         ;                   ;
+       s    bc,r0                                          ;                   ; R0 = num
+clip_line_move:
+       mov  *hl,de                                         ;                   ; DE = the other point's other coordinate
+       c    de,*r2                                         ;                   ;
+       jlt  clip_line_move_1                               ;                   ;
+       s    *r2,de                                         ;                   ; it is the greater: DE = the difference
+       mpy  r0,de                                          ;                   ; DE:HL = the difference * num
+       div  a,de                                           ;                   ; DE = that / den
+       a    de,*r2                                         ;                   ; move the point towards it
+       jmp  clip_line_move_2                               ;                   ;
+clip_line_move_1:
+       mov  *r2,de                                         ;                   ; it is the lesser
+       s    *hl,de                                         ;                   ;
+       mpy  r0,de                                          ;                   ;
+       div  a,de                                           ;                   ;
+       s    de,*r2                                         ;                   ;
+clip_line_move_2:
+       mov  bc,*r1                                         ;                   ; and onto the edge
+       rt                                                  ;                   ;
+clip_line_reject:
+       .endproc                                            ;                   ; nothing to draw: return from #R$3AC2
 
 ********************************************************************************
 * Draw a line

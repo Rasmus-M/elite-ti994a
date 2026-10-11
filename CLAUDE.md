@@ -163,10 +163,14 @@ words. A single-byte access to
   Projecting (`project_point`, `project_coordinate`) is native too: 128 * v / depth with `DIV`, exact where the MSX
   subtracts logarithms, with the depth itself in `projection_depth` (set by `project_point` and `ship_screen_size`)
   rather than its logarithm; `log_depth` is now only `ship_screen_size`'s own, for the planet's and the sun's radius.
+- **Lines** (`clip_and_draw_line`) are native on the TI: a line with both points inside the view is drawn by
+  `draw_line_inside`; one with both points beyond the same edge is skipped; and any other is clipped against each edge
+  in turn (`clip_line_low`, `clip_line_high`: the crossing point with `MPY` and `DIV`) where the MSX bisects it. The MSX's
+  bisection code ($3B26-$3C47) is not in `src`. `setup_bresenham_line` and `view_mark_line` remain for #R$2DC8.
 - **The program image** (low and high RAM) is packed into the 32K of cartridge banks 0-3 with a loader: `ea5tocart`
   prints "Cartridge full" (and leaves a broken cartridge) if it doesn't fit, so check `make.bat`'s output for that. The
   space view buffer is last in low RAM and defined with `equ`, so it isn't in the image: nothing may be assembled after
-  it. High RAM has about 730 bytes free; low RAM has about 440 bytes free.
+  it. High RAM has about 1220 bytes free; low RAM has about 440 bytes free.
 - **Disk operations** (the routines in ROM bank 14, `rom-bank-14.a99`; their entry point `disk_entry`, which selects the bank, and their data in `ti-disk.a99`, low RAM): the commander menu (bank 7) loads and saves commanders on disk where the
   MSX uses tape: the file `DSK1.<name>`, a program file of 139 bytes (the record at #R$D606: the name and the commander
   file). Set `disk_opcode`, `disk_name` and `disk_name_length`, `blwp @disk_vector`, and check `disk_error`. The disk DSR

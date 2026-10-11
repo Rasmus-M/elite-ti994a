@@ -273,6 +273,88 @@ view_mark_all_1:
        rt
 *// view_mark_all
 
+*********************************************************************
+*
+* Fill a row of a disc (#R$3F68, #R$3F9F, #R$3FC7)
+*
+* For the filled disc that the sun and far away objects are drawn as
+* (#R$3DF4): sets the pixels of a row of the space view's buffer from the
+* left column (#R$EB92) to the right column (#R$EB96), and marks them as
+* drawn in (see view_mark_line in main-code.a99). Does nothing if the row
+* is outside the view. Written for the TI: the MSX jumps into 32 unrolled
+* instructions to fill the whole bytes.
+*
+* I:HL The row, as the disc's y: >8000 is the middle of the view (row 64),
+* .    >8040 its top and >7FC1 its bottom
+* Changes R0-R2, A, DE and HL.
+*
+fill_disc_row_span:
+       ci   hl,>7fc1
+       jl   fill_disc_row_span_6       ; below the view
+       ci   hl,>8041
+       jhe  fill_disc_row_span_6       ; above it
+       li   r0,>4000
+       sb   @l,r0
+       srl  r0,8                       ; R0 = the row: >40 - the low byte
+       clr  r1
+       movb @clip_point1_x+1,r1
+       swpb r1                         ; R1 = the left column
+       clr  r2
+       movb @clip_point2_x+1,r2
+       swpb r2                         ; R2 = the right column
+       ci   r2,175                     ; (the last column of the view)
+       jle  fill_disc_row_span_1
+       li   r2,175
+fill_disc_row_span_1:
+       c    r1,r2
+       jh   fill_disc_row_span_6       ; nothing to fill
+       mov  r0,de
+       srl  de,3                       ; DE = the character row: mark what is drawn in
+       mov  r1,a
+       sla  a,5                        ; A (high byte) = the first character
+       cb   a,@view_min(de)
+       jhe  fill_disc_row_span_2
+       movb a,@view_min(de)
+fill_disc_row_span_2:
+       mov  r2,a
+       sla  a,5                        ; and the last
+       cb   a,@view_max(de)
+       jle  fill_disc_row_span_3
+       movb a,@view_max(de)
+fill_disc_row_span_3:
+       sla  r0,5
+       ai   r0,space_view_buffer       ; R0 -> the row in the buffer
+       mov  r1,hl
+       srl  hl,3
+       a    r0,hl                      ; HL -> the byte of the left column
+       mov  r2,de
+       srl  de,3
+       a    r0,de                      ; DE -> the byte of the right column
+       andi r1,7
+       andi r2,7
+       movb @partial_byte_right_mask_table_8(r1),r0 ; R0 = the pixels from the left column to the end of its byte
+       movb @partial_byte_right_mask_table_8(r2),a
+       srl  a,1
+       inv  a                          ; A = the pixels from the start of its byte to the right column
+       c    hl,de
+       jne  fill_disc_row_span_4
+       inv  a                          ; Both in one byte: the pixels that are in both
+       szcb a,r0
+       socb r0,*hl
+       rt
+fill_disc_row_span_4:
+       socb r0,*hl+                    ; The left byte,
+fill_disc_row_span_5:
+       c    hl,de
+       jeq  fill_disc_row_span_7
+       movb @b255,*hl+                 ; the whole bytes between,
+       jmp  fill_disc_row_span_5
+fill_disc_row_span_7:
+       socb a,*hl                      ; and the right byte
+fill_disc_row_span_6:
+       rt
+*// fill_disc_row_span
+
 view_min:                              ; For each character row of the space view: the first character drawn in
        byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 view_max:                              ; and the last (before the first if there are none)

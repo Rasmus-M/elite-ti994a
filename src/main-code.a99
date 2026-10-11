@@ -4175,7 +4175,7 @@ draw_disc_fill_between_steps:                              ; >3e6a
        .proc
        movb @e,a                                           ; LD A,E            ; A = the previous step's scaled sin (dy-ish component)
        sb   @c,a                                           ; SUB C             ; A -= this step's scaled sin
-       movb one,@l                                         ; LD L,$01          ; 
+       ;                                                   ; LD L,$01          ; (TI: the step of 1 is added with ONE, as SRL H below shifts into L)
        movb a,@e                                           ; LD E,A            ; E = the row delta
        movb b,a                                            ; LD A,B            ; A = the previous step's scaled cos
        sb   d,a                                            ; SUB D             ; A -= this step's scaled cos
@@ -4191,7 +4191,7 @@ draw_disc_fill_between_steps:                              ; >3e6a
        movb a,@ixl                                         ; LD IXL,A          ; IXl = loop count
 draw_disc_next_row:                                        ; >3e7e
        movb @c,a                                           ; LD A,C            ; A = the column so far
-       ab   @l,a                                           ; ADD A,L           ; step it by 1 (L=1)
+       ab   one,a                                          ; ADD A,L           ; step it by 1 (L=1)
        movb a,@c                                           ; LD C,A            ; 
        movb h,a                                            ; LD A,H            ; error term
        sb   d,a                                            ; SUB D             ; -= column delta
@@ -4221,7 +4221,7 @@ _3e9a:                                                     ; >3e9a
        ab   d,a                                            ; ADD A,D           ; underflowed - correct the error term
        movb a,h                                            ; LD H,A            ; 
        movb @c,a                                           ; LD A,C            ; column so far
-       ab   @l,a                                           ; ADD A,L           ; step it by 1
+       ab   one,a                                          ; ADD A,L           ; step it by 1
        movb a,@c                                           ; LD C,A            ; 
 _3ea5:                                                     ; >3ea5
        bl   @draw_disc_fill_row                            ; CALL $3EAD        ; fill this row's span at (B,C)
@@ -4333,37 +4333,19 @@ _3f28:                                                     ; >3f28
        ab   @bytes+>57,a                                   ; ADD A,$57         ; 
        movb a,@clip_point2_x+1                             ; LD ($EB96),A      ; cache the right bound's screen column
        movb @disc_row_offset+1,bc                          ; LD BC,($E824)     ; BC = this row's row offset
-       movb @disc_row_offset,@c                            ;                   ;
+       movb @disc_row_offset,@c                            ;                   ; 
        movb @circle_centre_y+1,hl                          ; LD HL,($E821)     ; HL = the cached centre Y
-       movb @circle_centre_y,@l                            ;                   ;
-       a    bc,hl                                          ; ADD HL,BC         ; HL = centre Y + row offset (one edge's row)
-       movb @l,a                                           ; LD A,L            ; test it against the vertical clip window...
-       sb   @bytes+>c1,a                                   ; SUB $C1           ; 
-       movb h,a                                            ; LD A,H            ; 
-       sb   @bytes+>7f,a                                   ; SBC A,$7F         ; 
-       jnc  _3f49                                          ; JR C,$3F49        ; below it - skip this edge's draw
-       movb @l,a                                           ; LD A,L            ; 
-       sb   @bytes+>41,a                                   ; SUB $41           ; 
-       movb h,a                                            ; LD A,H            ; 
-       sb   @bytes+>80,a                                   ; SBC A,$80         ; 
-       ; CALL C,$3F68                                      ; CALL C,$3F68      ; TODO: check code. in range - draw the left/right span at this row
+       movb @circle_centre_y,@l                            ;                   ; 
+       a    bc,hl                                          ; ADD HL,BC         ; HL = centre Y + row offset: the row below the centre...
+       bl   @fill_disc_row_span                            ; CALL C,$3F68      ; fill the span in it, if it is in the view (TI: the routine checks that)
 _3f49:                                                     ; >3f49
        movb @disc_row_offset+1,bc                          ; LD BC,($E824)     ; BC = this row's row offset again
-       movb @disc_row_offset,@c                            ;                   ;
+       movb @disc_row_offset,@c                            ;                   ; 
        movb @circle_centre_y+1,hl                          ; LD HL,($E821)     ; HL = the cached centre Y
-       movb @circle_centre_y,@l                            ;                   ;
-       socb a,a                                            ; OR A              ; 
-       s    bc,hl                                          ; SBC HL,BC         ; HL = centre Y - row offset (the other edge's row)
-       movb @l,a                                           ; LD A,L            ; test it against the same window...
-       sb   @bytes+>c1,a                                   ; SUB $C1           ; 
-       movb h,a                                            ; LD A,H            ; 
-       sb   @bytes+>7f,a                                   ; SBC A,$7F         ; 
-       jnc  _3f64                                          ; JR C,$3F64        ; below it - skip
-       movb @l,a                                           ; LD A,L            ; 
-       sb   @bytes+>41,a                                   ; SUB $41           ; 
-       movb h,a                                            ; LD A,H            ; 
-       sb   @bytes+>80,a                                   ; SBC A,$80         ; 
-       ; CALL C,$3F68                                      ; CALL C,$3F68      ; TODO: check code. in range - draw the span at this row too
+       movb @circle_centre_y,@l                            ;                   ; 
+       s    bc,hl                                          ; OR A / SBC HL,BC  ; HL = centre Y - row offset: ...and the row above it
+       bl   @fill_disc_row_span                            ; CALL C,$3F68      ; fill the span in it too
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, as interrupts are off)
 _3f64:                                                     ; >3f64
        .pop hl                                             ; POP HL            ; restore (row delta, column delta)
        .pop de                                             ; POP DE            ; restore (row, column)

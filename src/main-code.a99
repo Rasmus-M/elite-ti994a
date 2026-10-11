@@ -3328,6 +3328,109 @@ outcodes_y_beyond_far_boundary_case:                       ; >3abf
        rt                                                  ; RET               ; 
 
 ********************************************************************************
+* TI: Draw a line that is all inside the view
+*
+* The fast path of #R$3AC2: does what #R$3C29 (the screen positions of the
+* ends), #R$3C48 (the setup of the line loops) and view_mark_line (marking
+* the characters the line covers) do, with words in registers. The line is
+* drawn from its upper end, or from point 1 if it is horizontal, by the
+* loops in scratchpad (line_loops), which return to #R$3AC2's caller.
+*
+* I:R1,A Point 1's x and y (#R$EB92, #R$EB94)
+* I:R2,BC Point 2's x and y (#R$EB96, #R$EB98)
+draw_line_inside:
+       neg  a                                              ;                   ;
+       ai   a,>40                                          ;                   ; A = point 1's row: 64 - y
+       neg  bc                                             ;                   ;
+       ai   bc,>40                                         ;                   ; BC = point 2's row
+       andi r1,>00ff                                       ;                   ;
+       movb @scale_3_4_table(r1),r1                        ;                   ;
+       ab   @bytes+>57,r1                                  ;                   ;
+       srl  r1,8                                           ;                   ; R1 = point 1's column: 3/4 of x, + 87
+       andi r2,>00ff                                       ;                   ;
+       movb @scale_3_4_table(r2),r2                        ;                   ;
+       ab   @bytes+>57,r2                                  ;                   ;
+       srl  r2,8                                           ;                   ; R2 = point 2's column
+       c    a,bc                                           ;                   ;
+       jle  draw_line_inside_1                             ;                   ;
+       mov  a,r0                                           ;                   ; point 2 is the upper one: swap them
+       mov  bc,a                                           ;                   ;
+       mov  r0,bc                                          ;                   ;
+       mov  r1,r0                                          ;                   ;
+       mov  r2,r1                                          ;                   ;
+       mov  r0,r2                                          ;                   ;
+draw_line_inside_1:                                        ; A, R1 = the row and column to start at; BC, R2 = those of the other end
+       mov  r1,r0                                          ;                   ;
+       mov  r2,hl                                          ;                   ;
+       c    r0,hl                                          ;                   ;
+       jle  draw_line_inside_2                             ;                   ;
+       mov  r1,hl                                          ;                   ;
+       mov  r2,r0                                          ;                   ;
+draw_line_inside_2:
+       sla  r0,5                                           ;                   ; R0 (high byte) = the first character the line covers
+       sla  hl,5                                           ;                   ; HL (high byte) = the last
+       mov  a,de                                           ;                   ;
+       srl  de,3                                           ;                   ; DE = its first character row
+       mov  bc,r11                                         ;                   ;
+       srl  r11,3                                          ;                   ; R11 = its last (R11 is free: the loops return with .ret)
+draw_line_inside_3:                                        ; Mark them as drawn in (see view_mark_line)
+       cb   r0,@view_min(de)                               ;                   ;
+       jhe  !                                              ;                   ;
+       movb r0,@view_min(de)                               ;                   ;
+!
+       cb   hl,@view_max(de)                               ;                   ;
+       jle  !                                              ;                   ;
+       movb hl,@view_max(de)                               ;                   ;
+!
+       inc  de                                             ;                   ;
+       c    de,r11                                         ;                   ;
+       jle  draw_line_inside_3                             ;                   ;
+       s    a,bc                                           ;                   ; BC = dy
+       mov  r2,de                                          ;                   ;
+       s    r1,de                                          ;                   ; DE = dx
+       jlt  draw_line_inside_4                             ;                   ;
+       li   r2,1                                           ;                   ; to the right: the column step,
+       li   r0,>8000                                       ;                   ; the pixel mask after a byte boundary
+       mov  @line_rotate_right,r11                         ;                   ; and the instruction that moves it
+       jmp  draw_line_inside_5                             ;                   ;
+draw_line_inside_4:
+       neg  de                                             ;                   ; to the left
+       seto r2                                             ;                   ;
+       li   r0,>0100                                       ;                   ;
+       mov  @line_rotate_left,r11                          ;                   ;
+draw_line_inside_5:
+       mov  r0,@line_mask_wrap                             ;                   ;
+       mov  r11,@line_shallow_rotate_pad                   ;                   ;
+       mov  r11,@line_steep_rotate_pad                     ;                   ;
+       mov  a,hl                                           ;                   ;
+       sla  hl,5                                           ;                   ;
+       mov  r1,r0                                          ;                   ;
+       srl  r0,3                                           ;                   ;
+       a    r0,hl                                          ;                   ;
+       ai   hl,space_view_buffer                           ;                   ; HL -> the byte of the first pixel
+       andi r1,7                                           ;                   ;
+       movb @pixel_bitmask_table(r1),r1                    ;                   ;
+       andi r1,>ff00                                       ;                   ; R1 = its mask
+       c    de,bc                                          ;                   ;
+       jl   draw_line_inside_6                             ;                   ; dx < dy: a steep line
+       mov  de,r0                                          ;                   ; a shallow line: dx pixels
+       jeq  draw_line_inside_7                             ;                   ; a single point isn't drawn
+       swpb bc                                             ;                   ;
+       a    bc,de                                          ;                   ; D = dy, E = dx
+       swpb r0                                             ;                   ;
+       mov  r0,bc                                          ;                   ; B = the number of pixels
+       srl  r0,1                                           ;                   ; R0 (high byte) = the error term: dx / 2
+       b    @line_shallow_rotate_pad                       ;                   ;
+draw_line_inside_6:
+       swpb bc                                             ;                   ; a steep line: dy pixels (B)
+       a    bc,de                                          ;                   ; D = dy, E = dx
+       mov  bc,r0                                          ;                   ;
+       srl  r0,1                                           ;                   ; R0 (high byte) = the error term: dy / 2
+       b    @line_steep_loop_pad                           ;                   ;
+draw_line_inside_7:
+       .ret                                                ;                   ;
+
+********************************************************************************
 * Clip and draw a line
 * 
 * Used by the routines at #R$3D8C, #R$43C2 and #R$496D.
@@ -3349,31 +3452,32 @@ outcodes_y_beyond_far_boundary_case:                       ; >3abf
 * becomes the reference point, and each of the original points is moved to
 * the edge by bisecting towards it (#R$3BEC) before the line is drawn.
 clip_and_draw_line:                                        ; >3ac2
-       .proc
+       .proc                                               ;                   ;
 * TI: a fast path for a line that is all inside the view, as most are: each
 * coordinate is tested with one unsigned comparison (x from -116 to 117, y from
-* -63 to 64, as in #R$3A72), and the line drawn straight away (#R$3C29 uses
-* only the low bytes, which the $8000 doesn't change). Otherwise the points are
-* still as they were, for the MSX code below.
-       mov  @clip_point1_x,r0                              ;                   ;
+* -63 to 64, as in #R$3A72), and the line drawn by draw_line_inside. Otherwise
+* the points are still as they were, for the MSX code below.
+       mov  @clip_point1_x,r1                              ;                   ; R1 = point 1's x
+       mov  r1,r0                                          ;                   ;
        ai   r0,116                                         ;                   ;
        ci   r0,116+117                                     ;                   ;
        jh   clip_and_draw_line_1                           ;                   ; point 1's x is outside
-       mov  @clip_point1_y,r0                              ;                   ;
+       mov  @clip_point1_y,a                               ;                   ; A = its y
+       mov  a,r0                                           ;                   ;
        ai   r0,63                                          ;                   ;
        ci   r0,63+64                                       ;                   ;
        jh   clip_and_draw_line_1                           ;                   ;
-       mov  @clip_point2_x,de                              ;                   ; DE = point 2's x
-       mov  de,r0                                          ;                   ;
+       mov  @clip_point2_x,r2                              ;                   ; R2 = point 2's x
+       mov  r2,r0                                          ;                   ;
        ai   r0,116                                         ;                   ;
        ci   r0,116+117                                     ;                   ;
        jh   clip_and_draw_line_1                           ;                   ;
-       mov  @clip_point2_y,hl                              ;                   ; HL = point 2's y
-       mov  hl,r0                                          ;                   ;
+       mov  @clip_point2_y,bc                              ;                   ; BC = its y
+       mov  bc,r0                                          ;                   ;
        ai   r0,63                                          ;                   ;
        ci   r0,63+64                                       ;                   ;
        jh   clip_and_draw_line_1                           ;                   ;
-       b    @clip_endpoints_to_screen_space                ;                   ; all inside: draw it
+       b    @draw_line_inside                              ;                   ; all inside: draw it
 * And a quick test for a line that is all beyond one edge of the view, which
 * isn't drawn (signed comparisons of the points as they are; a point on an
 * edge is inside).

@@ -148,7 +148,7 @@ words. A single-byte access to
   `view_max` hold the first and last character drawn in since the buffer was cleared (`view_prev_min`/`_max`: what was
   copied last, so is on the screen): `clear_space_view` clears only those and `copy_space_view` copies only those and
   the previous ones. So everything that writes to the buffer must mark what it covers: `view_mark_line` (lines, the
-  rectangle they're in), `view_mark_rows` (pixels) and inline in `draw_view_message`, `move_and_plot_stardust` and `fill_disc_row_span` (the rows of the sun's disc,
+  rectangle they're in; `draw_line_inside`, the fast path for lines that need no clipping, does the same in line), `view_mark_rows` (pixels) and inline in `draw_view_message`, `move_and_plot_stardust` and `fill_disc_row_span` (the rows of the sun's disc,
   a native routine in low RAM where the MSX has #R$3F68). `view_mark_all` marks everything
   (`enter_flight_mode`, as then neither the buffer nor the screen is known). `clear_space_view` mustn't change BC: its
   callers count with it.

@@ -108,10 +108,10 @@ graphics_mode_1:
        ai   r0,>0100
        dec  r2
        jne  graphics_mode_1
-*      Clear VDP RAM
+*      Clear VDP RAM, but for the top, where the disk DSR's buffers are (ti-disk.a99)
        clr  r0
        clr  r1
-       li   r2,>4000
+       li   r2,color_table+>1800-dsr_color_max
        bl   @vsmw
 *      Disable sprites
        li   r0,sprite_attr_table

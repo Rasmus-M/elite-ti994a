@@ -20,11 +20,11 @@ The game is playable from the title screen to the death scene:
 - The five missions.
 - The sound effects.
 - Freezing the game, with its options.
+- Saving and loading commanders, on disk (DSK1) rather than tape.
 
 What is still missing or not right:
 
 - Speed. The game runs at only a few frames a second in flight. Nothing has been done about this yet.
-- Saving and loading commanders. The commander menu is there, but the MSX's tape routines have not been replaced.
 
 The default commander currently starts with 5000 credits instead of 100, to make testing easier.
 
@@ -131,6 +131,9 @@ On a chart, the joystick or the S, X, comma and full stop keys move the cursor.
 | 9          | Commander status         |
 | 0          | Inventory                |
 | FCTN-R (`[`) | Load/save commander menu |
+
+The commander menu saves a commander as the file DSK1.<name>, and loads it again by name. If no name is typed, the
+commander's own name is used.
 
 Keys 5, 6, 7, 8, 9 and 0 also work in flight.
 

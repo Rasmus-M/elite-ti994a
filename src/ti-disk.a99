@@ -2,6 +2,11 @@
 *
 * Disk operations (TI-specific)
 *
+* The commander menu loads and saves commanders on disk, where the MSX uses
+* tape (#R$A492, #R$A4CA): a commander is a file of 139 bytes, the record
+* at #R$D606 (the name and the commander file), loaded and saved as a
+* program file with the DSR's LOAD and SAVE operations.
+*
 * The disk controller's DSR needs two things that the game overwrites:
 *
 * - The scratchpad (>8300->83FF), as the console left it: the top of the
@@ -12,16 +17,28 @@
 *   in >8370 (>37D8 with the usual three files). They start with a header
 *   that the DSR checks, in the last 40 bytes of the color table (the
 *   colors of the bottom right five characters of the screen); the rest of
-*   the area is under the name table and the sprite attribute table.
+*   the area is under the name table and the sprite attribute table, and
+*   above them (which the game leaves alone: ti_setup_environment doesn't
+*   clear it).
 *
 * So ti_save_console_state keeps a copy of both when the game starts, and
-* ti_disk_operation puts them back around a call to the DSR, with the
+* ti_disk_operation puts them back around the call to the DSR, with the
 * game's scratchpad and colors where the copies were - and sets up the name
 * table and the sprite attribute table again afterwards.
 *
 * All of this runs in a workspace of its own in low RAM (disk_ws), since
 * the main workspace is in the scratchpad.
 *
+disk_pab:                              ; The PAB, in VDP RAM that is free (see equates.a99)
+       equ  sprite_pattern_table+>0100
+disk_buffer:                           ; The buffer for the file, in VDP RAM
+       equ  sprite_pattern_table+>0140
+disk_record_size:                      ; The size of the record (#R$D606): 11 + 128 bytes
+       equ  139
+disk_load:                             ; The DSR's operations
+       equ  >0500
+disk_save:
+       equ  >0600
 
 *********************************************************************
 *
@@ -68,53 +85,209 @@ ti_save_console_state_5:
 
 *********************************************************************
 *
-* Do a disk operation
+* Load or save the commander record
 *
-* Called with BLWP @disk_vector. Gives the DSR the console's scratchpad
-* and its part of the color table back, calls it, and then puts the game's
-* back and sets up the name table and the sprite attribute table again
-* (all sprites off the screen), as the DSR's buffers are under them.
+* Called with BLWP @disk_vector. Loads the file disk_name into the record
+* at #R$D606, or saves the record as that file. Gives the DSR the console's
+* scratchpad and its part of the color table back, calls it, and then puts
+* the game's back and sets up the name table and the sprite attribute table
+* again (all sprites off the screen), as the DSR's buffers are under them.
 *
-* Not converted yet: the call to the DSR.
+* I:disk_opcode disk_load or disk_save (the high byte)
+* I:disk_name The file's name, with the device ("DSK1.JAMESON")
+* I:disk_name_length Its length
+* O:disk_error 0 if it went well
 *
 disk_vector:
        data disk_ws,ti_disk_operation
 
 ti_disk_operation:
-       bl   @ti_swap_pad               ; the console's scratchpad
+       li   r0,disk_pab+>4000          ; The PAB:
+       bl   @ti_disk_vdp_address
+       clr  r1
+       movb @disk_opcode,@vdpwd        ; 0: the operation
+       movb r1,@vdpwd                  ; 1: the flags, and the error code afterwards
+       li   r2,disk_buffer
+       movb r2,@vdpwd                  ; 2-3: the buffer's address
+       swpb r2
+       movb r2,@vdpwd
+       movb r1,@vdpwd                  ; 4-5: not used
+       movb r1,@vdpwd
+       li   r2,disk_record_size        ; 6-7: the size of the file (when loading, the most
+       movb r2,@vdpwd                  ; to load)
+       swpb r2
+       movb r2,@vdpwd
+       movb r1,@vdpwd                  ; 8: not used
+       movb @disk_name_length,r2       ; 9: the length of the name
+       movb r2,@vdpwd
+       srl  r2,8
+       li   r3,disk_name               ; 10: the name
+ti_disk_operation_1:
+       movb *r3+,@vdpwd
+       dec  r2
+       jne  ti_disk_operation_1
+       cb   @disk_opcode,@disk_save_byte
+       jne  ti_disk_operation_3
+       li   r0,disk_buffer+>4000       ; Saving: copy the record to the buffer
+       bl   @ti_disk_vdp_address
+       li   r3,tape_record
+       li   r2,disk_record_size
+ti_disk_operation_2:
+       movb *r3+,@vdpwd
+       dec  r2
+       jne  ti_disk_operation_2
+ti_disk_operation_3:
+       bl   @ti_swap_pad               ; The console's scratchpad
        bl   @ti_swap_dsr_colors        ; and the DSR's part of the color table
-* (The DSR will be called here.)
-       bl   @ti_swap_dsr_colors        ; the game's colors
+       mov  @dsr_color_length,r2
+       jeq  ti_disk_operation_5        ; (no disk controller)
+       li   r0,name_table+>4000        ; Clear the DSR's buffers that are under the name table
+       bl   @ti_disk_vdp_address       ; and the sprite attribute table, so that it finds none
+       clr  r1                         ; of its files open
+       li   r2,>0380
+ti_disk_operation_4:
+       movb r1,@vdpwd
+       dec  r2
+       jne  ti_disk_operation_4
+ti_disk_operation_5:
+       bl   @ti_dsrlnk                 ; Call the DSR
+       bl   @ti_swap_dsr_colors        ; The game's colors
        bl   @ti_swap_pad               ; and its scratchpad
+       movb @disk_error,r1
+       jne  ti_disk_operation_7
+       cb   @disk_opcode,@disk_save_byte
+       jeq  ti_disk_operation_7
+       li   r0,disk_buffer             ; Loaded: copy the buffer to the record
+       bl   @ti_disk_vdp_address
+       li   r3,tape_record
+       li   r2,disk_record_size
+ti_disk_operation_6:
+       movb @vdprd,*r3+
+       dec  r2
+       jne  ti_disk_operation_6
+ti_disk_operation_7:
        li   r0,name_table+>4000        ; The name table: characters 0-255, three times
-       swpb r0
-       movb r0,@vdpwa
-       swpb r0
-       movb r0,@vdpwa
+       bl   @ti_disk_vdp_address
        clr  r1
        li   r2,>0300
-ti_disk_operation_1:
+ti_disk_operation_8:
        movb r1,@vdpwd
        ai   r1,>0100
        dec  r2
-       jne  ti_disk_operation_1
+       jne  ti_disk_operation_8
        li   r0,sprite_attr_table+>4000 ; The sprite attribute table: all 32 sprites off the
-       swpb r0                         ; screen (y = >DF, as #R$3942 does), and transparent
-       movb r0,@vdpwa
-       swpb r0
-       movb r0,@vdpwa
+       bl   @ti_disk_vdp_address       ; screen (y = >DF, as #R$3942 does), and transparent
        li   r1,>df00
        clr  r3
        li   r2,32
-ti_disk_operation_2:
+ti_disk_operation_9:
        movb r1,@vdpwd
        movb r3,@vdpwd
        movb r3,@vdpwd
        movb r3,@vdpwd
        dec  r2
-       jne  ti_disk_operation_2
+       jne  ti_disk_operation_9
        rtwp
 *// ti_disk_operation
+
+*********************************************************************
+*
+* Set the VDP address
+*
+* I:R0 The address (+ >4000 to write)
+*
+ti_disk_vdp_address:
+       swpb r0
+       movb r0,@vdpwa
+       swpb r0
+       movb r0,@vdpwa
+       rt
+*// ti_disk_vdp_address
+
+*********************************************************************
+*
+* Call the DSR of the device in the PAB
+*
+* A DSRLNK: looks for the device of disk_name ("DSK1") in the DSR ROMs of
+* the cards (CRU >1000->1F00), and calls its routine, in the GPL workspace
+* (>83E0) and with the scratchpad set up as DSRs expect: the device name's
+* length in >8354, the VDP address of the "." after it in the PAB in >8356,
+* the card's CRU address in >83D0 and the DSR's entry in its ROM in >83D2.
+* Must be called with the console's scratchpad in place.
+*
+* O:disk_error 0 if it went well; >FF if there is no such device;
+* .           otherwise the error code from the PAB (in bits 7-5)
+*
+ti_dsrlnk:
+       seto r0
+       movb r0,@disk_error             ; (no such device, until it's found)
+       li   r1,disk_name               ; Copy the device name, up to the ".", to >834A
+       li   r3,>834a
+       clr  r2
+ti_dsrlnk_1:
+       cb   *r1,@disk_period
+       jeq  ti_dsrlnk_2
+       movb *r1+,*r3+
+       inc  r2
+       ci   r2,7
+       jl   ti_dsrlnk_1
+ti_dsrlnk_2:
+       mov  r2,@>8354                  ; its length
+       ai   r2,disk_pab+10
+       mov  r2,@>8356                  ; the VDP address of the "."
+       sb   @>837c,@>837c              ; clear the GPL status
+       lwpi >83e0                      ; The GPL workspace (R13-R15 are the console's)
+       clr  r1
+       li   r12,>0f00
+ti_dsrlnk_3:
+       sbz  0                          ; The next card: turn the last one's ROM off
+       ai   r12,>0100
+       ci   r12,>2000
+       jeq  ti_dsrlnk_8                ; no more cards
+       mov  r12,@>83d0
+       sbo  0                          ; turn its ROM on
+       li   r2,>4000
+       cb   *r2,@disk_valid            ; a DSR ROM?
+       jne  ti_dsrlnk_3
+       ai   r2,8                       ; its list of devices
+       jmp  ti_dsrlnk_5
+ti_dsrlnk_4:
+       mov  @>83d2,r2                  ; The next device in the list
+       sbo  0
+ti_dsrlnk_5:
+       mov  *r2,r2
+       jeq  ti_dsrlnk_3                ; the end of the list
+       mov  r2,@>83d2
+       inct r2
+       mov  *r2+,r9                    ; R9 = its routine
+       movb @>8355,r5
+       cb   r5,*r2+                    ; the same length?
+       jne  ti_dsrlnk_4
+       srl  r5,8
+       li   r6,>834a
+ti_dsrlnk_6:
+       cb   *r6+,*r2+                  ; the same name?
+       jne  ti_dsrlnk_4
+       dec  r5
+       jne  ti_dsrlnk_6
+       inc  r1
+       bl   *r9                        ; Call it. It returns here if it isn't its device,
+       jmp  ti_dsrlnk_4                ; and one instruction on if it is
+       sbz  0
+       lwpi disk_ws
+       li   r0,disk_pab+1              ; The error code in the PAB
+       swpb r0
+       movb r0,@vdpwa
+       swpb r0
+       movb r0,@vdpwa
+       movb @vdprd,r1
+       andi r1,>e000
+       movb r1,@disk_error
+       rt
+ti_dsrlnk_8:
+       lwpi disk_ws
+       rt
+*// ti_dsrlnk
 
 *********************************************************************
 *
@@ -179,6 +352,21 @@ ti_swap_dsr_colors_4:
        rt
 *// ti_swap_dsr_colors
 
+disk_opcode:                           ; The operation: disk_load or disk_save (the high byte)
+       byte 0
+disk_error:                            ; 0 if the last operation went well
+       byte 0
+disk_name_length:                      ; The length of the file's name
+       byte 0
+disk_name:                             ; The file's name: "DSK1." and up to 10 characters
+       bss  15
+disk_save_byte:
+       byte disk_save/256
+disk_period:
+       text '.'
+disk_valid:
+       byte >aa
+       even
 dsr_color_max:                         ; The most bytes of the color table that are kept
        equ  40
 dsr_color_address:                     ; The VDP address of the DSR's part of the color table

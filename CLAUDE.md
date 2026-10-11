@@ -133,11 +133,16 @@ words. A single-byte access to
   once a frame (it's in `clear_space_view`, `copy_space_view`, `draw_object`'s face loop and after each edge, and for
   the docked screens in `print_char`, `generate_system` and `clear_page`, or a sound effect plays on until a screen is drawn) and
   never between the two bytes of a VDP address.
-- **Disk operations** (`ti-disk.a99`, low RAM): the disk DSR needs the scratchpad as the console left it and its
-  buffers at the top of the VDP RAM (from >37D8, starting in the last 40 bytes of the color table). `ti_save_console_state`
-  saves both as the first thing the program does (before `lwpi wrksp`), and `ti_disk_operation` (`blwp @disk_vector`)
-  swaps them in around the DSR call and sets up the name table and the sprite attribute table again. It all runs in
-  `disk_ws`, a workspace in low RAM, as the main workspace is in the scratchpad. The DSR call isn't there yet.
+- **Disk operations** (`ti-disk.a99`, low RAM): the commander menu (bank 7) loads and saves commanders on disk where the
+  MSX uses tape: the file `DSK1.<name>`, a program file of 139 bytes (the record at #R$D606: the name and the commander
+  file). Set `disk_opcode`, `disk_name` and `disk_name_length`, `blwp @disk_vector`, and check `disk_error`. The disk DSR
+  needs the scratchpad as the console left it and its buffers at the top of the VDP RAM (from >37D8, starting in the
+  last 40 bytes of the color table), so `ti_save_console_state` saves both as the first thing the program does (before
+  `lwpi wrksp`), `ti_setup_environment` doesn't clear the VDP RAM from >37D8, and `ti_disk_operation` swaps them in
+  around the DSR call (`ti_dsrlnk`), clears the DSR's buffers under the name table and the sprite attribute table first,
+  and sets those two tables up again afterwards (so the screen is blank meanwhile). It all runs in `disk_ws`, a
+  workspace in low RAM, as the main workspace is in the scratchpad. The PAB and the file's buffer are in VDP RAM at
+  >1900 and >1940. Low RAM is nearly full (about 170 bytes free).
 - **Sound effects**: a native SN76489 player in ROM bank 14 (`rom-bank-14.a99`) rather than a conversion of the MSX's
   AY-3-8910 engine (#R$7468, #R$7645): the same effects (0-13), handlers and three channels, with its state in the MSX's
   sound variables (#R$E894). Play one with `.sfx N` (a `blwp @sound_effect_vector` and the number): it runs in its own

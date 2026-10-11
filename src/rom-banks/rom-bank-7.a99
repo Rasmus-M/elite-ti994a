@@ -329,8 +329,6 @@ commander_menu_jmp:
        .sfx 6                                              ; CALL $16FE        ; beep
        .endproc                                            ;                   ; (TI: back to the caller)
 commander_menu_docked:                                     
-* TI: temporary test of the disk routines (no DSR call yet): the game must carry on as before
-       blwp @disk_vector                                   ;                   ; 
        bl   @pack_commander                                ; CALL $A44F        ; pack the commander file
        li   hl,commander_name                              ; LD HL,$EB06       ; the commander's name
        sb   b,b                                            ; LD B,$00          ; 
@@ -401,22 +399,177 @@ _a42a:                                                     ; >a42a
        b    @commander_menu_jmp                            ; JP $A30A          ; back to the menu
 
 ********************************************************************************
-* TI: options 1-3 use the tape (#R$A377, #R$A3E0, #R$A3C7), which isn't
-* converted yet: they say so and go back to the menu, as after a tape error
-* (#R$A542).
-menu_tape_not_available:                                   
+* Prompt for and read a commander name
+* 
+* Used by the routines at #R$A377 and #R$A3E0.
+* 
+* O:F Carry set if Enter was pressed, clear for ESC
+read_commander_name:                                       ; >a36b
+       .proc                                               ;                   ; 
+       li   hl,msg_commanders_name                         ; LD HL,$A61D       ; "Commander's name ? "
+       bl   @rst_20_target_print_list_positioned           ; RST $20           ; print it
+       li   de,>415a                                       ; LD DE,$415A       ; letters only
+       movb @bytes+>0a,@c                                  ; LD C,$0A          ; up to 10 characters
+       .pop r11                                            ;                   ; 
+       b    @read_line_keyboard_input                      ; JP $3631          ; read a line of keyboard input
+
+********************************************************************************
+* Commander menu option 1: load a new commander
+* 
+* Reached via the table at $A6A4 (#R$A30A). Asks for a name (#R$A36B), then
+* loads the commander with that name - or the current commander's name, if
+* none was typed. Copies the name (11 bytes, from $D606) to #R$EB06 and the
+* commander file (128 bytes, from $D611) to $F6C0, and unpacks it (#R$A469)
+* before going back to the menu.
+* 
+* TI: from disk rather than tape (ti_disk_operation): the file DSK1.<name>,
+* which holds the record at #R$D606. So there is no searching, and the name
+* is needed.
+menu_load_commander:                                       ; >a377
+       bl   @read_commander_name                           ; CALL $A36B        ; prompt for and read a commander name
+       joc  _a37d                                          ; JP NC,$A30A       ; 
+       b    @commander_menu_jmp                            ;                   ; Esc - back to the menu
+_a37d:                                                     ; >a37d
+       li   hl,msg_loading_commander                       ; LD HL,$A646       ; "Loading Commander " (TI: for "Searching ..")
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       bl   @disk_set_name                                 ;                   ; the file's name; HL -> the commander name
+       bl   @rst_08_target_print_tokenised_string          ;                   ; print it
+       movb @bytes+>05,@disk_opcode                        ; CALL $A492        ; load the record from disk
+       blwp @disk_vector                                   ;                   ; 
        bl   @clear_message_line                            ; CALL $3955        ; clear the message line
-       li   hl,msg_tape_not_available                      ;                   ; 
+       movb @disk_error,r0                                 ;                   ; 
+       jne  show_disk_io_error                             ; JP C,$A542        ; failed
+       li   hl,tape_record                                 ; LD HL,$D606       ; the name in the record
+       li   de,commander_name                              ; LD DE,$EB06       ; 
+       li   bc,>000b                                       ; LD BC,$000B       ; 11 bytes
+       .ldir                                               ; LDIR              ; 
+       li   hl,tape_record_data                            ; LD HL,$D611       ; the commander file in the record
+       li   de,commander_menu_buffer                       ; LD DE,$F6C0       ; 
+       li   bc,>0080                                       ; LD BC,$0080       ; 128 bytes
+       .ldir                                               ; LDIR              ; 
+       bl   @unpack_commander                              ; CALL $A469        ; unpack it
+       b    @commander_menu_jmp                            ; JP $A30A          ; back to the menu
+
+********************************************************************************
+* Commander menu option '2': save commander
+* 
+* Reached via the menu's jump table ($A6A4, #R$A359). Asks for a name
+* (#R$A36B), which becomes the commander's name (#R$EB06) if one is
+* typed. Then shows "Saving Commander" and the name, and saves the
+* commander: on failure, #R$A542; otherwise back to the menu (#R$A30A).
+* 
+* TI: to disk rather than tape (ti_disk_operation), as the file
+* DSK1.<name>, so there is no "Start recording and press a key".
+menu_save_commander:                                       ; >a3e0
+       bl   @read_commander_name                           ; CALL $A36B        ; prompt for and read a commander name
+       joc  _a3e6                                          ; JP NC,$A33A       ; 
+       b    @commander_menu_ask                            ;                   ; Esc - ask again
+_a3e6:                                                     ; >a3e6
+       movb @keyboard_input_buffer,r0                      ; LD A,($E8F7) / OR A; a name typed?
+       jeq  _a3f7                                          ; JR Z,$A3F7        ; no - keep the name
+       li   hl,keyboard_input_buffer                       ; LD HL,$E8F7       ; yes - it is the commander's name now
+       li   de,commander_name                              ; LD DE,$EB06       ; 
+       li   bc,>000b                                       ; LD BC,$000B       ; 11 bytes
+       .ldir                                               ; LDIR              ; 
+       sb   @keyboard_input_buffer,@keyboard_input_buffer  ;                   ; (TI: so that disk_set_name uses it)
+_a3f7:                                                     ; >a3f7
+       li   hl,msg_saving_commander                        ; LD HL,$A634       ; "Saving Commander "
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print it
+       li   hl,commander_name                              ; LD HL,$EB06       ; 
+       bl   @rst_08_target_print_tokenised_string          ; RST $08           ; print the name
+       li   hl,commander_name                              ; LD HL,$EB06       ; the record: the name...
+       li   de,tape_record                                 ; LD DE,$D606       ; 
+       li   bc,>000b                                       ; LD BC,$000B       ; 11 bytes
+       .ldir                                               ; LDIR              ; 
+       li   hl,commander_menu_buffer                       ; LD HL,$F6C0       ; ...and the commander file
+       li   de,tape_record_data                            ; LD DE,$D611       ; 
+       li   bc,>0080                                       ; LD BC,$0080       ; 128 bytes
+       .ldir                                               ; LDIR              ; 
+       bl   @disk_set_name                                 ;                   ; the file's name
+       movb @bytes+>06,@disk_opcode                        ; CALL $A4CA        ; save the record to disk
+       blwp @disk_vector                                   ;                   ; 
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       movb @disk_error,r0                                 ;                   ; 
+       jne  show_disk_io_error                             ; JP C,$A542        ; failed
+       b    @commander_menu_jmp                            ; JP $A30A          ; back to the menu
+
+********************************************************************************
+* Show a disk I/O error message, then return to the menu
+* 
+* Used by the routines at #R$A377 and #R$A3E0.
+* .
+* Beeps (#R$16FE), clears the message line, and shows "Disk I/O error!"
+* (TI: for "Tape I/O error!") before returning to the commander menu
+* (#R$A30A).
+show_disk_io_error:                                        ; >a542
+       .sfx 6                                              ; CALL $16FE        ; beep
+       bl   @clear_message_line                            ; CALL $3955        ; clear the message line
+       li   hl,msg_disk_io_error                           ; LD HL,$A666       ; "Disk I/O error!"
        bl   @show_message                                  ; CALL $5FFB        ; show it for a while
        b    @commander_menu_jmp                            ; JP $A30A          ; back to the menu
-menu_load_commander:                                       
-       equ  menu_tape_not_available                               ; 
-menu_save_commander:                                       
-       equ  menu_tape_not_available                               ; 
-menu_catalog_tape:                                         
-       equ  menu_tape_not_available                               ; 
-msg_tape_not_available:                                    
-       text 'Tape not available on the T',>c9                     ; 
+
+********************************************************************************
+* TI: Set the name of the commander's file
+* 
+* Makes disk_name (ti-disk.a99) "DSK1." and the name that was typed
+* (#R$E8F7) or, if none was, the commander's name (#R$EB06).
+* 
+* O:HL The name used
+disk_set_name:
+       li   hl,keyboard_input_buffer                       ;                   ; the name typed...
+       movb *hl,r0                                         ;                   ; 
+       jne  disk_set_name_1                                ;                   ; 
+       li   hl,commander_name                              ;                   ; ...or the commander's
+disk_set_name_1:
+       li   r1,disk_device                                 ;                   ; 
+       li   r2,disk_name                                   ;                   ; 
+       li   r0,5                                           ;                   ; 
+disk_set_name_2:
+       movb *r1+,*r2+                                      ;                   ; "DSK1."
+       dec  r0                                             ;                   ; 
+       jne  disk_set_name_2                                ;                   ; 
+       mov  hl,r1                                          ;                   ; 
+       li   r0,>0500                                       ;                   ; R0 = the length so far (in the high byte)
+disk_set_name_3:
+       movb *r1+,*r2+                                      ;                   ; the name, up to its 0
+       jeq  disk_set_name_4                                ;                   ; 
+       ai   r0,>0100                                       ;                   ; 
+       ci   r0,>0f00                                       ;                   ; (10 characters at most)
+       jl   disk_set_name_3                                ;                   ; 
+disk_set_name_4:
+       movb r0,@disk_name_length                           ;                   ; 
+       rt                                                  ;                   ; 
+
+* TI: option 3, "Catalog tape" (#R$A3C7), isn't on the menu: it asks again
+menu_catalog_tape:
+       b    @commander_menu_ask                            ;                   ; 
+
+disk_device:
+       text 'DSK1.'                                               ; 
+
+********************************************************************************
+* Commander menu: "Commander's name ?"
+* 
+* Printed by #R$A36B.
+msg_commanders_name:                                       ; >a61d
+       text >05,>16,'Commander''s name ? ',>00                     ; 
+       byte >FF                                                   ; 
+
+********************************************************************************
+* The message "Saving Commander "
+msg_saving_commander:                                      ; >a634
+       text 'Saving Commander',>a0                                ; 
+
+********************************************************************************
+* The message "Loading Commander " (TI: for "Searching .. (CTRL-STOP to exit)", #R$A646)
+msg_loading_commander:
+       text 'Loading Commander',>a0                               ; 
+
+********************************************************************************
+* The message "Disk I/O error!" (TI: for "Tape I/O error!")
+msg_disk_io_error:                                         ; >a666
+       text 'Disk I/O error',>a1                                  ; 
+       even                                                       ; 
 
 ********************************************************************************
 * Load the default commander
@@ -468,8 +621,7 @@ _a455_end:
 commander_menu_text:                                       ; >a58f
        text >05,>04,'1. Load new Commander',>00                   ; 
        text >05,>06,'2. Save Commander',>00                       ; 
-       text >05,>08,'3. Catalog tape',>00                         ; 
-       text >05,>0a,'4. Default JAMESON',>00                      ; 
+       text >05,>0a,'4. Default JAMESON',>00                      ; (TI: no "3. Catalog tape")
        text >05,>0c,'5. Exit',>00                                 ; 
        byte >FF                                                   ; 
 

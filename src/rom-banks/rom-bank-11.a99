@@ -31,8 +31,7 @@
 * indicator (#R$6ADC).
 check_safe_zone:                                           ; >1549
        .proc                                               ;                   ; 
-       movb @planet_distance+1,r0                          ; LD HL,($E727)     ; R0 = distance from the planet
-       movb @planet_distance,@r0lb                         ;                   ; 
+       mov  @planet_distance,r0                            ; LD HL,($E727)     ; R0 = distance from the planet
        ci   r0,9000                                        ; LD DE,$2328 / OR A / SBC HL,DE; 9000 or more?
        jhe  station_safe_zone_leave                        ; JR NC,$156D       ; yes - outside
        movb @station_in_range,r0                           ; LD HL,$EB05 / LD A,(HL) / OR A; 
@@ -1857,8 +1856,7 @@ compute_relative_position_scale:                           ; >2df1
        swpb r0                                             ; LD B,A            ; 
        srl  hl,0                                           ; SRL H / RR L / DJNZ $2E4C; scale it right by that many bits
 _2e52:                                                     ; >2e52
-       movb hl,@scaled_delta_divisor+1                     ; LD ($E86A),HL     ; the scaled divisor for #R$2E7B
-       movb @l,@scaled_delta_divisor                       ;                   ; 
+       mov  hl,@scaled_delta_divisor                       ; LD ($E86A),HL     ; the scaled divisor for #R$2E7B
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -1922,8 +1920,7 @@ steer_dot_product_hi:
        jnc  steer_dot_product_div                          ;                   ; 
        inc  bc                                             ;                   ; 
 steer_dot_product_div:                                     
-       movb @scaled_delta_divisor+1,r0                     ; LD DE,($E86A)     ; R0 = the divisor
-       movb @scaled_delta_divisor,@r0lb                    ;                   ; 
+       mov  @scaled_delta_divisor,r0                       ; LD DE,($E86A)     ; R0 = the divisor
        c    bc,r0                                          ;                   ; does the quotient fit in 16 bits?
        jl   steer_dot_product_ok                           ;                   ; 
        li   hl,>7fff                                       ;                   ; no (TI: the largest)

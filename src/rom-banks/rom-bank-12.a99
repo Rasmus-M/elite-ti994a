@@ -842,23 +842,17 @@ _43d3:                                                     ; >43d3
        .far_call code_bank_11_select,multiply_vector       ; CALL $439D        ; 
        bl   @convert_to_view                               ; CALL $44CE        ; convert to the view
        bl   @add_object_position                           ; CALL $44D2        ; add the ship's position
-       movb de,@line_end_1_x+1                             ; LD ($F769),DE     ; the far end
-       movb @e,@line_end_1_x                               ;                   ; 
-       movb bc,@line_end_1_y+1                             ; LD ($F76B),BC     ; 
-       movb @c,@line_end_1_y                               ;                   ; 
-       movb hl,@line_end_1_z+1                             ; LD ($F76D),HL     ; 
-       movb @l,@line_end_1_z                               ;                   ; 
+       mov  de,@line_end_1_x                               ; LD ($F769),DE     ; the far end
+       mov  bc,@line_end_1_y                               ; LD ($F76B),BC     ;
+       mov  hl,@line_end_1_z                               ; LD ($F76D),HL     ;
        mov  hl,hl                                          ; JR Z,$43FC / LD A,H / OR A; 
        jgt  draw_ship_laser_2                              ; JP P,$442A        ; in front of the player
 _43fc:                                                     ; >43fc
        bl   @gun_vertex_relative                           ; LD A,($F803) / LD E,A / CALL $4A5C; the gun vertex relative to the player
        jnc  _4463                                          ; JR NC,$4428       ; behind the player too
-       movb de,@line_end_2_x+1                             ; LD ($F76F),DE     ; the gun
-       movb @e,@line_end_2_x                               ;                   ; 
-       movb bc,@line_end_2_y+1                             ; LD ($F771),BC     ; 
-       movb @c,@line_end_2_y                               ;                   ; 
-       movb hl,@line_end_2_z+1                             ; LD ($F773),HL     ; 
-       movb @l,@line_end_2_z                               ;                   ; 
+       mov  de,@line_end_2_x                               ; LD ($F76F),DE     ; the gun
+       mov  bc,@line_end_2_y                               ; LD ($F771),BC     ;
+       mov  hl,@line_end_2_z                               ; LD ($F773),HL     ;
        bl   @project_point                                 ; CALL $47C4        ; project the gun
        mov  bc,@clip_point1_x                              ; LD ($EB92),BC     ; 
        mov  de,@clip_point1_y                              ; LD ($EB94),DE     ; 
@@ -873,12 +867,9 @@ draw_ship_laser_2:                                         ; >442a
        mov  de,@clip_point1_y                              ; LD ($EB94),DE     ; 
        bl   @gun_vertex_relative                           ; LD A,($F803) / LD E,A / CALL $4A5C; the gun vertex relative to the player
        joc  draw_ship_laser_3                              ; JR C,$4455        ; in front of the player
-       movb de,@line_end_2_x+1                             ; LD ($F76F),DE     ; 
-       movb @e,@line_end_2_x                               ;                   ; 
-       movb bc,@line_end_2_y+1                             ; LD ($F771),BC     ; 
-       movb @c,@line_end_2_y                               ;                   ; 
-       movb hl,@line_end_2_z+1                             ; LD ($F773),HL     ; 
-       movb @l,@line_end_2_z                               ;                   ; 
+       mov  de,@line_end_2_x                               ; LD ($F76F),DE     ;
+       mov  bc,@line_end_2_y                               ; LD ($F771),BC     ;
+       mov  hl,@line_end_2_z                               ; LD ($F773),HL     ;
        bl   @clip_line_at_player                           ; CALL $4B22        ; clip the beam where it passes the player
        mov  bc,@clip_point2_x                              ; LD ($EB96),BC     ; 
        mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; 
@@ -1339,8 +1330,7 @@ missile_launch_start:                                      ; >3429
 * the sun (#R$F811 high) and going fast enough (speed #R$F814).
 update_altitude_and_temperature:                           ; >1577
        .proc                                               ;                   ; 
-       movb @planet_distance+1,hl                          ; LD HL,($E727)     ; HL = distance from the planet
-       movb @planet_distance,@l                            ;                   ; 
+       mov  @planet_distance,hl                            ; LD HL,($E727)     ; HL = distance from the planet
        ai   hl,1000                                        ; LD DE,$03E8 / ADD HL,DE; + 1000
        li   bc,>04e0                                       ; LD BC,$04E0       ; B = shift count, C = mask
        li   de,>f000                                       ; LD DE,$F000       ; DE = -4096, the baseline
@@ -1350,8 +1340,7 @@ update_altitude_and_temperature:                           ; >1577
        movb a,@altitude_gauge                              ;                   ; yes - store it...
        bl   @draw_altitude                                 ;                   ; ...and redraw the gauge
 _158f:                                                     ; >158f
-       movb @sun_distance+1,hl                             ; LD HL,($E725)     ; HL = distance from the sun
-       movb @sun_distance,@l                               ;                   ; 
+       mov  @sun_distance,hl                               ; LD HL,($E725)     ; HL = distance from the sun
        li   bc,>03f0                                       ; LD BC,$03F0       ; B = shift count, C = mask
        li   de,>f800                                       ; LD DE,$F800       ; DE = -2048, the baseline
        bl   @distance_to_gauge                             ; CALL $15CB        ; A = 0-24
@@ -1845,8 +1834,7 @@ engage_torus_jump_drive:                                   ; >86e6
        .sfx 6                                              ;                   ; beep
        jmp  _86e6_end                                      ;                   ; 
 !
-       movb @planet_distance+1,r0                          ; LD DE,($E727)     ; R0 = the distance from the planet
-       movb @planet_distance,@r0lb                         ;                   ; 
+       mov  @planet_distance,r0                            ; LD DE,($E727)     ; R0 = the distance from the planet
        li   r1,10000                                       ; LD HL,$2710 / OR A / SBC HL,DE; 
        c    r0,r1                                          ;                   ; 
        jh   !                                              ; JP NC,$16FE       ; 10000 or less
@@ -1858,8 +1846,8 @@ engage_torus_jump_drive:                                   ; >86e6
        .far_call code_bank_13_select,stop_ship             ; CALL $8B7B        ; bring the speed down to 0
        movb @bytes+>19,@torus_jump_countdown               ; LD A,$19 / LD ($E918),A; the jump lasts 25 frames
        movb @bytes+>02,@jump_in_progress                   ; LD A,$02 / LD ($E722),A; flag the jump as in progress
-       movb @bytes+>c8,@jump_speed                         ; LD HL,$00C8 / LD ($E878),HL; (little-endian)
-       sb   @jump_speed+1,@jump_speed+1                    ;                   ; 
+       movb @bytes+>c8,@jump_speed+1                       ; LD HL,$00C8 / LD ($E878),HL; (little-endian)
+       sb   @jump_speed,@jump_speed                        ;                   ; 
        movb @bytes+>05,@stardust_passes_interval           ; LD A,$05 / LD ($E87C),A; lengthen the stardust streaks every 5 frames...
        movb one,@stardust_passes                           ; LD A,$01 / LD ($E723),A; ...starting from 1 pass per frame
        movb one,@stardust_passes_countdown                 ; LD ($E87B),A      ; 

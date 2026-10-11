@@ -1338,7 +1338,7 @@ empty_mission_message:                                     ; >9a4a
 * only calls it while one of them is on.
 cloak_and_jammer_frame:                                    ; >140f
        .proc                                               ;                   ; 
-       movb @main_loop_tick_counter,r0                     ; LD A,($F746) / RRA; odd frame?
+       movb @main_loop_tick_counter+1,r0                   ; LD A,($F746) / RRA; odd frame?
        czc  one,r0                                         ;                   ; 
        jeq  _140f_end                                      ; JR NC,$1437       ; no - skip the cloak and jammer checks
        movb @cloaking_active_flag,r0                       ; LD A,($EF9F) / OR A; cloaking device on?

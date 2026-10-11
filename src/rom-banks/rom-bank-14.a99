@@ -418,10 +418,10 @@ sfx_h_tunnel:
        movb @tunnel_rings_finished,r0
        jne  sfx_h_end
        clr  r0
-       movb @tunnel_ring_radius,r0
+       movb @tunnel_ring_radius+1,r0
        swpb r0
        clr  r1
-       movb @tunnel_ring_radius+1,r1
+       movb @tunnel_ring_radius,r1
        a    r0,r1
        ai   r1,50
        mov  r1,@sfx_period(r9)

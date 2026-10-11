@@ -77,8 +77,16 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
 
 - **Variables ($E600-$F81B) are an exact image of the MSX variable area**, so records copied with LDIR or
   indexed through IX/IY keep their layout. `.msxalign >addr` pads so a label has the same address parity as its
-  MSX address. Words are stored **little-endian**, as the Z80 code reads and writes them byte by byte: a word
-  variable is accessed as a byte pair (`movb @x+1,hl` / `movb @x,@l`), never with `mov`. The exceptions are the
+  MSX address. Words are stored **little-endian** by default, as the Z80 code reads and writes them byte by byte: such a word
+  variable is accessed as a byte pair (`movb @x+1,hl` / `movb @x,@l`), not with `mov`. But many have been made
+  big-endian `data` words, accessed with `mov` (shorter and faster): check a variable's definition before accessing it.
+  One at an odd MSX address can't be a word in place, so it is defined in `word_variables` (in `main-code.a99`, after
+  `rotate_vertex`) and its two bytes in the image are left unused: the line ends (`line_end_1_x`...), `circle_centre_x/_y`,
+  `clip_reference_x/_y`, the stardust logs, `sun_distance`, `planet_distance` and others. Only variables that nothing
+  reaches by address (a block copy, an index register, another label + offset, the commander file's field list) can be
+  converted; `tools/words.py var[,var...]` does it (the pairs become `mov`, single-byte accesses swap `@x` and `@x+1`,
+  and it reports what it can't handle - then check that the other variables' addresses only shift by the same even
+  amount). The first exceptions were the
   blueprint pointers `bp_vertices`/`bp_edges`/`bp_faces`/`bp_name`, which are big-endian because the blueprint
   headers use `data`. Also big-endian `data` words, for speed in
   `rotate_vertex`, are `rotated_vector`/`_y`/`_z` (the code that copies blueprint vertices and normals into it
@@ -154,7 +162,7 @@ words. A single-byte access to
 - **The program image** (low and high RAM) is packed into the 32K of cartridge banks 0-3 with a loader: `ea5tocart`
   prints "Cartridge full" (and leaves a broken cartridge) if it doesn't fit, so check `make.bat`'s output for that. The
   space view buffer is last in low RAM and defined with `equ`, so it isn't in the image: nothing may be assembled after
-  it. High RAM has about 530 bytes free; low RAM has about 520 bytes free.
+  it. High RAM has about 830 bytes free; low RAM has about 520 bytes free.
 - **Disk operations** (the routines in ROM bank 14, `rom-bank-14.a99`; their entry point `disk_entry`, which selects the bank, and their data in `ti-disk.a99`, low RAM): the commander menu (bank 7) loads and saves commanders on disk where the
   MSX uses tape: the file `DSK1.<name>`, a program file of 139 bytes (the record at #R$D606: the name and the commander
   file). Set `disk_opcode`, `disk_name` and `disk_name_length`, `blwp @disk_vector`, and check `disk_error`. The disk DSR

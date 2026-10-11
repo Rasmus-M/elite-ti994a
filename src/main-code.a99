@@ -9,11 +9,9 @@
 * per-frame pass (#R$13FD), and it goes back to the title screen when the game
 * is over (#R$F749).
 main_loop_wait_tick:                                       ; >010f
-       movb @main_loop_tick_counter+1,hl                   ; LD HL,($F746)     ; 
-       movb @main_loop_tick_counter,@l                     ;                   ; 
+       mov  @main_loop_tick_counter,hl                     ; LD HL,($F746)     ;
        inc  hl                                             ; INC HL            ; 
-       movb hl,@main_loop_tick_counter+1                   ; LD ($F746),HL     ; advance the frame counter
-       movb @l,@main_loop_tick_counter                     ;                   ; 
+       mov  hl,@main_loop_tick_counter                     ; LD ($F746),HL     ; advance the frame counter
        sb   @vblank_subtick_counter,@vblank_subtick_counter; XOR A / LD ($F748),A; 
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
        bl   @read_controls                                 ; CALL $401C        ; 
@@ -257,8 +255,8 @@ _1409:                                                     ; >1409
        li   r0,scanner_queue                               ; LD HL,$E94A       ; 
        mov  r0,@scanner_queue_ptr                          ; LD ($E946),HL     ; ...write pointer back at the start (TI: a big-endian word)...
        li   r0,>2c01                                       ; LD HL,$012C       ; (R0 holds it byte-swapped)
-       movb r0,@scanner_background_space                   ; LD ($EB03),HL     ; ...and 300 bytes free for saving the background
-       movb @r0lb,@scanner_background_space+1              ;                   ; 
+       movb r0,@scanner_background_space+1                 ; LD ($EB03),HL     ; ...and 300 bytes free for saving the background
+       movb @r0lb,@scanner_background_space                ;                   ; 
        li   hl,ship_object_table                           ; LD HL,$EBA0       ; HL -> the object table
        movb @bytes+>14,b                                   ; LD B,$14          ; B = 20 slots
 process_frame_object:                                      ; >1455
@@ -2524,8 +2522,7 @@ _36f1_end:
 * column only sometimes.
 draw_bresenham_line_372b:                                  ; >372b
        .proc                                               ;                   ; (TI: the pixel masks come from pixel_bitmask_table in plot_line_pixel, IX isn't used)
-       movb de,@bresenham_cached_endpoint+1                ; LD ($E730),DE     ; cache the original second endpoint
-       movb @e,@bresenham_cached_endpoint                  ;                   ; 
+       mov  de,@bresenham_cached_endpoint                  ; LD ($E730),DE     ; cache the original second endpoint
        movb d,a                                            ; LD A,D            ; 
        cb   a,b                                            ; CP B              ; first endpoint's row < second's?
        jl   _373c                                          ; JR C,$373C        ; yes - no swap needed
@@ -2680,8 +2677,7 @@ pixel_address:                                             ; >37d1
 * I:D y
 * I:E x
 draw_line_on:                                              ; >37e2
-       movb @bresenham_cached_endpoint+1,bc                ; LD BC,($E730)     ; BC = the endpoint #R$372B cached last time
-       movb @bresenham_cached_endpoint,@c                  ;                   ; 
+       mov  @bresenham_cached_endpoint,bc                  ; LD BC,($E730)     ; BC = the endpoint #R$372B cached last time
        b    @draw_bresenham_line_372b                      ; JP $372B          ; draw a line from there to (D,E)
 
 ********************************************************************************
@@ -2705,8 +2701,7 @@ draw_lines_1:
        movb a,b                                            ; LD B,A            ; 
        inc  hl                                             ; INC HL            ; 
        movb *hl+,@c                                        ; LD C,(HL) / INC HL; 
-       movb bc,@bresenham_cached_endpoint+1                ; LD ($E730),BC     ; the starting point
-       movb @c,@bresenham_cached_endpoint                  ;                   ; 
+       mov  bc,@bresenham_cached_endpoint                  ; LD ($E730),BC     ; the starting point
 _37f5:                                                     ; >37f5
        movb *hl,a                                          ; LD A,(HL)         ; 
        cb   a,@b255                                        ; CP $FF            ; 
@@ -3127,8 +3122,7 @@ _39c0:                                                     ; >39c0
 show_view_message_jmp:
        .pop r11
 show_view_message:                                         ; >39c8
-       movb hl,@view_message_address+1                     ; LD ($E735),HL     ; the message
-       movb @l,@view_message_address                       ;                   ;
+       mov  hl,@view_message_address                       ; LD ($E735),HL     ; the message
        sb   @c,@c                                          ; LD C,$00          ; 
 show_view_message_count:                                   ; >39cd
        ab   one,@c                                         ; INC C             ; count its characters
@@ -3186,8 +3180,7 @@ count_message_timer_2:                                     ; >39fc
        movb @bytes+>19,*hl                                 ; LD (HL),$19       ; 25 frames before the next message
        rt                                                  ; RET               ; 
 draw_view_message:                                         ; >3a03
-       movb @view_message_address+1,hl                     ; LD HL,($E735)     ; the message
-       movb @view_message_address,@l                       ;                   ;
+       mov  @view_message_address,hl                       ; LD HL,($E735)     ; the message
        movb @view_message_column,@e                        ; LD A,($E737)      ; E = column
        movb @message_row,d                                 ; LD A,($E92C)      ; D = row, as an MSX buffer page ($D6-$E5)
        ai   de,space_view_buffer->d600                     ;                   ; DE -> the buffer at that row and column
@@ -3447,10 +3440,8 @@ clip_and_draw_line_6:
        andi a,>0f00                                        ; AND $0F           ; keep only the true outcode bits (0-3)
        jne  clip_case_point2_only_outside                  ; JR NZ,$3B26       ; point 2 fails some boundary - go clip it
        movb @c,a                                           ; LD A,C            ; point 2 is inside, so point 1 is outside; A = point 2's outcode
-       movb de,@clip_reference_x+1                         ; LD ($E827),DE     ; cache point 2's (inside) coordinates to $E827/$E829 as the known-good reference
-       movb @e,@clip_reference_x                           ;                   ;
-       movb hl,@clip_reference_y+1                         ; LD ($E829),HL     ; and its Y to $E829
-       movb @l,@clip_reference_y                           ;                   ;
+       mov  de,@clip_reference_x                           ; LD ($E827),DE     ; cache point 2's (inside) coordinates to $E827/$E829 as the known-good reference
+       mov  hl,@clip_reference_y                           ; LD ($E829),HL     ; and its Y to $E829
        .exx                                                ; EXX               ; switch to the shadow registers
        mov  @clip_point1_x,hl                              ; LD HL,($EB92)     ; HL = point 1's (biased) X
        mov  hl,@clip_point2_x                              ; LD ($EB96),HL     ; copy it into point 2's slot ($EB96)
@@ -3466,11 +3457,9 @@ clip_case_point2_only_outside:                             ; >3b26
        jne  bisect_clip_both_points_outside                ; JR NZ,$3B3B       ; point 1 also fails a boundary - bisect both sides
        movb b,a                                            ; LD A,B            ; (redundant reload)
        mov  @clip_point1_x,hl                              ; LD HL,($EB92)     ; HL = point 1's (inside) X
-       movb hl,@clip_reference_x+1                         ; LD ($E827),HL     ; cache it as the reference X
-       movb @l,@clip_reference_x                           ;                   ;
+       mov  hl,@clip_reference_x                           ; LD ($E827),HL     ; cache it as the reference X
        mov  @clip_point1_y,hl                              ; LD HL,($EB94)     ; HL = point 1's (inside) Y
-       movb hl,@clip_reference_y+1                         ; LD ($E829),HL     ; cache it as the reference Y
-       movb @l,@clip_reference_y                           ;                   ;
+       mov  hl,@clip_reference_y                           ; LD ($E829),HL     ; cache it as the reference Y
        b    @finish_clip_and_draw                          ; JP $3BDA          ; go clip point 2 (still at ($EB96)/($EB98)) towards the reference
 bisect_clip_both_points_outside:                           ; >3b3b
        movb a,b                                            ; LD B,A            ; B = point 1's masked outcode
@@ -3522,10 +3511,8 @@ _3b72:                                                     ; >3b72
        andi a,>0f00                                        ; AND $0F           ; keep only the true outcode bits
        jne  bisect_test_which_endpoint_to_replace          ; JR NZ,$3BA9       ; midpoint still outside - pick which endpoint to replace
        movb @c,a                                           ; LD A,C            ; midpoint is inside
-       movb de,@clip_reference_x+1                         ; LD ($E827),DE     ; cache it as the new reference X
-       movb @e,@clip_reference_x                           ;                   ;
-       movb hl,@clip_reference_y+1                         ; LD ($E829),HL     ; and reference Y
-       movb @l,@clip_reference_y                           ;                   ;
+       mov  de,@clip_reference_x                           ; LD ($E827),DE     ; cache it as the new reference X
+       mov  hl,@clip_reference_y                           ; LD ($E829),HL     ; and reference Y
        .exx                                                ; EXX               ; (unused since $3B4D - just scratch here)
        .pop hl                                             ; POP HL            ; HL = point 1's ORIGINAL Y (saved at $3B49)
        mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; park it in point 2's Y slot (see prose above)
@@ -3537,10 +3524,8 @@ _3b72:                                                     ; >3b72
        mov  de,@clip_point1_x                              ; LD ($EB92),DE     ; point 1's slot becomes the refined boundary crossing
        mov  hl,@clip_point1_y                              ; LD ($EB94),HL     ; 
        .exx                                                ; EXX               ; back to the main set
-       movb de,@clip_reference_x+1                         ; LD ($E827),DE     ; re-cache the refined point as the reference too
-       movb @e,@clip_reference_x                           ;                   ;
-       movb hl,@clip_reference_y+1                         ; LD ($E829),HL     ; 
-       movb @l,@clip_reference_y                           ;                   ;
+       mov  de,@clip_reference_x                           ; LD ($E827),DE     ; re-cache the refined point as the reference too
+       mov  hl,@clip_reference_y                           ; LD ($E829),HL     ;
        .pop hl                                             ; POP HL            ; HL = point 2's ORIGINAL Y (saved at $3B41)
        mov  hl,@clip_point2_y                              ; LD ($EB98),HL     ; restore point 2's Y slot to its true original value
        .pop hl                                             ; POP HL            ; HL = point 2's ORIGINAL X (saved at $3B40)
@@ -3608,15 +3593,12 @@ move_point_to_edge:                                        ; >3be0
        .proc
        andi a,>f000                                        ; AND $F0           ; keep only the "exactly on boundary" bits
        jeq  bisect_clip_single_outside_endpoint            ; JR Z,$3BEC        ; none set - go bisect
-       movb @clip_reference_x+1,de                         ; LD DE,($E827)     ; already on a boundary - DE = the reference X
-       movb @clip_reference_x,@e                           ;                   ;
-       movb @clip_reference_y+1,hl                         ; LD HL,($E829)     ; and reference Y
-       movb @clip_reference_y,@l                           ;                   ;
+       mov  @clip_reference_x,de                           ; LD DE,($E827)     ; already on a boundary - DE = the reference X
+       mov  @clip_reference_y,hl                           ; LD HL,($E829)     ; and reference Y
        jmp  move_point_to_edge_exit                        ; RET               ; 
 bisect_clip_single_outside_endpoint:                       ; >3bec
        mov  @clip_point2_x,hl                              ; LD HL,($EB96)     ; HL = the outside point's current X
-       movb @clip_reference_x+1,de                         ; LD DE,($E827)     ; DE = the reference X
-       movb @clip_reference_x,@e                           ;                   ;
+       mov  @clip_reference_x,de                           ; LD DE,($E827)     ; DE = the reference X
        a    de,hl                                          ; ADD HL,DE         ; HL = sum
        jnc  !                                              ; RR H              ; halve... (the ADD's carry is bit 16 of the sum)
        srl  hl,1                                           ; RR L              ; 
@@ -3629,8 +3611,7 @@ bisect_clip_single_outside_endpoint:                       ; >3bec
        inc  hl                                             ; INC HL            ; round the midpoint X up
 _3bfb:                                                     ; >3bfb
        .ex_de_hl                                           ; EX DE,HL          ; DE = midpoint X
-       movb @clip_reference_y+1,hl                         ; LD HL,($E829)     ; HL = the reference Y
-       movb @clip_reference_y,@l                           ;                   ;
+       mov  @clip_reference_y,hl                           ; LD HL,($E829)     ; HL = the reference Y
        mov  @clip_point2_y,bc                              ; LD BC,($EB98)     ; BC = the outside point's current Y
        a    bc,hl                                          ; ADD HL,BC         ; HL = sum
        jnc  !                                              ; RR H              ; halve... (the ADD's carry is bit 16 of the sum)
@@ -3653,10 +3634,8 @@ _3c0b:                                                     ; >3c0b
 move_point_to_edge_exit:
        .endproc                                            ;                   
 !
-       movb de,@clip_reference_x+1                         ; LD ($E827),DE     ; fully inside - it becomes the new reference X
-       movb @e,@clip_reference_x                           ;                   ;
-       movb hl,@clip_reference_y+1                         ; LD ($E829),HL     ; and reference Y
-       movb @l,@clip_reference_y                           ;                   ;
+       mov  de,@clip_reference_x                           ; LD ($E827),DE     ; fully inside - it becomes the new reference X
+       mov  hl,@clip_reference_y                           ; LD ($E829),HL     ; and reference Y
        jmp  _3c27                                          ; JR $3C27          ; loop again from the (now closer) reference
 bisect_move_outside_endpoint_to_midpoint:                  ; >3c20
        mov  de,@clip_point2_x                              ; LD ($EB96),DE     ; the outside point's X becomes the midpoint X
@@ -3953,10 +3932,8 @@ _3d1d:                                                     ; >3d1d
        movb @l,a                                           ; LD A,L            ; A = the reduced mantissa (magnitude >> shift count)
        movb a,@shared_normalize_mantissa                   ; LD ($EB9C),A      ; cache the mantissa for #R$3D76 to multiply against
        movb a,@circle_first_step                           ; LD ($E80C),A      ; also seed the "first vertex" flag with it (nonzero unless the whole magnitude was 0)
-       movb ix,@circle_centre_x+1                          ; LD ($E81F),IX     ; cache the caller's centre X
-       movb @ixl,@circle_centre_x                          ;                   ;
-       movb iy,@circle_centre_y+1                          ; LD ($E821),IY     ; cache the caller's centre Y
-       movb @iyl,@circle_centre_y                          ;                   ;
+       mov  ix,@circle_centre_x                            ; LD ($E81F),IX     ; cache the caller's centre X
+       mov  iy,@circle_centre_y                            ; LD ($E821),IY     ; cache the caller's centre Y
        li   hl,trig_table_coarse                           ; LD HL,$1311       ; HL -> #R$1311's coarse trig table
 _3d32:                                                     ; >3d32
        .push bc                                            ; PUSH BC           ; save the outer step counter (B) and its partner C
@@ -4057,13 +4034,11 @@ draw_circle_point:                                         ; >3d8c
        .proc                                               ;                   ; 
        movb @circle_first_step,a                           ; LD A,($E80C)      ; still the first step (nothing in the slot to connect to yet)?
        jeq  write_vertex_and_draw_edge                     ; OR A / JR Z,$3DAC ; no - read the slot and draw the line
-       movb @circle_centre_x+1,r0                          ; LD HL,($E81F)     ; R0 = the centre X...
-       movb @circle_centre_x,@r0lb                         ;                   ; 
+       mov  @circle_centre_x,r0                            ; LD HL,($E81F)     ; R0 = the centre X...
        a    de,r0                                          ; ADD HL,DE         ; ...+ this step's cos-scaled offset
        movb r0,@-2(hl)                                     ; PUSH HL           ; the vertex's X, 2 bytes below the cursor
        movb @r0lb,@-1(hl)                                  ;                   ; 
-       movb @circle_centre_y+1,r0                          ; LD HL,($E821)     ; R0 = the centre Y...
-       movb @circle_centre_y,@r0lb                         ;                   ; 
+       mov  @circle_centre_y,r0                            ; LD HL,($E821)     ; R0 = the centre Y...
        a    bc,r0                                          ; ADD HL,BC         ; ...+ this step's sin-scaled offset
        movb r0,@-4(hl)                                     ; PUSH HL           ; the vertex's Y, 4 bytes below the cursor
        movb @r0lb,@-3(hl)                                  ;                   ; 
@@ -4076,14 +4051,12 @@ write_vertex_and_draw_edge:                                ; >3dac
        movb @2(hl),r0                                      ; POP HL            ; R0 = the slot's old X
        movb @3(hl),@r0lb                                   ;                   ; 
        mov  r0,@clip_point2_x                              ; LD ($EB96),HL     ; -> point 2's X
-       movb @circle_centre_x+1,r0                          ; LD HL,($E81F)     ; R0 = the centre X...
-       movb @circle_centre_x,@r0lb                         ;                   ; 
+       mov  @circle_centre_x,r0                            ; LD HL,($E81F)     ; R0 = the centre X...
        a    de,r0                                          ; ADD HL,DE         ; ...+ this step's cos-scaled offset
        mov  r0,@clip_point1_x                              ; LD ($EB92),HL     ; -> point 1's X
        movb r0,@2(hl)                                      ; PUSH HL           ; and the slot's, for the next step
        movb @r0lb,@3(hl)                                   ;                   ; 
-       movb @circle_centre_y+1,r0                          ; LD HL,($E821)     ; R0 = the centre Y...
-       movb @circle_centre_y,@r0lb                         ;                   ; 
+       mov  @circle_centre_y,r0                            ; LD HL,($E821)     ; R0 = the centre Y...
        a    bc,r0                                          ; ADD HL,BC         ; ...+ this step's sin-scaled offset
        mov  r0,@clip_point1_y                              ; LD ($EB94),HL     ; -> point 1's Y
        movb r0,*hl                                         ; PUSH HL           ; and the slot's, for the next step
@@ -4175,11 +4148,9 @@ _3e0e:                                                     ; >3e0e
        movb a,@scratch_buffer_4                            ; LD ($E604),A      ; cache the type
        li   bc,>8000                                       ; LD BC,$8000       ; 
        a    bc,ix                                          ; ADD IX,BC         ; bias the centre X into clip-space convention
-       movb ix,@circle_centre_x+1                          ; LD ($E81F),IX     ; cache it
-       movb @ixl,@circle_centre_x                          ;                   ;
+       mov  ix,@circle_centre_x                            ; LD ($E81F),IX     ; cache it
        a    bc,iy                                          ; ADD IY,BC         ; bias the centre Y likewise
-       movb iy,@circle_centre_y+1                          ; LD ($E821),IY     ; cache it
-       movb @iyl,@circle_centre_y                          ;                   ;
+       mov  iy,@circle_centre_y                            ; LD ($E821),IY     ; cache it
        li   iy,partial_byte_right_mask_table_8             ; LD IY,$4014       ; IY -> #R$4014's partial-byte mask table (fixed for the whole call tree)
        li   hl,trig_table_coarse                           ; LD HL,$1311       ; HL -> #R$1311's trig table
        movb @bytes+>0a,b                                   ; LD B,$0A          ; 10 steps
@@ -4356,8 +4327,7 @@ _3ee8:                                                     ; >3ee8
        movb bc,@disc_row_half_width+1                      ; LD ($E823),BC     ; cache this row's (jitter+column, row) offset pair
        movb @c,@disc_row_half_width                        ;                   ;
        sb   b,b                                            ; LD B,$00          ; 
-       movb @circle_centre_x+1,hl                          ; LD HL,($E81F)     ; HL = the cached centre X
-       movb @circle_centre_x,@l                            ;                   ;
+       mov  @circle_centre_x,hl                            ; LD HL,($E81F)     ; HL = the cached centre X
        socb a,a                                            ; OR A              ; 
        s    bc,hl                                          ; SBC HL,BC         ; HL = centre X - offset (left bound, raw)
        .ex_de_hl                                           ; EX DE,HL          ; DE = left bound
@@ -4374,8 +4344,7 @@ _3f06:                                                     ; >3f06
        movb @scale_3_4_table(r1),a                         ; LD A,(DE)         ; A = table[column]
        ab   @bytes+>57,a                                   ; ADD A,$57         ; 
        movb a,@clip_point1_x+1                             ; LD ($EB92),A      ; cache the left bound's screen column
-       movb @circle_centre_x+1,hl                          ; LD HL,($E81F)     ; HL = the cached centre X again
-       movb @circle_centre_x,@l                            ;                   ;
+       mov  @circle_centre_x,hl                            ; LD HL,($E81F)     ; HL = the cached centre X again
        movb @disc_row_half_width+1,bc                      ; LD BC,($E823)     ; BC = the offset pair
        movb @disc_row_half_width,@c                        ;                   ;
        sb   b,b                                            ; LD B,$00          ; 
@@ -4397,15 +4366,13 @@ _3f28:                                                     ; >3f28
        movb a,@clip_point2_x+1                             ; LD ($EB96),A      ; cache the right bound's screen column
        movb @disc_row_offset+1,bc                          ; LD BC,($E824)     ; BC = this row's row offset
        movb @disc_row_offset,@c                            ;                   ; 
-       movb @circle_centre_y+1,hl                          ; LD HL,($E821)     ; HL = the cached centre Y
-       movb @circle_centre_y,@l                            ;                   ; 
+       mov  @circle_centre_y,hl                            ; LD HL,($E821)     ; HL = the cached centre Y
        a    bc,hl                                          ; ADD HL,BC         ; HL = centre Y + row offset: the row below the centre...
        bl   @fill_disc_row_span                            ; CALL C,$3F68      ; fill the span in it, if it is in the view (TI: the routine checks that)
 _3f49:                                                     ; >3f49
        movb @disc_row_offset+1,bc                          ; LD BC,($E824)     ; BC = this row's row offset again
        movb @disc_row_offset,@c                            ;                   ; 
-       movb @circle_centre_y+1,hl                          ; LD HL,($E821)     ; HL = the cached centre Y
-       movb @circle_centre_y,@l                            ;                   ; 
+       mov  @circle_centre_y,hl                            ; LD HL,($E821)     ; HL = the cached centre Y
        s    bc,hl                                          ; OR A / SBC HL,BC  ; HL = centre Y - row offset: ...and the row above it
        bl   @fill_disc_row_span                            ; CALL C,$3F68      ; fill the span in it too
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, as interrupts are off)
@@ -4668,7 +4635,7 @@ draw_object_body:
        movb @handler_type,a                                ; LD A,($F7EE)      ; mode 30: A = the object's type
        cb   a,one                                          ; CP $01            ; is it type 1?
        jeq  draw_ship                                      ; JR Z,$4255        ; exploding
-       movb @main_loop_tick_counter,a                      ; LD A,($F746)      ; else A = the tick/frame counter's low byte
+       movb @main_loop_tick_counter+1,a                    ; LD A,($F746)      ; else A = the tick/frame counter's low byte
        andi a,>2000                                        ; AND $20           ; test bit 5
        jne  draw_ship                                      ; JR NZ,$4255       ; its turn to be seen
        sb   one,a                                          ; DEC A             ; clear: A = $FF (from 0)
@@ -4944,6 +4911,69 @@ rotate_vertex_4:
        .endproc                                            ; RET               ;
 rotation_matrix:                                           ; The orientation, cached by cache_orientation: 9 words
        bss  18                                             ;                   ;
+* TI: word variables that are at odd addresses on the MSX, where they would
+* have to be read and written a byte at a time. Here they are big-endian words
+* (the high byte at the label, the low byte at the label + 1); the two bytes
+* in the image of the MSX variables are unused. Nothing reaches them by
+* address.
+word_variables:
+       even
+line_end_1_x:                                              ; >f769
+       data >0000
+line_end_1_y:                                              ; >f76b
+       data >0000
+line_end_1_z:                                              ; >f76d
+       data >0000
+line_end_2_x:                                              ; >f76f
+       data >0000
+line_end_2_y:                                              ; >f771
+       data >0000
+line_end_2_z:                                              ; >f773
+       data >0000
+nearest_distance:                                          ; >e613
+       data >0000
+furthest_distance:                                         ; >e617
+       data >0000
+system_search_point:                                       ; >e61b
+       data >0000
+sun_distance:                                              ; >e725
+       data >0000
+planet_distance:                                           ; >e727
+       data >0000
+view_message_address:                                      ; >e735
+       data >0000
+equipment_install_flags_ptr:                               ; >e749
+       data >0000
+status_equipment_position:                                 ; >e74b
+       data >0000
+stardust_log_cos:                                          ; >e779
+       data >0000
+stardust_log_sin:                                          ; >e77b
+       data >0000
+stardust_log_x:                                            ; >e77d
+       data >0000
+stardust_log_y:                                            ; >e77f
+       data >0000
+circle_centre_x:                                           ; >e81f
+       data >0000
+circle_centre_y:                                           ; >e821
+       data >0000
+clip_reference_x:                                          ; >e827
+       data >0000
+clip_reference_y:                                          ; >e829
+       data >0000
+tunnel_ring_radius:                                        ; >e921
+       data >0000
+object_depth:                                              ; >e941
+       data >0000
+goatsoup_seed_word1:                                       ; >ead7
+       data >0000
+goatsoup_seed_word2:                                       ; >ead9
+       data >0000
+scanner_background_space:                                  ; >eb03
+       data >0000
+word_variables_end:
+       equ  $
 * This entry point is used by the routines at #R$422E and #R$43C2.
 convert_to_view:                                           ; >44ce
        b    @view_front                                    ; CALL $44E5        ; convert to the current view (operand patched by #R$64A1)
@@ -5464,25 +5494,21 @@ ship_screen_size_exit:
 * O:DE,BC,HL x, y and 0
 explosion_dot:                                             ; >47a1
        .proc
-       movb @explosion_random_pointer+1,hl                 ; LD HL,($E6DE)     ; HL -> the next random number (#R$EEC6)
-       movb @explosion_random_pointer,@l                   ;                   ;
+       mov  @explosion_random_pointer,hl                   ; LD HL,($E6DE)     ; HL -> the next random number (#R$EEC6)
        movb *hl,@c                                         ; LD C,(HL)         ; 
        inc  hl                                             ; INC HL            ; 
        movb *hl,b                                          ; LD B,(HL)         ; BC = the first
        inc  hl                                             ; INC HL            ; 
        .push hl                                            ; PUSH HL           ; save the pointer
-       movb @perentry_loop_pointer+1,hl                    ; LD HL,($EB90)     ; HL = the explosion's size (as a logarithm)
-       movb @perentry_loop_pointer,@l                      ;                   ;
+       mov  @perentry_loop_pointer,hl                      ; LD HL,($EB90)     ; HL = the explosion's size (as a logarithm)
        bl   @multiply_logs                                 ; CALL $2160        ; HL = the first * the size (#R$2160)
        .ex_sp_hl                                           ; EX (SP),HL        ; save it, HL = the pointer
        movb *hl,@c                                         ; LD C,(HL)         ; 
        inc  hl                                             ; INC HL            ; 
        movb *hl,b                                          ; LD B,(HL)         ; BC = the second
        inc  hl                                             ; INC HL            ; 
-       movb hl,@explosion_random_pointer+1                 ; LD ($E6DE),HL     ; save the pointer for the next dot
-       movb @l,@explosion_random_pointer                   ;                   ;
-       movb @perentry_loop_pointer+1,hl                    ; LD HL,($EB90)     ; 
-       movb @perentry_loop_pointer,@l                      ;                   ;
+       mov  hl,@explosion_random_pointer                   ; LD ($E6DE),HL     ; save the pointer for the next dot
+       mov  @perentry_loop_pointer,hl                      ; LD HL,($EB90)     ;
        bl   @multiply_logs                                 ; CALL $2160        ; HL = the second * the size
        movb h,b                                            ; LD B,H            ; BC = y
        movb @l,@c                                          ; LD C,L            ; 
@@ -5741,12 +5767,9 @@ draw_edge:                                                 ; >496d
        .push de                                            ; PUSH DE           ; save the vertex-index pair for later
        bl   @project_vertex                                ; CALL $49FD        ; project vertex E
        joc  draw_edge_2                                    ; JR C,$49B6        ; valid - go project the second vertex too
-       movb de,@line_end_1_x+1                             ; LD ($F769),DE     ; invalid: cache #R$49FD's raw output anyway (unused further here)
-       movb @e,@line_end_1_x                               ;                   ;
-       movb bc,@line_end_1_y+1                             ; LD ($F76B),BC     ; 
-       movb @c,@line_end_1_y                               ;                   ;
-       movb hl,@line_end_1_z+1                             ; LD ($F76D),HL     ; 
-       movb @l,@line_end_1_z                               ;                   ;
+       mov  de,@line_end_1_x                               ; LD ($F769),DE     ; invalid: cache #R$49FD's raw output anyway (unused further here)
+       mov  bc,@line_end_1_y                               ; LD ($F76B),BC     ;
+       mov  hl,@line_end_1_z                               ; LD ($F76D),HL     ;
        .exx                                                ; EXX               ; (scratch use of the shadow set)
        movb @e,a                                           ; LD A,E            ; 
        movb a,@draw_edge_clear_flag_e+>0005                ; LD ($4988),A      ; point (IY+d) at vertex E's flag (#R$4986+2)
@@ -5756,12 +5779,9 @@ draw_edge_clear_flag_e:                                    ; >4986
        movb d,a                                            ; LD A,D            ; A = the second vertex's index
        bl   @vertex_relative                               ; CALL $4A5C        ; project it directly (no caching)
        jnc  _49b4                                          ; JR NC,$49B4       ; also invalid - no edge to draw
-       movb de,@line_end_2_x+1                             ; LD ($F76F),DE     ; cache the raw projection
-       movb @e,@line_end_2_x                               ;                   ;
-       movb bc,@line_end_2_y+1                             ; LD ($F771),BC     ; 
-       movb @c,@line_end_2_y                               ;                   ;
-       movb hl,@line_end_2_z+1                             ; LD ($F773),HL     ; 
-       movb @l,@line_end_2_z                               ;                   ;
+       mov  de,@line_end_2_x                               ; LD ($F76F),DE     ; cache the raw projection
+       mov  bc,@line_end_2_y                               ; LD ($F771),BC     ;
+       mov  hl,@line_end_2_z                               ; LD ($F773),HL     ;
        bl   @project_point                                 ; CALL $47C4        ; finishing step -> point 1
        mov  bc,@clip_point1_x                              ; LD ($EB92),BC     ; -> point 1's X
        mov  de,@clip_point1_y                              ; LD ($EB94),DE     ; -> point 1's Y
@@ -5779,12 +5799,9 @@ draw_edge_2:                                               ; >49b6
        movb d,@e                                           ; LD E,D            ; E = the second vertex's index
        bl   @project_vertex                                ; CALL $49FD        ; project it
        joc  draw_edge_draw_clipped                         ; JR C,$49EE        ; valid - go store it as point 2 and draw
-       movb de,@line_end_1_x+1                             ; LD ($F769),DE     ; invalid: cache #R$49FD's raw output anyway
-       movb @e,@line_end_1_x                               ;                   ;
-       movb bc,@line_end_1_y+1                             ; LD ($F76B),BC     ; 
-       movb @c,@line_end_1_y                               ;                   ;
-       movb hl,@line_end_1_z+1                             ; LD ($F76D),HL     ; 
-       movb @l,@line_end_1_z                               ;                   ;
+       mov  de,@line_end_1_x                               ; LD ($F769),DE     ; invalid: cache #R$49FD's raw output anyway
+       mov  bc,@line_end_1_y                               ; LD ($F76B),BC     ;
+       mov  hl,@line_end_1_z                               ; LD ($F76D),HL     ;
        .exx                                                ; EXX               ; (scratch use of the shadow set)
        movb @e,a                                           ; LD A,E            ; 
        movb a,@draw_edge_clear_flag_d+>0005                ; LD ($49D7),A      ; point (IY+d) at vertex D's flag (#R$49D5+2)
@@ -5793,12 +5810,9 @@ draw_edge_clear_flag_d:                                    ; >49d5
        .pop de                                             ; POP DE            ; DE = the vertex-index pair again
        movb @e,a                                           ; LD A,E            ; A = the FIRST vertex's index (E, already known valid)
        bl   @vertex_relative                               ; CALL $4A5C        ; project it directly (no caching)
-       movb de,@line_end_2_x+1                             ; LD ($F76F),DE     ; cache the raw projection
-       movb @e,@line_end_2_x                               ;                   ;
-       movb bc,@line_end_2_y+1                             ; LD ($F771),BC     ; 
-       movb @c,@line_end_2_y                               ;                   ;
-       movb hl,@line_end_2_z+1                             ; LD ($F773),HL     ; 
-       movb @l,@line_end_2_z                               ;                   ;
+       mov  de,@line_end_2_x                               ; LD ($F76F),DE     ; cache the raw projection
+       mov  bc,@line_end_2_y                               ; LD ($F771),BC     ;
+       mov  hl,@line_end_2_z                               ; LD ($F773),HL     ;
        bl   @clip_line_at_player                           ; CALL $4B22        ; finishing step (only one here - see #R$49EF for where it lands)
        jmp  _49ef                                          ; JR $49EF          ; 
 draw_edge_draw_clipped:                                    ; >49ee
@@ -6076,12 +6090,11 @@ draw_explosion:                                            ; >4aec
        andi r1,>01fe                                       ;                   ; 
        ai   r1,log_table                                   ; ADC A,$08         ; HL -> the entry in the log table
        mov  *r1,r0                                         ; LD DE,$EB90 / LDI x 2; R0 = the entry (TI: log_table is big-endian)...
-       movb r0,@perentry_loop_pointer+1                    ;                   ; ...stored little-endian at $EB90 for #R$47A1
+       movb r0,@perentry_loop_pointer                      ;                   ; ...stored little-endian at $EB90 for #R$47A1
        swpb r0                                             ;                   ; 
-       movb r0,@perentry_loop_pointer                      ;                   ; 
+       movb r0,@perentry_loop_pointer+1                    ;                   ; 
        li   hl,explosion_random_numbers                    ; LD HL,$EEC6       ; HL = $EEC6 - the list #R$47A1 walks
-       movb hl,@explosion_random_pointer+1                 ; LD ($E6DE),HL     ; store it to $E6DE
-       movb @l,@explosion_random_pointer                   ;                   ;
+       mov  hl,@explosion_random_pointer                   ; LD ($E6DE),HL     ; store it to $E6DE
        movb @handler_countdown,a                           ; LD A,($F7EF)      ; A = a count at $F7EF
        ab   one,a                                          ; INC A             ; A += 1
        cb   a,@bytes+>32                                   ; CP $32            ; compare against 50
@@ -6115,10 +6128,8 @@ _4b0e:                                                     ; >4b0e
 * O:BC,HL The point on screen
 clip_line_at_player:                                       ; >4b22
        .proc
-       movb @line_end_2_z+1,hl                             ; LD HL,($F773)     ; HL = the front end's z
-       movb @line_end_2_z,@l                               ;                   ;
-       movb @line_end_1_z+1,de                             ; LD DE,($F76D)     ; DE = the back end's z
-       movb @line_end_1_z,@e                               ;                   ;
+       mov  @line_end_2_z,hl                               ; LD HL,($F773)     ; HL = the front end's z
+       mov  @line_end_1_z,de                               ; LD DE,($F76D)     ; DE = the back end's z
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; HL = z2 - z1
        jgt  clip_line_dz                                   ; JP P,$4B35        ; non-negative - keep it
@@ -6128,8 +6139,7 @@ clip_line_at_player:                                       ; >4b22
 clip_line_dz:                                              ; >4b35
        .ex_de_hl                                           ; EX DE,HL          ; DE = that absolute difference
        li   hl,>0001                                       ; LD HL,$0001       ; HL = 1
-       movb @line_end_1_z+1,bc                             ; LD BC,($F76D)     ; BC = z1
-       movb @line_end_1_z,@c                               ;                   ;
+       mov  @line_end_1_z,bc                               ; LD BC,($F76D)     ; BC = z1
        socb a,a                                            ; OR A              ; 
        s    bc,hl                                          ; SBC HL,BC         ; HL = 1 - z1
        jgt  clip_line_divide                               ; JP P,$4B49        ; non-negative - keep it
@@ -6144,16 +6154,12 @@ clip_line_divide:                                          ; >4b49
        div  de,r1                                          ; SBC HL,DE         ; R1 = R1:R2 / |z2 - z1| (the restoring division on the Z80)
        swpb r1                                             ;                   ; 
        movb r1,a                                           ; CPL               ; A = 256 * |1 - z1| / |z2 - z1|, the fraction of the way along
-       movb @line_end_2_y+1,hl                             ; LD HL,($F771)     ; HL = y2
-       movb @line_end_2_y,@l                               ;                   ;
-       movb @line_end_1_y+1,de                             ; LD DE,($F76B)     ; DE = y1
-       movb @line_end_1_y,@e                               ;                   ;
+       mov  @line_end_2_y,hl                               ; LD HL,($F771)     ; HL = y2
+       mov  @line_end_1_y,de                               ; LD DE,($F76B)     ; DE = y1
        bl   @lerp_towards                                  ; CALL $4B76        ; HL = y1 + (y2 - y1) * A / 256 (#R$4B76)
        .push hl                                            ; PUSH HL           ; save it
-       movb @line_end_2_x+1,hl                             ; LD HL,($F76F)     ; HL = x2
-       movb @line_end_2_x,@l                               ;                   ;
-       movb @line_end_1_x+1,de                             ; LD DE,($F769)     ; DE = x1
-       movb @line_end_1_x,@e                               ;                   ;
+       mov  @line_end_2_x,hl                               ; LD HL,($F76F)     ; HL = x2
+       mov  @line_end_1_x,de                               ; LD DE,($F769)     ; DE = x1
        bl   @lerp_towards                                  ; CALL $4B76        ; HL = x1 + (x2 - x1) * A / 256
        movb h,b                                            ; LD B,H            ; BC = x
        movb @l,@c                                          ; LD C,L            ; 
@@ -7253,14 +7259,11 @@ stardust_side_store:
 stardust_rotate:                                           ; >66dc
        .proc
        bl   @log_sign_tagged                               ; CALL $1FCF        ; convert cos to a log
-       movb hl,@stardust_log_cos+1                         ; LD ($E779),HL     ; and save it
-       movb @l,@stardust_log_cos                           ;                   ;
+       mov  hl,@stardust_log_cos                           ; LD ($E779),HL     ; and save it
        .ex_de_hl                                           ; EX DE,HL          ; 
        bl   @log_sign_tagged                               ; CALL $1FCF        ; convert sin to a log
-       movb hl,@stardust_log_sin+1                         ; LD ($E77B),HL     ; and save it
-       movb @l,@stardust_log_sin                           ;                   ;
-       movb @reclaimed_range_start+1,ix                    ; LD IX,($EFA6)     ; IX -> the stardust table
-       movb @reclaimed_range_start,@ixl                    ;                   ;
+       mov  hl,@stardust_log_sin                           ; LD ($E77B),HL     ; and save it
+       mov  @reclaimed_range_start,ix                      ; LD IX,($EFA6)     ; IX -> the stardust table
        movb @bytes+>0f,b                                   ; LD B,$0F          ; B = 15 particles
 stardust_rotate_particle:                                  ; >66ef
        .push bc                                            ; PUSH BC           ; 
@@ -7283,8 +7286,7 @@ stardust_log_x_lookup:                                     ; >66fe
 !
        socb @bit6,h                                        ; SET 6,H           ; tag the sign of X
 stardust_rotate_save_log_x:                                ; >6707
-       movb hl,@stardust_log_x+1                           ; LD ($E77D),HL     ; save log X
-       movb @l,@stardust_log_x                             ;                   ;
+       mov  hl,@stardust_log_x                             ; LD ($E77D),HL     ; save log X
        movb @>03(ix),a                                     ; LD A,(IX+$03) / OR A; A = Y
        .push af                                            ; PUSH AF           ; save its sign
        jgt  stardust_rotate_log_y                          ; JP P,$6714        ; 
@@ -7304,30 +7306,22 @@ stardust_log_y_lookup:                                     ; >6718
 !
        socb @bit6,h                                        ; SET 6,H           ; tag the sign of Y
 stardust_rotate_save_log_y:                                ; >6721
-       movb hl,@stardust_log_y+1                           ; LD ($E77F),HL     ; save log Y
-       movb @l,@stardust_log_y                             ;                   ;
-       movb @stardust_log_sin+1,bc                         ; LD BC,($E77B)     ; 
-       movb @stardust_log_sin,@c                           ;                   ;
+       mov  hl,@stardust_log_y                             ; LD ($E77F),HL     ; save log Y
+       mov  @stardust_log_sin,bc                           ; LD BC,($E77B)     ;
        bl   @multiply_logs                                 ; CALL $2160        ; HL = Y * sin
        .ex_de_hl                                           ; EX DE,HL          ; 
-       movb @stardust_log_x+1,hl                           ; LD HL,($E77D)     ; 
-       movb @stardust_log_x,@l                             ;                   ;
-       movb @stardust_log_cos+1,bc                         ; LD BC,($E779)     ; 
-       movb @stardust_log_cos,@c                           ;                   ;
+       mov  @stardust_log_x,hl                             ; LD HL,($E77D)     ;
+       mov  @stardust_log_cos,bc                           ; LD BC,($E779)     ;
        bl   @multiply_logs                                 ; CALL $2160        ; HL = X * cos
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; X' = X * cos - Y * sin
        movb @l,@>01(ix)                                    ; LD (IX+$01),L     ; store the new X
-       movb @stardust_log_x+1,hl                           ; LD HL,($E77D)     ; 
-       movb @stardust_log_x,@l                             ;                   ;
-       movb @stardust_log_sin+1,bc                         ; LD BC,($E77B)     ; 
-       movb @stardust_log_sin,@c                           ;                   ;
+       mov  @stardust_log_x,hl                             ; LD HL,($E77D)     ;
+       mov  @stardust_log_sin,bc                           ; LD BC,($E77B)     ;
        bl   @multiply_logs                                 ; CALL $2160        ; HL = X * sin
        .ex_de_hl                                           ; EX DE,HL          ; 
-       movb @stardust_log_y+1,hl                           ; LD HL,($E77F)     ; 
-       movb @stardust_log_y,@l                             ;                   ;
-       movb @stardust_log_cos+1,bc                         ; LD BC,($E779)     ; 
-       movb @stardust_log_cos,@c                           ;                   ;
+       mov  @stardust_log_y,hl                             ; LD HL,($E77F)     ;
+       mov  @stardust_log_cos,bc                           ; LD BC,($E779)     ;
        bl   @multiply_logs                                 ; CALL $2160        ; HL = Y * cos
        a    de,hl                                          ; ADD HL,DE         ; Y' = X * sin + Y * cos
        movb @l,@>03(ix)                                    ; LD (IX+$03),L     ; store the new Y
@@ -7378,8 +7372,7 @@ stardust_move_vertically:                                  ; >6775
        neg a                                               ; NEG               ; 
 _677d:                                                     ; >677d
        movb a,@c                                           ; LD C,A            ; C = signed distance to move
-       movb @reclaimed_range_start+1,ix                    ; LD IX,($EFA6)     ; IX -> the stardust table
-       movb @reclaimed_range_start,@ixl                    ;                   ;
+       mov  @reclaimed_range_start,ix                      ; LD IX,($EFA6)     ; IX -> the stardust table
        movb @bytes+>0f,b                                   ; LD B,$0F          ; B = 15 particles
 _6784:                                                     ; >6784
        movb @>03(ix),a                                     ; LD A,(IX+$03)     ; 
@@ -7659,8 +7652,7 @@ _6873:                                                     ; >6873
 * centre, or much nearer one axis than the other.
 scatter_stardust:                                          ; >6882
        .proc
-       movb @reclaimed_range_start+1,ix                    ; LD IX,($EFA6)     ; IX -> the stardust table
-       movb @reclaimed_range_start,@ixl                    ;                   ;
+       mov  @reclaimed_range_start,ix                      ; LD IX,($EFA6)     ; IX -> the stardust table
        movb @bytes+>0f,b                                   ; LD B,$0F          ; B = 15 particles
 _6888:                                                     ; >6888
        .push bc                                            ; PUSH BC           ; 
@@ -7763,8 +7755,7 @@ _68de:                                                     ; >68de
        li   hl,stardust_pitch_handlers                     ; LD HL,$6EE5       ; HL -> the per-view pitch handlers
        bl   @jump_to_view_handler                          ; CALL $67A8        ; pitch the stardust for this view
 _68ea:                                                     ; >68ea
-       movb @reclaimed_range_start+1,ix                    ; LD IX,($EFA6)     ; IX -> the stardust table
-       movb @reclaimed_range_start,@ixl                    ;                   ;
+       mov  @reclaimed_range_start,ix                      ; LD IX,($EFA6)     ; IX -> the stardust table
        movb @bytes+>0f,b                                   ; LD B,$0F          ; B = 15 particles
 _68f0:                                                     ; >68f0
        .push bc                                            ; PUSH BC           ; save the particle counter
@@ -7851,8 +7842,7 @@ speed_up:                                                  ; >6956
        jhe  _699a                                          ; JR NC,$699A       ; already 30 - done
        ab   one,@speed_gauge_value                         ; INC (HL)          ; speed up
        bl   @draw_speed_gauge                              ; CALL $6A59        ; update the speed gauge
-       movb @reclaimed_range_start+1,r1                    ; LD IX,($EFA6)     ; R1 -> the stardust table
-       movb @reclaimed_range_start,@r1lb                   ;                   ; 
+       mov  @reclaimed_range_start,r1                      ; LD IX,($EFA6)     ; R1 -> the stardust table
        li   r2,15                                          ; LD DE,$000B / LD B,$0F; 15 particles
 _696c:                                                     ; >696c
        movb @9(r1),r0                                      ; LD A,(IX+$09) / LD C,A; 
@@ -7889,8 +7879,7 @@ speed_down:                                                ; >699c
        jeq  _69e3                                          ; JR Z,$69E3        ; already 0 - done
        sb   one,@speed_gauge_value                         ; DEC (HL)          ; slow down
        bl   @draw_speed_gauge                              ; CALL $6A59        ; update the speed gauge
-       movb @reclaimed_range_start+1,r1                    ; LD IX,($EFA6)     ; R1 -> the stardust table
-       movb @reclaimed_range_start,@r1lb                   ;                   ; 
+       mov  @reclaimed_range_start,r1                      ; LD IX,($EFA6)     ; R1 -> the stardust table
        li   r2,15                                          ; LD DE,$000B / LD B,$0F; 15 particles
 _69b1:                                                     ; >69b1
        movb @9(r1),r0                                      ; LD A,(IX+$09) / LD C,A; 
@@ -8613,8 +8602,7 @@ _6cde:                                                     ; >6cde
        li   de,>0010                                       ; LD DE,$0010       ; 
        li   ix,>0000                                       ; LD IX,$0000       ; 
        li   iy,>0000                                       ; LD IY,$0000       ; 
-       movb hl,@tunnel_ring_radius+1                       ; LD ($E921),HL     ; 
-       movb @l,@tunnel_ring_radius                         ;                   ;
+       mov  hl,@tunnel_ring_radius                         ; LD ($E921),HL     ;
        bl   @draw_circle                                   ; CALL $3D0E        ; draw a ring
        .pop hl                                             ; POP HL            ; 
        .pop bc                                             ; POP BC            ; 
@@ -9098,8 +9086,7 @@ blank_screen_decompress_picture_recolour:                  ; >7139
        movb a,@vdpwa                                       ; OUT ($99),A       ; turn the display off
        .save_bank                                          ;                   ; (TI: select the caller's bank again afterwards)
        .select_bank cockpit_picture_bank_select            ;                   ; the picture is in ROM bank 6 on the TI
-       movb @cockpit_picture_addr+1,hl                     ; LD HL,($F740)     ; HL -> the cockpit picture (#R$F740)
-       movb @cockpit_picture_addr,@l                       ;                   ;
+       mov  @cockpit_picture_addr,hl                       ; LD HL,($F740)     ; HL -> the cockpit picture (#R$F740)
        bl   @decompress_picture                            ; CALL $390E        ; decompress it (#R$390E)
        .restore_bank                                       ;                   ; 
        movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; in witchspace?
@@ -9354,13 +9341,11 @@ _8332:                                                     ; >8332
        movb @circle_connector_no_prev_point_gate,r0        ;                   ; 
        swpb r0                                             ;                   ; 
        ai   r0,5                                           ; ADD A,$05 / LD C,A / XOR A / LD B,A; R0 = size of the saved-background record
-       movb @scanner_background_space+1,r1                 ; LD HL,($EB03)     ; R1 = space left in the saved-background list
-       movb @scanner_background_space,@r1lb                ;                   ; 
+       mov  @scanner_background_space,r1                   ; LD HL,($EB03)     ; R1 = space left in the saved-background list
        c    r0,r1                                          ; SBC HL,BC         ; 
        jh   _8205_end                                      ; RET C             ; no room - don't show this object
        s    r0,r1                                          ;                   ; 
-       movb r1,@scanner_background_space+1                 ; LD ($EB03),HL     ; 
-       movb @r1lb,@scanner_background_space                ;                   ; 
+       mov  r1,@scanner_background_space                   ; LD ($EB03),HL     ;
        ai   ix,7                                           ; LD ($E946),DE     ; advance the queue write pointer
        mov  ix,@scanner_queue_ptr                          ;                   ; 
        ab   one,@scanner_queue_count                       ; LD HL,$E948 / INC (HL); one more object in the queue
@@ -10163,14 +10148,12 @@ work_out_distance:                                         ; >883d
        abs  hl                                             ; BIT 7,H / ...     ; its size
        movb hl,@delta_z_hi                                 ; LD ($EB86),HL     ; Z for #R$84A6
        movb @l,@abs_delta_z                                ;                   ; 
-       movb hl,@object_depth+1                             ; LD ($E941),HL     ; and the depth
-       movb @l,@object_depth                               ;                   ; 
+       mov  hl,@object_depth                               ; LD ($E941),HL     ; and the depth
        bl   @vector_length                                 ; CALL $84A6        ; HL = the object's distance
        movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
        cb   a,@bytes+>64                                   ; CP $64            ; the planet?
        jne  sun_distance_supernova                         ; JR NZ,$887F       ; no
-       movb hl,@planet_distance+1                          ; LD ($E727),HL     ; yes: the planet's distance
-       movb @l,@planet_distance                            ;                   ; 
+       mov  hl,@planet_distance                            ; LD ($E727),HL     ; yes: the planet's distance
        jmp  _88a8                                          ; JR $88A8          ; 
 sun_distance_supernova:                                    ; >887f
        cb   a,@bytes+>65                                   ; CP $65            ; the sun?
@@ -10181,16 +10164,13 @@ sun_distance_supernova:                                    ; >887f
        cb   a,@bytes+>33                                   ; CP $33            ; 
        jne  _889c                                          ; JR NZ,$889C       ; no supernova
 _888e:                                                     ; >888e
-       movb @supernova_offset+1,de                         ; LD DE,($E93E)     ; DE = the offset
-       movb @supernova_offset,@e                           ;                   ; 
+       mov  @supernova_offset,de                           ; LD DE,($E93E)     ; DE = the offset
        a    de,hl                                          ; ADD HL,DE         ; add it (it's negative)
        li   r0,-100                                        ; LD HL,$FF9C       ; the offset grows by 100 every frame
        a    de,r0                                          ; ADD HL,DE         ; 
-       movb r0,@supernova_offset+1                         ; LD ($E93E),HL     ; 
-       movb @r0lb,@supernova_offset                        ;                   ; 
+       mov  r0,@supernova_offset                           ; LD ($E93E),HL     ;
 _889c:                                                     ; >889c
-       movb hl,@sun_distance+1                             ; LD ($E725),HL     ; the sun's distance
-       movb @l,@sun_distance                               ;                   ; 
+       mov  hl,@sun_distance                               ; LD ($E725),HL     ; the sun's distance
        jmp  _88a8                                          ; JR $88A8          ; 
 ship_type_1_case_else_join:                                ; >88a1
        cb   a,one                                          ; CP $01            ; the space station?
@@ -10226,8 +10206,7 @@ move_past_player:                                          ; >8b00
        movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
        cb   a,one                                          ; CP $01            ; the space station?
        jne  move_past_player_2                             ; JR NZ,$8B0D       ; no
-       movb @last_move+1,de                                ; LD DE,($E876)     ; yes: the same as the planet
-       movb @last_move,@e                                  ;                   ; 
+       mov  @last_move,de                                  ; LD DE,($E876)     ; yes: the same as the planet
        jmp  _8b58                                          ; JR $8B58          ; move it
 move_past_player_2:                                        ; >8b0d
        bl   @distance_band                                 ; CALL $8B66        ; A = distance band
@@ -10242,8 +10221,7 @@ move_past_player_2:                                        ; >8b0d
        clr  de                                             ; LD D,A / LD E,A   ; behind, in band 5: don't move
        jmp  _8b58                                          ; JR $8B4D / JR $8B58; 
 move_past_player_jump:                                     ; >8b27
-       movb @jump_speed+1,de                               ; LD DE,($E878)     ; DE = the jump's speed
-       movb @jump_speed,@e                                 ;                   ; 
+       mov  @jump_speed,de                                 ; LD DE,($E878)     ; DE = the jump's speed
        movb @ship_type,a                                   ; LD A,($F7E7)      ; 
        cb   a,@bytes+>64                                   ; CP $64            ; the planet?
        jne  _8b58                                          ; JR NZ,$8B4D       ; no
@@ -10255,8 +10233,7 @@ move_past_player_jump:                                     ; >8b27
        movb @object_distance+1,hl                          ; LD HL,($EB8E)     ; too close:
        movb @object_distance,@l                            ;                   ; 
        ai   hl,-10000                                      ; OR A / SBC HL,BC  ; HL = distance - 10000
-       movb hl,@jump_speed+1                               ; LD ($E878),HL     ; the jump's new speed
-       movb @l,@jump_speed                                 ;                   ; 
+       mov  hl,@jump_speed                                 ; LD ($E878),HL     ; the jump's new speed
        mov  hl,de                                          ; EX DE,HL          ; DE = it
        movb a,@secondary_flag_counter_pair                 ; LD ($E933),A      ; cut the jump short
        jmp  _8b58                                          ; JR $8B58          ; move it
@@ -10269,8 +10246,7 @@ _8b52:                                                     ; >8b52
        clr  de                                             ; LD E,A / LD D,B   ; DE = the amount
        movb a,@e                                           ;                   ; 
 _8b58:                                                     ; >8b58
-       movb de,@last_move+1                                ; LD ($E876),DE     ; remember the amount
-       movb @e,@last_move                                  ;                   ; 
+       mov  de,@last_move                                  ; LD ($E876),DE     ; remember the amount
        mov  @object_position_z,hl                          ; LD HL,($F7D2)     ; HL = z
        s    de,hl                                          ; OR A / SBC HL,DE  ; take the amount off
        mov  hl,@object_position_z                          ; LD ($F7D2),HL     ; 
@@ -10287,8 +10263,7 @@ _8b58:                                                     ; >8b58
 * 
 * O:A Distance band (1 upwards)
 distance_band:                                             ; >8b66
-       movb @object_depth+1,r1                             ; LD BC,($E941)     ; R1 = depth
-       movb @object_depth,@r1lb                            ;                   ; 
+       mov  @object_depth,r1                               ; LD BC,($E941)     ; R1 = depth
        movb one,a                                          ; LD A,$01          ; band 1
        li   r0,>2710                                       ; LD HL,$2710       ; up to 10000
 _8b6f:                                                     ; >8b6f
@@ -10475,7 +10450,7 @@ unused_e610:                                               ; >e610
 * 
 * The square of the distance to the nearest system found so far by #R$5325 and
 * #R$538B, a 24-bit number ($E613-$E615).
-nearest_distance:                                          ; >e613
+* (TI: nearest_distance is a word in word_variables; these two bytes are unused)
        byte >00,>00                                                  ; 
 nearest_distance_hi:                                       ; >e615
        byte >00,>00                                                  ; 
@@ -10485,7 +10460,7 @@ nearest_distance_hi:                                       ; >e615
 * 
 * The square of the distance to the furthest system found so far by #R$5325, a
 * 24-bit number ($E617-$E619).
-furthest_distance:                                         ; >e617
+* (TI: furthest_distance is a word in word_variables; these two bytes are unused)
        byte >00,>00                                                  ; 
 furthest_distance_hi:                                      ; >e619
        byte >00,>00                                                  ; 
@@ -10494,7 +10469,7 @@ furthest_distance_hi:                                      ; >e619
 * System search point
 * 
 * The point (x, y) #R$5325 and #R$538B measure the distances from.
-system_search_point:                                       ; >e61b
+* (TI: system_search_point is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -10599,7 +10574,7 @@ view_z:                                                    ; >e6dc
 * Where #R$47A1 reads the next pair of random numbers for an explosion's dots,
 * set by #R$4AEC.
 explosion_random_pointer:                                  ; >e6de
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * On-screen check: left edge
@@ -10862,7 +10837,7 @@ fuel_price:                                                ; >e724
 * 
 * Worked out each frame by #R$887F (via #R$883D) - in the supernova
 * mission less #R$E93E - and turned into the cabin temperature (#R$1577).
-sun_distance:                                              ; >e725
+* (TI: sun_distance is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -10871,7 +10846,7 @@ sun_distance:                                              ; >e725
 * Worked out each frame by #R$883D, and turned into the altitude
 * (#R$1577). Also decides whether the ship is in the space station's safe
 * zone (#R$1549) and whether the Torus Jump Drive works (#R$86E6).
-planet_distance:                                           ; >e727
+* (TI: planet_distance is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -10935,7 +10910,7 @@ unused_e72f:                                               ; >e72f
 * here on entry, for #R$37E2's fan-drawing use (redrawing a fresh line
 * from this same recovered endpoint to a new one each call).
 bresenham_cached_endpoint:                                 ; >e730
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Saved stack pointer while clearing the space view
@@ -10958,7 +10933,7 @@ line_points_left:                                          ; >e734
 * 
 * The message #R$39C8 shows in the space view, which #R$39F1 draws (at $3A03)
 * each frame while it is showing.
-view_message_address:                                      ; >e735
+* (TI: view_message_address is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -11001,14 +10976,14 @@ remaining_divisions_count:                                 ; >e73d
 * 
 * See #R$5B81's (continue_5b4d_print_scaled_value) own header.
 scaled_cargo_value:                                        ; >e73e
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Cached cargo sell value (word)
 * 
 * See #R$5D72's (complete_cargo_sale) own header.
 cached_cargo_sell_value:                                   ; >e740
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Per-unit cargo-sale payout (word)
@@ -11016,7 +10991,7 @@ cached_cargo_sell_value:                                   ; >e740
 * Computed by #R$5D72 (complete_cargo_sale) from #R$E740's sell value,
 * scaled by a $13/$14 sell-back ratio - see that routine's own header.
 per_unit_cargo_payout:                                     ; >e742
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Equip Ship: number of items on sale
@@ -11038,7 +11013,7 @@ offered_mount_letters:                                     ; >e745
 * 
 * Set by #R$5EFE to the laser's entry in the equipment (#R$F775), whose bit
 * for the chosen mount it sets once the laser is paid for.
-equipment_install_flags_ptr:                               ; >e749
+* (TI: equipment_install_flags_ptr is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -11046,7 +11021,7 @@ equipment_install_flags_ptr:                               ; >e749
 * 
 * The (column, row) at which #R$6276 prints the next item of equipment fitted,
 * starting at column 5, row 12.
-status_equipment_position:                                 ; >e74b
+* (TI: status_equipment_position is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -11063,7 +11038,7 @@ equipment_prerefund_flag:                                  ; >e74d
 * 
 * Set by #R$5EFE along with #R$E74D.
 equipment_conflict_flags_ptr:                              ; >e74e
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Equip Ship: cash before a refund, low word
@@ -11207,28 +11182,28 @@ tunnel_ring_radius_3:                                      ; >e778
 * Stardust rotation: log of the cosine
 * 
 * Saved by #R$66DC (#R$1FCF).
-stardust_log_cos:                                          ; >e779
+* (TI: stardust_log_cos is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
 * Stardust rotation: log of the sine
 * 
 * Saved by #R$66DC (#R$1FCF).
-stardust_log_sin:                                          ; >e77b
+* (TI: stardust_log_sin is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
 * Stardust rotation: log of the particle's X
 * 
 * Saved by #R$66DC for each particle.
-stardust_log_x:                                            ; >e77d
+* (TI: stardust_log_x is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
 * Stardust rotation: log of the particle's Y
 * 
 * Saved by #R$66DC for each particle.
-stardust_log_y:                                            ; >e77f
+* (TI: stardust_log_y is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -11368,14 +11343,14 @@ circle_saved_sp:                                           ; >e81d
 * Circle: centre x
 * 
 * Set by #R$3D0E and #R$3DF4.
-circle_centre_x:                                           ; >e81f
+* (TI: circle_centre_x is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
 * Circle: centre y
 * 
 * Set by #R$3D0E and #R$3DF4.
-circle_centre_y:                                           ; >e821
+* (TI: circle_centre_y is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -11406,14 +11381,14 @@ clip_bisection_count:                                      ; >e826
 * 
 * The point inside the space view that #R$3AC2 and #R$3BE0 bisect towards when
 * moving a point to the edge.
-clip_reference_x:                                          ; >e827
+* (TI: clip_reference_x is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
 * Line clipping: reference point y
 * 
 * See #R$E827.
-clip_reference_y:                                          ; >e829
+* (TI: clip_reference_y is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -11685,7 +11660,7 @@ something_destroyed:                                       ; >e869
 * own header. Consumed by #R$2E7B (signed_divide_24_by_16) as the
 * unsigned 16-bit divisor.
 scaled_delta_divisor:                                      ; >e86a
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Steering: tolerance
@@ -11752,7 +11727,7 @@ type_entry_cache:                                          ; >e874
 * space station, which follows the planet, is moved by the same amount
 * (#R$8B00).
 last_move:                                                 ; >e876
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Torus jump speed
@@ -11760,7 +11735,7 @@ last_move:                                                 ; >e876
 * How far each object moves past the player per frame during a Torus
 * jump: set to 200 by #R$86E6, less if the planet gets close (#R$8B00).
 jump_speed:                                                ; >e878
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Speed saved while the Torus Jump Drive is engaged
@@ -11845,7 +11820,7 @@ title_wobble_target_2:                                     ; >e887
 * Set by #R$1C5C from the ship's size ((($F805) * 64) / 44); #R$1D3D
 * moves the ship in until it's this far away.
 title_ship_distance:                                       ; >e888
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Title screen ship arrived flag
@@ -11886,7 +11861,7 @@ unused_e88d:                                               ; >e88d
 * Set by #R$1E01 (at $1E3D) to the object-table slot of the letter just
 * added, so that #R$1E5A can move that letter differently from the rest.
 title_letter_slot:                                         ; >e88e
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Title screen: pointer to the next ship in the list (word)
@@ -11894,7 +11869,7 @@ title_letter_slot:                                         ; >e88e
 * Set by #R$1C5C to the start of #R$1F40 (or #R$1F4F for a mission
 * briefing) and advanced past each ship as it's shown.
 title_ship_ptr:                                            ; >e890
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Title screen: letter-being-added flag
@@ -12469,7 +12444,7 @@ hyperspace_trigger:                                        ; >e920
 * 
 * Set by #R$6CB2 for each ring it draws, and used by sound effect 7's handler
 * (#R$77FB) to make the sound follow the rings.
-tunnel_ring_radius:                                        ; >e921
+* (TI: tunnel_ring_radius is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -12728,7 +12703,7 @@ mission_state:                                             ; >e93d
 * $33, and reduced by 100 every frame, so the sun gets closer and
 * closer. Reset to 0 by #R$1868.
 supernova_offset:                                          ; >e93e
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Search-cascade gate flag
@@ -12744,7 +12719,7 @@ e940_gate_flag:                                            ; >e940
 * 
 * The magnitude of the object's z relative to the player, stored by
 * #R$883D; decides its distance band (#R$8B66).
-object_depth:                                              ; >e941
+* (TI: object_depth is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -12897,14 +12872,14 @@ goatsoup_capitalize_flag:                                  ; >ead6
 * generator, the same shape as the original game's system-description
 * seed). #R$9B7C also folds this word (XORed with word 2) into the seeds
 * it generates a random ship name from (#R$E904).
-goatsoup_seed_word1:                                       ; >ead7
+* (TI: goatsoup_seed_word1 is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
 * Goatsoup RNG seed, word 2 [text]
 * 
 * See #R$EAD7 (word 1) for the full twist mechanism this pairs with.
-goatsoup_seed_word2:                                       ; >ead9
+* (TI: goatsoup_seed_word2 is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -12943,7 +12918,7 @@ scanner_queue_ready:                                       ; >eb02
 * Reset to 300 (the size of #R$E9D6's list) by #R$13FD each frame and
 * reduced by #R$8332 for each object added; an object whose record
 * wouldn't fit isn't shown that frame.
-scanner_background_space:                                  ; >eb03
+* (TI: scanner_background_space is a word in word_variables; these two bytes are unused)
        byte >00,>00
 
 ********************************************************************************
@@ -13234,7 +13209,7 @@ object_distance_hi:                                        ; >eb8f
 * #R$47A1 consumes it through #R$2160 - see #R$4AEC's own header for
 * the full mechanism.
 perentry_loop_pointer:                                     ; >eb90
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * Clip point 1: column (X)
@@ -13772,7 +13747,7 @@ reclaimed_range_end:                                       ; >efa4
 * and #R$699C (at $69A8) - the 15-particle stardust table (see #R$68CD),
 * which occupies the reclaimed $6F9F-$7043 space.
 reclaimed_range_start:                                     ; >efa6
-       byte startup_code_stardust_table%%256,startup_code_stardust_table//256
+       data startup_code_stardust_table
 
 ********************************************************************************
 * ECM jammer active
@@ -13847,7 +13822,7 @@ commander_menu_buffer:                                     ; >f6c0
 * one-time startup code (#R$6F9F, step 1), and read by #R$7139, which
 * unpacks the picture (#R$390E) when entering flight.
 cockpit_picture_addr:                                      ; >f740
-       byte cockpit_picture%%256,cockpit_picture//256
+       data cockpit_picture
 
 ********************************************************************************
 * In-game clock: seconds/minutes/hours/days
@@ -13879,7 +13854,7 @@ clock_days:                                                ; >f745
 * HL / LD ($F746),HL` at $010F-$0113) - counts loop passes, not VBlanks.
 * Also read by the routines at #R$13FD (at $140F) and #R$422E (at $4249).
 main_loop_tick_counter:                                    ; >f746
-       byte >00,>00
+       data >0000
 
 ********************************************************************************
 * VBlank sub-tick counter since the last loop pass
@@ -14068,17 +14043,17 @@ current_system_name:                                       ; >f765
 * or an edge (#R$496D) in the view, kept so that #R$4B22 can clip the line
 * where it passes the player when one end is behind: $F769-$F76E is the end
 * behind the player, $F76F-$F774 the end in front.
-line_end_1_x:                                              ; >f769
+* (TI: line_end_1_x is a word in word_variables; these two bytes are unused)
        byte >00,>00                                                  ; 
-line_end_1_y:                                              ; >f76b
+* (TI: line_end_1_y is a word in word_variables; these two bytes are unused)
        byte >00,>00                                                  ; 
-line_end_1_z:                                              ; >f76d
+* (TI: line_end_1_z is a word in word_variables; these two bytes are unused)
        byte >00,>00                                                  ; 
-line_end_2_x:                                              ; >f76f
+* (TI: line_end_2_x is a word in word_variables; these two bytes are unused)
        byte >00,>00                                                  ; 
-line_end_2_y:                                              ; >f771
+* (TI: line_end_2_y is a word in word_variables; these two bytes are unused)
        byte >00,>00                                                  ; 
-line_end_2_z:                                              ; >f773
+* (TI: line_end_2_z is a word in word_variables; these two bytes are unused)
        byte >00,>00                                                  ; 
 
 ********************************************************************************

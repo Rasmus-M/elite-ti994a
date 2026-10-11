@@ -392,13 +392,11 @@ show_system_description:                                   ; >9a4b
        movb @system_s1_hi,r1                               ; LD DE,($F74D)     ; 
        movb @system_s1_lo,@r1lb                            ;                   ; 
        xor  r1,r0                                          ; XOR D / XOR E     ; 
-       movb r0,@goatsoup_seed_word1+1                      ; LD ($EAD7),HL     ; the first seed word
-       movb @r0lb,@goatsoup_seed_word1                     ;                   ; 
+       mov  r0,@goatsoup_seed_word1                        ; LD ($EAD7),HL     ; the first seed word
        movb @system_s2_hi,r1                               ; LD DE,($F74F)     ; 
        movb @system_s2_lo,@r1lb                            ;                   ; 
        xor  r1,r0                                          ; XOR D / XOR E     ; 
-       movb r0,@goatsoup_seed_word2+1                      ; LD ($EAD9),HL     ; the second seed word
-       movb @r0lb,@goatsoup_seed_word2                     ;                   ; 
+       mov  r0,@goatsoup_seed_word2                        ; LD ($EAD9),HL     ; the second seed word
        li   r1,shared_blit_or_goatsoup_buffer              ; LD HL,$E9D6 / LD (HL),$00; clear the buffer
        li   r2,>80                                         ; LD BC,$00FF / LDIR; (TI: 256 bytes, a word at a time)
 _9a6e_clear:                                               
@@ -617,12 +615,10 @@ line_editor_ctrl_f:                                        ; >9b77
 * expanding the result into the output (#R$9AB9) and appending a space.
 line_editor_ctrl_c:                                        ; >9b7c
        .proc                                               ;                   ; 
-       movb @goatsoup_seed_word1+1,r0                      ; LD HL,($EAD7)     ; combine the two seed words...
-       movb @goatsoup_seed_word1,@r0lb                     ;                   ; 
+       mov  @goatsoup_seed_word1,r0                        ; LD HL,($EAD7)     ; combine the two seed words...
        movb r0,@system_seeds+1                             ; LD ($E904),HL     ; 
        movb @r0lb,@system_seeds                            ;                   ; 
-       movb @goatsoup_seed_word2+1,r1                      ; LD HL,($EAD9)     ; 
-       movb @goatsoup_seed_word2,@r1lb                     ;                   ; 
+       mov  @goatsoup_seed_word2,r1                        ; LD HL,($EAD9)     ;
        movb r1,@seed_s1+1                                  ; LD ($E906),HL     ; 
        movb @r1lb,@seed_s1                                 ;                   ; 
        xor  r0,r1                                          ; XOR D / XOR E     ; 
@@ -654,15 +650,11 @@ line_editor_ctrl_c:                                        ; >9b7c
 goatsoup_advance_seed_roll_0_51:                           ; >9bb2
        .proc                                               ;                   ; 
        .push hl                                            ; PUSH HL           ; 
-       movb @goatsoup_seed_word2+1,r0                      ; LD HL,($EAD9)     ; R0 = the second seed word
-       movb @goatsoup_seed_word2,@r0lb                     ;                   ; 
-       movb @goatsoup_seed_word1+1,r1                      ; LD DE,($EAD7)     ; R1 = the first seed word
-       movb @goatsoup_seed_word1,@r1lb                     ;                   ; 
-       movb r0,@goatsoup_seed_word1+1                      ; LD ($EAD7),HL     ; the second word becomes the new first
-       movb @r0lb,@goatsoup_seed_word1                     ;                   ; 
+       mov  @goatsoup_seed_word2,r0                        ; LD HL,($EAD9)     ; R0 = the second seed word
+       mov  @goatsoup_seed_word1,r1                        ; LD DE,($EAD7)     ; R1 = the first seed word
+       mov  r0,@goatsoup_seed_word1                        ; LD ($EAD7),HL     ; the second word becomes the new first
        a    r1,r0                                          ; ADD HL,DE         ; sum them
-       movb r0,@goatsoup_seed_word2+1                      ; LD ($EAD9),HL     ; the sum becomes the new second word
-       movb @r0lb,@goatsoup_seed_word2                     ;                   ; 
+       mov  r0,@goatsoup_seed_word2                        ; LD ($EAD9),HL     ; the sum becomes the new second word
        andi r0,>00ff                                       ; LD H,$00          ; HL = the sum's low byte
        mov  r0,hl                                          ;                   ; 
        movb @bytes+>34,a                                   ; LD A,$34          ; 52

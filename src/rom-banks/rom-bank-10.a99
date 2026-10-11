@@ -79,21 +79,18 @@ _1c8b:                                                     ; >1c8b
 title_screen_mission:                                      ; >1c93
        li   hl,mission_briefing_ship                       ; LD HL,$1F4F       ; HL -> the mission briefing ship
 _1c96:                                                     ; >1c96
-       movb hl,@title_ship_ptr+1                           ; LD ($E890),HL     ; point at the first ship
-       movb @l,@title_ship_ptr                             ;                   ;
+       mov  hl,@title_ship_ptr                             ; LD ($E890),HL     ; point at the first ship
        movb @bytes+>71,a                                   ; LD A,$71          ;
        bl   @colour_space_view                             ; CALL $3A4D        ; colour the space view ($71)
 title_screen_next_ship:                                    ; >1c9e
-       movb @title_ship_ptr+1,hl                           ; LD HL,($E890)     ; HL -> next ship in the list
-       movb @title_ship_ptr,@l                             ;                   ;
+       mov  @title_ship_ptr,hl                             ; LD HL,($E890)     ; HL -> next ship in the list
        movb *hl,a                                          ; LD A,(HL)         ; A = this step's view-type byte
        socb a,a                                            ; OR A              ;
        jeq  _1c8b                                          ; JR Z,$1C8B        ; end of the list - start again with the letters
        movb *hl,a                                          ; LD A,(HL)         ;
        movb a,@ship_type                                   ; LD ($F7E7),A      ; set the object's type
        inc  hl                                             ; INC HL            ;
-       movb hl,@title_ship_ptr+1                           ; LD ($E890),HL     ;
-       movb @l,@title_ship_ptr                             ;                   ;
+       mov  hl,@title_ship_ptr                             ; LD ($E890),HL     ;
        movb one,a                                          ; LD A,$01          ;
        movb a,@title_wobble_target_1                       ; LD ($E886),A      ; wobble targets start at 1
        movb a,@title_wobble_target_2                       ; LD ($E887),A      ;
@@ -121,8 +118,7 @@ title_screen_next_ship:                                    ; >1c9e
        ; RR L                                              ; RR L              ; (done by the SRL H above, which shifts all of HL)
        movb @bytes+>2c,a                                   ; LD A,$2C          ;
        bl   @divide_hl_a                                   ; CALL $2079        ; HL = size * 64 / 44
-       movb hl,@title_ship_distance+1                      ; LD ($E888),HL     ; the distance to fly in to
-       movb @l,@title_ship_distance                        ;                   ;
+       mov  hl,@title_ship_distance                        ; LD ($E888),HL     ; the distance to fly in to
 title_screen_next_frame:                                   ; >1cf4
        bl   @clear_space_view                              ; CALL $388F        ; next frame: clear the space view
        movb @bytes+>d6,a                                   ; LD A,$D6          ;
@@ -165,8 +161,7 @@ title_screen_frame:                                        ; >1d3d
        li   de,>ff88                                       ; LD DE,$FF88       ;
        a    de,hl                                          ; ADC HL,DE         ;
        mov  hl,@object_position_z                          ; LD ($F7D2),HL     ; 
-       movb @title_ship_distance+1,de                      ; LD DE,($E888)     ; DE = distance to stop at
-       movb @title_ship_distance,@e                        ;                   ;
+       mov  @title_ship_distance,de                        ; LD DE,($E888)     ; DE = distance to stop at
        mov  hl,hl                                          ;                   ; test the sign of the new distance (the MOVs above changed the status)
        jgt  !                                              ; JP M,$1D5A        ;
        jeq  !                                              ;                   ; 
@@ -336,8 +331,7 @@ spawn_fresh_ship:                                          ; >1e32
        ab   one,a                                          ; INC A             ;
        movb a,@object_status_byte                          ; LD ($F7CD),A      ;
        bl   @add_object                                    ; CALL $3037        ; add it to the object table
-       movb hl,@title_letter_slot+1                        ; LD ($E88E),HL     ; remember which slot it's in
-       movb @l,@title_letter_slot                          ;                   ;
+       mov  hl,@title_letter_slot                          ; LD ($E88E),HL     ; remember which slot it's in
        bl   @title_screen_letter_frames                    ; CALL $1E5A        ; run 24 frames
        jnc  title_screen_next_letter                       ; JR NC,$1E48       ; no key pressed
        .pop hl                                             ; POP HL            ;
@@ -416,8 +410,7 @@ _1e67:                                                     ; >1e67
        socb a,a                                            ; OR A              ;
        jeq  title_screen_letter_away                       ; JR Z,$1E96        ; no letter being added
        .pop de                                             ; POP DE            ;
-       movb @title_letter_slot+1,hl                        ; LD HL,($E88E)     ;
-       movb @title_letter_slot,@l                          ;                   ;
+       mov  @title_letter_slot,hl                          ; LD HL,($E88E)     ;
        socb a,a                                            ; OR A              ;
        s    de,hl                                          ; SBC HL,DE         ;
        jne  _1e94                                          ; JR NZ,$1E94       ; not the one being added
@@ -563,8 +556,8 @@ continue_1837_clear_e93e:                                  ; >1868
        andi a,>f000                                        ; AND $F0           ; keep the high nibble
        cb   a,@bytes+>30                                   ; CP $30            ; state $30-$3F?
        jne  _1872                                          ; RET NZ            ; no - nothing to do
-       sb   @supernova_offset,@supernova_offset            ; SBC HL,HL / LD ($E93E),HL; yes - reset the running total
-       sb   @supernova_offset+1,@supernova_offset+1        ;                   ; 
+       sb   @supernova_offset+1,@supernova_offset+1        ; SBC HL,HL / LD ($E93E),HL; yes - reset the running total
+       sb   @supernova_offset,@supernova_offset            ;                   ; 
 _1872:                                                     ; >1872
        .endproc                                            ; RET               ; 
 

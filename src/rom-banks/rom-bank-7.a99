@@ -164,8 +164,7 @@ _6309:                                                     ; >6309
        li   hl,msg_harmless_0f25                           ; LD HL,$0F25       ; "Harmless" ...
        bl   @rst_10_target_print_ath_tokenised             ; RST $10           ; print the rank
        li   hl,>050c                                       ; LD HL,$050C       ; the first equipment column
-       movb hl,@status_equipment_position+1                ; LD ($E74B),HL     ; 
-       movb @l,@status_equipment_position                  ;                   ; 
+       mov  hl,@status_equipment_position                  ; LD ($E74B),HL     ;
        li   hl,item_large_cargo_bay                        ; LD HL,$F777       ; the equipment, from the large cargo bay
        movb @bytes+>0f,b                                   ; LD B,$0F          ; 15 items
 _6325:                                                     ; >6325
@@ -175,8 +174,7 @@ _6325:                                                     ; >6325
        andi a,>7f00                                        ; AND $7F           ; 
        jeq  _636d                                          ; JR Z,$636D        ; not fitted
        .push bc                                            ; PUSH BC           ; 
-       movb @status_equipment_position+1,bc                ; LD BC,($E74B)     ; 
-       movb @status_equipment_position,@c                  ;                   ; 
+       mov  @status_equipment_position,bc                  ; LD BC,($E74B)     ;
        bl   @set_cursor_position                           ; CALL $3548        ; 
        movb b,a                                            ; LD A,B            ; 
        ab   @bytes+>11,a                                   ; ADD A,$11         ; 
@@ -186,8 +184,7 @@ _6325:                                                     ; >6325
        movb @bytes+>05,b                                   ; LD B,$05          ; the second column
        ab   one,@c                                         ; INC C             ; 
 _633f:                                                     ; >633f
-       movb bc,@status_equipment_position+1                ; LD ($E74B),BC     ; 
-       movb @c,@status_equipment_position                  ;                   ; 
+       mov  bc,@status_equipment_position                  ; LD ($E74B),BC     ;
        .pop bc                                             ; POP BC            ; 
        movb @bytes+>11,a                                   ; LD A,$11          ; 
        sb   b,a                                            ; SUB B             ; 
@@ -730,8 +727,7 @@ _5b66_divide:
        jmp  _5b66                                          ; JR $5B66          ; check again
 continue_5b4d_print_scaled_value:                          ; >5b81
        movb a,@remaining_divisions_count                   ; LD ($E73D),A      ; cache the remaining-divisions count
-       movb de,@scaled_cargo_value+1                       ; LD ($E73E),DE     ; cache the scaled value
-       movb @e,@scaled_cargo_value                         ;                   ; 
+       mov  de,@scaled_cargo_value                         ; LD ($E73E),DE     ; cache the scaled value
        .push af                                            ; PUSH AF           ; 
        movb @e,@c                                          ; LD C,E            ; 
        movb d,@l                                           ; LD L,D            ; 
@@ -1239,8 +1235,7 @@ _5d1a_some:
        movb @market(r1),r1                                 ; LD HL,$F789 / ADD HL,DE / LD A,(HL); the price
        srl  r1,8                                           ;                   ; 
        sla  r1,2                                           ; ADD HL,HL x 2     ; *4
-       movb r1,@cached_cargo_sell_value+1                  ; LD ($E740),HL     ; the price
-       movb @r1lb,@cached_cargo_sell_value                 ;                   ; 
+       mov  r1,@cached_cargo_sell_value                    ; LD ($E740),HL     ; the price
        movb @r1lb,@c                                       ; LD C,L            ; 
        movb r1,@l                                          ; LD L,H            ; 
        sb   h,h                                            ; LD H,D            ; 
@@ -1280,16 +1275,13 @@ _5d1a_esc:
 * I:IX Pointer to the goods in the hold (#R$EB19)
 sell_all:                                                  ; >5d72
        .proc                                               ;                   ; 
-       movb @cached_cargo_sell_value+1,r1                  ; LD HL,($E740)     ; the price
-       movb @cached_cargo_sell_value,@r1lb                 ;                   ; 
+       mov  @cached_cargo_sell_value,r1                    ; LD HL,($E740)     ; the price
        li   r0,19                                          ; LD A,$13          ; 
        mpy  r0,r1                                          ; CALL $1F73        ; * 19 (TI: MPY and DIV)
        li   r0,20                                          ; LD A,$14          ; 
        div  r0,r1                                          ; CALL $2079        ; / 20
-       movb r1,@per_unit_cargo_payout+1                    ; LD ($E742),HL     ; 
-       movb @r1lb,@per_unit_cargo_payout                   ;                   ; 
-       movb @scaled_cargo_value+1,bc                       ; LD BC,($E73E)     ; BC = quantity
-       movb @scaled_cargo_value,@c                         ;                   ; 
+       mov  r1,@per_unit_cargo_payout                      ; LD ($E742),HL     ;
+       mov  @scaled_cargo_value,bc                         ; LD BC,($E73E)     ; BC = quantity
        mpy  bc,r1                                          ;                   ; (TI: R1:R2 = the payout * the quantity, added to the cash once)
        movb @player_cash+1,r0                              ; LD HL,($EB16)     ; 
        movb @player_cash,@r0lb                             ;                   ; 
@@ -1777,8 +1769,7 @@ confirm_special_item_purchase:                             ; >5eef
 * I:HL Pointer to its entry in the equipment (#R$F775)
 buy_laser:                                                 ; >5efe
        .proc                                               ;                   ; 
-       movb hl,@equipment_install_flags_ptr+1              ; LD ($E749),HL     ; keep the entry's address
-       movb @l,@equipment_install_flags_ptr                ;                   ; 
+       mov  hl,@equipment_install_flags_ptr                ; LD ($E749),HL     ; keep the entry's address
        andi a,>0f00                                        ; AND $0F           ; 
        cb   a,@bytes+>0f                                   ; CP $0F            ; 
        jne  popcount_a_kernighan                           ; JR NZ,$5F0D       ; not all set
@@ -1886,8 +1877,7 @@ _5f8e:                                                     ; >5f8e
        jeq  _5fcd                                          ; JR Z,$5FCC        ; no - try the next laser
        mov  r1,r0                                          ;                   ; yes: remember the entry's address...
        ai   r0,fuel_level                                  ;                   ; 
-       movb r0,@equipment_conflict_flags_ptr+1             ; LD ($E74E),HL     ; 
-       movb @r0lb,@equipment_conflict_flags_ptr            ;                   ; 
+       mov  r0,@equipment_conflict_flags_ptr               ; LD ($E74E),HL     ;
        movb @fuel_level(r1),@equipment_prerefund_flag      ; LD A,(HL) / LD ($E74D),A; ...and its old value, in case they need putting back
        szcb @c,@fuel_level(r1)                             ; LD A,C / CPL / AND (HL) / LD (HL),A; take it off the mount
 _5fab:                                                     ; >5fab
@@ -1910,8 +1900,7 @@ _5fcd:                                                     ; >5fcd
        sb   one,b                                          ; DJNZ $5F8E        ; 
        jne  _5f8e                                          ;                   ; 
 buy_laser_install:                                         ; >5fd0
-       movb @equipment_install_flags_ptr+1,hl              ; LD HL,($E749)     ; HL -> the new laser's entry in the equipment
-       movb @equipment_install_flags_ptr,@l                ;                   ; 
+       mov  @equipment_install_flags_ptr,hl                ; LD HL,($E749)     ; HL -> the new laser's entry in the equipment
        .push bc                                            ; PUSH BC           ; 
        .push hl                                            ; PUSH HL           ; 
        movb @view_laser_type,a                             ; LD A,($F818)      ; A = its item number
@@ -1927,8 +1916,7 @@ _5fd0_failed:
 rollback_conflict_refund_on_failure:                       ; >5fe4
        movb @equipment_prerefund_flag,a                    ; LD A,($E74D) / OR A; A = the removed laser's old entry
        jeq  _5ffa                                          ; JR Z,$5FFA        ; no laser was removed
-       movb @equipment_conflict_flags_ptr+1,hl             ; LD HL,($E74E)     ; put the removed laser back
-       movb @equipment_conflict_flags_ptr,@l               ;                   ; 
+       mov  @equipment_conflict_flags_ptr,hl               ; LD HL,($E74E)     ; put the removed laser back
        movb a,*hl                                          ; LD (HL),A         ; 
        movb @equipment_prerefund_cash_lo+1,@player_cash+1  ; LD HL,($E750) / LD ($EB16),HL; and the cash
        movb @equipment_prerefund_cash_lo,@player_cash      ;                   ; 

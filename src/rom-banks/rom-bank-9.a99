@@ -1470,33 +1470,29 @@ galactic_chart_select:                                     ; >5314
 * O:A The furthest system (also in #R$E83D)
 nearest_and_furthest_systems:                              ; >5325
        .proc                                               ;                   ; 
-       movb @c,@system_search_point                        ; LD ($E61B),BC     ; the point
-       movb b,@system_search_point+1                       ;                   ; 
+       mov  bc,@system_search_point                        ; LD ($E61B),BC     ; the point
        seto r0                                             ; LD HL,$FFFF       ; 
-       movb r0,@nearest_distance                           ; LD ($E613),HL / LD ($E615),HL; the nearest so far: none
-       movb r0,@nearest_distance+1                         ;                   ; 
+       movb r0,@nearest_distance+1                         ; LD ($E613),HL / LD ($E615),HL; the nearest so far: none
+       movb r0,@nearest_distance                           ;                   ; 
        movb r0,@nearest_distance_hi                        ;                   ; 
-       sb   @furthest_distance,@furthest_distance          ; INC HL / LD ($E617),HL / LD ($E619),HL; the furthest so far: none
-       sb   @furthest_distance+1,@furthest_distance+1      ;                   ; 
+       sb   @furthest_distance+1,@furthest_distance+1      ; INC HL / LD ($E617),HL / LD ($E619),HL; the furthest so far: none
+       sb   @furthest_distance,@furthest_distance          ;                   ; 
        sb   @furthest_distance_hi,@furthest_distance_hi    ;                   ; 
        bl   @galaxy_seeds_to_system                        ; CALL $5607        ; start at system 0
        clr  bc                                             ;                   ; (TI: B = 0 for 256 systems)
 _533c:                                                     ; >533c
        .push bc                                            ; PUSH BC           ; 
        bl   @next_system_coordinates                       ; CALL $4C80        ; BC = this system's coordinates
-       movb @system_search_point+1,d                       ; LD DE,($E61B)     ; DE = the point
-       movb @system_search_point,@e                        ;                   ; 
+       mov  @system_search_point,de                        ; LD DE,($E61B)     ; DE = the point
        bl   @squared_distance_2d                           ; CALL $205D        ; AHL = distance squared
        cb   a,@nearest_distance_hi                         ; LD BC,($E613) / SBC HL,BC / SBC A,C; (TI: compared by byte and word)
        jl   _5359                                          ;                   ; 
        jh   _5366                                          ; JR NC,$5366       ; not nearer
-       movb @nearest_distance+1,r0                         ;                   ; 
-       movb @nearest_distance,@r0lb                        ;                   ; 
+       mov  @nearest_distance,r0                           ;                   ;
        c    hl,r0                                          ;                   ; 
        jhe  _5366                                          ;                   ; not nearer
 _5359:                                                     ; >5359
-       movb @l,@nearest_distance                           ; LD ($E613),HL     ; the nearest so far
-       movb h,@nearest_distance+1                          ;                   ; 
+       mov  hl,@nearest_distance                           ; LD ($E613),HL     ; the nearest so far
        movb a,@nearest_distance_hi                         ; LD ($E615),DE     ; 
        .peek r0                                            ; LD A,B            ; (the loop counter, on the stack)
        andi r0,>ff00                                       ;                   ; 
@@ -1506,13 +1502,11 @@ _5366:                                                     ; >5366
        cb   a,@furthest_distance_hi                        ; LD BC,($E617) / SBC HL,BC / SBC A,C; 
        jh   _5378                                          ;                   ; 
        jl   _5385                                          ; JR C,$5385        ; not further
-       movb @furthest_distance+1,r0                        ;                   ; 
-       movb @furthest_distance,@r0lb                       ;                   ; 
+       mov  @furthest_distance,r0                          ;                   ;
        c    hl,r0                                          ;                   ; 
        jl   _5385                                          ;                   ; not further
 _5378:                                                     ; >5378
-       movb @l,@furthest_distance                          ; LD ($E617),HL     ; the furthest so far
-       movb h,@furthest_distance+1                         ;                   ; 
+       mov  hl,@furthest_distance                          ; LD ($E617),HL     ; the furthest so far
        movb a,@furthest_distance_hi                        ; LD ($E619),DE     ; 
        .peek r0                                            ; LD A,B            ; and its system index
        andi r0,>ff00                                       ;                   ; 
@@ -1542,11 +1536,10 @@ local_chart_select:                                        ; >538b
        movb @chart_cursor_y,b                              ; LD A,H            ; 
        ab   @bytes+>08,b                                   ; ADD A,$08 / LD B,A; 
        bl   @local_chart_galaxy_coordinates                ; CALL $4F37        ; unscale to chart units
-       movb @c,@system_search_point                        ; LD ($E61B),BC     ; cache the search point
-       movb b,@system_search_point+1                       ;                   ; 
+       mov  bc,@system_search_point                        ; LD ($E61B),BC     ; cache the search point
        seto r0                                             ; LD HL,$FFFF       ; 
-       movb r0,@nearest_distance                           ; LD ($E613),HL / LD ($E615),HL; the running minimum
-       movb r0,@nearest_distance+1                         ;                   ; 
+       movb r0,@nearest_distance+1                         ; LD ($E613),HL / LD ($E615),HL; the running minimum
+       movb r0,@nearest_distance                           ;                   ; 
        li   ix,chart_system_list                           ; LD IX,($EFA4)     ; IX -> #R$502C's list (TI: chart_system_list)
        movb @nearby_systems_count,b                        ; LD A,($E832) / LD B,A; how many are in it
        jeq  _53ec                                          ;                   ; 
@@ -1557,17 +1550,14 @@ _53ae:                                                     ; >53ae
        bl   @generate_system                               ; CALL $4C9B        ; generate its coordinates
        movb @system_y,d                                    ; LD DE,($F751)     ; DE = its (X, Y)
        movb @system_x,@e                                   ;                   ; 
-       movb @system_search_point+1,b                       ; LD BC,($E61B)     ; BC = the search point
-       movb @system_search_point,@c                        ;                   ; 
+       mov  @system_search_point,bc                        ; LD BC,($E61B)     ; BC = the search point
        bl   @squared_distance_2d                           ; CALL $205D        ; HL:A = the squared distance to it
        .pop ix                                             ; POP IX            ; 
        .pop bc                                             ; POP BC            ; 
-       movb @nearest_distance+1,r0                         ; LD BC,($E613) / SBC HL,BC ...; compare against the running minimum
-       movb @nearest_distance,@r0lb                        ;                   ; 
+       mov  @nearest_distance,r0                           ; LD BC,($E613) / SBC HL,BC ...; compare against the running minimum
        c    hl,r0                                          ;                   ; 
        jhe  _53e8                                          ; JR NC,$53E8       ; not closer - next entry
-       movb @l,@nearest_distance                           ; LD ($E613),IY ... ; closer - update the running minimum
-       movb h,@nearest_distance+1                          ;                   ; 
+       mov  hl,@nearest_distance                           ; LD ($E613),IY ... ; closer - update the running minimum
        movb *ix,@selected_system                           ; LD A,(IX+$00) / LD ($E72B),A; and select this entry
 _53e8:                                                     ; >53e8
        inc  ix                                             ; INC IX            ; -> the next list entry
@@ -1603,12 +1593,12 @@ animate_expanding_selection_box:                           ; >541e
        movb r0,@plot_pixel_xor                             ;                   ; not a patched opcode)
        movb @chart_cursor_x,a                              ; LD A,($E709)      ; the cursor's X
        ab   @bytes+>07,a                                   ; ADD A,$07         ; 
-       movb a,@line_end_1_x                                ; LD ($F769),A      ; the box's left edge
-       movb a,@line_end_2_x                                ; LD ($F76F),A      ; and initial right edge
+       movb a,@line_end_1_x+1                              ; LD ($F769),A      ; the box's left edge
+       movb a,@line_end_2_x+1                              ; LD ($F76F),A      ; and initial right edge
        movb @chart_cursor_y,a                              ; LD A,($E70A)      ; the cursor's Y
        ab   @bytes+>10,a                                   ; ADD A,$10         ; 
-       movb a,@line_end_1_y                                ; LD ($F76B),A      ; the box's top edge
-       movb a,@line_end_2_y                                ; LD ($F771),A      ; and initial bottom edge
+       movb a,@line_end_1_y+1                              ; LD ($F76B),A      ; the box's top edge
+       movb a,@line_end_2_y+1                              ; LD ($F771),A      ; and initial bottom edge
        movb @bytes+>0f,@selection_box_sides_animating      ; LD A,$0F / LD ($E83E),A; all 4 sides still animating
 selection_box_pass:                                        ; >5444
        movb @selection_box_sides_animating,a               ; LD A,($E83E) / OR A; 
@@ -1621,37 +1611,37 @@ selection_box_side:                                        ; >544d
        movb @selection_box_sides_animating,r0              ; LD HL,$E83E / BIT 0,(HL); top side still animating?
        andi r0,>0100                                       ;                   ; 
        jeq  _5468                                          ; JR Z,$5468        ; 
-       movb @line_end_1_x,@c                               ; LD A,($F769) / LD C,A; draw/erase the top edge
-       movb @line_end_1_y,b                                ; LD A,($F76B) / LD B,A; 
-       movb @line_end_2_x,@e                               ; LD A,($F76F) / LD E,A; 
-       movb @line_end_1_y,d                                ; LD A,($F76B) / LD D,A; 
+       movb @line_end_1_x+1,@c                             ; LD A,($F769) / LD C,A; draw/erase the top edge
+       movb @line_end_1_y+1,b                              ; LD A,($F76B) / LD B,A; 
+       movb @line_end_2_x+1,@e                             ; LD A,($F76F) / LD E,A; 
+       movb @line_end_1_y+1,d                              ; LD A,($F76B) / LD D,A; 
        bl   @draw_bresenham_line_372b                      ; CALL $372B        ; 
 _5468:                                                     ; >5468
        movb @selection_box_sides_animating,r0              ; BIT 1,(HL)        ; right side still animating?
        andi r0,>0200                                       ;                   ; 
        jeq  _5482                                          ; JR Z,$5482        ; 
-       movb @line_end_2_x,@c                               ; LD A,($F76F) / LD C,A; draw/erase the right edge
-       movb @line_end_1_y,b                                ; LD A,($F76B) / LD B,A; 
-       movb @line_end_2_x,@e                               ; LD A,($F76F) / LD E,A; 
-       movb @line_end_2_y,d                                ; LD A,($F771) / LD D,A; 
+       movb @line_end_2_x+1,@c                             ; LD A,($F76F) / LD C,A; draw/erase the right edge
+       movb @line_end_1_y+1,b                              ; LD A,($F76B) / LD B,A; 
+       movb @line_end_2_x+1,@e                             ; LD A,($F76F) / LD E,A; 
+       movb @line_end_2_y+1,d                              ; LD A,($F771) / LD D,A; 
        bl   @draw_bresenham_line_372b                      ; CALL $372B        ; 
 _5482:                                                     ; >5482
        movb @selection_box_sides_animating,r0              ; BIT 2,(HL)        ; bottom side still animating?
        andi r0,>0400                                       ;                   ; 
        jeq  _549c                                          ; JR Z,$549C        ; 
-       movb @line_end_2_x,@c                               ; LD A,($F76F) / LD C,A; draw/erase the bottom edge
-       movb @line_end_2_y,b                                ; LD A,($F771) / LD B,A; 
-       movb @line_end_1_x,@e                               ; LD A,($F769) / LD E,A; 
-       movb @line_end_2_y,d                                ; LD A,($F771) / LD D,A; 
+       movb @line_end_2_x+1,@c                             ; LD A,($F76F) / LD C,A; draw/erase the bottom edge
+       movb @line_end_2_y+1,b                              ; LD A,($F771) / LD B,A; 
+       movb @line_end_1_x+1,@e                             ; LD A,($F769) / LD E,A; 
+       movb @line_end_2_y+1,d                              ; LD A,($F771) / LD D,A; 
        bl   @draw_bresenham_line_372b                      ; CALL $372B        ; 
 _549c:                                                     ; >549c
        movb @selection_box_sides_animating,r0              ; BIT 3,(HL)        ; left side still animating?
        andi r0,>0800                                       ;                   ; 
        jeq  _54b6                                          ; JR Z,$54B6        ; 
-       movb @line_end_1_x,@c                               ; LD A,($F769) / LD C,A; draw/erase the left edge
-       movb @line_end_2_y,b                                ; LD A,($F771) / LD B,A; 
-       movb @line_end_1_x,@e                               ; LD A,($F769) / LD E,A; 
-       movb @line_end_1_y,d                                ; LD A,($F76B) / LD D,A; 
+       movb @line_end_1_x+1,@c                             ; LD A,($F769) / LD C,A; draw/erase the left edge
+       movb @line_end_2_y+1,b                              ; LD A,($F771) / LD B,A; 
+       movb @line_end_1_x+1,@e                             ; LD A,($F769) / LD E,A; 
+       movb @line_end_1_y+1,d                              ; LD A,($F76B) / LD D,A; 
        bl   @draw_bresenham_line_372b                      ; CALL $372B        ; 
 _54b6:                                                     ; >54b6
        .pop r0                                             ; POP BC / DEC B    ; 
@@ -1661,7 +1651,7 @@ _54b6:                                                     ; >54b6
        bl   @ti_wait_frame                                 ; LD DE,$07D0 / DEC DE ...; a short delay (TI: a frame, polling for VBlank)
        jmp  selection_box_side                             ;                   ; draw them again, erasing them
 _54c7:                                                     ; >54c7
-       movb @line_end_1_y,a                                ; LD A,($F76B)      ; expand the top edge by 16...
+       movb @line_end_1_y+1,a                              ; LD A,($F76B)      ; expand the top edge by 16...
        ai   a,>f000                                        ; ADD A,$F0         ; 
        jnc  _54d2                                          ; JR NC,$54D2       ; 
        cb   a,@bytes+>08                                   ; CP $08            ; 
@@ -1670,8 +1660,8 @@ _54d2:                                                     ; >54d2
        movb @bytes+>07,a                                   ; LD A,$07          ; ...clamping at the screen edge...
        szcb @bit0,@selection_box_sides_animating           ; LD HL,$E83E / RES 0,(HL); ...and stopping this side once it gets there
 _54d9:                                                     ; >54d9
-       movb a,@line_end_1_y                                ; LD ($F76B),A      ; 
-       movb @line_end_2_x,a                                ; LD A,($F76F)      ; expand the right edge by 16...
+       movb a,@line_end_1_y+1                              ; LD ($F76B),A      ; 
+       movb @line_end_2_x+1,a                              ; LD A,($F76F)      ; expand the right edge by 16...
        ab   @bytes+>10,a                                   ; ADD A,$10         ; 
        joc  _54e7                                          ; JR C,$54E7        ; 
        cb   a,@bytes+>e8                                   ; CP $E8            ; 
@@ -1680,8 +1670,8 @@ _54e7:                                                     ; >54e7
        movb @bytes+>e8,a                                   ; LD A,$E8          ; ...clamping at the screen edge...
        szcb @bit1,@selection_box_sides_animating           ; RES 1,(HL)        ; ...and stopping this side once it gets there
 _54ee:                                                     ; >54ee
-       movb a,@line_end_2_x                                ; LD ($F76F),A      ; 
-       movb @line_end_2_y,a                                ; LD A,($F771)      ; expand the bottom edge by 16...
+       movb a,@line_end_2_x+1                              ; LD ($F76F),A      ; 
+       movb @line_end_2_y+1,a                              ; LD A,($F771)      ; expand the bottom edge by 16...
        ab   @bytes+>10,a                                   ; ADD A,$10         ; 
        joc  _54fc                                          ; JR C,$54FC        ; 
        cb   a,@bytes+>a8                                   ; CP $A8            ; 
@@ -1690,8 +1680,8 @@ _54fc:                                                     ; >54fc
        movb @bytes+>a8,a                                   ; LD A,$A8          ; ...clamping at the screen edge...
        szcb @bit2,@selection_box_sides_animating           ; RES 2,(HL)        ; ...and stopping this side once it gets there
 _5503:                                                     ; >5503
-       movb a,@line_end_2_y                                ; LD ($F771),A      ; 
-       movb @line_end_1_x,a                                ; LD A,($F769)      ; expand the left edge by 16...
+       movb a,@line_end_2_y+1                              ; LD ($F771),A      ; 
+       movb @line_end_1_x+1,a                              ; LD A,($F769)      ; expand the left edge by 16...
        ai   a,>f000                                        ; ADD A,$F0         ; 
        jnc  _5511                                          ; JR NC,$5511       ; 
        cb   a,@bytes+>18                                   ; CP $18            ; 
@@ -1700,7 +1690,7 @@ _5511:                                                     ; >5511
        movb @bytes+>17,a                                   ; LD A,$17          ; ...clamping at the screen edge...
        szcb @bit3,@selection_box_sides_animating           ; RES 3,(HL)        ; ...and stopping this side once it gets there
 _5518:                                                     ; >5518
-       movb a,@line_end_1_x                                ; LD ($F769),A      ; 
+       movb a,@line_end_1_x+1                              ; LD ($F769),A      ; 
        b    @selection_box_pass                            ; JP $5444          ; next pass
 restore_3793_or_opcode:                                    ; >551e
        sb   @plot_pixel_xor,@plot_pixel_xor                ; LD A,$B6 / LD ($37C0),A; OR the lines again

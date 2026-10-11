@@ -3357,6 +3357,31 @@ outcodes_y_beyond_far_boundary_case:                       ; >3abf
 * the edge by bisecting towards it (#R$3BEC) before the line is drawn.
 clip_and_draw_line:                                        ; >3ac2
        .proc
+* TI: a fast path for a line that is all inside the view, as most are: each
+* coordinate is tested with one unsigned comparison (x from -116 to 117, y from
+* -63 to 64, as in #R$3A72), and the line drawn straight away (#R$3C29 uses
+* only the low bytes, which the $8000 doesn't change). Otherwise the points are
+* still as they were, for the MSX code below.
+       mov  @clip_point1_x,r0                              ;                   ;
+       ai   r0,116                                         ;                   ;
+       ci   r0,116+117                                     ;                   ;
+       jh   clip_and_draw_line_1                           ;                   ; point 1's x is outside
+       mov  @clip_point1_y,r0                              ;                   ;
+       ai   r0,63                                          ;                   ;
+       ci   r0,63+64                                       ;                   ;
+       jh   clip_and_draw_line_1                           ;                   ;
+       mov  @clip_point2_x,de                              ;                   ; DE = point 2's x
+       mov  de,r0                                          ;                   ;
+       ai   r0,116                                         ;                   ;
+       ci   r0,116+117                                     ;                   ;
+       jh   clip_and_draw_line_1                           ;                   ;
+       mov  @clip_point2_y,hl                              ;                   ; HL = point 2's y
+       mov  hl,r0                                          ;                   ;
+       ai   r0,63                                          ;                   ;
+       ci   r0,63+64                                       ;                   ;
+       jh   clip_and_draw_line_1                           ;                   ;
+       b    @clip_endpoints_to_screen_space                ;                   ; all inside: draw it
+clip_and_draw_line_1:
        mov  @clip_point1_x,de                              ; LD DE,($EB92)     ; DE = point 1's X (biased/unbiased mix - see #R$3A72)
        ai   de,>8000                                       ; LD A,D / ADD A,$80; bias the high byte by $80 into the unsigned comparison range
        mov  de,@clip_point1_x                              ; LD D,A / LD ($EB93),A; and store it back - the high byte is biased in memory too

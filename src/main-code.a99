@@ -5274,6 +5274,7 @@ ship_screen_size:                                          ; >46ca
        movb @object_distance+1,de                          ; LD DE,($EB8E)     ; their distance
        movb @object_distance,@e                            ;                   ;
 _46d9:                                                     ; >46d9
+       mov  de,@projection_depth                           ;                   ; (TI: the depth itself, for #R$47F0)
        movb d,a                                            ; LD A,D / OR A     ; A = DE's high byte
        jeq  _46e7                                          ; JR Z,$46E7        ; zero - skip the normalize loop below
        movb d,r1                                           ; LD L,A            ; 
@@ -5441,34 +5442,18 @@ explosion_dot:                                             ; >47a1
 * O:BC x on screen
 * O:DE y on screen
 project_point:                                             ; >47c4
-       .proc
-       .push bc                                            ; PUSH BC           ; save the caller's BC (the second value to combine)
-       movb h,a                                            ; LD A,H / OR A     ; A = HL's high byte
-       jeq  _47d5                                          ; JR Z,$47D5        ; z under 256
-       movb h,r1                                           ; LD L,A            ; 
-       srl  r1,8                                           ; LD H,$02          ; 
-       movb @bit_length_table(r1),a                        ; LD B,(HL)         ; A = the bit length of the high byte (the exponent)
-       movb a,r0                                           ; RRA               ; 
-       srl  r0,8                                           ; RR L              ; 
-       mov  hl,r2                                          ; DJNZ              ; shift HL right by that many bits...
-       srl  r2,0                                           ;                   ; 
-       swpb r2                                             ;                   ; 
-       movb r2,@l                                          ;                   ; ...keeping the low byte
-_47d5:                                                     ; >47d5
-       movb a,@depth_shift                                 ; LD ($EB9B),A      ; the shift
-       movb @l,r2                                          ; SLA L             ; 
-       srl  r2,7                                           ; ADC A,$08         ; R2 = the word index * 2
-       andi r2,>01fe                                       ;                   ; 
-       mov  @log_table(r2),hl                              ; LD A,(HL)         ; read the table entry
-       movb hl,@log_depth+1                                ; LD ($E6F1),HL     ; log(z)
-       movb @l,@log_depth                                  ;                   ;
-       .ex_de_hl                                           ; EX DE,HL          ; HL = the caller's DE (first value to combine)
-       bl   @project_coordinate                            ; CALL $47F0        ; project x
-       .ex_sp_hl                                           ; EX (SP),HL        ; stash the first result on the stack; HL = the saved BC
-       bl   @project_coordinate                            ; CALL $47F0        ; project y
-       .ex_de_hl                                           ; EX DE,HL          ; DE = the second result
-       .pop bc                                             ; POP BC            ; BC = the first result (stashed above)
-       .endproc                                            ; RET               ; return with BC/DE = the two combined results
+* TI: a native version, which divides with DIV (project_value) rather than by
+* subtracting logarithms, so the result is exact. Keeps the depth for
+* #R$47F0 in projection_depth instead of its logarithm. Changes R0-R2 and HL.
+       mov  hl,@projection_depth                           ;                   ; the depth
+       mov  r11,hl                                         ;                   ; HL = the return address
+       mov  de,r1                                          ;                   ;
+       bl   @project_value                                 ; CALL $47F0        ; project x
+       mov  bc,r1                                          ;                   ;
+       mov  r0,bc                                          ;                   ; BC = x on screen
+       bl   @project_value                                 ; CALL $47F0        ; project y
+       mov  r0,de                                          ;                   ; DE = y on screen
+       b    *hl                                            ; RET               ;
 
 ********************************************************************************
 * Project a coordinate
@@ -5485,68 +5470,39 @@ _47d5:                                                     ; >47d5
 * I:HL v
 * O:HL 128 * v / z
 project_coordinate:                                        ; >47f0
-       .proc
-       .ex_de_hl                                           ; EX DE,HL          ; HL = the caller's value; DE = whatever it swaps with
-       movb d,a                                            ; LD A,D / OR A     ; A = DE's high byte (the value's sign)
-       .push af                                            ; PUSH AF           ; save the sign
-       jgt  project_coordinate_abs                         ; JP P,$47FD        ; non-negative - skip the negate below
-       jeq  project_coordinate_abs                         ;                   ; 
-!
-       neg  de                                             ; SUB E             ; negative: negate DE (absolute value)
-       movb d,a                                            ; LD D,A            ; 
-project_coordinate_abs:                                    ; >47fd
-       movb d,a                                            ;                   ; A = D (the PUSH above changed the status)
-       jeq  _4809                                          ; JR Z,$4809        ; zero - skip the normalize loop below
-       movb d,r1                                           ; LD L,A            ; 
-       srl  r1,8                                           ; LD H,$02          ; 
-       movb @bit_length_table(r1),a                        ; LD B,(HL)         ; A = the bit length of the high byte (the exponent)
-       movb a,r0                                           ; RRA               ; 
-       srl  r0,8                                           ; RR E              ; 
-       mov  de,r2                                          ; DJNZ              ; shift DE right by that many bits...
-       srl  r2,0                                           ;                   ; 
-       swpb r2                                             ;                   ; 
-       movb r2,@e                                          ;                   ; ...keeping the low byte
-_4809:                                                     ; >4809
-       li   hl,depth_shift                                 ; LD HL,$EB9B       ; HL -> the exponent #R$46CA/#R$47C4 stored
-       sb   *hl,a                                          ; SUB (HL)          ; A -= that exponent
-       ab   a,a                                            ; ADD A,A           ; A doubled...
-       ab   a,a                                            ; ADD A,A           ; ...twice more (A *= 4)
-       .ex_af_af_                                          ; EX AF,AF'         ; stash A (and flags) in the shadow set
-       movb @e,r2                                          ; SLA E             ; 
-       srl  r2,7                                           ; ADC A,$08         ; R2 = the word index * 2
-       andi r2,>01fe                                       ;                   ; 
-       mov  @log_table(r2),hl                              ; LD A,(HL)         ; read the table entry
-       li   bc,>1c00                                       ; LD BC,$1C00       ; BC = $1C00
-       a    bc,hl                                          ; ADD HL,BC         ; HL += $1C00
-       joc  project_coordinate_2                           ; JR C,$4839        ; overflowed - out of range
-       movb @log_depth+1,de                                ; LD DE,($E6F1)     ; DE = the caller's stored scale word
-       movb @log_depth,@e                                  ;                   ;
-       s    de,hl                                          ; SBC HL,DE         ; HL -= DE
-       .ex_af_af_                                          ; EX AF,AF'         ; restore the stashed exponent*4 value
-       ab   h,a                                            ; ADD A,H           ; A += HL's high byte
-       jlt  project_coordinate_2                           ; JP M,$4839        ; negative - out of range
-!
-       movb a,h                                            ; LD H,A            ; else: H = the combined high byte
-       bl   @antilog16                                     ; CALL $21A3        ; combine via #R$21A3
-       mov  hl,hl                                          ; BIT 7,H           ; test the result's sign bit
-       jgt  project_coordinate_join                        ; JP P,$4837        ; non-negative - keep it
-       jeq  project_coordinate_join                        ;                   ; 
-!
-       szcb @bit7,h                                        ; RES 7,H           ; else clear the sign bit (magnitude only)
-project_coordinate_join:                                   ; >4837
-       jmp  _483c                                          ; JR $483C          ; join the shared sign-reapply tail
-project_coordinate_2:                                      ; >4839
-       li   hl,>0000                                       ; LD HL,$0000       ; HL = 0 (the out-of-range case)
-_483c:                                                     ; >483c
-       movb h,d                                            ; LD D,H            ; D = H
-       movb @l,@e                                          ; LD E,L            ; E = L (DE = HL, the magnitude copy)
-       .pop af                                             ; POP AF            ; restore the value's original sign
-       jgt  project_coordinate_exit                        ; RET P             ; non-negative - return as-is
-       jeq  project_coordinate_exit                        ;                   ; 
-!
-       neg  hl                                             ; SUB L             ; negative: negate HL
-project_coordinate_exit:
-       .endproc                                            ; RET               ; return with the original sign reapplied to HL
+* TI: a native version, which divides with DIV. z is the depth that #R$47C4 or
+* #R$46CA stored in projection_depth. The result is exact, where the MSX's is
+* within a few percent, and is 32767 if it is too big (on the MSX: 32767 from
+* 65536, and the low 15 bits below that). Changes R0-R2 and DE.
+       mov  r11,de                                         ;                   ; DE = the return address
+       mov  hl,r1                                          ;                   ;
+       bl   @project_value                                 ;                   ;
+       mov  r0,hl                                          ;                   ;
+       b    *de                                            ; RET               ;
+* I:R1 v  O:R0 128 * v / the depth  Changes R1 and R2.
+project_value:
+       mov  r1,r2                                          ;                   ; R2 = v, for its sign
+       abs  r1                                             ;                   ;
+       mov  r1,r0                                          ;                   ;
+       srl  r0,9                                           ;                   ;
+       sla  r1,7                                           ;                   ; R0:R1 = 128 * abs(v)
+       div  @projection_depth,r0                           ;                   ; R0 = the quotient
+       jno  project_value_2                                ;                   ;
+project_value_1:
+       li   r0,>7fff                                       ;                   ; too big (or the depth is 0)
+       jmp  project_value_3                                ;                   ;
+project_value_2:
+       mov  r0,r0                                          ;                   ;
+       jlt  project_value_1                                ;                   ; over 32767
+project_value_3:
+       mov  r2,r2                                          ;                   ;
+       jlt  project_value_4                                ;                   ;
+       rt                                                  ;                   ;
+project_value_4:
+       neg  r0                                             ;                   ; put back v's sign
+       rt                                                  ;                   ;
+projection_depth:                                          ; The depth that project_value divides by
+       data 0                                              ;                   ;
 
 ********************************************************************************
 * Draw a ship: does a face face the player?

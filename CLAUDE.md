@@ -147,10 +147,13 @@ words. A single-byte access to
   the MSX adds logarithms: `cache_orientation` caches the object's orientation in `rotation_matrix` as nine unsigned
   words (the component + 2.0), not as the logarithms at `side_vector_logs` and `roof_vector_logs`, which are no longer
   used. The results differ from the MSX's by a few units (they are slightly more accurate).
+  Projecting (`project_point`, `project_coordinate`) is native too: 128 * v / depth with `DIV`, exact where the MSX
+  subtracts logarithms, with the depth itself in `projection_depth` (set by `project_point` and `ship_screen_size`)
+  rather than its logarithm; `log_depth` is now only `ship_screen_size`'s own, for the planet's and the sun's radius.
 - **The program image** (low and high RAM) is packed into the 32K of cartridge banks 0-3 with a loader: `ea5tocart`
   prints "Cartridge full" (and leaves a broken cartridge) if it doesn't fit, so check `make.bat`'s output for that. The
   space view buffer is last in low RAM and defined with `equ`, so it isn't in the image: nothing may be assembled after
-  it. High RAM has about 360 bytes free; low RAM has about 520 bytes free.
+  it. High RAM has about 530 bytes free; low RAM has about 520 bytes free.
 - **Disk operations** (the routines in ROM bank 14, `rom-bank-14.a99`; their entry point `disk_entry`, which selects the bank, and their data in `ti-disk.a99`, low RAM): the commander menu (bank 7) loads and saves commanders on disk where the
   MSX uses tape: the file `DSK1.<name>`, a program file of 139 bytes (the record at #R$D606: the name and the commander
   file). Set `disk_opcode`, `disk_name` and `disk_name_length`, `blwp @disk_vector`, and check `disk_error`. The disk DSR

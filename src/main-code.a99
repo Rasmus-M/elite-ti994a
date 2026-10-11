@@ -1844,6 +1844,7 @@ msg_incoming_missile:                                      ; >33b7
 * #R$E72C, on by one).
 print_char:                                                ; >34a8
        .proc
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, as interrupts are off, so the sound effects play on)
        .push af                                            ; PUSH AF           ; save registers
        .push bc                                            ; PUSH BC           ; 
        .push de                                            ; PUSH DE           ; 
@@ -6272,6 +6273,7 @@ _4c58:
 * I:A System number (0-255)
 generate_system:                                           ; >4c9b
        .proc                                               ;                   ; 
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, as interrupts are off, so the sound effects play on)
        .exx                                                ; EXX               ; 
        bl   @galaxy_seeds_to_system                        ; CALL $5607        ; start from the galaxy's seeds
        movb a,a                                            ; OR A              ; 
@@ -6537,12 +6539,14 @@ hide_all_sprites:                                          ; >60b1
 * (#R$35B8) - with white on black, and sets the current screen (#R$E902) to 0.
 clear_page:                                                ; >60ca
        .proc                                               ;                   ; 
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, as interrupts are off, so the sound effects play on)
        sb   a,a                                            ; XOR A             ; 
        movb a,@current_screen                              ; LD ($E902),A      ; the current screen
        li   hl,>0118                                       ; LD HL,$0118       ; HL = $0118: the pattern table at row 1, column 3
        li   bc,>a01a                                       ; LD BC,$A01A       ; 160 pixel rows (20 character rows), 26 characters
        sb   a,a                                            ; XOR A             ; 
        bl   @fill_vram_rect                                ; CALL $35B8        ; clear the patterns (#R$35B8)
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, as interrupts are off, so the sound effects play on)
        li   hl,>2118                                       ; LD HL,$2118       ; HL = $2118: the colours
        li   bc,>a01a                                       ; LD BC,$A01A       ; 
        movb @bytes+>f1,a                                   ; LD A,$F1          ; white on black

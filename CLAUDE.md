@@ -126,7 +126,8 @@ words. A single-byte access to
   work: it counts the frame (`vblank_frame_counter`, `vblank_subtick_counter`), counts down the ECM and hyperspace, ticks the game clock, sounds the alarm, plays a tick of the sound effects and of the music and reads
   the keyboard (`ti_read_keyboard`: each new key press's character goes to `pending_debounced_keypress_byte_status`). It
   ignores every sixth frame, to keep the MSX's 50 Hz timing. It changes no registers, but must be called at least
-  once a frame (it's in `clear_space_view`, `copy_space_view`, `draw_object`'s face loop and after each edge) and
+  once a frame (it's in `clear_space_view`, `copy_space_view`, `draw_object`'s face loop and after each edge, and for
+  the docked screens in `print_char`, `generate_system` and `clear_page`, or a sound effect plays on until a screen is drawn) and
   never between the two bytes of a VDP address.
 - **Sound effects**: a native SN76489 player in ROM bank 14 (`rom-bank-14.a99`) rather than a conversion of the MSX's
   AY-3-8910 engine (#R$7468, #R$7645): the same effects (0-13), handlers and three channels, with its state in the MSX's

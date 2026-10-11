@@ -42,7 +42,7 @@ check_safe_zone:                                           ; >1549
        movb @safe_zone_entry_latch,r0                      ; LD HL,$EF9C / LD A,(HL) / OR A; 
        jne  _1576                                          ; JR NZ,$156B       ; not just arrived
        sb   one,@safe_zone_entry_latch                     ; DEC (HL)          ; 
-* TI: calling the police (#R$2C21) isn't converted yet.
+       bl   @maybe_call_police                             ; CALL $2C21        ; maybe call the police
        jmp  _1576                                          ; JR $1576          ; done
 station_safe_zone_leave:                                   ; >156d
        movb @station_in_range,r0                           ; LD A,(HL) / OR A  ; A = station-in-range flag
@@ -2344,6 +2344,33 @@ handler_enemy_missile:                                     ; >2618
        .pop r11                                            ;                   ; 
        b    @damage_shields                                ; JP $193F          ; damage the player's shields by 48
 _2618_end:                                                 
+       .endproc                                            ;                   ; 
+
+********************************************************************************
+* Maybe call the police, depending on legal status and government
+* 
+* Used by the routine at #R$1549.
+* .
+* Called by #R$1549. If the player's legal status (#R$EB65) isn't clean,
+* calls the police (#R$2A1C) with a chance of (legal status / 4 +
+* government * 16) in 256.
+maybe_call_police:                                         ; >2c21
+       .proc                                               ;                   ; 
+       movb @legal_status,a                                ; LD A,($EB65) / OR A; A = legal status
+       jeq  _2c21_end                                      ; RET Z             ; clean - no police
+       srl  a,2                                            ; RRA / RRA         ; A /= 4...
+       andi a,>3f00                                        ; AND $3F           ; 
+       movb a,@c                                           ; LD C,A            ; C = legal status / 4
+       movb @current_system_government,a                   ; LD A,($F762)      ; A = the system's government
+       andi a,>ff00                                        ;                   ; 
+       sla  a,4                                            ; ADD A,A x 4       ; A = government * 16
+       ab   @c,a                                           ; ADD A,C           ; 
+       movb a,@c                                           ; LD C,A            ; C = the chance, out of 256
+       bl   @random_byte                                   ; CALL $2176        ; 
+       cb   a,@c                                           ; CP C              ; 
+       jhe  _2c21_end                                      ; RET NC            ; no police this time
+       .far_call code_bank_12_select,call_police           ; JP $2A1C          ; call the police (in ROM bank 12)
+_2c21_end:
        .endproc                                            ;                   ; 
 
 rom_bank_11_end:

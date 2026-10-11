@@ -270,7 +270,7 @@ music_channels:
 * VBlank handler (#R$7202): call it often enough to see every frame. When
 * the VDP has flagged a new frame, it counts the frame (#R$E90B, #R$F748),
 * plays a tick of the music, moves the chart cursor (#R$73BA) and reads the
-* keyboard (#R$347A) and joysticks (#R$7312). The MSX runs at 50 Hz, and frames can be
+* keyboard (#R$347A, every second frame) and joysticks (#R$7312, every fourth). The MSX runs at 50 Hz, and frames can be
 * missed when this is not called for a while, so the TMS9901 timer tells how
 * many MSX frames have passed (ti_timer_frames), and that many are processed.
 *
@@ -288,8 +288,17 @@ ti_poll_vblank_1:
 ti_poll_vblank_2:
        movb @frames_due,@frames_due
        jne  ti_poll_vblank_7
+       sb   one,@input_countdown       ; 3, 2, 1, 0: read the keyboard every second time,
+       jeq  ti_poll_vblank_8           ; and the joysticks every fourth, as scanning them
+       cb   @input_countdown,@bytes+2  ; every frame takes too long
+       jne  ti_poll_vblank_9
+       blwp @keyboard_vector           ; read the keyboard (#R$347A)
+       rt
+ti_poll_vblank_8:
+       movb @bytes+4,@input_countdown
        blwp @keyboard_vector           ; read the keyboard (#R$347A)
        blwp @joystick_vector           ; and the joysticks (#R$7312)
+ti_poll_vblank_9:
        rt
 ti_poll_vblank_7:
        sb   one,@frames_due            ; for each MSX frame:
@@ -450,6 +459,8 @@ vdp_status:
        byte 0
 frames_due:                            ; The MSX frames ti_poll_vblank has still to process
        byte 0
+input_countdown:                       ; Counts the frames down to reading the keyboard and the joysticks
+       byte 4
        even
 timer_last:                            ; The value of the TMS9901 timer the last time
        data >3fff

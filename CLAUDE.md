@@ -125,7 +125,7 @@ words. A single-byte access to
   only for their labels (`main_program` is defined); banks 5 and 6 then reserve the tables' space with `bss`.
 - Interrupts stay disabled (`limi 0` once at startup); the converted `DI`/`EI` are commented out. Instead,
   `ti_poll_vblank` (`music-player.a99`) reads the VDP status and, on a new frame, does the MSX VBlank handler's
-  work: it counts the frame (`vblank_frame_counter`, `vblank_subtick_counter`), counts down the ECM and hyperspace, ticks the game clock, sounds the alarm, plays a tick of the sound effects and of the music and reads
+  work: it counts the frame (`vblank_frame_counter`, `vblank_subtick_counter`), counts down the ECM and hyperspace, ticks the game clock, sounds the alarm, plays a tick of the sound effects and of the music and (every second frame; the joysticks every fourth, as scanning them takes long) reads
   the keyboard (`ti_read_keyboard`: each new key press's character goes to `pending_debounced_keypress_byte_status`). The
   MSX runs at 50 Hz, and frames are missed when it isn't called for more than a frame, so on a new frame it reads the
   TMS9901's timer (`ti_timer_frames`; `ti_setup_environment` starts it) to find how many MSX frames have passed, and does

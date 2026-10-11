@@ -4436,6 +4436,8 @@ key_table:                                                 ; >419b
        data >5900,code_bank_13_select,key_handler_y               ; 'Y': cloaking device on/off (#R$1B13)
        data >4c00,code_bank_13_select,key_handler_l               ; 'L': ECM jammer on/off (#R$1B25)
        data >8600,code_bank_12_select,freeze_game                 ; STOP (FCTN-6): freeze the game (#R$40DE)
+       data >8700,code_bank_9_select,update_chart_cursor          ; HOME (FCTN-8): bring back the cursor, as 'B' (#R$527F)
+       data >4200,code_bank_9_select,update_chart_cursor          ; 'B': bring back the cursor (#R$527F)
        data 0                                                     ; end of the table
 
 ********************************************************************************

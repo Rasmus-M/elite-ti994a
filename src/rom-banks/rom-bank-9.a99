@@ -1825,6 +1825,54 @@ msg_planet_name:                                           ; >56a2
 msg_not_found:                                             ; >56b1
        text ' not found.',>00                                     ; 
 
+********************************************************************************
+* Update the chart cursor
+* 
+* Used by the routines at #R$4F64 and #R$A469.
+* .
+* In witchspace (#R$EEC1), puts the cursor on the ship's position ($EEC3)
+* on the local chart (#R$4F09) or the galactic chart (#R$4EEC, at $5298).
+* .
+* Otherwise (at $52A4), selects the current system (#R$E72B, #R$EB67) and
+* moves the cursor to it: on the local chart (at $52C3, #R$53ED), first
+* redrawing the chart centred on it (#R$4F64) unless it already is
+* (#R$E83C); on the galactic chart at $52C8 (#R$53FD).
+update_chart_cursor:                                       ; >527f
+       .proc                                               ;                   ; 
+       movb @in_witchspace,r0                              ; LD A,($EEC1) / OR A; in witchspace?
+       jeq  select_current_system                          ; JR Z,$52A4        ; no
+       movb @witchspace_position+1,b                       ; LD BC,($EEC3)     ; BC = the ship's position in witchspace
+       movb @witchspace_position,@c                        ;                   ; 
+       cb   @current_screen,@bytes+>06                     ; LD A,($E902) / CP $06; the local chart?
+       jne  update_chart_cursor_2                          ; JR NZ,$5298       ; no
+       bl   @local_chart_coordinates                       ; CALL $4F09        ; scale relative to the chart's origin
+       bl   @move_cursor_to_position                       ; CALL $540D        ; move the cursor there
+       jmp  _52cd                                          ; JR $52A2          ; 
+update_chart_cursor_2:                                     ; >5298
+       cb   @current_screen,@bytes+>04                     ; CP $04            ; the galactic chart?
+       jne  _52cd                                          ; JR NZ,$52A2       ; no
+       bl   @galactic_chart_coordinates                    ; CALL $4EEC        ; convert to screen coordinates
+       bl   @move_cursor_to_position                       ; CALL $540D        ; move the cursor there
+       jmp  _52cd                                          ; JR $52CD          ; 
+select_current_system:                                     ; >52a4
+       movb @current_system,@selected_system               ; LD A,($EB67) / LD ($E72B),A; select the current system
+       cb   @current_screen,@bytes+>06                     ; LD A,($E902) / CP $06; the local chart?
+       jne  select_current_system_3                        ; JR NZ,$52C8       ; no
+       cb   @current_system,@chart_chosen_system_index     ; LD A,($EB67) / LD HL,$E83C / CP (HL); is the chart centred on it?
+       jeq  select_current_system_2                        ; JR Z,$52C3        ; yes
+       sb   @current_screen,@current_screen                ; XOR A / LD ($E902),A; 
+       bl   @local_chart                                   ; CALL $4F64        ; redraw the local chart around it
+       jmp  _52cd                                          ; JR $52C6          ; 
+select_current_system_2:                                   ; >52c3
+       bl   @local_chart_cursor_to_selected                ; CALL $53ED        ; move the cursor to the selected system
+       jmp  _52cd                                          ; JR $52CD          ; 
+select_current_system_3:                                   ; >52c8
+       cb   @current_screen,@bytes+>04                     ; CP $04            ; the galactic chart?
+       jne  _52cd                                          ; CALL Z,$53FD      ; 
+       bl   @galactic_chart_cursor_to_selected             ;                   ; yes - move the cursor to the selected system
+_52cd:                                                     ; >52cd
+       .endproc                                            ; RET               ; 
+
 rom_bank_9_end:
        equ  $
        bss  >8000-$

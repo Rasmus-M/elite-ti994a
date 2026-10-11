@@ -25,9 +25,6 @@ What is still missing or not right:
 
 - Speed. The game runs at only a few frames a second in flight. Nothing has been done about this yet.
 - Saving and loading commanders. The commander menu is there, but the MSX's tape routines have not been replaced.
-- Timing. The game polls for the vertical blank instead of using an interrupt, and misses some when a frame takes
-  long, so the game clock and the countdowns run slow in flight.
-- A few details, such as the keys that bring back the chart cursor (HOME and B on the MSX).
 
 The default commander currently starts with 5000 credits instead of 100, to make testing easier.
 
@@ -118,6 +115,7 @@ doesn't have (the function keys, STOP, TAB, Esc and `[`).
 | 7   | Data on system                                          |
 | F   | Find a system by name (on a chart)                      |
 | D   | Distance to the system nearest the cursor (on a chart)  |
+| B or FCTN-8 (HOME) | Bring the chart cursor back to the current system |
 
 On a chart, the joystick or the S, X, comma and full stop keys move the cursor.
 

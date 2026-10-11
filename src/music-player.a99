@@ -270,8 +270,9 @@ music_channels:
 * VBlank handler (#R$7202): call it often enough to see every frame. When
 * the VDP has flagged a new frame, it counts the frame (#R$E90B, #R$F748),
 * plays a tick of the music, moves the chart cursor (#R$73BA) and reads the
-* keyboard (#R$347A) and joysticks (#R$7312). The MSX runs at 50 Hz, so every sixth
-* (60 Hz) frame is ignored to keep the same timing.
+* keyboard (#R$347A) and joysticks (#R$7312). The MSX runs at 50 Hz, and frames can be
+* missed when this is not called for a while, so the TMS9901 timer tells how
+* many MSX frames have passed (ti_timer_frames), and that many are processed.
 *
 * Reading the VDP status resets the VDP's address latch, so this mustn't be
 * called between the two bytes of a VDP address.
@@ -283,11 +284,15 @@ ti_poll_vblank:
        jlt  ti_poll_vblank_1
        rt
 ti_poll_vblank_1:
-       sb   one,@frame_skip_counter
-       jne  ti_poll_vblank_2
-       movb @bytes+>06,@frame_skip_counter
-       rt                              ; ignore every sixth frame
+       blwp @timer_vector              ; frames_due = the MSX frames since the last time
 ti_poll_vblank_2:
+       movb @frames_due,@frames_due
+       jne  ti_poll_vblank_7
+       blwp @keyboard_vector           ; read the keyboard (#R$347A)
+       blwp @joystick_vector           ; and the joysticks (#R$7312)
+       rt
+ti_poll_vblank_7:
+       sb   one,@frames_due            ; for each MSX frame:
        ab   one,@vblank_frame_counter
        ab   one,@vblank_subtick_counter
        movb @ecm_countdown,@ecm_countdown ; count the ECM down (#R$7246)...
@@ -333,10 +338,53 @@ ti_poll_vblank_6:
        blwp @sound_tick_vector         ; play the sound effects (#R$7645)
        blwp @music_tick_vector
        blwp @chart_cursor_vector       ; move the chart cursor (#R$73BA)
-       blwp @keyboard_vector           ; read the keyboard (#R$347A)
-       blwp @joystick_vector           ; and the joysticks (#R$7312)
-       rt
+       b    @ti_poll_vblank_2
 *// ti_poll_vblank
+
+*********************************************************************
+*
+* Work out how many MSX frames have passed
+*
+* Called with BLWP @timer_vector when ti_poll_vblank sees a new frame.
+* Reads the timer of the TMS9901, which ti_setup_environment starts: it
+* counts down from >3FFF, 46875 times a second. Sets frames_due to the
+* number of MSX frames (1/50 s, 937.5 ticks) since the last time, keeping
+* the fraction for the next time. So the frames that ti_poll_vblank misses,
+* when it is not called for more than a frame, are made up for - as long
+* as it is called again within a third of a second, before the timer has
+* gone all the way round.
+*
+timer_vector:
+       data pad_ws,ti_timer_frames
+
+ti_timer_frames:
+       clr  r12
+       sbo  0                          ; clock mode, which holds the timer value for reading
+       stcr r1,15
+       sbz  0                          ; back to I/O mode (the timer goes on running)
+       srl  r1,1                       ; R1 = the timer
+       mov  @timer_last,r0
+       mov  r1,@timer_last
+       s    r1,r0                      ; R0 = the ticks since the last time
+       jgt  ti_timer_frames_1
+       jeq  ti_timer_frames_1
+       ai   r0,>3fff                   ; the timer has started again from >3FFF
+ti_timer_frames_1:
+       sla  r0,1                       ; in half ticks
+       a    @timer_fraction,r0
+       clr  r2
+ti_timer_frames_2:
+       ci   r0,1875                    ; an MSX frame is 1875 half ticks
+       jl   ti_timer_frames_3
+       ai   r0,-1875
+       inc  r2
+       jmp  ti_timer_frames_2
+ti_timer_frames_3:
+       mov  r0,@timer_fraction
+       swpb r2
+       movb r2,@frames_due
+       rtwp
+*// ti_timer_frames
 
 *********************************************************************
 *
@@ -400,6 +448,11 @@ current_bank:                          ; The ROM bank selected last (.select_ban
        data font_bank_select
 vdp_status:
        byte 0
-frame_skip_counter:
-       byte 6
+frames_due:                            ; The MSX frames ti_poll_vblank has still to process
+       byte 0
+       even
+timer_last:                            ; The value of the TMS9901 timer the last time
+       data >3fff
+timer_fraction:                        ; The half ticks not yet counted as a frame
+       data 0
        even

@@ -8,6 +8,13 @@ ti_setup_environment:
        li   r0,>fffe
        mov  r0,@b255
        li   sp,ram_stack
+       clr  r12                        ; Start the TMS9901 timer, counting down from >3FFF (ti_timer_frames)
+       sbo  0                          ; clock mode
+       li   r0,>3fff
+       inct r12
+       ldcr r0,14                      ; the timer's start value
+       dect r12
+       sbz  0                          ; back to I/O mode: the timer runs
        .proc
        bl   @init_bits
        bl   @clear_pad

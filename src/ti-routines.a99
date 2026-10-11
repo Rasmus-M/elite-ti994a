@@ -573,7 +573,7 @@ ti_check_key:
 * R7 column 0 (for FCTN), R12 CRU base.
 *
 keyboard_vector:
-       data keyboard_ws,ti_read_keyboard
+       data pad_ws,ti_read_keyboard
 
 ti_read_keyboard:
        mov  @key_held_column,r2
@@ -657,7 +657,7 @@ ti_read_keyboard_column:
 * '/' and J, which the MSX reads in #R$401C.
 *
 joystick_vector:
-       data keyboard_ws,ti_read_joysticks
+       data pad_ws,ti_read_joysticks
 
 ti_read_joysticks:
        clr  r1                         ; R1 = the directions pressed on either joystick
@@ -774,7 +774,7 @@ joystick_up:
 * chart, and every 7 frames speeds it up, up to 8.
 *
 chart_cursor_vector:
-       data keyboard_ws,ti_move_chart_cursor
+       data pad_ws,ti_move_chart_cursor
 
 ti_move_chart_cursor:
        movb @chart_cursor_active_flag,r0
@@ -868,8 +868,6 @@ key_held_row:                          ; Its row's bit (as from ti_read_keyboard
        data 0
 key_fctn_bit:                          ; FCTN in column 0
        data >1000
-keyboard_ws:
-       bss  >20
 
 * The character for each key, by column (0-5) and row (0-7), as in #R$0A57
 key_chars:

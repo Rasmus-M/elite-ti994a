@@ -99,7 +99,9 @@ words. A single-byte access to
   (see `temp-src/startup-code.a99`); values above that keep the snapshot.
 - **Scratchpad** (`equates.a99`): `pad_stack` (no longer used), then the routines `copy_to_pad` installs at startup:
   `copy_space_view_row_pad` (`>26`), `clear_space_view_rows_pad` (`>20`) and `line_loops_pad` (`>50`), ending at
-  `pad_max` (`>83F8`, overlapping GPLWS - fine while interrupts and console routines are unused). The slot sizes
+  `pad_max` (`>83C8`), then `pad_ws` (`>83C8`-`>83E7`, overlapping GPLWS - fine while interrupts and console routines
+  are unused): the one workspace the music, sound effects, keyboard and joystick routines share, as they never call each
+  other and keep nothing in registers between calls. The slot sizes
   are constants; update them if those routines change. Code there runs without wait states.
 - **Code in ROM banks**: `program.a99` holds the whole program and is assembled once per output: by `elite.a99` with
   RAM real (`aorg`) and the code banks `dorg`, and by `code-bank-N.a99` with only bank N real, so RAM and the banks
@@ -132,7 +134,7 @@ words. A single-byte access to
 - **Sound effects**: a native SN76489 player in ROM bank 14 (`rom-bank-14.a99`) rather than a conversion of the MSX's
   AY-3-8910 engine (#R$7468, #R$7645): the same effects (0-13), handlers and three channels, with its state in the MSX's
   sound variables (#R$E894). Play one with `.sfx N` (a `blwp @sound_effect_vector` and the number): it runs in its own
-  workspace (`sound_ws`), through entry points in `music-player.a99` that select bank 14 and then `current_bank` again,
+  workspace (`pad_ws`), through entry points in `music-player.a99` that select bank 14 and then `current_bank` again,
   so it changes no registers and not the status, and works from RAM and from any bank.
 - **Music**: a native SN76489 player (`music-player.a99`, low RAM) with its own workspace, called with `blwp`
   (`music_start_vector` with HL = the tune, `music_stop_vector`, `music_tick_vector`). The title music data

@@ -20,7 +20,7 @@
 * effects (#R$7AC6), their handlers and their numbers are the MSX's, as are
 * the three channels and taking over a busy channel in rotation (#R$74AE).
 *
-* The routines here run in the sound workspace (sound_ws), called through
+* The routines here run in their own workspace (pad_ws), called through
 * the BLWP vectors in RAM (lower-memory.a99), which select this bank:
 * sound_effect_vector (the .sfx macro: the effect number follows the BLWP),
 * sound_tick_vector (once per MSX frame, from ti_poll_vblank) and
@@ -68,6 +68,8 @@ sfx_channels:
        equ  sound_channel_active
 sfx_noise_rate:                        ; The noise rate written last (#R$E8D6)
        equ  sound_mode
+sfx_seed:                              ; The random number of the explosion (#R$E8D0)
+       equ  tune_address
 
 *********************************************************************
 *
@@ -353,11 +355,11 @@ sfx_h_end:
 * every 20 frames the volume goes down by one, ending at 0.
 sfx_h_explosion:
        mov  r11,r8
-       mov  r12,r0                     ; A random number (the R register on the MSX)
+       mov  @sfx_seed,r0               ; A random number (the R register on the MSX)
        sla  r0,2
-       a    r0,r12
-       inc  r12
-       mov  r12,r0
+       a    @sfx_seed,r0
+       inc  r0
+       mov  r0,@sfx_seed
        bl   @sfx_set_noise
        mov  r8,r11
        sb   @bytes+1,@sfx_count(r9)

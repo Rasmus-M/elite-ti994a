@@ -63,6 +63,10 @@ line_loops_pad:
        equ  clear_space_view_rows_pad+>20 ; the size of clear_space_view_rows
 pad_max:
        equ  line_loops_pad+>50   ; the size of line_loops
+pad_ws:                                ; The workspace of the music, sound effects, keyboard and joystick routines
+       equ  pad_max
+pad_ws_end:
+       equ  pad_ws+>20
 
 **
 * Z80 register mapping

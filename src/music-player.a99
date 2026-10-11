@@ -44,11 +44,11 @@ music_record_size:
        equ  16
 
 music_start_vector:                    ; Start the tune at the caller's HL
-       data music_ws,music_start
+       data pad_ws,music_start
 music_stop_vector:                     ; Stop the music
-       data music_ws,music_stop
+       data pad_ws,music_stop
 music_tick_vector:                     ; Play one tick
-       data music_ws,music_tick
+       data pad_ws,music_tick
 
 *********************************************************************
 *
@@ -261,8 +261,6 @@ music_playing:                         ; Number of channels still playing
        data 0
 music_channels:
        bss  3*music_record_size
-music_ws:
-       bss  >20
 
 *********************************************************************
 *
@@ -366,11 +364,11 @@ ti_wait_frame_1:
 * caller's bank (current_bank) again.
 *
 sound_effect_vector:                   ; Play a sound effect: BLWP, then DATA the effect (.sfx)
-       data sound_ws,sound_effect
+       data pad_ws,sound_effect
 sound_tick_vector:                     ; Play one tick of the sound effects
-       data sound_ws,sound_tick
+       data pad_ws,sound_tick
 sound_stop_vector:                     ; Stop the sound effects
-       data sound_ws,sound_stop
+       data pad_ws,sound_stop
 
 sound_effect:
        mov  *r14+,r4                   ; R4 = the effect number, after the BLWP
@@ -397,9 +395,6 @@ sound_bank_call:
 sound_return:
        rtwp
 *// sound_effect
-
-sound_ws:
-       bss  >20
 
 current_bank:                          ; The ROM bank selected last (.select_bank)
        data font_bank_select

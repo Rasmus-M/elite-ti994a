@@ -5680,65 +5680,47 @@ face_visible_term_3:
 * .
 * At $4969, moves on to the next edge.
 draw_face_edges:                                           ; >491a
-       .proc
-       movb *hl,b                                          ; LD B,(HL)         ; B = the number of edges
-       inc  hl                                             ; INC HL            ; 
+* TI: a native version: the edge's flag is addressed through a register
+* instead of by patching an (IX+d) instruction.
+       .proc                                               ;                   ;
+       movb *hl+,b                                         ; LD B,(HL) / INC HL; B = the number of edges
 _491c:                                                     ; >491c
-       movb *hl,a                                          ; LD A,(HL)         ; A = the next edge
-       movb a,@draw_face_edge_flag+>0003                   ; LD ($4922),A      ; point (IX+d) at the edge's flag (#R$4920+2)
-draw_face_edge_flag:                                       ; >4920
-       movb @>05(ix),a                                     ; LD A,(IX+$05) / OR A; A = the edge's flag
+       movb *hl,r1                                         ; LD A,(HL)         ; the next edge
+       srl  r1,8                                           ;                   ;
+       mov  r1,r2                                          ;                   ;
+       a    ix,r2                                          ; LD ($4922),A      ; R2 -> the edge's flag
+       movb *r2,a                                          ; LD A,(IX+$05) / OR A; A = the edge's flag
        jne  draw_face_edges_3                              ; JR NZ,$4957       ; already drawn or skipped
        .push hl                                            ; PUSH HL           ; 
-       movb *hl,a                                          ; LD A,(HL)         ; 
-       movb @bp_edges,hl                                   ; LD HL,($F7F7)     ; HL = the edge data
+       .push r2                                            ;                   ; (and the flag's address)
+       sla  r1,1                                           ;                   ;
+       movb @bp_edges,hl                                   ; LD HL,($F7F7)     ; HL = the edge data (a big-endian word at an odd address)
        movb @bp_edges+1,@l                                 ;                   ;
-       ab   a,a                                            ; ADD A,A           ; 
-       ab   @l,a                                           ; ADD A,L           ; 
-       movb a,@l                                           ; LD L,A            ; 
-       jnc  draw_face_edge                                 ; JP NC,$4932       ; 
-!
-       ab   one,h                                          ; INC H             ; 
-draw_face_edge:                                            ; >4932
-       movb *hl,a                                          ; LD A,(HL) / OR A  ; A = the edge's first vertex
+       a    r1,hl                                          ;                   ; HL -> the edge's two vertices
+       movb *hl+,a                                         ; LD A,(HL) / OR A  ; A = the edge's first vertex
        jlt  draw_face_edges_2                              ; JP M,$4948        ; bit 7 set - skip it
-!
        movb a,@e                                           ; LD E,A            ; E = the first vertex
-       inc  hl                                             ; INC HL            ; 
        movb *hl,d                                          ; LD D,(HL)         ; D = the second vertex
        bl   @draw_edge                                     ; CALL $496D        ; draw the edge
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
+       .pop r2                                             ;                   ;
        .pop hl                                             ; POP HL            ; 
-       movb *hl,a                                          ; LD A,(HL)         ; 
-       movb a,@draw_face_edge_drawn+>0003                  ; LD ($4944),A      ; point (IX+d) at the edge's flag (#R$4942+2)
-draw_face_edge_drawn:                                      ; >4942
-       movb one,@>05(ix)                                   ; LD (IX+$05),$01   ; the edge is drawn
-       jmp  _4955                                          ; JR $4955          ; 
+       movb one,*r2                                        ; LD (IX+$05),$01   ; the edge is drawn
+       jmp  draw_face_next_edge                            ; JR $4955          ;
 draw_face_edges_2:                                         ; >4948
-       li   hl,skipped_edges_count                         ; LD HL,$E6EE       ; 
-       ab   one,*hl                                        ; INC (HL)          ; one more edge skipped
+       ab   one,@skipped_edges_count                       ; INC (HL)          ; one more edge skipped
+       .pop r2                                             ;                   ;
        .pop hl                                             ; POP HL            ; 
-       movb *hl,a                                          ; LD A,(HL)         ; 
-       movb a,@draw_face_edge_skipped+>0005                ; LD ($4953),A      ; point (IX+d) at the edge's flag (#R$4951+2)
-draw_face_edge_skipped:                                    ; >4951
-       movb @b255,@>00(ix)                                 ; LD (IX+$00),$FF   ; the edge is skipped
-_4955:                                                     ; >4955
+       movb @b255,*r2                                      ; LD (IX+$00),$FF   ; the edge is skipped
        jmp  draw_face_next_edge                            ; JR $4969          ; next edge
 draw_face_edges_3:                                         ; >4957
        jgt  draw_face_next_edge                            ; JP P,$4969        ; already drawn - next edge
-       jeq  draw_face_next_edge                            ;                   ; 
-!
-       movb *hl,a                                          ; LD A,(HL)         ; skipped:
-       movb a,@draw_face_edge_drawn_2+>0003                ; LD ($4960),A      ; point (IX+d) at the edge's flag (#R$495E+2)
-draw_face_edge_drawn_2:                                    ; >495e
-       movb one,@>00(ix)                                   ; LD (IX+$00),$01   ; the edge is drawn
-       movb @skipped_edges_count,a                         ; LD A,($E6EE)      ; one fewer edge skipped
-       sb   one,a                                          ; DEC A             ; 
-       movb a,@skipped_edges_count                         ; LD ($E6EE),A      ; 
+       movb one,*r2                                        ; LD (IX+$00),$01   ; skipped: the edge is drawn
+       sb   one,@skipped_edges_count                       ; DEC A             ; one fewer edge skipped
 draw_face_next_edge:                                       ; >4969
        inc  hl                                             ; INC HL            ; 
        sb   one,b                                          ; DJNZ $491C        ; next edge
-       jne  _491c                                          ;                   
+       jne  _491c                                          ;                   ;
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -5770,12 +5752,11 @@ draw_edge:                                                 ; >496d
        mov  de,@line_end_1_x                               ; LD ($F769),DE     ; invalid: cache #R$49FD's raw output anyway (unused further here)
        mov  bc,@line_end_1_y                               ; LD ($F76B),BC     ;
        mov  hl,@line_end_1_z                               ; LD ($F76D),HL     ;
-       .exx                                                ; EXX               ; (scratch use of the shadow set)
-       movb @e,a                                           ; LD A,E            ; 
-       movb a,@draw_edge_clear_flag_e+>0005                ; LD ($4988),A      ; point (IY+d) at vertex E's flag (#R$4986+2)
-draw_edge_clear_flag_e:                                    ; >4986
-       movb @zero,@>00(iy)                                 ; LD (IY+$00),$00   ; clear the per-vertex cache flag for E
        .pop de                                             ; POP DE            ; DE = the original vertex-index pair
+       movb @e,r1                                          ; LD A,E            ;
+       srl  r1,8                                           ;                   ;
+       a    iy,r1                                          ; LD ($4988),A      ; R1 -> vertex E's flag (TI: no (IY+d) to patch, and no EXX)
+       movb @zero,*r1                                      ; LD (IY+$00),$00   ; clear the per-vertex cache flag for E
        movb d,a                                            ; LD A,D            ; A = the second vertex's index
        bl   @vertex_relative                               ; CALL $4A5C        ; project it directly (no caching)
        jnc  _49b4                                          ; JR NC,$49B4       ; also invalid - no edge to draw
@@ -5802,12 +5783,11 @@ draw_edge_2:                                               ; >49b6
        mov  de,@line_end_1_x                               ; LD ($F769),DE     ; invalid: cache #R$49FD's raw output anyway
        mov  bc,@line_end_1_y                               ; LD ($F76B),BC     ;
        mov  hl,@line_end_1_z                               ; LD ($F76D),HL     ;
-       .exx                                                ; EXX               ; (scratch use of the shadow set)
-       movb @e,a                                           ; LD A,E            ; 
-       movb a,@draw_edge_clear_flag_d+>0005                ; LD ($49D7),A      ; point (IY+d) at vertex D's flag (#R$49D5+2)
-draw_edge_clear_flag_d:                                    ; >49d5
-       movb @zero,@>00(iy)                                 ; LD (IY+$00),$00   ; clear the per-vertex cache flag for D
        .pop de                                             ; POP DE            ; DE = the vertex-index pair again
+       movb d,r1                                           ; LD A,E            ;
+       srl  r1,8                                           ;                   ;
+       a    iy,r1                                          ; LD ($49D7),A      ; R1 -> vertex D's flag
+       movb @zero,*r1                                      ; LD (IY+$00),$00   ; clear the per-vertex cache flag for D
        movb @e,a                                           ; LD A,E            ; A = the FIRST vertex's index (E, already known valid)
        bl   @vertex_relative                               ; CALL $4A5C        ; project it directly (no caching)
        mov  de,@line_end_2_x                               ; LD ($F76F),DE     ; cache the raw projection
@@ -5844,78 +5824,55 @@ _49f9:                                                     ; >49f9
 * O:F Carry set if it's in front of the player
 * O:BC,HL Its screen position
 project_vertex:                                            ; >49fd
-       .proc
-       movb @e,a                                           ; LD A,E            ; A = the vertex index
-       movb a,@project_vertex_flag+>0003                   ; LD ($4A03),A      ; patch the (IY+d) read to (IY+E) (#R$4A01+2)
-project_vertex_flag:                                       ; >4a01
-       movb @>00(iy),a                                     ; LD A,(IY+$00) / OR A; A = this vertex's cache flag
+* TI: a native version. The vertex's flag is addressed through a register
+* instead of by patching an (IY+d) instruction, the cached position is two
+* words (x, y) at scratch_buffer + 4 * the vertex, the object's position is
+* added in line (#R$44D2), and the shadow registers are not used. If the
+* vertex is behind the player, returns its x, y and z in DE, BC and HL.
+       .proc                                               ;                   ;
+       movb @e,r1                                          ; LD A,E            ;
+       srl  r1,8                                           ;                   ; R1 = the vertex
+       mov  r1,r2                                          ;                   ;
+       a    iy,r2                                          ; LD ($4A03),A      ; R2 -> its flag
+       sla  r1,2                                           ;                   ; R1 = 4 * the vertex
+       movb *r2,a                                          ; LD A,(IY+$00) / OR A; A = this vertex's cache flag
        jne  project_vertex_from_cache                      ; JR NZ,$4A4C       ; already cached - read it back
-       movb @e,a                                           ; LD A,E            ; not cached: A = the vertex index again
-       movb a,@project_vertex_set_flag+>0005               ; LD ($4A0D),A      ; patch the (IY+d) write to (IY+E) (#R$4A0B+2)
-project_vertex_set_flag:                                   ; >4a0b
-       movb @b255,@>05(iy)                                 ; LD (IY+$05),$FF   ; set a second, fixed-offset flag
-       .exx                                                ; EXX               ; (scratch use of the shadow set)
-       movb @bp_vertices,hl                                ; LD HL,($F7F5)     ; HL = the vector-record table's base pointer
+       movb @b255,*r2                                      ; LD (IY+$05),$FF   ; set the flag
+       mov  r1,r0                                          ;                   ;
+       srl  r0,1                                           ;                   ;
+       a    r1,r0                                          ;                   ; R0 = 6 * the vertex
+       ai   r1,scratch_buffer                              ;                   ;
+       mov  r1,@vertex_cache_slot                          ; LD ($E6C8),A      ; the vertex's cache slot
+       movb @bp_vertices,hl                                ; LD HL,($F7F5)     ;
        movb @bp_vertices+1,@l                              ;                   ;
-       ab   a,a                                            ; ADD A,A           ; A = index * 2
-       movb a,@c                                           ; LD C,A            ; C = it
-       sb   b,b                                            ; LD B,$00          ; BC = index * 2, widened
-       ab   a,a                                            ; ADD A,A           ; A = index * 4
-       movb a,r0                                           ; LD ($E6C8),A      ; the vertex's cache slot: $E600 + index * 4 on the MSX...
-       srl  r0,8                                           ;                   ; 
-       ai   r0,scratch_buffer                              ;                   ; ...the same offset from scratch_buffer on the TI
-       mov  r0,@vertex_cache_slot                          ;                   ; 
-       ab   @l,a                                           ; ADD A,L           ; A += table base low byte
-       movb a,@l                                           ; LD L,A            ; L = table base low byte + index*4
-       jnc  project_vertex_record                          ; JP NC,$4A21       ; no carry - skip the high-byte bump
-!
-       ab   one,h                                          ; INC H             ; carry into the high byte
+       a    r0,hl                                          ; ADD HL,BC         ; HL -> the vertex (6 bytes)
 project_vertex_record:                                     ; >4a21
-       a    bc,hl                                          ; ADD HL,BC         ; HL = table base + index*4 + index*2 = + index*6 (6 bytes/record)
        movb *hl+,@rotated_vector+1                         ; LD DE,$E7EA       ; copy the 6-byte vector, swapping each little-endian word
        movb *hl+,@rotated_vector                           ; LDI               ; to big-endian for word access
        movb *hl+,@rotated_vector_y+1                       ; LDI               ; 
        movb *hl+,@rotated_vector_y                         ; LDI               ; 
        movb *hl+,@rotated_vector_z+1                       ; LDI               ; 
-       movb *hl+,@rotated_vector_z                         ; LDI x 2           ; (DE and BC are not used afterwards)
-       bl   @rotate_vertex                                 ; CALL $4464        ; combine via #R$4464
-       bl   @add_object_position                           ; CALL $44D2        ; combine that result via #R$44D2
-       movb h,a                                            ; LD A,H / OR A     ; test the combined result's sign
-       jgt  !                                              ; RET M             ; negative - no valid projection, carry clear
-       jeq  !                                              ;                   ; 
-       .retnc                                              ;                   
+       movb *hl+,@rotated_vector_z                         ; LDI x 2           ;
+       bl   @rotate_vertex                                 ; CALL $4464        ; rotate it into the view
+       a    @view_x,de                                     ; CALL $44D2        ; add the object's position: x,
+       a    @object_position_y,bc                          ;                   ; y
+       jnc  !                                              ;                   ; (with the carry of y added to z, as on the MSX)
+       inc  hl                                             ;                   ;
 !
-       socb @l,a                                           ; OR L              ; exactly zero?
-       jne  !                                              ; RET Z             ; yes - no valid projection, carry clear
-       .retnc                                              ;                   
+       a    @view_z2,hl                                    ;                   ; and z
+       jgt  !                                              ; LD A,H / OR A / RET M / OR L / RET Z; in front of the player?
+       .retnc                                              ;                   ; no - no valid projection, carry clear
 !
-       bl   @project_point                                 ; CALL $47C4        ; finish the projection
-       mov  @vertex_cache_slot,hl                          ; LD HL,($E6C8)     ; HL -> this vertex's cache slot
-       movb @c,*hl                                         ; LD (HL),C         ; cache (C,B,E,D) - the projected point
-       inc  hl                                             ; INC L             ; 
-       movb b,*hl                                          ; LD (HL),B         ; 
-       inc  hl                                             ; INC L             ; 
-       movb @e,*hl                                         ; LD (HL),E         ; 
-       inc  hl                                             ; INC L             ; 
-       movb d,*hl                                          ; LD (HL),D         ; 
-       .ex_de_hl                                           ; EX DE,HL          ; HL = the projected point's second word
+       bl   @project_point                                 ; CALL $47C4        ; project it: BC = x, DE = y
+       mov  @vertex_cache_slot,r1                          ; LD HL,($E6C8)     ; R1 -> this vertex's cache slot
+       mov  bc,*r1+                                        ; LD (HL),C / ...   ; cache the projected point
+       mov  de,*r1                                         ;                   ;
+       mov  de,hl                                          ; EX DE,HL          ; HL = y
        .retc                                               ; RET               ; 
 project_vertex_from_cache:                                 ; >4a4c
-       movb @e,a                                           ; LD A,E            ; A = the vertex index
-       ab   a,a                                            ; ADD A,A           ; A *= 4 (2 doublings)...
-       ab   a,a                                            ; ADD A,A           ; 
-       movb a,r0                                           ; LD L,A            ; HL -> this vertex's cache slot...
-       srl  r0,8                                           ; LD H,$E6          ; 
-       ai   r0,scratch_buffer                              ;                   ; ...index * 4 from scratch_buffer ($E600 on the MSX)
-       mov  r0,hl                                          ;                   ; 
-       movb *hl,@c                                         ; LD C,(HL)         ; C = the slot's first byte
-       inc  hl                                             ; INC L             ; 
-       movb *hl,b                                          ; LD B,(HL)         ; B = the second byte - BC is the first cached word
-       inc  hl                                             ; INC L             ; 
-       movb *hl,@e                                         ; LD E,(HL)         ; E = the third byte
-       inc  hl                                             ; INC L             ; 
-       movb *hl,d                                          ; LD D,(HL)         ; D = the fourth byte - DE is the second cached word
-       .ex_de_hl                                           ; EX DE,HL          ; HL = the second cached word (DE becomes a leftover pointer, unused)
+       ai   r1,scratch_buffer                              ; LD L,A / LD H,$E6 ; R1 -> this vertex's cache slot
+       mov  *r1+,bc                                        ; LD C,(HL) / ...   ; BC = x
+       mov  *r1,hl                                         ;                   ; HL = y
        .retc                                               ; RET               ; 
 
 ********************************************************************************

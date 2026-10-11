@@ -329,6 +329,8 @@ commander_menu_jmp:
        .sfx 6                                              ; CALL $16FE        ; beep
        .endproc                                            ;                   ; (TI: back to the caller)
 commander_menu_docked:                                     
+* TI: temporary test of the disk routines (no DSR call yet): the game must carry on as before
+       blwp @disk_vector                                   ;                   ; 
        bl   @pack_commander                                ; CALL $A44F        ; pack the commander file
        li   hl,commander_name                              ; LD HL,$EB06       ; the commander's name
        sb   b,b                                            ; LD B,$00          ; 

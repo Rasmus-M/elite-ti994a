@@ -1,0 +1,195 @@
+*********************************************************************
+*
+* Disk operations (TI-specific)
+*
+* The disk controller's DSR needs two things that the game overwrites:
+*
+* - The scratchpad (>8300->83FF), as the console left it: the top of the
+*   free VDP RAM (>8370), the GPL workspace (>83E0) and more. The game uses
+*   all of it: the main workspace, the bit masks, the routines copy_to_pad
+*   installs and pad_ws.
+* - Its buffers at the top of the VDP RAM, from the address after the one
+*   in >8370 (>37D8 with the usual three files). They start with a header
+*   that the DSR checks, in the last 40 bytes of the color table (the
+*   colors of the bottom right five characters of the screen); the rest of
+*   the area is under the name table and the sprite attribute table.
+*
+* So ti_save_console_state keeps a copy of both when the game starts, and
+* ti_disk_operation puts them back around a call to the DSR, with the
+* game's scratchpad and colors where the copies were - and sets up the name
+* table and the sprite attribute table again afterwards.
+*
+* All of this runs in a workspace of its own in low RAM (disk_ws), since
+* the main workspace is in the scratchpad.
+*
+
+*********************************************************************
+*
+* Save the console's scratchpad and the DSR's part of the color table
+*
+* Called once, as the first thing the program does, before anything is
+* written to the scratchpad or to the VDP RAM. Runs in disk_ws (LWPI).
+*
+ti_save_console_state:
+       li   r0,wrksp
+       li   r1,console_pad
+       li   r2,>80
+ti_save_console_state_1:
+       mov  *r0+,*r1+
+       dec  r2
+       jne  ti_save_console_state_1
+       mov  @console_pad+>70,r0        ; R0 = the first address of the DSR's buffers:
+       inc  r0                         ; one after the top of the free VDP RAM (>8370)
+       li   r2,color_table+>1800       ; R2 = how many bytes of the color table they cover
+       s    r0,r2
+       jgt  ti_save_console_state_2
+       clr  r2                         ; none (no disk controller)
+ti_save_console_state_2:
+       ci   r2,dsr_color_max
+       jle  ti_save_console_state_3
+       li   r2,dsr_color_max           ; (more than three files: only the last 40 bytes are kept)
+       li   r0,color_table+>1800-dsr_color_max
+ti_save_console_state_3:
+       mov  r0,@dsr_color_address
+       mov  r2,@dsr_color_length
+       jeq  ti_save_console_state_5
+       li   r1,dsr_color_bytes
+       swpb r0                         ; read them from the VDP RAM
+       movb r0,@vdpwa
+       swpb r0
+       movb r0,@vdpwa
+ti_save_console_state_4:
+       movb @vdprd,*r1+
+       dec  r2
+       jne  ti_save_console_state_4
+ti_save_console_state_5:
+       rt
+*// ti_save_console_state
+
+*********************************************************************
+*
+* Do a disk operation
+*
+* Called with BLWP @disk_vector. Gives the DSR the console's scratchpad
+* and its part of the color table back, calls it, and then puts the game's
+* back and sets up the name table and the sprite attribute table again
+* (all sprites off the screen), as the DSR's buffers are under them.
+*
+* Not converted yet: the call to the DSR.
+*
+disk_vector:
+       data disk_ws,ti_disk_operation
+
+ti_disk_operation:
+       bl   @ti_swap_pad               ; the console's scratchpad
+       bl   @ti_swap_dsr_colors        ; and the DSR's part of the color table
+* (The DSR will be called here.)
+       bl   @ti_swap_dsr_colors        ; the game's colors
+       bl   @ti_swap_pad               ; and its scratchpad
+       li   r0,name_table+>4000        ; The name table: characters 0-255, three times
+       swpb r0
+       movb r0,@vdpwa
+       swpb r0
+       movb r0,@vdpwa
+       clr  r1
+       li   r2,>0300
+ti_disk_operation_1:
+       movb r1,@vdpwd
+       ai   r1,>0100
+       dec  r2
+       jne  ti_disk_operation_1
+       li   r0,sprite_attr_table+>4000 ; The sprite attribute table: all 32 sprites off the
+       swpb r0                         ; screen (y = >DF, as #R$3942 does), and transparent
+       movb r0,@vdpwa
+       swpb r0
+       movb r0,@vdpwa
+       li   r1,>df00
+       clr  r3
+       li   r2,32
+ti_disk_operation_2:
+       movb r1,@vdpwd
+       movb r3,@vdpwd
+       movb r3,@vdpwd
+       movb r3,@vdpwd
+       dec  r2
+       jne  ti_disk_operation_2
+       rtwp
+*// ti_disk_operation
+
+*********************************************************************
+*
+* Swap the scratchpad with its copy
+*
+* The first time this puts the console's scratchpad back, keeping the
+* game's in console_pad; the second time the other way round.
+*
+ti_swap_pad:
+       li   r0,wrksp
+       li   r1,console_pad
+       li   r2,>80
+ti_swap_pad_1:
+       mov  *r0,r3
+       mov  *r1,*r0+
+       mov  r3,*r1+
+       dec  r2
+       jne  ti_swap_pad_1
+       rt
+*// ti_swap_pad
+
+*********************************************************************
+*
+* Swap the DSR's part of the color table with its copy
+*
+* The first time this puts the DSR's bytes back in the VDP RAM, keeping the
+* game's colors in dsr_color_bytes; the second time the other way round
+* (keeping the bytes as the DSR left them).
+*
+ti_swap_dsr_colors:
+       mov  @dsr_color_length,r2
+       jeq  ti_swap_dsr_colors_4
+       mov  @dsr_color_address,r0      ; read what is in the VDP RAM now
+       swpb r0
+       movb r0,@vdpwa
+       swpb r0
+       movb r0,@vdpwa
+       li   r1,dsr_color_temp
+ti_swap_dsr_colors_1:
+       movb @vdprd,*r1+
+       dec  r2
+       jne  ti_swap_dsr_colors_1
+       ori  r0,>4000                   ; write the copy there
+       swpb r0
+       movb r0,@vdpwa
+       swpb r0
+       movb r0,@vdpwa
+       li   r1,dsr_color_bytes
+       mov  @dsr_color_length,r2
+ti_swap_dsr_colors_2:
+       movb *r1+,@vdpwd
+       dec  r2
+       jne  ti_swap_dsr_colors_2
+       li   r0,dsr_color_temp          ; and keep what was there as the copy
+       li   r1,dsr_color_bytes
+       mov  @dsr_color_length,r2
+ti_swap_dsr_colors_3:
+       movb *r0+,*r1+
+       dec  r2
+       jne  ti_swap_dsr_colors_3
+ti_swap_dsr_colors_4:
+       rt
+*// ti_swap_dsr_colors
+
+dsr_color_max:                         ; The most bytes of the color table that are kept
+       equ  40
+dsr_color_address:                     ; The VDP address of the DSR's part of the color table
+       data 0
+dsr_color_length:                      ; and its length (0 if there is none)
+       data 0
+dsr_color_bytes:                       ; The copy of it: the DSR's bytes, or the game's colors during a disk operation
+       bss  dsr_color_max
+dsr_color_temp:
+       bss  dsr_color_max
+disk_ws:                               ; The workspace of the disk routines
+       bss  >20
+console_pad:                           ; The copy of the scratchpad: the console's, or the game's during a disk operation
+       bss  >100

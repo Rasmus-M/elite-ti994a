@@ -1,4 +1,6 @@
        limi 0
+       lwpi disk_ws                    ; (a workspace outside the scratchpad)
+       bl   @ti_save_console_state     ; keep the scratchpad as the console left it, for the disk DSR
        lwpi wrksp
        bl   @ti_setup_environment
        .select_bank code_bank_10_select ; the title screen is in ROM bank 10
@@ -8,6 +10,7 @@
        copy "ti-routines.a99"
        copy "ti-tables.a99"
        copy "music-player.a99"
+       copy "ti-disk.a99"
 
 * The stack (TI-specific): 256 bytes, growing up (see the .push macro). It is in
 * RAM rather than scratchpad (pad_stack, 48 bytes), since the system

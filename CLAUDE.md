@@ -133,6 +133,11 @@ words. A single-byte access to
   once a frame (it's in `clear_space_view`, `copy_space_view`, `draw_object`'s face loop and after each edge, and for
   the docked screens in `print_char`, `generate_system` and `clear_page`, or a sound effect plays on until a screen is drawn) and
   never between the two bytes of a VDP address.
+- **Disk operations** (`ti-disk.a99`, low RAM): the disk DSR needs the scratchpad as the console left it and its
+  buffers at the top of the VDP RAM (from >37D8, starting in the last 40 bytes of the color table). `ti_save_console_state`
+  saves both as the first thing the program does (before `lwpi wrksp`), and `ti_disk_operation` (`blwp @disk_vector`)
+  swaps them in around the DSR call and sets up the name table and the sprite attribute table again. It all runs in
+  `disk_ws`, a workspace in low RAM, as the main workspace is in the scratchpad. The DSR call isn't there yet.
 - **Sound effects**: a native SN76489 player in ROM bank 14 (`rom-bank-14.a99`) rather than a conversion of the MSX's
   AY-3-8910 engine (#R$7468, #R$7645): the same effects (0-13), handlers and three channels, with its state in the MSX's
   sound variables (#R$E894). Play one with `.sfx N` (a `blwp @sound_effect_vector` and the number): it runs in its own

@@ -6999,12 +6999,11 @@ stardust_front_x:                                          ; >6533
        movb a,@c                                           ; LD C,A            ; 
        movb a,r1                                           ; LD B,$02          ; 
        srl  r1,8                                           ;                   ; 
-       movb @bit_length_table(r1),a                        ; LD A,(BC)         ; B = number of steps from the bit length table
-       movb a,b                                            ; LD B,A            ; 
+       movb @bit_length_table(r1),r1                       ; LD A,(BC) / LD B,A; R1 = number of steps from the bit length table
+       srl  r1,8                                           ;                   ;
 _653c:                                                     ; >653c
-       a    de,hl                                          ; ADD HL,DE         ; move along X...
-       sb   one,b                                          ; DJNZ $653C        ; ...that many times
-       jne  _653c                                          ;                   
+       mpy  de,r1                                          ; ADD HL,DE         ; move along X that many times (TI: a multiplication; the low word is
+       a    r2,hl                                          ; DJNZ $653C        ; right for a negative velocity too)
        movb @l,*ix                                         ; LD (IX+$00),L     ; 
        movb h,@>01(ix)                                     ; LD (IX+$01),H     ; store the new X
        movb @>02(ix),@l                                    ; LD L,(IX+$02)     ; 
@@ -7023,12 +7022,11 @@ stardust_front_y:                                          ; >6558
        movb a,@c                                           ; LD C,A            ; 
        movb a,r1                                           ; LD B,$02          ; 
        srl  r1,8                                           ;                   ; 
-       movb @bit_length_table(r1),a                        ; LD A,(BC)         ; B = number of steps from the bit length table
-       movb a,b                                            ; LD B,A            ; 
+       movb @bit_length_table(r1),r1                       ; LD A,(BC) / LD B,A; R1 = number of steps from the bit length table
+       srl  r1,8                                           ;                   ;
 _6561:                                                     ; >6561
-       a    de,hl                                          ; ADD HL,DE         ; move along Y...
-       sb   one,b                                          ; DJNZ $6561        ; ...that many times
-       jne  _6561                                          ;                   
+       mpy  de,r1                                          ; ADD HL,DE         ; move along Y that many times (TI: a multiplication; the low word is
+       a    r2,hl                                          ; DJNZ $6561        ; right for a negative velocity too)
        movb @l,@>02(ix)                                    ; LD (IX+$02),L     ; 
        movb h,@>03(ix)                                     ; LD (IX+$03),H     ; store the new Y
 _656a:                                                     ; >656a
@@ -7136,24 +7134,22 @@ _6627:                                                     ; >6627
 * TI: moves HL back by the velocity DE a number of times depending on abs H
 * (#R$6520), returning the status of HL xor its old value, so negative if it
 * changed sign (from $65C5-$65E9 and $65F8-$661C).
-stardust_move_back:                                        
-       movb h,a                                            ; LD C,H / LD A,H   ; 
-       mov  hl,r2                                          ;                   ; R2 = the old value
-       jgt  stardust_move_back_1                           ; OR A / JP P,$65CF ; 
-       jeq  stardust_move_back_1                           ;                   ; 
+stardust_move_back:
+       movb h,a                                            ; LD C,H / LD A,H   ;
+       mov  hl,r0                                          ;                   ; R0 = the old value
+       jgt  stardust_move_back_1                           ; OR A / JP P,$65CF ;
+       jeq  stardust_move_back_1                           ;                   ;
        andi a,>ff00                                        ; NEG               ; A = abs H
-       neg  a                                              ;                   ; 
-stardust_move_back_1:                                      
+       neg  a                                              ;                   ;
+stardust_move_back_1:
        srl  a,2                                            ; SRL A / SRL A     ; abs H / 4
-       movb a,r1                                           ; LD E,A / LD D,$02 ; 
-       srl  r1,8                                           ;                   ; 
-       movb @bit_length_table(r1),b                        ; LD A,(DE) / LD B,A; B = number of steps from the bit length table
-stardust_move_back_2:                                      
-       s    de,hl                                          ; OR A / SBC HL,DE  ; move back...
-       sb   one,b                                          ; DJNZ $65DE        ; ...that many times
-       jne  stardust_move_back_2                           ;                   ; 
-       mov  hl,r0                                          ; LD A,H / XOR C    ; 
-       xor  r2,r0                                          ;                   ; negative if it changed sign
+       movb a,r1                                           ; LD E,A / LD D,$02 ;
+       srl  r1,8                                           ;                   ;
+       movb @bit_length_table(r1),r1                       ; LD A,(DE) / LD B,A; R1 = number of steps from the bit length table
+       srl  r1,8                                           ;                   ;
+       mpy  de,r1                                          ; OR A / SBC HL,DE  ; move back that many times (TI: a multiplication)
+       s    r2,hl                                          ; DJNZ $65DE        ;
+       xor  hl,r0                                          ; LD A,H / XOR C    ; negative if it changed sign
        rt                                                  ;                   ; 
 
 ********************************************************************************
@@ -7597,13 +7593,10 @@ _6831:                                                     ; >6831
        ; RR E                                              ; RR E              ; (done by the SRA D above, which shifts all of DE)
        sra  d,1                                            ; SRA D             ; 
        ; RR E                                              ; RR E              ; DE = b = v / 4 (done by the SRA D above, which shifts all of DE)
-       movb @speed_gauge_value,a                           ; LD A,($F814) / OR A; A = speed
-       jeq  _6849                                          ; JR Z,$6849        ; stationary - velocity is just v
-       movb a,b                                            ; LD B,A            ; 
-_6846:                                                     ; >6846
-       a    de,hl                                          ; ADD HL,DE         ; add b once for each unit of speed
-       sb   one,b                                          ; DJNZ $6846        ; 
-       jne  _6846                                          ;                   
+       movb @speed_gauge_value,r1                          ; LD A,($F814) / OR A; R1 = speed
+       srl  r1,8                                           ; JR Z,$6849        ;
+       mpy  de,r1                                          ; ADD HL,DE         ; add b once for each unit of speed (TI: a multiplication)
+       a    r2,hl                                          ; DJNZ $6846        ;
 _6849:                                                     ; >6849
        movb @l,@>04(ix)                                    ; LD (IX+$04),L     ; 
        movb h,@>05(ix)                                     ; LD (IX+$05),H     ; set the X velocity
@@ -7625,13 +7618,10 @@ _685b:                                                     ; >685b
        ; RR E                                              ; RR E              ; (done by the SRA D above, which shifts all of DE)
        sra  d,1                                            ; SRA D             ; 
        ; RR E                                              ; RR E              ; DE = b = v / 4 (done by the SRA D above, which shifts all of DE)
-       movb @speed_gauge_value,a                           ; LD A,($F814) / OR A; A = speed
-       jeq  _6873                                          ; JR Z,$6873        ; stationary - velocity is just v
-       movb a,b                                            ; LD B,A            ; 
-_6870:                                                     ; >6870
-       a    de,hl                                          ; ADD HL,DE         ; add b once for each unit of speed
-       sb   one,b                                          ; DJNZ $6870        ; 
-       jne  _6870                                          ;                   
+       movb @speed_gauge_value,r1                          ; LD A,($F814) / OR A; R1 = speed
+       srl  r1,8                                           ; JR Z,$6873        ;
+       mpy  de,r1                                          ; ADD HL,DE         ; add b once for each unit of speed (TI: a multiplication)
+       a    r2,hl                                          ; DJNZ $6870        ;
 _6873:                                                     ; >6873
        movb @l,@>06(ix)                                    ; LD (IX+$06),L     ; 
        movb h,@>07(ix)                                     ; LD (IX+$07),H     ; set the Y velocity
@@ -7803,15 +7793,32 @@ stardust_check_centre_y:                                   ; >692d
        cb   a,@bytes+>0a                                   ; CP $0A            ; 
        jl   stardust_flag_respawn                          ; JR C,$6950        ; |Y| < 10 too - reached the centre, respawn it
 _6931:                                                     ; >6931
-       movb @e,a                                           ; LD A,E            ; 
-       ab   @bytes+>57,a                                   ; ADD A,$57         ; C = screen column (view centre is column 87)
-       movb a,@c                                           ; LD C,A            ; 
-       movb d,a                                            ; LD A,D            ; 
-       ab   @bytes+>3f,a                                   ; ADD A,$3F         ; B = screen row (view centre is row 63)
-       movb a,b                                            ; LD B,A            ; 
-       .push ix                                            ; PUSH IX           ; 
-       bl   @plot_single_pixel                             ; CALL $3CFD        ; plot the particle
-       .pop ix                                             ; POP IX            ; 
+* TI: plots the pixel in line (#R$3CFD), marking its character for the copy
+* (view_mark_rows).
+       movb @e,r1                                          ; LD A,E            ;
+       ab   @bytes+>57,r1                                  ; ADD A,$57         ; screen column (view centre is column 87)
+       srl  r1,8                                           ; LD C,A            ; R1 = the column
+       movb d,r2                                           ; LD A,D            ;
+       ab   @bytes+>3f,r2                                  ; ADD A,$3F         ; screen row (view centre is row 63)
+       srl  r2,8                                           ; LD B,A            ; R2 = the row
+       mov  r1,r0                                          ;                   ;
+       srl  r0,3                                           ;                   ; R0 = the character column
+       mov  r2,hl                                          ;                   ;
+       srl  hl,3                                           ;                   ; HL = the character row
+       swpb r0                                             ;                   ;
+       cb   r0,@view_min(hl)                               ;                   ; mark the character as drawn in
+       jhe  !                                              ;                   ;
+       movb r0,@view_min(hl)                               ;                   ;
+!
+       cb   r0,@view_max(hl)                               ;                   ;
+       jle  !                                              ;                   ;
+       movb r0,@view_max(hl)                               ;                   ;
+!
+       swpb r0                                             ;                   ;
+       sla  r2,5                                           ;                   ;
+       a    r0,r2                                          ; CALL $3CFD        ; R2 = the offset of its byte in the buffer: row * 32 + column / 8
+       andi r1,7                                           ;                   ;
+       socb @pixel_bitmask_table(r1),@space_view_buffer(r2);                   ; plot the particle
 _6940:                                                     ; >6940
        movb @>08(ix),a                                     ; LD A,(IX+$08) / OR A; Z flag = particle doesn't need respawning
 stardust_move_handler:                                     ; >6944

@@ -82,8 +82,8 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   blueprint pointers `bp_vertices`/`bp_edges`/`bp_faces`/`bp_name`, which are big-endian because the blueprint
   headers use `data`. Also big-endian `data` words, for speed in
   `rotate_vertex`, are `rotated_vector`/`_y`/`_z` (the code that copies blueprint vertices and normals into it
-  swaps the bytes of each word) and the orientation logs `side_vector_logs`, `roof_vector_logs` and
-  `nose_vector_logs` (also used by the MSX code at $869A, not converted yet), and the per-edge and per-vertex
+  swaps the bytes of each word) and the logs `nose_vector_logs` (used only by `move_along_axis` now; `side_vector_logs`
+  and `roof_vector_logs` are unused), and the per-edge and per-vertex
   variables `clip_point1_x/_y`, `clip_point2_x/_y`, `view_x`, `view_z2`, `view_z`, `vertex_cache_slot`,
   `face_visible_workspace_1/_2`, `screen_radius` and `on_screen_left/right/top/bottom`. So are the object
 workspace's position and orientation words (`object_position_x/_y/_z`, `side_vector*`, `nose_vector*`,
@@ -143,10 +143,14 @@ words. A single-byte access to
   a native routine in low RAM where the MSX has #R$3F68). `view_mark_all` marks everything
   (`enter_flight_mode`, as then neither the buffer nor the screen is known). `clear_space_view` mustn't change BC: its
   callers count with it.
+- **Rotating vertices** (`rotate_vertex`, and `face_visible` with it) is native code that multiplies with `MPY` where
+  the MSX adds logarithms: `cache_orientation` caches the object's orientation in `rotation_matrix` as nine unsigned
+  words (the component + 2.0), not as the logarithms at `side_vector_logs` and `roof_vector_logs`, which are no longer
+  used. The results differ from the MSX's by a few units (they are slightly more accurate).
 - **The program image** (low and high RAM) is packed into the 32K of cartridge banks 0-3 with a loader: `ea5tocart`
   prints "Cartridge full" (and leaves a broken cartridge) if it doesn't fit, so check `make.bat`'s output for that. The
   space view buffer is last in low RAM and defined with `equ`, so it isn't in the image: nothing may be assembled after
-  it. High RAM is nearly full (about 120 bytes free); low RAM has about 520 bytes free.
+  it. High RAM has about 360 bytes free; low RAM has about 520 bytes free.
 - **Disk operations** (the routines in ROM bank 14, `rom-bank-14.a99`; their entry point `disk_entry`, which selects the bank, and their data in `ti-disk.a99`, low RAM): the commander menu (bank 7) loads and saves commanders on disk where the
   MSX uses tape: the file `DSK1.<name>`, a program file of 139 bytes (the record at #R$D606: the name and the commander
   file). Set `disk_opcode`, `disk_name` and `disk_name_length`, `blwp @disk_vector`, and check `disk_error`. The disk DSR

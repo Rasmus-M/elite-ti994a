@@ -4758,41 +4758,37 @@ draw_object_exit:
 * $E6D2, and the nose vector (unless bit 4 of #R$F7CD is set) at
 * #R$EB68. Marks the cache valid (#R$E6F0).
 cache_orientation:                                         ; >433f
-       .proc
-       mov  @side_vector,hl                                ; LD HL,($F7D4)     ; HL = a position/axis word
-       bl   @log_sign_tagged                               ; CALL $1FCF        ; side vector's x
-       mov  hl,@side_vector_logs                           ; LD ($E6CC),HL     ; cache the result
-       mov  @side_vector_y,hl                              ; LD HL,($F7D6)     ; side y
-       bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       mov  hl,@side_vector_log_y                          ; LD ($E6CE),HL     ; cache the result
-       mov  @side_vector_z,hl                              ; LD HL,($F7D8)     ; side z
-       bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       mov  hl,@side_vector_log_z                          ; LD ($E6D0),HL     ; cache the result
-       mov  @roof_vector,hl                                ; LD HL,($F7E0)     ; roof x
-       bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       mov  hl,@roof_vector_logs                           ; LD ($E6D2),HL     ; cache the result
-       mov  @roof_vector_y,hl                              ; LD HL,($F7E2)     ; roof y
-       bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       mov  hl,@roof_vector_log_y                          ; LD ($E6D4),HL     ; cache the result
-       mov  @roof_vector_z,hl                              ; LD HL,($F7E4)     ; roof z
-       bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       mov  hl,@roof_vector_log_z                          ; LD ($E6D6),HL     ; cache the result
-       movb @object_status_byte,a                          ; LD A,($F7CD)      ; A = the object status byte
-       andi a,>1000                                        ; AND $10           ; test bit 4
-       jne  _4397                                          ; JR NZ,$4397       ; skip the nose vector
-       mov  @nose_vector,hl                                ; LD HL,($F7DA)     ; nose x
-       bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       mov  hl,@nose_vector_logs                           ; LD ($EB68),HL     ; cache the result
-       mov  @nose_vector_y,hl                              ; LD HL,($F7DC)     ; nose y
-       bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       mov  hl,@nose_vector_log_y                          ; LD ($EB6A),HL     ; cache the result
-       mov  @nose_vector_z,hl                              ; LD HL,($F7DE)     ; nose z
-       bl   @log_sign_tagged                               ; CALL $1FCF        ; quantize it
-       mov  hl,@nose_vector_log_z                          ; LD ($EB6C),HL     ; cache the result
-_4397:                                                     ; >4397
+* TI: rotate_vertex multiplies with MPY rather than by adding logarithms, so
+* this caches the nine components as unsigned words instead: the component
+* + 2.0 (>8000 + the two's complement value, 1.0 being >4000), which is always
+* positive. They go in rotation_matrix in the order side, roof, nose (in the
+* object it is side, nose, roof). The nose vector is always done.
+       .proc                                               ;                   ;
+       li   r1,side_vector                                 ;                   ; R1 -> the side vector
+       li   r2,rotation_matrix                             ;                   ;
+       bl   @cache_orientation_1                           ;                   ;
+       li   r2,rotation_matrix+12                          ;                   ; the nose vector follows it in the object
+       bl   @cache_orientation_1                           ;                   ;
+       li   r2,rotation_matrix+6                           ;                   ; and then the roof vector
+       bl   @cache_orientation_1                           ;                   ;
        movb @b255,a                                        ; LD A,$FF          ; A = $FF
        movb a,@vector_cache_valid_flag                     ; LD ($E6F0),A      ; the cache is valid
-       .endproc                                            ; RET               ; 
+       .endproc                                            ; RET               ;
+* Convert the three sign-magnitude words at R1 to the three words at R2
+cache_orientation_1:
+       li   r0,3                                           ;                   ;
+cache_orientation_2:
+       mov  *r1+,hl                                        ;                   ; HL = the component: sign-magnitude
+       jlt  cache_orientation_3                            ;                   ;
+       ai   hl,>8000                                       ;                   ; positive: 2.0 + it
+       jmp  cache_orientation_4                            ;                   ;
+cache_orientation_3:
+       neg  hl                                             ;                   ; negative: 2.0 - its magnitude (-(>8000 + m) = >8000 - m)
+cache_orientation_4:
+       mov  hl,*r2+                                        ;                   ;
+       dec  r0                                             ;                   ;
+       jne  cache_orientation_2                            ;                   ;
+       rt                                                  ;                   ;
 
 ********************************************************************************
 * Rotate a vertex into the view
@@ -4811,52 +4807,80 @@ _4397:                                                     ; >4397
 * O:BC y
 * O:HL z
 rotate_vertex:                                             ; >4464
-       .proc
-       mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; x * side.x
-       mov  @side_vector_logs,bc                           ; LD BC,($E6CC)     ; BC = row 1's first coefficient
-       bl   @multiply_logs                                 ; CALL $2160        ; combine it via #R$2160
-       .ex_de_hl                                           ; EX DE,HL          ; DE = that combine's result
-       mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; y * roof.x
-       mov  @roof_vector_logs,bc                           ; LD BC,($E6D2)     ; BC = row 1's second coefficient
-       bl   @multiply_logs                                 ; CALL $2160        ; combine it
-       a    de,hl                                          ; ADD HL,DE         ; HL = the running sum for row 1
-       .ex_de_hl                                           ; EX DE,HL          ; DE = that sum
-       mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; z * nose.x
-       mov  @nose_vector_logs,bc                           ; LD BC,($EB68)     ; BC = row 1's third coefficient
-       bl   @multiply_logs                                 ; CALL $2160        ; combine it
-       a    de,hl                                          ; ADD HL,DE         ; x'
-       .push hl                                            ; PUSH HL           ; save it
-       mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; x * side.y
-       mov  @side_vector_log_y,bc                          ; LD BC,($E6CE)     ; 
-       bl   @multiply_logs                                 ; CALL $2160        ; combine
-       .ex_de_hl                                           ; EX DE,HL          ; DE = that result
-       mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; y * roof.y
-       mov  @roof_vector_log_y,bc                          ; LD BC,($E6D4)     ; BC = row 2's second coefficient
-       bl   @multiply_logs                                 ; CALL $2160        ; combine
-       a    de,hl                                          ; ADD HL,DE         ; running sum for row 2
-       .ex_de_hl                                           ; EX DE,HL          ; DE = that sum
-       mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; z * nose.y
-       mov  @nose_vector_log_y,bc                          ; LD BC,($EB6A)     ; BC = row 2's third coefficient
-       bl   @multiply_logs                                 ; CALL $2160        ; combine
-       a    de,hl                                          ; ADD HL,DE         ; y'
-       .push hl                                            ; PUSH HL           ; save it
-       mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; x * side.z
-       mov  @side_vector_log_z,bc                          ; LD BC,($E6D0)     ; BC = row 3's first coefficient
-       bl   @multiply_logs                                 ; CALL $2160        ; combine
-       .ex_de_hl                                           ; EX DE,HL          ; DE = that result
-       mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; y * roof.z
-       mov  @roof_vector_log_z,bc                          ; LD BC,($E6D6)     ; BC = row 3's second coefficient
-       bl   @multiply_logs                                 ; CALL $2160        ; combine
-       a    de,hl                                          ; ADD HL,DE         ; running sum for row 3
-       .ex_de_hl                                           ; EX DE,HL          ; DE = that sum
-       mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; z * nose.z
-       mov  @nose_vector_log_z,bc                          ; LD BC,($EB6C)     ; BC = row 3's third coefficient
-       bl   @multiply_logs                                 ; CALL $2160        ; combine
-       a    de,hl                                          ; ADD HL,DE         ; z'
-       .pop bc                                             ; POP BC            ; BC = the second output component
-       .pop de                                             ; POP DE            ; DE = the first output component
+* TI: a native version, which multiplies with MPY. For each component v of the
+* vertex (a sign-tagged logarithm; >FFFF is 0): its value * 32 comes from the
+* antilog table (entry log / 32 + 256, i.e. the value * 256, then / 8), and is
+* multiplied by the three cached matrix components c + 2.0 (cache_orientation):
+* the high word of each product is v * 32 * (c + 2) / 4, which is added to (or,
+* if v is negative, subtracted from) x', y' and z'. The sum of the v * 32 is
+* kept too: half of it is the "+ 2.0" part of each sum, and is taken off at
+* the end, leaving 8 * the result, which is rounded. Slightly more accurate
+* than the MSX's nine log multiplications (#R$2160), so the results can differ
+* by a few units.
+* Changes R0-R2 and A.
+       .proc                                               ;                   ;
+       .push r12                                           ;                   ; (AF' on the MSX; saved, as the TI code may count on it)
+       clr  de                                             ;                   ; DE, BC, HL = x', y', z'
+       clr  bc                                             ;                   ;
+       clr  hl                                             ;                   ;
+       clr  r12                                            ;                   ; R12 = the sum of the components * 32
+       li   a,rotated_vector                               ;                   ; A -> the vertex's components
+       li   r2,rotation_matrix                             ;                   ; R2 -> the matrix: side, roof, nose
+rotate_vertex_1:
+       mov  *a+,r1                                         ;                   ; R1 = the next component's logarithm
+       ci   r1,>ffff                                       ;                   ;
+       jeq  rotate_vertex_3                                ;                   ; the component is 0
+       mov  r1,r11                                         ;                   ; (R11 is free: its sign tag, bit 14)
+       srl  r1,4                                           ;                   ;
+       andi r1,>03fe                                       ;                   ; the word index log / 32, as an offset
+       mov  @antilog_table+>0200(r1),r1                    ;                   ; R1 = the value * 256
+       srl  r1,3                                           ;                   ; R1 = the value * 32
+       sla  r11,2                                          ;                   ; carry = the sign tag
+       mov  r1,r11                                         ;                   ; R11 = the value * 32 (MOV leaves the carry alone)
+       joc  rotate_vertex_2                                ;                   ; negative
+       a    r11,r12                                        ;                   ;
+       mov  r11,r0                                         ;                   ;
+       mpy  *r2+,r0                                        ;                   ; * side.x (roof.x, nose.x)
+       a    r0,de                                          ;                   ;
+       mov  r11,r0                                         ;                   ;
+       mpy  *r2+,r0                                        ;                   ; * side.y
+       a    r0,bc                                          ;                   ;
+       mov  r11,r0                                         ;                   ;
+       mpy  *r2+,r0                                        ;                   ; * side.z
+       a    r0,hl                                          ;                   ;
+       jmp  rotate_vertex_4                                ;                   ;
+rotate_vertex_2:
+       s    r11,r12                                        ;                   ; The same for a negative component
+       mov  r11,r0                                         ;                   ;
+       mpy  *r2+,r0                                        ;                   ;
+       s    r0,de                                          ;                   ;
+       mov  r11,r0                                         ;                   ;
+       mpy  *r2+,r0                                        ;                   ;
+       s    r0,bc                                          ;                   ;
+       mov  r11,r0                                         ;                   ;
+       mpy  *r2+,r0                                        ;                   ;
+       s    r0,hl                                          ;                   ;
+       jmp  rotate_vertex_4                                ;                   ;
+rotate_vertex_3:
+       ai   r2,6                                           ;                   ; skip the matrix's column
+rotate_vertex_4:
+       ci   a,rotated_vector+6                             ;                   ;
+       jne  rotate_vertex_1                                ;                   ;
+       sra  r12,1                                          ;                   ; R12 = the "+ 2.0" part of each sum
+       s    r12,de                                         ;                   ;
+       ai   de,4                                           ;                   ;
+       sra  de,3                                           ;                   ; x'
+       s    r12,bc                                         ;                   ;
+       ai   bc,4                                           ;                   ;
+       sra  bc,3                                           ;                   ; y'
+       s    r12,hl                                         ;                   ;
+       ai   hl,4                                           ;                   ;
+       sra  hl,3                                           ;                   ; z'
+       .pop r12                                            ;                   ;
        bl   @convert_to_view                               ;                   ; convert to the current view
-       .endproc                                            ; RET               ; 
+       .endproc                                            ; RET               ;
+rotation_matrix:                                           ; The orientation, cached by cache_orientation: 9 words
+       bss  18                                             ;                   ;
 * This entry point is used by the routines at #R$422E and #R$43C2.
 convert_to_view:                                           ; >44ce
        b    @view_front                                    ; CALL $44E5        ; convert to the current view (operand patched by #R$64A1)
@@ -5525,39 +5549,6 @@ project_coordinate_exit:
        .endproc                                            ; RET               ; return with the original sign reapplied to HL
 
 ********************************************************************************
-* Draw a ship: scale a normal's component
-* 
-* Used by the routine at #R$4873.
-* .
-* Part of #R$4873. Multiplies the component by the face's scale byte
-* ($E7E8, with its bit length in $E7E9) and divides by 256, keeping the
-* sign.
-* 
-* I:HL Component
-* O:HL Scaled component
-scale_normal_component:                                    ; >4847
-       mov  hl,r0                                          ; BIT 7,H           ; R0 bit 15 = the value's sign
-       clr  r1                                             ;                   ; 
-       movb @l,r1                                          ; LD A,L            ; 
-       mov  r0,r0                                          ;                   ; 
-       jgt  !                                              ; JP P,$4851        ; non-negative - keep L as-is
-       jeq  !                                              ;                   ; 
-       neg  r1                                             ; NEG               ; negative: negate L
-!
-       srl  r1,8                                           ; LD E,L            ; R1 = abs(L)
-       movb @face_scale,r2                                 ; LD A,($E7E8)      ; 
-       srl  r2,8                                           ;                   ; R2 = the face's scale byte
-       mpy  r2,r1                                          ; ADD HL,DE         ; R1:R2 = the product (the shift-and-add loop on the Z80)
-       srl  r2,8                                           ; LD L,H            ; 
-       mov  r2,hl                                          ; LD H,$00          ; HL = the product's high byte
-       mov  r0,r0                                          ; POP AF            ; restore the value's original sign
-       jlt  !                                              ; RET P             ; non-negative - return as-is
-       rt                                                  ;                   ; 
-!
-       neg  hl                                             ; SUB L             ; negative: negate HL
-       rt                                                  ; RET               ; 
-
-********************************************************************************
 * Draw a ship: does a face face the player?
 * 
 * Used by the routine at #R$422E.
@@ -5569,108 +5560,65 @@ scale_normal_component:                                    ; >4847
 * 
 * O:A,HL The dot product (A the high byte)
 face_visible:                                              ; >4873
-       .proc
+* TI: a native version, with the scaling (#R$4847) and the multiplications
+* (#R$48EC) done in line by face_visible_term. Only the sign of A is used. HL
+* is kept.
+       .proc                                               ;                   ;
        .push hl                                            ; PUSH HL           ; save the caller's HL
-       bl   @rotate_vertex                                 ; CALL $4464        ; transform the vector via #R$4464 (BC/DE/HL = its three components)
-       mov  de,@rotated_vector                             ; LD ($E7EA),DE     ; cache the first component
-       mov  bc,@rotated_vector_y                           ; LD ($E7EC),BC     ; cache the second component
-       mov  hl,@rotated_vector_z                           ; LD ($E7EE),HL     ; cache the third component
-       .ex_de_hl                                           ; EX DE,HL          ; HL = the first component
-       bl   @scale_normal_component                        ; CALL $4847        ; scale it via #R$4847
-       .push hl                                            ; PUSH HL           ; save the scaled result
-       mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; HL = the second component
-       bl   @scale_normal_component                        ; CALL $4847        ; scale it too
-       .push hl                                            ; PUSH HL           ; save that result
-       mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; HL = the third component
-       bl   @scale_normal_component                        ; CALL $4847        ; scale it too
-       .pop bc                                             ; POP BC            ; BC = the second scaled result
-       .pop de                                             ; POP DE            ; DE = the first scaled result
-       bl   @add_object_position                           ; CALL $44D2        ; combine (third scaled result in HL) with BC/DE via #R$44D2
-       czc  @bit7,d                                        ; BIT 7,D           ; test D's sign bit
-       jeq  _48a5                                          ; JR Z,$48A5        ; clear - skip the negate below
-       neg  de                                             ; SUB E             ; set: negate DE...
-       ori  de,>8000                                       ; OR $80            ; ...and force the sign bit set (sign-magnitude form)
-_48a5:                                                     ; >48a5
-       czc  @bit7,b                                        ; BIT 7,B           ; test B's sign bit
-       jeq  _48b1                                          ; JR Z,$48B1        ; clear - skip the negate below
-       neg  bc                                             ; SUB C             ; set: negate BC...
-       ori  bc,>8000                                       ; OR $80            ; ...and force the sign bit set
-_48b1:                                                     ; >48b1
-       mov  bc,@face_visible_workspace_1                   ; LD ($E6EA),BC     ; cache the sign-magnitude BC
-       czc  @bit7,h                                        ; BIT 7,H           ; test H's sign bit
-       jeq  _48c1                                          ; JR Z,$48C1        ; clear - skip the negate below
-       neg  hl                                             ; SUB L             ; set: negate HL...
-       ori  hl,>8000                                       ; OR $80            ; ...and force the sign bit set
-_48c1:                                                     ; >48c1
-       mov  hl,@face_visible_workspace_2                   ; LD ($E6EC),HL     ; cache the sign-magnitude HL
-       mov  @rotated_vector,hl                             ; LD HL,($E7EA)     ; HL = the first (unscaled) component again
-       bl   @multiply_small_by_word                        ; CALL $48EC        ; multiply it against DE (the sign-magnitude D from above) via #R$48EC
-       .push af                                            ; PUSH AF           ; save the product's high byte (A)
-       .push hl                                            ; PUSH HL           ; save the product's HL
-       mov  @face_visible_workspace_1,de                   ; LD DE,($E6EA)     ; DE = the cached sign-magnitude BC ($E6EA)
-       mov  @rotated_vector_y,hl                           ; LD HL,($E7EC)     ; HL = the second (unscaled) component
-       bl   @multiply_small_by_word                        ; CALL $48EC        ; multiply it against DE via #R$48EC
-       .push af                                            ; PUSH AF           ; save the product's high byte (A)
-       .push hl                                            ; PUSH HL           ; save the product's HL
-       mov  @face_visible_workspace_2,de                   ; LD DE,($E6EC)     ; DE = the cached sign-magnitude HL ($E6EC)
-       mov  @rotated_vector_z,hl                           ; LD HL,($E7EE)     ; HL = the third (unscaled) component
-       bl   @multiply_small_by_word                        ; CALL $48EC        ; multiply it against DE via #R$48EC
-       .pop de                                             ; POP DE            ; DE = the second product's HL
-       .pop bc                                             ; POP BC            ; BC = the second product's high byte
-       a    de,hl                                          ; ADD HL,DE         ; HL += DE (sum the second product in)
-       jnc  !                                              ;                   ; (ADC: add the carry first)
-       ab   one,a                                          ;                   ; 
-!
-       ab   b,a                                            ; ADC A,B           ; A += B, with carry
-       .pop de                                             ; POP DE            ; DE = the first product's HL
-       .pop bc                                             ; POP BC            ; BC = the first product's high byte
-       a    de,hl                                          ; ADD HL,DE         ; HL += DE (sum the first product in)
-       jnc  !                                              ;                   ; (ADC: add the carry first)
-       ab   one,a                                          ;                   ; 
-!
-       ab   b,a                                            ; ADC A,B           ; A += B, with carry
+       bl   @rotate_vertex                                 ; CALL $4464        ; rotate the normal into the view: DE, BC, HL
+       mov  bc,@rotated_vector_y                           ; LD ($E7EC),BC     ; keep y
+       mov  hl,@rotated_vector_z                           ; LD ($E7EE),HL     ; and z
+       mov  de,r1                                          ;                   ; x...
+       mov  @view_x,r0                                     ;                   ; ...and the object's x
+       clr  a                                              ;                   ; A:HL = the sum
+       clr  hl                                             ;                   ;
+       bl   @face_visible_term                             ;                   ;
+       mov  @rotated_vector_y,r1                           ;                   ;
+       mov  @object_position_y,r0                          ;                   ;
+       bl   @face_visible_term                             ;                   ;
+       mov  @rotated_vector_z,r1                           ;                   ;
+       mov  @view_z2,r0                                    ;                   ;
+       bl   @face_visible_term                             ;                   ;
+       swpb a                                              ;                   ; A = bits 16-23 of the sum: the MSX adds up 24 bits, and its sign is bit 23
        .pop hl                                             ; POP HL            ; restore the caller's HL
-       .endproc                                            ; RET               ; return with A:HL = the summed 24-bit accumulator
-
-********************************************************************************
-* Multiply a small signed number by a sign-magnitude word
-* 
-* Used by the routine at #R$4873.
-* .
-* Returns A:HL = L * DE, where L is a signed number from -128 to 127 (H
-* being its sign, so only bit 7 of H matters) and DE is sign-magnitude.
-* The sign of the result is the XOR of the two signs, kept in F' while the
-* magnitudes are multiplied by shift and add (stopping once no bits of |L|
-* are left); the result is a 24-bit two's complement number.
-* 
-* I:HL The first number (L, with H its sign)
-* I:DE The second number (sign-magnitude)
-* O:A:HL The product
-multiply_small_by_word:                                    ; >48ec
-       mov  hl,r0                                          ; LD A,H            ; 
-       xor  de,r0                                          ; XOR D             ; R0 bit 15 = the sign of the product
-       andi de,>7fff                                       ; RES 7,D           ; DE = |DE|
-       clr  r1                                             ;                   ; 
-       movb @l,r1                                          ;                   ; 
-       mov  hl,hl                                          ; BIT 7,H           ; L negative?
-       jgt  !                                              ; JR Z,$48F9        ; no
-       jeq  !                                              ;                   ; 
-       neg  r1                                             ; NEG               ; yes: L = |L|
+       .endproc                                            ; RET               ; return with the sign of A the sign of the dot product
+* Add n * (n * the face's scale / 256 + p) to A:HL
+* I:R1 n, a component of the normal (only the low byte of its magnitude counts, as on the MSX)
+* I:R0 p, that coordinate of the object
+* Changes R0-R2, BC and DE.
+face_visible_term:
+       mov  r1,de                                          ;                   ; DE = n: its sign
+       abs  r1                                             ;                   ;
+       andi r1,>00ff                                       ;                   ; R1 = abs(n)
+       jeq  face_visible_term_3                            ;                   ; nothing to add
+       mov  r1,bc                                          ;                   ; BC = abs(n)
+       mpy  @face_scale,r1                                 ;                   ; R1 = abs(n) * scale / 256: the high word of abs(n) * the word at face_scale, whose
+       ;                                                   ;                   ; high byte is the scale (its low byte, the bit length, can make it 1 more)
+       mov  de,de                                          ;                   ;
+       jgt  face_visible_term_1                            ;                   ;
+       neg  r1                                             ;                   ; with n's sign
+face_visible_term_1:
+       a    r0,r1                                          ;                   ; R1 = the scaled component + p
+       mov  r1,r0                                          ;                   ;
+       xor  de,r0                                          ;                   ; R0 = the sign of the product
+       abs  r1                                             ;                   ;
+       mpy  bc,r1                                          ;                   ; R1:R2 = abs(n) * abs(that)
+       mov  r0,r0                                          ;                   ;
+       jlt  face_visible_term_2                            ;                   ;
+       a    r2,hl                                          ;                   ; add it
+       jnc  !                                              ;                   ;
+       inc  a                                              ;                   ;
 !
-       srl  r1,8                                           ; LD B,L            ; R1 = |L|
-       mpy  de,r1                                          ; ADD HL,DE         ; R1:R2 = the product (the shift-and-add loop on the Z80)
-       mov  r0,r0                                          ; EX AF,AF'         ; the sign
-       jgt  !                                              ; RET P             ; positive - done
-       jeq  !                                              ;                   ; 
-       inv  r1                                             ; SUB L             ; negative: negate the product
-       neg  r2                                             ; SBC A,H           ; 
-       jne  !                                              ;                   ; 
-       inc  r1                                             ;                   ; 
+       a    r1,a                                           ;                   ;
+       rt                                                  ;                   ;
+face_visible_term_2:
+       s    r2,hl                                          ;                   ; subtract it
+       joc  !                                              ;                   ; (no borrow)
+       dec  a                                              ;                   ;
 !
-       mov  r2,hl                                          ;                   ; 
-       swpb r1                                             ;                   ; 
-       movb r1,a                                           ; LD A,C            ; A:HL = the product
-       rt                                                  ; RET               ; 
+       s    r1,a                                           ;                   ;
+face_visible_term_3:
+       rt                                                  ;                   ;
 
 ********************************************************************************
 * Draw a ship: draw a face's edges

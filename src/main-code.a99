@@ -13852,7 +13852,7 @@ vdp_reg1_cache:                                            ; >f3e0
        .msxalign >f6c0
 commander_menu_buffer:                                     ; >f6c0
        byte >00,>4A,>5A
-       byte >48,>02,>53,>B7,>07,>03,>50,>C3            ; (TI: cash temporarily 5000.0 credits, for testing)
+       byte >48,>02,>53,>B7,>07,>03,>E8,>03
        byte >00,>00,>2D,>31,>01,>FF,>46,>03
        byte >00,>00,>81,>80,>00,>00,>00,>00
        byte >00,>00,>80,>80,>00,>00,>00,>00

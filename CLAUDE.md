@@ -10,9 +10,10 @@ commented SkoolKit disassembly in the sister repo `../elite-msx-skoolkit` (`src/
 CLAUDE.md for addresses, naming and the MSX memory map). The `#R$xxxx` references and `; >xxxx` address
 comments throughout the `.a99` files point at MSX addresses in that disassembly.
 
-Current goal (per README): get the title screen (spinning ELITE letters + wireframe ships) running. Space is
-the main constraint: TMS9900 code is much larger than Z80 and there is half the RAM, so the plan is to page
-data from extra 8K cartridge ROM banks into `>6000` while main code runs in 32K RAM. Speed is deferred.
+The whole game is converted and playable (see the README's status). Space was the main constraint: TMS9900 code
+is much larger than Z80 and there is half the RAM, so data and most of the code are in 8K cartridge ROM banks paged
+into `>6000`, while the code that everything shares runs in 32K RAM. What remains is speed: the game runs at only a
+few frames a second in flight.
 
 ## Build
 
@@ -23,7 +24,7 @@ data from extra 8K cartridge ROM banks into `>6000` while main code runs in 32K 
 2. `xas99.py src/math-tables-bin.a99 -b ...` and `xas99.py src/code-bank-N.a99 -B ...` — assemble the code banks 7-14
    (`bin/bankN.bin`), which include the math tables (`bin/math-tables.bin`) with `bcopy`.
 3. `xas99.py src/rom-banks/rom-bank-N.a99 -B ...` — assemble the data banks 4-6 (`bin/bankN.bin`).
-4. `java -jar tools/ea5tocart.jar bin\elite "elite"` — pack the program (lower and upper RAM only) with a loader
+4. `java -jar tools/ea5tocart.jar bin\elite "ELITE"` — pack the program (lower and upper RAM only) with a loader
    into a 32K cartridge image (banks 0-3), then append banks 4-14 and 1 empty bank: a 128K image (`elite8.bin`).
 5. Package `elite8.bin` + `layout.xml` into `elite.rpk` (MAME cartridge, PCB type `paged378`).
 
@@ -62,8 +63,8 @@ Each converted line keeps the original Z80 instruction and comment in trailing c
   status, so re-test flags after a call or push/pop.
 - **Calls into ROM banks** use `.far_call <bank select address>,<routine>` (`far_call` in `ti-routines.a99`, in RAM):
   it selects the routine's bank, calls it with `bl`, then selects the caller's bank (`current_bank`) again. It
-  changes R0 and R1 and passes back only the carry. No code is in the banks yet; `tools/callgraph.py` shows which
-  parts of the game could go there.
+  changes R0 and R1 and passes back only the carry. `tools/callgraph.py` shows which
+  routines call which, for deciding what can move to a bank.
 - Byte constants: `one`, `@b255`, `@b254`, and `@bytes+>NN` (a 0–255 table in `ti-tables.a99`) since TMS9900
   byte ops need memory/register sources. `@bit0`..`@bit7` are bit masks used for `bit`/`set`/`res`.
 - Known semantic gaps to watch for: Z80 vs TMS9900 flag behaviour (carry after `cb`, the converter maps `jr c`

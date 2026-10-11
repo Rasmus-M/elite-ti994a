@@ -26,8 +26,6 @@ What is still missing or not right:
 
 - Speed. The game runs at only a few frames a second in flight. Nothing has been done about this yet.
 
-The default commander currently starts with 5000 credits instead of 100, to make testing easier.
-
 ## How it was made
 
 The MSX game was disassembled first, and the source code was reengineered in the SkoolKit format, in a separate

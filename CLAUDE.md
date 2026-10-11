@@ -133,6 +133,18 @@ words. A single-byte access to
   once a frame (it's in `clear_space_view`, `copy_space_view`, `draw_object`'s face loop and after each edge, and for
   the docked screens in `print_char`, `generate_system` and `clear_page`, or a sound effect plays on until a screen is drawn) and
   never between the two bytes of a VDP address.
+- **The space view** is drawn in a buffer in low RAM (`space_view_buffer`, 4K) and copied to the pattern table
+  (`copy_space_view`). Copying and clearing all of it takes long, so for each of the 16 character rows `view_min` and
+  `view_max` hold the first and last character drawn in since the buffer was cleared (`view_prev_min`/`_max`: what was
+  copied last, so is on the screen): `clear_space_view` clears only those and `copy_space_view` copies only those and
+  the previous ones. So everything that writes to the buffer must mark what it covers: `view_mark_line` (lines, the
+  rectangle they're in), `view_mark_rows` (pixels) and inline in `draw_view_message`. `view_mark_all` marks everything
+  (`enter_flight_mode`, as then neither the buffer nor the screen is known). `clear_space_view` mustn't change BC: its
+  callers count with it.
+- **The program image** (low and high RAM) is packed into the 32K of cartridge banks 0-3 with a loader: `ea5tocart`
+  prints "Cartridge full" (and leaves a broken cartridge) if it doesn't fit, so check `make.bat`'s output for that. The
+  space view buffer is last in low RAM and defined with `equ`, so it isn't in the image: nothing may be assembled after
+  it. RAM itself is nearly full: about 60 bytes free in high RAM and 40 in low RAM.
 - **Disk operations** (`ti-disk.a99`, low RAM): the commander menu (bank 7) loads and saves commanders on disk where the
   MSX uses tape: the file `DSK1.<name>`, a program file of 139 bytes (the record at #R$D606: the name and the commander
   file). Set `disk_opcode`, `disk_name` and `disk_name_length`, `blwp @disk_vector`, and check `disk_error`. The disk DSR

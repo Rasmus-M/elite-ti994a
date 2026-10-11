@@ -2779,28 +2779,53 @@ copy_to_vram:                                              ; >3830
 * of the buffer. Sets #R$EF9E while it's writing to VRAM. Reads the buffer
 * through HL with indexed offsets, so it can be located anywhere.
 copy_space_view:                                           ; >3846
-       .proc
+       .proc                                               ;                   ; 
        bl   @count_message_timer                           ; CALL $39F1        ; count the message timer down
-       li   hl,space_view_buffer                           ; LD H,$D6          ; HL -> the buffer
-       li   de,>4128                                       ; LD DE,$4120       ; DE = VRAM $0128 for writing (row 1, column 5)
+* TI: copies only the characters of each row that were drawn in this time
+* (view_min, view_max) or last time (view_prev_min, view_prev_max), rather than
+* all 22: see view_mark_line.
+       li   de,space_view_buffer                           ; LD H,$D6          ; DE -> the buffer
        li   r2,vdpwd                                       ; LD C,$98          ; R2 -> the VDP data port
-       movb @bytes+>10,a                                   ; LD A,$10          ; 16 character rows
-       movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; writing to VRAM
+       movb @bytes+>10,@vram_busy_flag                     ; LD A,$10 / LD ($EF9E),A; writing to VRAM
+       clr  r1                                             ;                   ; R1 = the character row (0-15)
 _3855:                                                     ; >3855
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
-;      limi 0                                              ; DI                ; 
-       swpb de                                             ; LD A,$28          ; 
-       movb de,@vdpwa                                      ; OUT ($99),A       ; VRAM address low byte: column 5
-       swpb de                                             ; LD A,D            ; 
-       movb de,@vdpwa                                      ; OUT ($99),A       ; high byte: the character row
-       ; EI                                                ; EI                ;
-       movb @bytes+>16,b                                   ; LD B,$C6          ; 22 characters
-       bl   @copy_space_view_row_pad                       ; OUTI              ; copy the row's 22 characters (8 OUTIs and a DJNZ each), from scratchpad
-       ai   hl,>100-22                                     ; INC H             ; next 8 rows of the buffer
-       ai   de,>100                                        ; INC D             ; next character row
-       sb   one,a                                          ; DEC A             ; 
+       movb @view_min(r1),r0                               ;                   ; R0 = the first character to copy...
+       movb @view_max(r1),a                                ;                   ; ...and A the last: those drawn in this time...
+       cb   @view_prev_min(r1),r0                          ;                   ; 
+       jhe  copy_space_view_1                              ;                   ; 
+       movb @view_prev_min(r1),r0                          ;                   ; ...and last time
+copy_space_view_1:
+       cb   @view_prev_max(r1),a                           ;                   ; 
+       jle  copy_space_view_2                              ;                   ; 
+       movb @view_prev_max(r1),a                           ;                   ; 
+copy_space_view_2:
+       movb @view_min(r1),@view_prev_min(r1)               ;                   ; what is on the screen after this
+       movb @view_max(r1),@view_prev_max(r1)               ;                   ; 
+       cb   r0,a                                           ;                   ; 
+       jh   copy_space_view_3                              ;                   ; none: nothing to copy in this row
+       movb a,b                                            ; LD B,$C6          ; 
+       sb   r0,b                                           ;                   ; 
+       ab   one,b                                          ;                   ; B = the number of characters
+       srl  r0,8                                           ;                   ; 
+       mov  de,hl                                          ;                   ; 
+       a    r0,hl                                          ;                   ; HL -> the first one in the buffer
+       sla  r0,3                                           ; LD DE,$4120       ; R0 = its address in the pattern table, for writing:
+       ai   r0,>4128                                       ;                   ; VRAM $0128 is row 1, column 5
+       mov  r1,a                                           ;                   ; 
+       swpb a                                              ;                   ; 
+       a    a,r0                                           ;                   ; + 256 for each character row
+       swpb r0                                             ; LD A,$28          ; 
+       movb r0,@vdpwa                                      ; OUT ($99),A       ; VRAM address low byte
+       swpb r0                                             ; LD A,D            ; 
+       movb r0,@vdpwa                                      ; OUT ($99),A       ; high byte
+       bl   @copy_space_view_row_pad                       ; OUTI              ; copy the characters (8 OUTIs and a DJNZ each), from scratchpad
+copy_space_view_3:
+       ai   de,>100                                        ; INC H             ; next 8 rows of the buffer
+       inc  r1                                             ; INC D             ; next character row
+       ci   r1,16                                          ; DEC A             ; 
        jne  _3855                                          ; JR NZ,$3855       ; 
-       movb a,@vram_busy_flag                              ; LD ($EF9E),A      ; done writing to VRAM
+       sb   @vram_busy_flag,@vram_busy_flag                ; LD ($EF9E),A      ; done writing to VRAM
        .endproc                                            ; RET               ; 
 
 ********************************************************************************
@@ -2813,14 +2838,53 @@ _3855:                                                     ; >3855
 * (176 pixels) of each of its 128 rows. The original pushes zeros with SP
 * pointed into the buffer; here each row is cleared with 11 CLRs.
 clear_space_view:                                          ; >388f
-       .proc
-       li   hl,space_view_buffer                           ; LD HL,$E5F6       ; HL -> the first row (top down instead of bottom up)
-       li   r0,64                                          ; LD A,$10          ; 64 rows at a time (16 passes of 8 rows on the MSX)
-       bl   @clear_space_view_rows_pad                     ; PUSH DE           ; clear each row's 22 bytes, from scratchpad
+       .proc                                               ;                   ; 
+* TI: clears only the characters of each row that were drawn in (view_min,
+* view_max): see view_mark_line. Changes A, DE and HL, as on the MSX, but not
+* BC, which its callers count with.
+       clr  r1                                             ; LD A,$10          ; R1 = the character row (0-15)
+clear_space_view_1:
+       movb @view_min(r1),r0                               ;                   ; R0 = the first character drawn in, A = the last
+       movb @view_max(r1),a                                ;                   ; 
+       cb   r0,a                                           ;                   ; 
+       jh   clear_space_view_5                             ;                   ; none
+       movb @b255,@view_min(r1)                            ;                   ; none from now on
+       sb   @view_max(r1),@view_max(r1)                    ;                   ; 
+       mov  r1,hl                                          ; LD HL,$E5F6       ; 
+       swpb hl                                             ;                   ; 
+       ai   hl,space_view_buffer                           ;                   ; HL -> the row in the buffer: 8 rows of 32 bytes
+       srl  r0,8                                           ;                   ; 
+       andi r0,>fffe                                       ;                   ; R0 = the first byte to clear (the buffer is cleared in words)
+       srl  a,8                                            ;                   ; 
+       s    r0,a                                           ;                   ; 
+       srl  a,1                                            ;                   ; 
+       inc  a                                              ;                   ; A = the number of words in each row
+       ci   a,4                                            ;                   ; 
+       jl   clear_space_view_2                             ;                   ; 
+       li   r0,8                                           ;                   ; many: clear all 22 bytes of the 8 rows, from scratchpad
+       bl   @clear_space_view_rows_pad                     ; PUSH DE           ; 
+       jmp  clear_space_view_5                             ;                   ; 
+clear_space_view_2:
+       a    r0,hl                                          ;                   ; HL -> the first word
+       li   r0,32                                          ;                   ; 
+       s    a,r0                                           ;                   ; 
+       s    a,r0                                           ;                   ; R0 = the step to the first word of the next row
+       li   r2,8                                           ;                   ; 8 rows
+clear_space_view_3:
+       mov  a,de                                           ;                   ; 
+clear_space_view_4:
+       clr  *hl+                                           ;                   ; 
+       dec  de                                             ;                   ; 
+       jne  clear_space_view_4                             ;                   ; 
+       a    r0,hl                                          ;                   ; 
+       dec  r2                                             ;                   ; 
+       jne  clear_space_view_3                             ;                   ; 
+clear_space_view_5:
+       inc  r1                                             ;                   ; 
+       ci   r1,16                                          ;                   ; 
+       jne  clear_space_view_1                             ;                   ; 
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
-       li   r0,64                                          ;                   ; the other 64 rows
-       bl   @clear_space_view_rows_pad                     ;                   ;
-       .endproc                                            ; RET               ;
+       .endproc                                            ; RET               ; 
 
 ********************************************************************************
 * Decompress a full-screen picture (pattern + colour data) to VRAM
@@ -3127,6 +3191,19 @@ draw_view_message:                                         ; >3a03
        movb @view_message_column,@e                        ; LD A,($E737)      ; E = column
        movb @message_row,d                                 ; LD A,($E92C)      ; D = row, as an MSX buffer page ($D6-$E5)
        ai   de,space_view_buffer->d600                     ;                   ; DE -> the buffer at that row and column
+       movb @message_row,r1                                ;                   ; (TI: mark the characters it covers, see view_mark_line:
+       srl  r1,8                                           ;                   ; it is centred, so from its column to 21 - its column)
+       ai   r1,->d6                                        ;                   ; R1 = the character row
+       movb @view_message_column,r0                        ;                   ; 
+       cb   r0,@view_min(r1)                               ;                   ; 
+       jhe  draw_view_message_1                            ;                   ; 
+       movb r0,@view_min(r1)                               ;                   ; 
+draw_view_message_1:
+       movb @bytes+21,r2                                   ;                   ; 
+       sb   r0,r2                                          ;                   ; 
+       cb   r2,@view_max(r1)                               ;                   ; 
+       jle  _3a0e                                          ;                   ; 
+       movb r2,@view_max(r1)                               ;                   ; 
 _3a0e:                                                     ; >3a0e
        movb *hl,a                                          ; LD A,(HL)         ; A = the next character
        inc  hl                                             ; INC HL            ; 
@@ -3609,6 +3686,7 @@ setup_bresenham_line:                                      ; >3c48
        movb @c,@e                                          ; LD E,C            ; 
        movb a,@c                                           ; LD C,A            ; now D>=B - walking from the higher row to the lower
 _3c51:                                                     ; >3c51
+       bl   @view_mark_line                                ;                   ; (TI: mark the characters the line covers)
        movb @e,a                                           ; LD A,E            ; A = column of the (now-first) endpoint
        sb   @c,a                                           ; SUB C             ; A = E-C
        li   r2,1                                           ; PUSH AF           ; R2 = the column step: +1 if E>=C...
@@ -3672,6 +3750,52 @@ line_mask_wrap:
        data 0                                              ;                   ; the pixel bitmask after crossing a byte boundary
 
 ********************************************************************************
+* TI: Mark the part of the space view that a line covers
+* 
+* Copying the whole space view to the screen (#R$3846) and clearing its
+* buffer (#R$388F) take long, so for each of the 16 character rows the game
+* keeps track of the first and last character that have been drawn in since
+* the buffer was cleared (view_min and view_max; the first is after the last
+* if none have been). #R$388F only clears those, and #R$3846 only copies
+* those and the ones it copied last time (view_prev_min and view_prev_max),
+* which are still on the screen. Everything that draws in the buffer marks
+* what it covers: lines (#R$3C48), which mark the rectangle they are in;
+* pixels (#R$3CFD); and the message (#R$3A03). #R$63F1 marks everything
+* (view_mark_all), as then neither the buffer nor the screen is known.
+* 
+* I:B,D The rows of the line's ends (B <= D)
+* I:C,E The columns of its ends
+view_mark_line:
+       movb @c,r0                                          ;                   ; 
+       movb @e,r2                                          ;                   ; 
+       cb   r0,r2                                          ;                   ; 
+       jle  view_mark_line_1                               ;                   ; 
+       movb r2,r0                                          ;                   ; R0 = the lower column, R2 the higher
+       movb @c,r2                                          ;                   ; 
+view_mark_line_1:
+       srl  r0,3                                           ;                   ; as characters
+       srl  r2,3                                           ;                   ; 
+       movb d,a                                            ;                   ; 
+       srl  a,11                                           ;                   ; A = the last character row
+       movb b,r1                                           ;                   ; 
+       srl  r1,11                                          ;                   ; R1 = the first
+* This entry point is used by #R$3CFD, with R0 = R2 = the character and R1 = A
+* = the character row.
+view_mark_rows:
+       cb   r0,@view_min(r1)                               ;                   ; 
+       jhe  view_mark_rows_1                               ;                   ; 
+       movb r0,@view_min(r1)                               ;                   ; 
+view_mark_rows_1:
+       cb   r2,@view_max(r1)                               ;                   ; 
+       jle  view_mark_rows_2                               ;                   ; 
+       movb r2,@view_max(r1)                               ;                   ; 
+view_mark_rows_2:
+       inc  r1                                             ;                   ; 
+       c    r1,a                                           ;                   ; 
+       jle  view_mark_rows                                 ;                   ; 
+       rt                                                  ;                   ; 
+
+********************************************************************************
 * Work out an address in the space view's bitmap buffer
 * 
 * Used by the routines at #R$3C48, #R$3CFD and #R$3F68.
@@ -3706,6 +3830,13 @@ plot_single_pixel:                                         ; >3cfd
        .proc
 plot_single_pixel_jmp:
        bl   @row_column_to_buffer_address                  ; CALL $3CEC        ; HL = buffer address for (B,C)
+       movb @c,r0                                          ;                   ; (TI: mark its character, see view_mark_line)
+       srl  r0,3                                           ;                   ; 
+       mov  r0,r2                                          ;                   ; 
+       movb b,r1                                           ;                   ; 
+       srl  r1,11                                          ;                   ; 
+       mov  r1,a                                           ;                   ; 
+       bl   @view_mark_rows                                ;                   ; 
        movb @c,a                                           ; LD A,C            ; A = column
        andi a,>0700                                        ; AND $07           ; keep the low 3 bits (bit position within the byte)
        mov  a,r1                                           ; LD ($3D07),A      ; index the table with A (instead of patching the operand)
@@ -6706,6 +6837,7 @@ _63e0_no_borrow:
 * flight" counterpart.
 enter_flight_mode:                                         ; >63f1
        .proc
+       bl   @view_mark_all                                 ;                   ; (TI: the whole space view has to be cleared and copied)
        sb   a,a                                            ; XOR A             ; 
        movb a,@chart_cursor_active_flag                    ; LD ($E70B),A      ; 
        movb a,@current_screen                              ; LD ($E902),A      ; 

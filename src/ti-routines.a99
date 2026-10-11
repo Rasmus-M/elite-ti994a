@@ -256,6 +256,34 @@ vsbw:
 
 *********************************************************************
 *
+* Mark the whole space view as drawn in and as on the screen, so that
+* all of it is cleared and copied the next time (see view_mark_line in
+* main-code.a99). Changes R1.
+*
+view_mark_all:
+       li   r1,15
+view_mark_all_1:
+       sb   @view_min(r1),@view_min(r1)
+       sb   @view_prev_min(r1),@view_prev_min(r1)
+       movb @bytes+21,@view_max(r1)
+       movb @bytes+21,@view_prev_max(r1)
+       dec  r1
+       jgt  view_mark_all_1
+       jeq  view_mark_all_1
+       rt
+*// view_mark_all
+
+view_min:                              ; For each character row of the space view: the first character drawn in
+       byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+view_max:                              ; and the last (before the first if there are none)
+       byte 21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21
+view_prev_min:                         ; The same for what was copied to the screen last
+       byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+view_prev_max:
+       byte 21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21
+
+*********************************************************************
+*
 * Copy one character row of the space view buffer to the VDP
 * (the inner loop of copy_space_view). Copied to scratchpad at
 * copy_space_view_row_pad, where it runs without wait states.

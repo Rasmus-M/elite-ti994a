@@ -6794,8 +6794,8 @@ stardust_front_view:                                       ; >64f1
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; 
 _6500:                                                     ; >6500
-       sb   *ix,*ix                                        ; LD (IX+$00),$00   ; 
-       movb a,@>01(ix)                                     ; LD (IX+$01),A     ; set X
+       sb   @>01(ix),@>01(ix)                              ; LD (IX+$00),$00   ;
+       movb a,*ix                                          ; LD (IX+$01),A     ; set X
        bl   @random_byte                                   ; CALL $2176        ; A = random byte
        movb a,@l                                           ; LD L,A            ; 
        andi a,>3f00                                        ; AND $3F           ; B = |Y| = 0-63
@@ -6806,15 +6806,13 @@ _6500:                                                     ; >6500
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
        neg a                                               ; NEG               ; 
 _6514:                                                     ; >6514
-       sb   @>02(ix),@>02(ix)                              ; LD (IX+$02),$00   ; 
-       movb a,@>03(ix)                                     ; LD (IX+$03),A     ; set Y
+       sb   @>03(ix),@>03(ix)                              ; LD (IX+$02),$00   ;
+       movb a,@>02(ix)                                     ; LD (IX+$03),A     ; set Y
        bl   @stardust_set_velocity                         ; CALL $6805        ; set the velocity, pointing away from the centre
        .endproc                                            ; JR $656A          ; 
 stardust_move_outwards:                                    ; >6520
-       movb *ix,@l                                         ; LD L,(IX+$00)     ; 
-       movb @>01(ix),h                                     ; LD H,(IX+$01)     ; HL = X
-       movb @>04(ix),@e                                    ; LD E,(IX+$04)     ; 
-       movb @>05(ix),d                                     ; LD D,(IX+$05)     ; DE = X velocity
+       mov  *ix,hl                                         ; LD L,(IX+$00)     ;
+       mov  @>04(ix),de                                    ; LD E,(IX+$04)     ;
        movb h,a                                            ; LD A,H / OR A     ; 
        jgt  stardust_front_x                               ; JP P,$6533        ; 
        jeq  stardust_front_x                               ;                   ; 
@@ -6832,12 +6830,9 @@ stardust_front_x:                                          ; >6533
 _653c:                                                     ; >653c
        mpy  de,r1                                          ; ADD HL,DE         ; move along X that many times (TI: a multiplication; the low word is
        a    r2,hl                                          ; DJNZ $653C        ; right for a negative velocity too)
-       movb @l,*ix                                         ; LD (IX+$00),L     ; 
-       movb h,@>01(ix)                                     ; LD (IX+$01),H     ; store the new X
-       movb @>02(ix),@l                                    ; LD L,(IX+$02)     ; 
-       movb @>03(ix),h                                     ; LD H,(IX+$03)     ; HL = Y
-       movb @>06(ix),@e                                    ; LD E,(IX+$06)     ; 
-       movb @>07(ix),d                                     ; LD D,(IX+$07)     ; DE = Y velocity
+       mov  hl,*ix                                         ; LD (IX+$00),L     ;
+       mov  @>02(ix),hl                                    ; LD L,(IX+$02)     ;
+       mov  @>06(ix),de                                    ; LD E,(IX+$06)     ;
        movb h,a                                            ; LD A,H / OR A     ; 
        jgt  stardust_front_y                               ; JP P,$6558        ; 
        jeq  stardust_front_y                               ;                   ; 
@@ -6855,8 +6850,7 @@ stardust_front_y:                                          ; >6558
 _6561:                                                     ; >6561
        mpy  de,r1                                          ; ADD HL,DE         ; move along Y that many times (TI: a multiplication; the low word is
        a    r2,hl                                          ; DJNZ $6561        ; right for a negative velocity too)
-       movb @l,@>02(ix)                                    ; LD (IX+$02),L     ; 
-       movb h,@>03(ix)                                     ; LD (IX+$03),H     ; store the new Y
+       mov  hl,@>02(ix)                                    ; LD (IX+$02),L     ;
 _656a:                                                     ; >656a
        rt                                                  ; RET               ; 
 
@@ -6926,34 +6920,28 @@ stardust_rear_random_y:                                    ; >659f
        movb @bytes+>c1,@l                                  ; LD L,$C1          ; 2 - X = -63
        movb @bytes+>3f,@c                                  ; LD C,$3F          ; C = abs X
 _65ae:                                                     ; >65ae
-       sb   *ix,*ix                                        ; LD (IX+$00),$00   ; 
-       movb @l,@>01(ix)                                    ; LD (IX+$01),L     ; set X
-       sb   @>02(ix),@>02(ix)                              ; LD (IX+$02),$00   ; 
-       movb h,@>03(ix)                                     ; LD (IX+$03),H     ; set Y
+       sb   @>01(ix),@>01(ix)                              ; LD (IX+$00),$00   ;
+       movb @l,*ix                                         ; LD (IX+$01),L     ; set X
+       sb   @>03(ix),@>03(ix)                              ; LD (IX+$02),$00   ;
+       movb h,@>02(ix)                                     ; LD (IX+$03),H     ; set Y
        bl   @stardust_set_velocity                         ; CALL $6805        ; set the velocity, pointing away from the centre
        .endproc                                            ; JR $6627          ; 
 stardust_move_inwards:                                     ; >65c1
        .proc                                               ;                   ; 
-       movb *ix,@l                                         ; LD L,(IX+$00)     ; 
-       movb @>01(ix),h                                     ; LD H,(IX+$01)     ; HL = X
-       movb @>04(ix),@e                                    ; LD E,(IX+$04)     ; 
-       movb @>05(ix),d                                     ; LD D,(IX+$05)     ; DE = X velocity
+       mov  *ix,hl                                         ; LD L,(IX+$00)     ;
+       mov  @>04(ix),de                                    ; LD E,(IX+$04)     ;
        bl   @stardust_move_back                            ;                   ; (TI: shared with Y)
        jlt  stardust_rear_flag_x                           ; JP P,$65EE        ; X changed sign?
-       movb @l,*ix                                         ; LD (IX+$00),L     ; no -
-       movb h,@>01(ix)                                     ; LD (IX+$01),H     ; store the new X
+       mov  hl,*ix                                         ; LD (IX+$00),L     ; no -
        jmp  _65f4                                          ;                   ; 
 stardust_rear_flag_x:                                      
        movb @b255,@>08(ix)                                 ; LD (IX+$08),$FF   ; yes - passed the centre, flag it for respawning
 _65f4:                                                     ; >65f4
-       movb @>02(ix),@l                                    ; LD L,(IX+$02)     ; 
-       movb @>03(ix),h                                     ; LD H,(IX+$03)     ; HL = Y
-       movb @>06(ix),@e                                    ; LD E,(IX+$06)     ; 
-       movb @>07(ix),d                                     ; LD D,(IX+$07)     ; DE = Y velocity
+       mov  @>02(ix),hl                                    ; LD L,(IX+$02)     ;
+       mov  @>06(ix),de                                    ; LD E,(IX+$06)     ;
        bl   @stardust_move_back                            ;                   ; 
        jlt  stardust_rear_flag_y                           ; JP P,$6621        ; Y changed sign?
-       movb @l,@>02(ix)                                    ; LD (IX+$02),L     ; no -
-       movb h,@>03(ix)                                     ; LD (IX+$03),H     ; store the new Y
+       mov  hl,@>02(ix)                                    ; LD (IX+$02),L     ; no -
        jmp  _6627                                          ;                   ; 
 stardust_rear_flag_y:                                      
        movb @b255,@>08(ix)                                 ; LD (IX+$08),$FF   ; yes - passed the centre, flag it for respawning
@@ -7000,10 +6988,8 @@ stardust_left_view:                                        ; >6628
        li   r2,>5800                                       ; LD (IX+$01),$58   ; X = 88 (right edge)
        jmp  stardust_side_respawn                          ;                   ; 
 stardust_move_left:                                        ; >665c
-       movb *ix,@l                                         ; LD L,(IX+$00)     ; 
-       movb @>01(ix),h                                     ; LD H,(IX+$01)     ; HL = X
-       movb @>06(ix),@e                                    ; LD E,(IX+$06)     ; 
-       movb @>07(ix),d                                     ; LD D,(IX+$07)     ; DE = Y velocity (the speed)
+       mov  *ix,hl                                         ; LD L,(IX+$00)     ;
+       mov  @>06(ix),de                                    ; LD E,(IX+$06)     ;
        abs  de                                             ; BIT 7,D / JP M,$6677; 
        sla  de,2                                           ;                   ; 
        s    de,hl                                          ; SBC HL,DE x 4 / ADD HL,DE x 4; X = X - 4 * abs speed
@@ -7037,10 +7023,10 @@ stardust_side_respawn_1:
 stardust_side_random_y:                                    
        cb   a,@bytes+>40                                   ; CP $40            ; 
        jhe  stardust_side_respawn_1                        ; JR NC,$662A       ; ...within 63 of the centre
-       sb   @>02(ix),@>02(ix)                              ; LD (IX+$02),$00   ; 
-       movb @l,@>03(ix)                                    ; LD (IX+$03),L     ; set Y
-       sb   *ix,*ix                                        ; LD (IX+$00),$00   ; 
-       movb r2,@>01(ix)                                    ; LD (IX+$01),$58   ; set X
+       sb   @>03(ix),@>03(ix)                              ; LD (IX+$02),$00   ;
+       movb @l,@>02(ix)                                    ; LD (IX+$03),L     ; set Y
+       sb   @>01(ix),@>01(ix)                              ; LD (IX+$00),$00   ;
+       movb r2,*ix                                         ; LD (IX+$01),$58   ; set X
        bl   @random_byte                                   ; CALL $2176        ; 
        andi a,>0300                                        ; AND $03           ; 
        ab   @bytes+>04,a                                   ; ADD A,$04         ; 
@@ -7052,16 +7038,13 @@ stardust_side_random_y:
        bl   @stardust_set_velocity                         ; CALL $6805        ; set a random velocity
        .endproc                                            ; JR $6681          ; 
 stardust_move_right:                                       ; >66b6
-       movb *ix,@l                                         ; LD L,(IX+$00)     ; 
-       movb @>01(ix),h                                     ; LD H,(IX+$01)     ; HL = X
-       movb @>06(ix),@e                                    ; LD E,(IX+$06)     ; 
-       movb @>07(ix),d                                     ; LD D,(IX+$07)     ; DE = Y velocity (the speed)
+       mov  *ix,hl                                         ; LD L,(IX+$00)     ;
+       mov  @>06(ix),de                                    ; LD E,(IX+$06)     ;
        abs  de                                             ; BIT 7,D / JP M,$66CD; 
        sla  de,2                                           ;                   ; 
        a    de,hl                                          ; ADD HL,DE x 4 / SBC HL,DE x 4; X = X + 4 * abs speed
 stardust_side_store:                                       
-       movb @l,*ix                                         ; LD (IX+$00),L     ; 
-       movb h,@>01(ix)                                     ; LD (IX+$01),H     ; store the new X
+       mov  hl,*ix                                         ; LD (IX+$00),L     ;
        rt                                                  ; RET               ; 
 
 ********************************************************************************
@@ -7091,7 +7074,7 @@ stardust_rotate:                                           ; >66dc
        movb @bytes+>0f,b                                   ; LD B,$0F          ; B = 15 particles
 stardust_rotate_particle:                                  ; >66ef
        .push bc                                            ; PUSH BC           ; 
-       movb @>01(ix),a                                     ; LD A,(IX+$01) / OR A; A = X
+       movb *ix,a                                          ; LD A,(IX+$01) / OR A; A = X
        .push af                                            ; PUSH AF           ; save its sign
        jgt  stardust_rotate_log_x                          ; JP P,$66FA        ; 
        jeq  stardust_rotate_log_x                          ;                   ; 
@@ -7111,7 +7094,7 @@ stardust_log_x_lookup:                                     ; >66fe
        socb @bit6,h                                        ; SET 6,H           ; tag the sign of X
 stardust_rotate_save_log_x:                                ; >6707
        mov  hl,@stardust_log_x                             ; LD ($E77D),HL     ; save log X
-       movb @>03(ix),a                                     ; LD A,(IX+$03) / OR A; A = Y
+       movb @>02(ix),a                                     ; LD A,(IX+$03) / OR A; A = Y
        .push af                                            ; PUSH AF           ; save its sign
        jgt  stardust_rotate_log_y                          ; JP P,$6714        ; 
        jeq  stardust_rotate_log_y                          ;                   ; 
@@ -7139,7 +7122,7 @@ stardust_rotate_save_log_y:                                ; >6721
        bl   @multiply_logs                                 ; CALL $2160        ; HL = X * cos
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; X' = X * cos - Y * sin
-       movb @l,@>01(ix)                                    ; LD (IX+$01),L     ; store the new X
+       movb @l,*ix                                         ; LD (IX+$01),L     ; store the new X
        mov  @stardust_log_x,hl                             ; LD HL,($E77D)     ;
        mov  @stardust_log_sin,bc                           ; LD BC,($E77B)     ;
        bl   @multiply_logs                                 ; CALL $2160        ; HL = X * sin
@@ -7148,7 +7131,7 @@ stardust_rotate_save_log_y:                                ; >6721
        mov  @stardust_log_cos,bc                           ; LD BC,($E779)     ;
        bl   @multiply_logs                                 ; CALL $2160        ; HL = Y * cos
        a    de,hl                                          ; ADD HL,DE         ; Y' = X * sin + Y * cos
-       movb @l,@>03(ix)                                    ; LD (IX+$03),L     ; store the new Y
+       movb @l,@>02(ix)                                    ; LD (IX+$03),L     ; store the new Y
        movb @l,a                                           ; LD A,L / OR A     ; 
        jgt  stardust_rotate_abs_y                          ; JP P,$675C        ; 
        jeq  stardust_rotate_abs_y                          ;                   ; 
@@ -7157,7 +7140,7 @@ stardust_rotate_save_log_y:                                ; >6721
        neg a                                               ; NEG               ; 
 stardust_rotate_abs_y:                                     ; >675c
        movb a,b                                            ; LD B,A            ; B = |Y|
-       movb @>01(ix),a                                     ; LD A,(IX+$01) / OR A; 
+       movb *ix,a                                          ; LD A,(IX+$01) / OR A;
        jgt  stardust_rotate_abs_x                          ; JP P,$6766        ; 
        jeq  stardust_rotate_abs_x                          ;                   ; 
 !
@@ -7166,7 +7149,7 @@ stardust_rotate_abs_y:                                     ; >675c
 stardust_rotate_abs_x:                                     ; >6766
        movb a,@c                                           ; LD C,A            ; C = |X|
        bl   @stardust_set_velocity                         ; CALL $6805        ; set the velocity, pointing away from the centre
-       li   de,>000b                                       ; LD DE,$000B       ; 
+       li   de,>000c                                       ; LD DE,$000B       ;
        a    de,ix                                          ; ADD IX,DE         ; IX -> next particle
        .pop bc                                             ; POP BC            ; 
        sb   one,b                                          ; DEC B             ; 
@@ -7199,9 +7182,9 @@ _677d:                                                     ; >677d
        mov  @reclaimed_range_start,ix                      ; LD IX,($EFA6)     ; IX -> the stardust table
        movb @bytes+>0f,b                                   ; LD B,$0F          ; B = 15 particles
 _6784:                                                     ; >6784
-       movb @>03(ix),a                                     ; LD A,(IX+$03)     ; 
+       movb @>02(ix),a                                     ; LD A,(IX+$03)     ;
        ab   @c,a                                           ; ADD A,C           ; move the particle up or down
-       movb a,@>03(ix)                                     ; LD (IX+$03),A     ; 
+       movb a,@>02(ix)                                     ; LD (IX+$03),A     ;
        .push bc                                            ; PUSH BC           ; 
        movb a,a                                            ;                   ; (the PUSH changed the status)
        jgt  stardust_move_abs_y                            ; JP P,$6791        ; 
@@ -7211,7 +7194,7 @@ _6784:                                                     ; >6784
        neg a                                               ; NEG               ; 
 stardust_move_abs_y:                                       ; >6791
        movb a,b                                            ; LD B,A            ; B = |Y|
-       movb @>01(ix),a                                     ; LD A,(IX+$01) / OR A; 
+       movb *ix,a                                          ; LD A,(IX+$01) / OR A;
        jgt  stardust_move_abs_x                            ; JP P,$679B        ; 
        jeq  stardust_move_abs_x                            ;                   ; 
 !
@@ -7220,7 +7203,7 @@ stardust_move_abs_y:                                       ; >6791
 stardust_move_abs_x:                                       ; >679b
        movb a,@c                                           ; LD C,A            ; C = |X|
        bl   @stardust_set_velocity                         ; CALL $6805        ; set the velocity, pointing away from the centre
-       li   de,>000b                                       ; LD DE,$000B       ; 
+       li   de,>000c                                       ; LD DE,$000B       ;
        a    de,ix                                          ; ADD IX,DE         ; IX -> next particle
        .pop bc                                             ; POP BC            ; 
        sb   one,b                                          ; DJNZ $6784        ; loop for all 15 particles
@@ -7405,7 +7388,7 @@ stardust_set_velocity_lookup:                              ; >6818
        movb *hl,a                                          ; LD A,(HL)         ; A = X component
        inc  hl                                             ; INC HL            ; 
        movb *hl,@c                                         ; LD C,(HL)         ; C = Y component
-       movb @>01(ix),r0                                    ; BIT 7,(IX+$01)    ; 
+       movb *ix,r0                                         ; BIT 7,(IX+$01)    ;
        andi r0,>8000                                       ;                   
        jeq  _6831                                          ; JR Z,$6831        ; 
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
@@ -7426,11 +7409,10 @@ _6831:                                                     ; >6831
        mpy  de,r1                                          ; ADD HL,DE         ; add b once for each unit of speed (TI: a multiplication)
        a    r2,hl                                          ; DJNZ $6846        ;
 _6849:                                                     ; >6849
-       movb @l,@>04(ix)                                    ; LD (IX+$04),L     ; 
-       movb h,@>05(ix)                                     ; LD (IX+$05),H     ; set the X velocity
+       mov  hl,@>04(ix)                                    ; LD (IX+$04),L     ;
        movb @e,@>09(ix)                                    ; LD (IX+$09),E     ; save b for speed changes
        movb @c,a                                           ; LD A,C            ; A = Y component
-       movb @>03(ix),r0                                    ; BIT 7,(IX+$03)    ; 
+       movb @>02(ix),r0                                    ; BIT 7,(IX+$03)    ;
        andi r0,>8000                                       ;                   
        jeq  _685b                                          ; JR Z,$685B        ; 
        andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
@@ -7451,8 +7433,7 @@ _685b:                                                     ; >685b
        mpy  de,r1                                          ; ADD HL,DE         ; add b once for each unit of speed (TI: a multiplication)
        a    r2,hl                                          ; DJNZ $6870        ;
 _6873:                                                     ; >6873
-       movb @l,@>06(ix)                                    ; LD (IX+$06),L     ; 
-       movb h,@>07(ix)                                     ; LD (IX+$07),H     ; set the Y velocity
+       mov  hl,@>06(ix)                                    ; LD (IX+$06),L     ;
        movb @e,@>0a(ix)                                    ; LD (IX+$0A),E     ; save b for speed changes
        sb   @>08(ix),@>08(ix)                              ; LD (IX+$08),$00   ; clear the respawn flag
        .pop bc                                             ; POP BC            ; restore the scaled-down C and B
@@ -7485,8 +7466,8 @@ _6889:                                                     ; >6889
 scatter_stardust_x:                                        ; >6893
        cb   a,@bytes+>58                                   ; CP $58            ; 
        jhe  _6889                                          ; JR NC,$6889       ; ...within 87 of the centre
-       sb   *ix,*ix                                        ; LD (IX+$00),$00   ; 
-       movb @l,@>01(ix)                                    ; LD (IX+$01),L     ; set X
+       sb   @>01(ix),@>01(ix)                              ; LD (IX+$00),$00   ;
+       movb @l,*ix                                         ; LD (IX+$01),L     ; set X
        .ex_af_af_                                          ; EX AF,AF'         ; save |X|
 _689f:                                                     ; >689f
        bl   @random_byte                                   ; CALL $2176        ; pick a random Y...
@@ -7499,8 +7480,8 @@ _689f:                                                     ; >689f
 scatter_stardust_y:                                        ; >68a9
        cb   a,@bytes+>40                                   ; CP $40            ; 
        jhe  _689f                                          ; JR NC,$689F       ; ...within 63 of the centre
-       sb   @>02(ix),@>02(ix)                              ; LD (IX+$02),$00   ; 
-       movb @l,@>03(ix)                                    ; LD (IX+$03),L     ; set Y
+       sb   @>03(ix),@>03(ix)                              ; LD (IX+$02),$00   ;
+       movb @l,@>02(ix)                                    ; LD (IX+$03),L     ; set Y
        movb a,b                                            ; LD B,A            ; B = |Y|
        .ex_af_af_                                          ; EX AF,AF'         ; 
        movb a,@c                                           ; LD C,A            ; C = |X|
@@ -7512,7 +7493,7 @@ scatter_stardust_y:                                        ; >68a9
        cb   a,@bytes+>04                                   ; CP $04            ; scaled-down |Y| below 4?
 _68c2:                                                     ; >68c2
        jl   _6889                                          ; JR C,$6889        ; yes - reroll
-       li   de,>000b                                       ; LD DE,$000B       ; 
+       li   de,>000c                                       ; LD DE,$000B       ;
        a    de,ix                                          ; ADD IX,DE         ; IX -> next particle
        .pop bc                                             ; POP BC            ; 
        sb   one,b                                          ; DJNZ $6888        ; loop for all 15 particles
@@ -7523,6 +7504,8 @@ _68c2:                                                     ; >68c2
 * Move and plot the stardust
 * 
 * Used by the routine at #R$872E.
+* .
+* TI: the particles are 12 bytes each, with big-endian words - see #R$6F9F.
 * .
 * The stardust is 15 particles held in an 11-byte-per-particle table at
 * ($EFA6) (the reclaimed startup code at #R$6F9F). Each particle's position
@@ -7573,62 +7556,36 @@ _68de:                                                     ; >68de
        li   hl,stardust_pitch_handlers                     ; LD HL,$6EE5       ; HL -> the per-view pitch handlers
        bl   @jump_to_view_handler                          ; CALL $67A8        ; pitch the stardust for this view
 _68ea:                                                     ; >68ea
+* TI: a native loop, with words in registers; the particle is plotted in line
+* (#R$3CFD), marking its cell for the copy (see view_mark_line).
        mov  @reclaimed_range_start,ix                      ; LD IX,($EFA6)     ; IX -> the stardust table
-       movb @bytes+>0f,b                                   ; LD B,$0F          ; B = 15 particles
 _68f0:                                                     ; >68f0
-       .push bc                                            ; PUSH BC           ; save the particle counter
-       movb @>01(ix),@e                                    ; LD E,(IX+$01)     ; E = X pixel offset
-       movb @>03(ix),d                                     ; LD D,(IX+$03)     ; D = Y pixel offset
-       movb @e,a                                           ; LD A,E / OR A     ; 
-       jlt  stardust_check_left_edge                       ; JP M,$6902        ; X negative - check the left edge instead
-!
-       cb   a,@bytes+>59                                   ; CP $59            ; X > 88?
-       jhe  stardust_flag_respawn                          ; JR NC,$6950       ; yes - off the right edge, respawn it
-       jmp  _6906                                          ; JR $6906          ; go check Y
-stardust_check_left_edge:                                  ; >6902
-       cb   a,@bytes+>a9                                   ; CP $A9            ; X < -87?
-       jl   stardust_flag_respawn                          ; JR C,$6950        ; yes - off the left edge, respawn it
-_6906:                                                     ; >6906
-       movb d,a                                            ; LD A,D / OR A     ; A = Y pixel offset
-       jlt  stardust_check_top_edge_and_plot               ; JP M,$6911        ; Y negative - check the top edge instead
-!
-       cb   a,@bytes+>41                                   ; CP $41            ; Y > 64?
-       jhe  stardust_flag_respawn                          ; JR NC,$6950       ; yes - off the bottom edge, respawn it
-       jmp  _6915                                          ; JR $6915          ; inside the view - go plot it
-stardust_check_top_edge_and_plot:                          ; >6911
-       cb   a,@bytes+>c1                                   ; CP $C1            ; Y < -63?
-       jl   stardust_flag_respawn                          ; JR C,$6950        ; yes - off the top edge, respawn it
+       movb *ix,r1                                         ; LD E,(IX+$01)     ;
+       sra  r1,8                                           ;                   ; R1 = X, the pixel offset from the centre
+       movb @>02(ix),r2                                    ; LD D,(IX+$03)     ;
+       sra  r2,8                                           ;                   ; R2 = Y
+       mov  r1,r0                                          ;                   ;
+       ai   r0,87                                          ;                   ;
+       ci   r0,87+88                                       ; CP $59 / CP $A9   ; X from -87 to 88?
+       jh   stardust_flag_respawn                          ; JR NC,$6950       ; no - off the left or right edge, respawn it
+       mov  r2,r0                                          ;                   ;
+       ai   r0,63                                          ;                   ;
+       ci   r0,63+64                                       ; CP $41 / CP $C1   ; Y from -63 to 64?
+       jh   stardust_flag_respawn                          ; JR NC,$6950       ; no - off the top or bottom edge, respawn it
 _6915:                                                     ; >6915
-       movb @current_view,a                                ; LD A,($EB9A)      ; A = current view
-       sb   one,a                                          ; DEC A             ; 
-       jne  _6931                                          ; JR NZ,$6931       ; not the rear view - go plot it
-       movb @e,a                                           ; LD A,E / OR A     ; 
-       jgt  stardust_check_centre_x                        ; JP P,$6922        ; 
-       jeq  stardust_check_centre_x                        ;                   ; 
-!
-       andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
-       neg a                                               ; NEG               ; A = |X|
-stardust_check_centre_x:                                   ; >6922
-       cb   a,@bytes+>0a                                   ; CP $0A            ; 
-       jhe  _6931                                          ; JR NC,$6931       ; |X| >= 10 - go plot it
-       movb d,a                                            ; LD A,D / OR A     ; 
-       jgt  stardust_check_centre_y                        ; JP P,$692D        ; 
-       jeq  stardust_check_centre_y                        ;                   ; 
-!
-       andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
-       neg a                                               ; NEG               ; A = |Y|
-stardust_check_centre_y:                                   ; >692d
-       cb   a,@bytes+>0a                                   ; CP $0A            ; 
-       jl   stardust_flag_respawn                          ; JR C,$6950        ; |Y| < 10 too - reached the centre, respawn it
+       cb   @current_view,one                              ; LD A,($EB9A) / DEC A; the rear view?
+       jne  _6931                                          ; JR NZ,$6931       ; no - go plot it
+       mov  r1,r0                                          ;                   ;
+       abs  r0                                             ;                   ;
+       ci   r0,10                                          ; CP $0A            ;
+       jhe  _6931                                          ; JR NC,$6931       ; abs X >= 10 - go plot it
+       mov  r2,r0                                          ;                   ;
+       abs  r0                                             ;                   ;
+       ci   r0,10                                          ; CP $0A            ;
+       jl   stardust_flag_respawn                          ; JR C,$6950        ; abs Y < 10 too - reached the centre, respawn it
 _6931:                                                     ; >6931
-* TI: plots the pixel in line (#R$3CFD), marking its cell for the copy (see
-* view_mark_line).
-       movb @e,r1                                          ; LD A,E            ;
-       ab   @bytes+>57,r1                                  ; ADD A,$57         ; screen column (view centre is column 87)
-       srl  r1,8                                           ; LD C,A            ; R1 = the column
-       movb d,r2                                           ; LD A,D            ;
-       ab   @bytes+>3f,r2                                  ; ADD A,$3F         ; screen row (view centre is row 63)
-       srl  r2,8                                           ; LD B,A            ; R2 = the row
+       ai   r1,87                                          ; ADD A,$57         ; R1 = the screen column (view centre is column 87)
+       ai   r2,63                                          ; ADD A,$3F         ; R2 = the screen row (view centre is row 63)
        mov  r1,r0                                          ;                   ;
        srl  r0,3                                           ;                   ; R0 = the character column
        mov  r0,a                                           ;                   ;
@@ -7645,13 +7602,11 @@ _6940:                                                     ; >6940
        movb @>08(ix),a                                     ; LD A,(IX+$08) / OR A; Z flag = particle doesn't need respawning
 stardust_move_handler:                                     ; >6944
        bl   @stardust_front_view                           ; CALL $64F1        ; move or respawn it (operand patched per view by #R$645B)
-       li   de,>000b                                       ; LD DE,$000B       ; 
-       a    de,ix                                          ; ADD IX,DE         ; IX -> next particle
-       .pop bc                                             ; POP BC            ; 
-       sb   one,b                                          ; DJNZ $68F0        ; loop for all 15 particles
-       jne  _68f0                                          ;                   
+       ai   ix,12                                          ; LD DE,$000B / ADD IX,DE; IX -> next particle
+       ci   ix,startup_code_stardust_table+(15*12)         ; DJNZ $68F0        ; loop for all 15 particles
+       jne  _68f0                                          ;                   ;
 move_and_plot_stardust_exit:
-       .endproc                                            ; RET               ; 
+       .endproc                                            ; RET               ;
 stardust_flag_respawn:                                     ; >6950
        movb @b255,@>08(ix)                                 ; LD (IX+$08),$FF   ; flag the particle for respawning
        jmp  _6940                                          ; JR $6940          ; go call the move handler
@@ -7676,19 +7631,15 @@ speed_up:                                                  ; >6956
 _696c:                                                     ; >696c
        movb @9(r1),r0                                      ; LD A,(IX+$09) / LD C,A; 
        sra  r0,8                                           ; RLA / SBC A,A / LD B,A; R0 = the X velocity's increment (sign-extended)
-       movb @5(r1),hl                                      ; LD L,(IX+$04) / LD H,(IX+$05); 
-       movb @4(r1),@l                                      ;                   ; 
+       mov  @4(r1),hl                                      ; LD L,(IX+$04) / LD H,(IX+$05);
        a    r0,hl                                          ; ADD HL,BC         ; 
-       movb hl,@5(r1)                                      ; LD (IX+$04),L / LD (IX+$05),H; add it to the X velocity
-       movb @l,@4(r1)                                      ;                   ; 
+       mov  hl,@4(r1)                                      ; LD (IX+$04),L / LD (IX+$05),H; add it to the X velocity
        movb @10(r1),r0                                     ; LD A,(IX+$0A) / LD C,A; 
        sra  r0,8                                           ; RLA / SBC A,A / LD B,A; R0 = the Y velocity's increment
-       movb @7(r1),hl                                      ; LD L,(IX+$06) / LD H,(IX+$07); 
-       movb @6(r1),@l                                      ;                   ; 
+       mov  @6(r1),hl                                      ; LD L,(IX+$06) / LD H,(IX+$07);
        a    r0,hl                                          ; ADD HL,BC         ; 
-       movb hl,@7(r1)                                      ; LD (IX+$06),L / LD (IX+$07),H; add it to the Y velocity
-       movb @l,@6(r1)                                      ;                   ; 
-       ai   r1,11                                          ; ADD IX,DE         ; next particle
+       mov  hl,@6(r1)                                      ; LD (IX+$06),L / LD (IX+$07),H; add it to the Y velocity
+       ai   r1,12                                          ; ADD IX,DE         ; next particle
        dec  r2                                             ; DJNZ $696C        ; 
        jne  _696c                                          ;                   ; 
 _699a:                                                     ; >699a
@@ -7713,19 +7664,15 @@ speed_down:                                                ; >699c
 _69b1:                                                     ; >69b1
        movb @9(r1),r0                                      ; LD A,(IX+$09) / LD C,A; 
        sra  r0,8                                           ; RLA / SBC A,A / LD B,A; R0 = the X velocity's increment (sign-extended)
-       movb @5(r1),hl                                      ; LD L,(IX+$04) / LD H,(IX+$05); 
-       movb @4(r1),@l                                      ;                   ; 
+       mov  @4(r1),hl                                      ; LD L,(IX+$04) / LD H,(IX+$05);
        s    r0,hl                                          ; OR A / SBC HL,BC  ; 
-       movb hl,@5(r1)                                      ; LD (IX+$04),L / LD (IX+$05),H; subtract it from the X velocity
-       movb @l,@4(r1)                                      ;                   ; 
+       mov  hl,@4(r1)                                      ; LD (IX+$04),L / LD (IX+$05),H; subtract it from the X velocity
        movb @10(r1),r0                                     ; LD A,(IX+$0A) / LD C,A; 
        sra  r0,8                                           ; RLA / SBC A,A / LD B,A; R0 = the Y velocity's increment
-       movb @7(r1),hl                                      ; LD L,(IX+$06) / LD H,(IX+$07); 
-       movb @6(r1),@l                                      ;                   ; 
+       mov  @6(r1),hl                                      ; LD L,(IX+$06) / LD H,(IX+$07);
        s    r0,hl                                          ; OR A / SBC HL,BC  ; 
-       movb hl,@7(r1)                                      ; LD (IX+$06),L / LD (IX+$07),H; subtract it from the Y velocity
-       movb @l,@6(r1)                                      ;                   ; 
-       ai   r1,11                                          ; ADD IX,DE         ; next particle
+       mov  hl,@6(r1)                                      ; LD (IX+$06),L / LD (IX+$07),H; subtract it from the Y velocity
+       ai   r1,12                                          ; ADD IX,DE         ; next particle
        dec  r2                                             ; DJNZ $69B1        ; 
        jne  _69b1                                          ;                   ; 
 _69e3:                                                     ; >69e3
@@ -8840,23 +8787,27 @@ stardust_directions:                                       ; >6f1f
 * 7. Hands its memory over to the stardust table, as above.
 * 8. Fills the explosion's table of random numbers (#R$EEC6).
 * 9. Sets the sprite size to 16x16 (VDP register 1, #R$F3E0).
-       .msxalign >6f9f
+* TI: each particle is 12 bytes rather than 11, with X, Y and the two
+* velocities as big-endian words at +0, +2, +4 and +6 (so the high byte, the
+* pixel, comes first), for word access; +8 to +10 are as on the MSX and +11
+* is unused.
+       even                                                ; (TI: no .msxalign: the table's words are at even addresses)
 startup_code_stardust_table:                               ; >6f9f
-       byte >00,>15,>00,>19,>28,>00,>30,>00,>00,>0A,>0C              ; particle 0
-       byte >00,>37,>00,>CB,>2D,>00,>D3,>FF,>00,>0B,>F4              ; particle 1
-       byte >00,>EB,>00,>1B,>D8,>FF,>30,>00,>00,>F6,>0C              ; particle 2
-       byte >00,>3B,>00,>E0,>37,>00,>E1,>FF,>00,>0D,>F8              ; particle 3
-       byte >00,>13,>00,>EC,>27,>00,>CF,>FF,>00,>09,>F3              ; particle 4
-       byte >00,>3F,>00,>DD,>37,>00,>E1,>FF,>00,>0D,>F8              ; particle 5
-       byte >00,>30,>00,>2C,>30,>00,>28,>00,>00,>0C,>0A              ; particle 6
-       byte >00,>EF,>00,>16,>D9,>FF,>31,>00,>00,>F6,>0C              ; particle 7
-       byte >00,>DD,>00,>2F,>D9,>FF,>31,>00,>00,>F6,>0C              ; particle 8
-       byte >00,>E8,>00,>12,>CC,>FF,>23,>00,>00,>F3,>08              ; particle 9
-       byte >00,>29,>00,>C7,>25,>00,>CD,>FF,>00,>09,>F3              ; particle 10
-       byte >00,>CB,>00,>32,>D3,>FF,>2D,>00,>00,>F4,>0B              ; particle 11
-       byte >00,>3E,>00,>35,>30,>00,>29,>00,>00,>0C,>0A              ; particle 12
-       byte >00,>24,>00,>CA,>23,>00,>CC,>FF,>00,>08,>F3              ; particle 13
-       byte >00,>3F,>00,>21,>37,>00,>1F,>00,>00,>0D,>07              ; particle 14
+       byte >15,>00,>19,>00,>00,>28,>00,>30,>00,>0A,>0C,>00 ; particle 0
+       byte >37,>00,>CB,>00,>00,>2D,>FF,>D3,>00,>0B,>F4,>00 ; particle 1
+       byte >EB,>00,>1B,>00,>FF,>D8,>00,>30,>00,>F6,>0C,>00 ; particle 2
+       byte >3B,>00,>E0,>00,>00,>37,>FF,>E1,>00,>0D,>F8,>00 ; particle 3
+       byte >13,>00,>EC,>00,>00,>27,>FF,>CF,>00,>09,>F3,>00 ; particle 4
+       byte >3F,>00,>DD,>00,>00,>37,>FF,>E1,>00,>0D,>F8,>00 ; particle 5
+       byte >30,>00,>2C,>00,>00,>30,>00,>28,>00,>0C,>0A,>00 ; particle 6
+       byte >EF,>00,>16,>00,>FF,>D9,>00,>31,>00,>F6,>0C,>00 ; particle 7
+       byte >DD,>00,>2F,>00,>FF,>D9,>00,>31,>00,>F6,>0C,>00 ; particle 8
+       byte >E8,>00,>12,>00,>FF,>CC,>00,>23,>00,>F3,>08,>00 ; particle 9
+       byte >29,>00,>C7,>00,>00,>25,>FF,>CD,>00,>09,>F3,>00 ; particle 10
+       byte >CB,>00,>32,>00,>FF,>D3,>00,>2D,>00,>F4,>0B,>00 ; particle 11
+       byte >3E,>00,>35,>00,>00,>30,>00,>29,>00,>0C,>0A,>00 ; particle 12
+       byte >24,>00,>CA,>00,>00,>23,>FF,>CC,>00,>08,>F3,>00 ; particle 13
+       byte >3F,>00,>21,>00,>00,>37,>00,>1F,>00,>0D,>07,>00 ; particle 14
 
 ********************************************************************************
 * Clear the screen and draw its frame

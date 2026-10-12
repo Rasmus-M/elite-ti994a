@@ -1841,101 +1841,103 @@ msg_incoming_missile:                                      ; >33b7
 * the second cell, and then moves the cursor on 6 pixels (and the column,
 * #R$E72C, on by one).
 print_char:                                                ; >34a8
-       .proc
+* TI: a native version. The pattern is shifted a word at a time into the 16
+* bytes at $E600 (the cell's 8 and the next cell's 8), and each cell is read
+* from the VDP, XORed and written back 8 bytes at a time (print_char_tile),
+* where the MSX sets the address twice for every byte. The second cell is
+* skipped when nothing was shifted into it.
+       .proc                                               ;                   ;
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, as interrupts are off, so the sound effects play on)
        .push af                                            ; PUSH AF           ; save registers
-       .push bc                                            ; PUSH BC           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push hl                                            ; PUSH HL           ; 
-       movb a,@l                                           ; LD L,A            ; HL = A (the character code)
-       sb   h,h                                            ; LD H,$00          ; 
-       sla  hl,3                                           ; ADD HL,HL         ; HL *= 8 (this char's offset into the font table)
-       ;                                                   ; ADD HL,HL         ; 
-       ;                                                   ; ADD HL,HL         ; 
-       .save_bank                                          ;                   ; (TI: select the caller's bank again after the copy)
+       .push bc                                            ; PUSH BC           ;
+       .push de                                            ; PUSH DE           ;
+       .push hl                                            ; PUSH HL           ;
+       clr  hl                                             ;                   ;
+       movb a,@l                                           ; LD L,A / LD H,$00 ; HL = A (the character code)
+       sla  hl,3                                           ; ADD HL,HL x 3     ; * 8
+       ai   hl,font->0100                                  ; LD BC,$099F / ADD HL,BC; HL -> this character's 8-byte pattern (codes $20-$7F)
+       .save_bank                                          ;                   ; (TI: select the caller's bank again afterwards)
        .select_bank font_bank_select                       ;                   ; the font is in ROM bank 6 on the TI
-       li   bc,font->0100                                  ; LD BC,$099F       ; the font pattern table (codes $20-$7F)
-       a    bc,hl                                          ; ADD HL,BC         ; HL -> this character's 8-byte glyph
-       li   de,scratch_buffer                              ; LD DE,$E600       ; DE -> the staging buffer
-       li   bc,>0008                                       ; LD BC,$0008       ; 8 bytes
-       .ldir                                               ; LDIR              ; copy the glyph in
-       .restore_bank                                       ;                   ; 
-       .ex_de_hl                                           ; EX DE,HL          ; HL -> just past the copied glyph ($E608)
-       sb   *hl,*hl                                        ; LD (HL),$00       ; zero it...
-       li   de,scratch_buffer_5+>0004                      ; LD DE,$E609       ; ...and the following 7 bytes too
-       movb @bytes+>07,@c                                  ; LD C,$07          ; 
-       .ldir                                               ; LDIR              ; ($E608-$E60F: the buffer's "spillover" half, initially all zero)
-       movb @cursor_subpixel_offset,a                      ; LD A,($E70E) / OR A; A = the cursor's sub-pixel shift (0-7)
-       jeq  _34e5                                          ; JR Z,$34E5        ; no shift needed - the buffer's ready as-is
-       movb a,b                                            ; LD B,A            ; B = the shift amount
-       li   hl,scratch_buffer                              ; LD HL,$E600       ; HL -> the glyph half of the buffer
-       li   de,scratch_buffer_5+>0003                      ; LD DE,$E608       ; DE -> the spillover half
-       movb @bytes+>08,@c                                  ; LD C,$08          ; 8 rows
+       movb @cursor_subpixel_offset,r0                     ; LD A,($E70E)      ;
+       srl  r0,8                                           ;                   ; R0 = the cursor's pixel within the cell (0-7): the shift
+       li   de,scratch_buffer                              ; LD DE,$E600       ; DE -> the buffer
+       movb @bytes+>08,b                                   ;                   ; 8 rows
+       clr  r2                                             ;                   ; R2 = whether anything is shifted into the second cell
 _34d7:                                                     ; >34d7
-       .push bc                                            ; PUSH BC           ; 
-       movb *hl,r0                                         ; LD A,(DE)         ; R0 = glyph byte : this row's spillover byte (0 to start)
-       movb *de,@r0lb                                      ;                   ; 
-_34d9:                                                     ; >34d9
-       srl  r0,1                                           ; SRL (HL)          ; shift the glyph byte right one bit...
-       ;                                                   ; RRA               ; ...carrying the bit shifted out into the spillover byte
-       sb   one,b                                          ; DJNZ $34D9        ; repeat for the full shift amount
-       jne  _34d9                                          ;                   
-       movb r0,*hl                                         ;                   ; store the shifted glyph byte
-       movb @r0lb,*de                                      ; LD (DE),A         ; store what spilled over into the next byte
-       inc  hl                                             ; INC HL            ; both halves -> next row
-       inc  de                                             ; INC DE            ; 
-       .pop bc                                             ; POP BC            ; 
-       sb   one,@c                                         ; DEC C             ; 
+       clr  r1                                             ;                   ;
+       movb *hl+,r1                                        ;                   ; the pattern's row
+       mov  r0,r0                                          ;                   ;
+       jeq  !                                              ;                   ;
+       srl  r1,0                                           ; SRL (HL) / RRA    ; shifted right by R0 bits
+!
+       movb r1,*de                                         ;                   ; the part in the first cell
+       movb @r1lb,@8(de)                                   ;                   ; and the part in the second
+       socb @r1lb,r2                                       ;                   ;
+       inc  de                                             ;                   ;
+       sb   one,b                                          ; DEC C             ;
        jne  _34d7                                          ; JR NZ,$34D7       ; next row
+       .restore_bank                                       ;                   ;
 _34e5:                                                     ; >34e5
-       movb @cursor_vram_addr+1,de                         ; LD DE,($E70F)     ; DE -> this cell's row-0 pattern-table byte
+       movb @cursor_vram_addr+1,de                         ; LD DE,($E70F)     ; DE -> the cell's row 0 in the pattern table
        movb @cursor_vram_addr,@e                           ;                   ;
-       li   hl,scratch_buffer                              ; LD HL,$E600       ; HL -> the buffer's glyph (left-tile) half
-       movb @bytes+>02,@c                                  ; LD C,$02          ; two tile columns to plot: this cell, then the next
-_34ee:                                                     ; >34ee
-       .push de                                            ; PUSH DE           ; stash this tile's base VRAM address
-       movb @bytes+>08,b                                   ; LD B,$08          ; 8 rows
-_34f1:                                                     ; >34f1
-;      limi 0                                              ; DI                ; VDP address/data access must not be interrupted
-       movb @e,a                                           ; LD A,E            ; 
-       movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
-       movb d,a                                            ; LD A,D            ; 
-       movb a,@vdpwa                                       ; OUT ($99),A       ; ...high byte, read mode
-;      .push hl                                            ; PUSH HL           ; (timing delay - let the VDP latch the address, not needed on the TI)
-;      .pop hl                                             ; POP HL            ; 
-       movb @vdprd,a                                       ; IN A,($98)        ; A = the current pattern byte at that address
-       movb *hl,r0                                         ; XOR (HL)          ; combine with this row's buffer byte
-       xor  r0,a                                           ;                   ; 
-       inc  hl                                             ; INC HL            ; buffer -> next row
-       .ex_af_af_                                          ; EX AF,AF'         ; stash the combined byte
-       movb @e,a                                           ; LD A,E            ; 
-       movb a,@vdpwa                                       ; OUT ($99),A       ; re-issue the address, low byte
-       movb d,a                                            ; LD A,D            ; 
-       socb @bytes+>40,a                                   ; OR $40            ; ...high byte, this time in write mode
-       movb a,@vdpwa                                       ; OUT ($99),A       ; 
-       .ex_af_af_                                          ; EX AF,AF'         ; recover the combined byte
-       movb a,@vdpwd                                       ; OUT ($98),A       ; write it back (an XOR-plot, not an overwrite)
-       ; EI                                                ; EI                ;
-       sb   one,b                                          ; DEC B             ; one row done
-       jeq  continue_34a8_advance_cursor                   ; JR Z,$351C        ; all 8 rows plotted - go advance the cursor
-       ab   one,@e                                         ; INC E             ; VRAM address -> next row of this pattern
-       movb @e,a                                           ; LD A,E            ; 
-       andi a,>0700                                        ; AND $07           ; crossed an 8-byte pattern-table boundary?
-       jne  _351a                                          ; JR NZ,$351A       ; no - carry on
-       movb @e,a                                           ; LD A,E            ; 
-       sb   one,a                                          ; DEC A             ; undo the wrap...
-       andi a,>f800                                        ; AND $F8           ; ...and snap back to this boundary's start
-       movb a,@e                                           ; LD E,A            ; 
-       ab   one,d                                          ; INC D             ; move into the pattern table's next bank
-_351a:                                                     ; >351a
-       jmp  _34f1                                          ; JR $34F1          ; plot the next row
+       li   hl,scratch_buffer                              ; LD HL,$E600       ; HL -> the first cell's bytes
+       bl   @print_char_tile                               ;                   ;
+       movb r2,r2                                          ;                   ;
+       jeq  continue_34a8_advance_cursor                   ;                   ; nothing in the second cell
+       ab   @bytes+>08,@e                                  ; LD A,E / ADD A,$08 / LD E,A; E += 8: the next cell
+       li   hl,scratch_buffer+8                            ;                   ;
+       bl   @print_char_tile                               ;                   ;
+       jmp  continue_34a8_advance_cursor                   ;                   ;
+* XOR the 8 bytes at HL into the pattern table at DE: the rows of a character
+* cell, or - when DE isn't the first row of a cell, as for a label on the
+* local chart - the rest of that cell's rows and then the first rows of the
+* cell below it, 256 bytes on. Changes R0, R1, A and BC.
+print_char_tile:
+       .push r11                                           ;                   ;
+       .push de                                            ;                   ;
+       li   a,8                                            ;                   ; A = the rows left
+       mov  de,r1                                          ;                   ;
+       andi r1,>0007                                       ;                   ;
+       neg  r1                                             ;                   ;
+       ai   r1,8                                           ;                   ; R1 = the rows left in this cell
+       mov  de,r0                                          ;                   ; R0 = their address
+print_char_tile_1:
+       swpb r0                                             ; LD A,E / OUT ($99),A; set the address, for reading
+       movb r0,@vdpwa                                      ;                   ;
+       swpb r0                                             ; LD A,D / OUT ($99),A;
+       movb r0,@vdpwa                                      ;                   ;
+       mov  r1,r11                                         ;                   ;
+print_char_tile_2:
+       movb @vdprd,bc                                      ; IN A,($98)        ; the pattern table's byte
+       movb *hl,de                                         ;                   ;
+       xor  de,bc                                          ; XOR (HL)          ; XORed with ours
+       movb bc,*hl+                                        ;                   ; (kept in the buffer)
+       dec  r11                                            ;                   ;
+       jne  print_char_tile_2                              ;                   ;
+       s    r1,hl                                          ;                   ;
+       ori  r0,>4000                                       ; OR $40            ; the same address, for writing
+       swpb r0                                             ; LD A,E / OUT ($99),A;
+       movb r0,@vdpwa                                      ;                   ;
+       swpb r0                                             ; LD A,D / OUT ($99),A;
+       movb r0,@vdpwa                                      ;                   ;
+       mov  r1,r11                                         ;                   ;
+print_char_tile_3:
+       movb *hl+,@vdpwd                                    ; OUT ($98),A       ; write them back
+       dec  r11                                            ;                   ;
+       jne  print_char_tile_3                              ;                   ;
+       s    r1,a                                           ;                   ;
+       jeq  print_char_tile_4                              ;                   ; all 8 rows done
+       mov  @-2(sp),r0                                     ;                   ; the rest are the first rows of the cell below:
+       andi r0,>fff8                                       ;                   ; the start of this cell's pattern,
+       ai   r0,>0100                                       ;                   ; 32 characters on
+       mov  a,r1                                           ;                   ;
+       jmp  print_char_tile_1                              ;                   ;
+print_char_tile_4:
+       .pop de                                             ;                   ;
+       .pop r11                                            ;                   ;
+       rt                                                  ;                   ;
 continue_34a8_advance_cursor:                              ; >351c
-       .pop de                                             ; POP DE            ; recover this tile's base VRAM address
-       movb @e,a                                           ; LD A,E            ; 
-       ab   @bytes+>08,a                                   ; ADD A,$08         ; E += 8: the next cell's row-0 pattern byte
-       movb a,@e                                           ; LD E,A            ; 
-       sb   one,@c                                         ; DEC C             ; one tile done
-       jne  _34ee                                          ; JR NZ,$34EE       ; plot the second tile (the buffer's spillover half)
+       sb   b,b                                            ;                   ; (TI: B = 0 here, as after the MSX's loops: BC is added below)
        movb @cursor_subpixel_offset,a                      ; LD A,($E70E)      ; A = the cursor's sub-pixel shift
        cb   a,@bytes+>02                                   ; CP $02            ; shifted by 2 or more?
        jl   _3534                                          ; JR C,$3534        ; no - stay in the same screen column

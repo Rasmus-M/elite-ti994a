@@ -110,9 +110,13 @@ words. A single-byte access to
   (see `temp-src/startup-code.a99`); values above that keep the snapshot.
 - **Scratchpad** (`equates.a99`): `pad_stack` (no longer used), then the routines `copy_to_pad` installs at startup:
   `copy_space_view_row_pad` (`>26`), `clear_space_view_rows_pad` (`>20`) and `line_loops_pad` (`>48`), ending at
-  `pad_max` (`>83C0`), then `pad_ws` (`>83C0`-`>83DF`, overlapping GPLWS - fine while interrupts and console routines
-  are unused): the one workspace the music, sound effects, keyboard and joystick routines share, as they never call each
-  other and keep nothing in registers between calls. The slot sizes
+  `pad_max` (`>83C0`), then `pad_ws` (`>83C0`-`>83DF`): the one workspace the music, sound effects, keyboard and
+  joystick routines share, as they never call each
+  other and keep nothing in registers between calls. The last 32 bytes (`>83E0`-`>83FF`, the console's GPL workspace -
+  free while interrupts and console routines are unused) hold the ship drawing routines' data: `rotation_matrix`,
+  `face_q`, `face_p` and `face_scale4`. So the scratchpad is full. What is in it was chosen for the scenes that take
+  longest (a planet or the sun filling the view: copying, clearing and line drawing); code there saves only the wait
+  states of fetching it, about a fifth of its time, and less for code that mostly multiplies. The slot sizes
   are constants; update them if those routines change. The line loops plot with a single `socb r1,*hl`; `tunnel_rings`,
   the only thing drawn with XOR, patches that and the `sb` after it to a call of `line_xor_plot` meanwhile. Code there runs without wait states.
 - **Code in ROM banks**: `program.a99` holds the whole program and is assembled once per output: by `elite.a99` with
@@ -161,13 +165,20 @@ words. A single-byte access to
   clears them. `view_mark_all` marks everything
   (`enter_flight_mode`, as then neither the buffer nor the screen is known). `clear_space_view` mustn't change BC: its
   callers count with it.
-- **Rotating vertices** (`rotate_vertex`, and `face_visible` with it) is native code that multiplies with `MPY` where
+- **Rotating vertices** (`rotate_vertex`) is native code that multiplies with `MPY` where
   the MSX adds logarithms: `cache_orientation` caches the object's orientation in `rotation_matrix` as nine unsigned
   words (the component + 2.0), not as the logarithms at `side_vector_logs` and `roof_vector_logs`, which are no longer
   used. The results differ from the MSX's by a few units (they are slightly more accurate).
   Projecting (`project_point`, `project_coordinate`) is native too: 128 * v / depth with `DIV`, exact where the MSX
   subtracts logarithms, with the depth itself in `projection_depth` (set by `project_point` and `ship_screen_size`)
   rather than its logarithm; `log_depth` is now only `ship_screen_size`'s own, for the planet's and the sun's radius.
+- **Face visibility** (`face_visible`) doesn't rotate each face's normal into the view as the MSX does (#R$4873: a
+  `rotate_vertex` for every face). `face_setup` rotates the ship's position into the ship's own frame instead, once for
+  the ship (`face_q`: its dot products with the side, roof and nose vectors, after taking it out of the view with
+  `convert_to_view` three times, which is its inverse), and `face_visible` then takes the dot product with the normal
+  as it is in the blueprint, reading the face's scale and normal at HL. The dot product is the same in either frame; a
+  face that is almost edge on can come out differently (about 1 in 800 when compared with the old code). The cached
+  vertices' fast return in `project_vertex` and `clear_flags` (the vertex and edge flags, in words) are TI too.
 - **The space view's x isn't scaled**: the MSX multiplies x by 3/4 (its table at $0300, not on the TI) when it turns a projected point
   into a screen column, for the shape of a PAL television's pixels; the TI takes pixels to be square, so that circles
   are round: column = x + 87, and the view is x from -87 to 88 (-116 to 117 on the MSX) in `outcode`,

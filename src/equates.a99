@@ -67,6 +67,16 @@ pad_ws:                                ; The workspace of the music, sound effec
        equ  pad_max
 pad_ws_end:
        equ  pad_ws+>20
+* The last 32 bytes of the scratchpad: the ship drawing routines' data, which is
+* read and written faster there (no wait states)
+rotation_matrix:                       ; The orientation, cached by cache_orientation: 9 words
+       equ  pad_ws_end
+face_q:                                ; The ship's position in its own frame, halved (face_setup): 3 words
+       equ  rotation_matrix+18
+face_p:                                ; and out of the view (x, y, 2 * z): 3 words
+       equ  face_q+6
+face_scale4:                           ; The face's scale * 4 (face_visible): a word. The scratchpad ends here
+       equ  face_p+6
 
 **
 * Z80 register mapping

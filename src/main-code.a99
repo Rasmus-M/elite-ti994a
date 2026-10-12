@@ -4674,24 +4674,15 @@ _42bc:                                                     ; >42bc
 !
        movb @b255,a                                        ; LD A,$FF          ; else: A = $FF
        movb a,@ef98_per_object_flag                        ; LD ($EF98),A      ; on screen
-       li   hl,vertex_flags                                ; LD HL,$E784       ; HL -> the $E784 buffer
-       li   de,vertex_flags+>0001                          ; LD DE,$E785       ; DE -> one byte past it
-       movb @bp_vertex_count+1,bc                          ; LD BC,($F7FF)     ; C = number of vertices
-       movb @bp_vertex_count,@c                            ;                   ;
-       sb   b,b                                            ; LD B,$00          ; keep only the low byte (C)
-       movb b,*hl                                          ; LD (HL),B         ; seed the first byte with 0
-       sb   one,@c                                         ; DEC C             ; one fewer byte to fill
-       .ldir                                               ; LDIR              ; clear the vertex flags
-       li   hl,edge_flags                                  ; LD HL,$E7B6       ; HL -> the $E7B6 buffer
-       li   de,edge_flags+>0001                            ; LD DE,$E7B7       ; DE -> one byte past it
-       movb @bp_edge_count+1,bc                            ; LD BC,($F7FE)     ; C = number of edges
-       movb @bp_edge_count,@c                              ;                   ;
-       sb   b,b                                            ; LD B,$00          ; keep only the low byte (C)
-       movb b,*hl                                          ; LD (HL),B         ; seed the first byte with 0
-       sb   one,@c                                         ; DEC C             ; one fewer byte to fill
-       .ldir                                               ; LDIR              ; clear the edge flags
+       li   hl,vertex_flags                                ; LD HL,$E784       ; HL -> the vertex flags
+       movb @bp_vertex_count,r0                            ; LD BC,($F7FF)     ; the number of vertices
+       bl   @clear_flags                                   ; LD (HL),B / LDIR  ; clear them (TI: a word at a time, where the MSX copies the first byte along)
+       li   hl,edge_flags                                  ; LD HL,$E7B6       ; HL -> the edge flags
+       movb @bp_edge_count,r0                              ; LD BC,($F7FE)     ; the number of edges
+       bl   @clear_flags                                   ; LD (HL),B / LDIR  ; clear them
 ;      movb @bytes+>e6,a                                   ; LD A,$E6          ; A = $E6
 ;      movb a,@vertex_cache_slot                           ; LD ($E6C9),A      ; the vertex cache is in page $E6 (the TI stores the full address in #R$49FD)
+       bl   @face_setup                                    ;                   ; (TI: the ship's position in its own frame, for face_visible)
        li   ix,edge_flags                                  ; LD IX,$E7B6       ; IX -> the $E7B6 buffer
        li   iy,vertex_flags                                ; LD IY,$E784       ; IY -> the $E784 buffer
        movb @bp_faces,hl                                   ; LD HL,($F7F9)     ; HL -> the faces
@@ -4702,24 +4693,7 @@ _4303:                                                     ; >4303
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
        .push bc                                            ; PUSH BC           ; save the loop counter
        movb @bp_face_normals,a                             ; LD A,($F804) / OR A; A = faces have normals?
-       jeq  _4325                                          ; JR Z,$4325        ; no
-       movb *hl,a                                          ; LD A,(HL)         ; else: A = the next data byte
-       inc  hl                                             ; INC HL            ; 
-       movb a,@face_scale                                  ; LD ($E7E8),A      ; the normal's scale
-       movb a,@e                                           ; LD E,A            ; E = that byte, used as a table index
-       movb a,r1                                           ; LD D,$02          ; 
-       srl  r1,8                                           ;                   ; 
-       movb @bit_length_table(r1),a                        ; LD A,(DE)         ; A = the scale's bit length (#R$0200)
-       movb a,@face_scale_bits                             ; LD ($E7E9),A      ; 
-       movb *hl+,@rotated_vector+1                         ; LD DE,$E7EA       ; copy the 6-byte vector, swapping each little-endian word
-       movb *hl+,@rotated_vector                           ; LDI               ; to big-endian for word access
-       movb *hl+,@rotated_vector_y+1                       ; LDI               ; 
-       movb *hl+,@rotated_vector_y                         ; LDI               ; 
-       movb *hl+,@rotated_vector_z+1                       ; LDI               ; 
-       movb *hl+,@rotated_vector_z                         ; LDI x 2           ; (DE and BC are not used afterwards)
-_4325:                                                     ; >4325
-       movb @bp_face_normals,a                             ; LD A,($F804) / OR A; A = the per-entry mode/flag byte again
-       jeq  _4331                                          ; JR Z,$4331        ; clear - skip #R$4873's combine step
+       jeq  _4331                                          ; JR Z,$4325        ; no (TI: face_visible reads the face's scale and normal at HL itself)
        bl   @face_visible                                  ; CALL $4873        ; does the face face the player?
        movb a,a                                            ;                   ; (the RET changed the status)
        jgt  draw_ship_skip_face                            ; JP P,$4336        ; no - skip it
@@ -4872,8 +4846,6 @@ rotate_vertex_4:
        .pop r12                                            ;                   ;
        bl   @convert_to_view                               ;                   ; convert to the current view
        .endproc                                            ; RET               ;
-rotation_matrix:                                           ; The orientation, cached by cache_orientation: 9 words
-       bss  18                                             ;                   ;
 * TI: word variables that are at odd addresses on the MSX, where they would
 * have to be read and written a byte at a time. Here they are big-endian words
 * (the high byte at the label, the low byte at the label + 1); the two bytes
@@ -5559,75 +5531,130 @@ projection_depth:                                          ; The depth that proj
        data 0                                              ;                   ;
 
 ********************************************************************************
-* Draw a ship: does a face face the player?
-* 
-* Used by the routine at #R$422E.
-* .
-* Part of #R$4255. Rotates the face's normal (#R$E7EA) into the view
-* (#R$4464), scales it by the face's scale byte (#R$4847), and adds up
-* its products with the ship's position (#R$48EC) - a dot product,
-* negative if the face can be seen.
-* 
-* O:A,HL The dot product (A the high byte)
-face_visible:                                              ; >4873
-* TI: a native version, with the scaling (#R$4847) and the multiplications
-* (#R$48EC) done in line by face_visible_term. Only the sign of A is used. HL
-* is kept.
-       .proc                                               ;                   ;
-       .push hl                                            ; PUSH HL           ; save the caller's HL
-       bl   @rotate_vertex                                 ; CALL $4464        ; rotate the normal into the view: DE, BC, HL
-       mov  bc,@rotated_vector_y                           ; LD ($E7EC),BC     ; keep y
-       mov  hl,@rotated_vector_z                           ; LD ($E7EE),HL     ; and z
-       mov  de,r1                                          ;                   ; x...
-       mov  @view_x,r0                                     ;                   ; ...and the object's x
-       clr  a                                              ;                   ; A:HL = the sum
-       clr  hl                                             ;                   ;
-       bl   @face_visible_term                             ;                   ;
-       mov  @rotated_vector_y,r1                           ;                   ;
-       mov  @object_position_y,r0                          ;                   ;
-       bl   @face_visible_term                             ;                   ;
-       mov  @rotated_vector_z,r1                           ;                   ;
-       mov  @view_z2,r0                                    ;                   ;
-       bl   @face_visible_term                             ;                   ;
-       swpb a                                              ;                   ; A = bits 16-23 of the sum: the MSX adds up 24 bits, and its sign is bit 23
-       .pop hl                                             ; POP HL            ; restore the caller's HL
-       .endproc                                            ; RET               ; return with the sign of A the sign of the dot product
-* Add n * (n * the face's scale / 256 + p) to A:HL
-* I:R1 n, a component of the normal (only the low byte of its magnitude counts, as on the MSX)
-* I:R0 p, that coordinate of the object
-* Changes R0-R2, BC and DE.
-face_visible_term:
-       mov  r1,de                                          ;                   ; DE = n: its sign
-       abs  r1                                             ;                   ;
-       andi r1,>00ff                                       ;                   ; R1 = abs(n)
-       jeq  face_visible_term_3                            ;                   ; nothing to add
-       mov  r1,bc                                          ;                   ; BC = abs(n)
-       mpy  @face_scale,r1                                 ;                   ; R1 = abs(n) * scale / 256: the high word of abs(n) * the word at face_scale, whose
-       ;                                                   ;                   ; high byte is the scale (its low byte, the bit length, can make it 1 more)
-       mov  de,de                                          ;                   ;
-       jgt  face_visible_term_1                            ;                   ;
-       neg  r1                                             ;                   ; with n's sign
-face_visible_term_1:
-       a    r0,r1                                          ;                   ; R1 = the scaled component + p
-       mov  r1,r0                                          ;                   ;
-       xor  de,r0                                          ;                   ; R0 = the sign of the product
-       abs  r1                                             ;                   ;
-       mpy  bc,r1                                          ;                   ; R1:R2 = abs(n) * abs(that)
-       mov  r0,r0                                          ;                   ;
-       jlt  face_visible_term_2                            ;                   ;
-       a    r2,hl                                          ;                   ; add it
+* TI: draw a ship: does a face face the player?
+*
+* The face can be seen if the dot product of its normal n, rotated into the
+* view, and (the ship's position p + n * the face's scale / 256) is negative.
+* The MSX rotates every face's normal for this (#R$4873, with #R$4464: nine
+* multiplications). Here the position is rotated into the ship's frame
+* instead, once for the ship (face_setup): the dot product of two vectors is
+* the same in either frame, so for a face it is the sum over the three
+* components of n * (n * scale / 256 + q), with n as it is in the blueprint
+* and q the rotated position. It works with 32 * n and q / 2, which gives 16
+* times the sum; only its sign matters.
+*
+* I: HL -> the face's scale byte and normal (three sign-tagged logarithms)
+* O: A negative if the face can be seen; HL -> after the normal
+* Changes R0-R2, BC and DE (and sets IX and IY again)
+face_visible:
+       movb *hl+,r0                                        ;                   ; R0 = the face's scale * 4, as a word
+       srl  r0,6                                           ;                   ;
+       andi r0,>03fc                                       ;                   ;
+       mov  r0,@face_scale4                                ;                   ;
+       clr  a                                              ;                   ; A:BC = the sum
+       clr  bc                                             ;                   ;
+       li   ix,face_q                                      ;                   ; IX -> the position in the ship's frame, halved
+face_visible_1:
+       movb *hl+,@r1lb                                     ;                   ; R1 = the next component of the normal: its logarithm
+       movb *hl+,r1                                        ;                   ;
+       mov  *ix+,r0                                        ;                   ; R0 = q / 2
+       ci   r1,>ffff                                       ;                   ;
+       jeq  face_visible_4                                 ;                   ; the component is 0
+       mov  r1,r2                                          ;                   ;
+       sla  r2,2                                           ;                   ; carry = the sign tag (bit 14)
+       jnc  face_visible_2                                 ;                   ;
+       neg  r0                                             ;                   ; n is negative: take abs(n) * (abs(n) * scale / 256 - q)
+face_visible_2:
+       srl  r1,4                                           ;                   ;
+       andi r1,>03fe                                       ;                   ; the word index log / 32, as an offset
+       mov  @antilog_table+>0200(r1),r1                    ;                   ; R1 = abs(n) * 256
+       srl  r1,3                                           ;                   ; R1 = m = abs(n) * 32
+       mov  r1,iy                                          ;                   ; IY = m
+       mpy  @face_scale4,r1                                ;                   ; R1 = m * scale * 4 / 65536 = abs(n) * scale / 512
+       a    r0,r1                                          ;                   ; R1 = that + q / 2
+       abs  r1                                             ;                   ; (sets the status for the JLT: MPY leaves it alone)
+       mpy  iy,r1                                          ;                   ; R1:R2 = m * abs(that)
+       jlt  face_visible_3                                 ;                   ;
+       a    r2,bc                                          ;                   ; add it
        jnc  !                                              ;                   ;
        inc  a                                              ;                   ;
 !
        a    r1,a                                           ;                   ;
-       rt                                                  ;                   ;
-face_visible_term_2:
-       s    r2,hl                                          ;                   ; subtract it
+       jmp  face_visible_4                                 ;                   ;
+face_visible_3:
+       s    r2,bc                                          ;                   ; subtract it
        joc  !                                              ;                   ; (no borrow)
        dec  a                                              ;                   ;
 !
        s    r1,a                                           ;                   ;
-face_visible_term_3:
+face_visible_4:
+       ci   ix,face_q+6                                    ;                   ;
+       jne  face_visible_1                                 ;                   ;
+       li   ix,edge_flags                                  ;                   ; IX and IY as #R$4255 has them
+       li   iy,vertex_flags                                ;                   ;
+       mov  a,a                                            ;                   ; the sign of the sum
+       rt                                                  ;                   ;
+
+* TI: clear the R0 (high byte) flags at HL (#R$E784, #R$E7B6): both buffers
+* are at even addresses and of even length, so it's done in words.
+clear_flags:
+       srl  r0,8                                           ;                   ;
+       inc  r0                                             ;                   ;
+       srl  r0,1                                           ;                   ; the number of words
+       jeq  clear_flags_2                                  ;                   ;
+clear_flags_1:
+       clr  *hl+                                           ;                   ;
+       dec  r0                                             ;                   ;
+       jne  clear_flags_1                                  ;                   ;
+clear_flags_2:
+       rt                                                  ;                   ;
+
+* TI: rotate the ship's position into its own frame, for face_visible: q =
+* (side . p, roof . p, nose . p) / 2. p is the position in the view that the
+* MSX adds to a rotated normal - x (#R$E6D8), y (#R$F7D0) and twice z
+* (#R$E6DA) - taken out of the view again (#R$44CE three times is its
+* inverse), as the orientation vectors are not in the view.
+* Changes R0-R2, A, BC, DE, HL, IX and IY
+face_setup:
+       .proc                                               ;                   ;
+       mov  @view_x,de                                     ;                   ;
+       mov  @view_z2,hl                                    ;                   ;
+       bl   @convert_to_view                               ;                   ;
+       bl   @convert_to_view                               ;                   ;
+       bl   @convert_to_view                               ;                   ;
+       mov  de,@face_p                                     ;                   ;
+       mov  @object_position_y,@face_p+2                   ;                   ;
+       mov  hl,@face_p+4                                   ;                   ;
+       li   ix,side_vector                                 ;                   ; in the object: side, nose, roof
+       bl   @face_dot                                      ;                   ;
+       mov  a,@face_q                                      ;                   ; for the normal's x
+       bl   @face_dot                                      ;                   ;
+       mov  a,@face_q+4                                    ;                   ; z
+       bl   @face_dot                                      ;                   ;
+       mov  a,@face_q+2                                    ;                   ; y
+       .endproc                                            ;                   ;
+* A = the vector at IX (three sign-magnitude words, 1.0 = >4000) . p / 2
+face_dot:
+       clr  a                                              ;                   ;
+       li   iy,face_p                                      ;                   ;
+face_dot_1:
+       mov  *ix+,r0                                        ;                   ;
+       mov  *iy+,r1                                        ;                   ;
+       mov  r0,bc                                          ;                   ;
+       xor  r1,bc                                          ;                   ; BC = the product's sign
+       andi r0,>7fff                                       ;                   ;
+       abs  r1                                             ;                   ;
+       mpy  r0,r1                                          ;                   ; R1 = the product / 65536: a quarter of it, as 1.0 is >4000
+       sla  r1,1                                           ;                   ; half of it
+       mov  bc,bc                                          ;                   ;
+       jlt  face_dot_2                                     ;                   ;
+       a    r1,a                                           ;                   ;
+       jmp  face_dot_3                                     ;                   ;
+face_dot_2:
+       s    r1,a                                           ;                   ;
+face_dot_3:
+       ci   iy,face_p+6                                    ;                   ;
+       jne  face_dot_1                                     ;                   ;
        rt                                                  ;                   ;
 
 ********************************************************************************
@@ -5794,14 +5821,20 @@ project_vertex:                                            ; >49fd
 * words (x, y) at scratch_buffer + 4 * the vertex, the object's position is
 * added in line (#R$44D2), and the shadow registers are not used. If the
 * vertex is behind the player, returns its x, y and z in DE, BC and HL.
-       .proc                                               ;                   ;
        movb @e,r1                                          ; LD A,E            ;
        srl  r1,8                                           ;                   ; R1 = the vertex
        mov  r1,r2                                          ;                   ;
        a    iy,r2                                          ; LD ($4A03),A      ; R2 -> its flag
        sla  r1,2                                           ;                   ; R1 = 4 * the vertex
        movb *r2,a                                          ; LD A,(IY+$00) / OR A; A = this vertex's cache flag
-       jne  project_vertex_from_cache                      ; JR NZ,$4A4C       ; already cached - read it back
+       jeq  project_vertex_1                               ; JR NZ,$4A4C       ; not cached yet
+       mov  @scratch_buffer(r1),bc                         ; LD C,(HL) / ...   ; (TI: as at $4A4C, but before anything is put on the stack) BC = x
+       mov  @scratch_buffer+2(r1),hl                       ;                   ; HL = y
+       seto r0                                             ; RET               ; with the carry set
+       inc  r0                                             ;                   ;
+       rt                                                  ;                   ;
+project_vertex_1:
+       .proc                                               ;                   ;
        movb @b255,*r2                                      ; LD (IY+$05),$FF   ; set the flag
        mov  r1,r0                                          ;                   ;
        srl  r0,1                                           ;                   ;
@@ -5833,11 +5866,6 @@ project_vertex_record:                                     ; >4a21
        mov  bc,*r1+                                        ; LD (HL),C / ...   ; cache the projected point
        mov  de,*r1                                         ;                   ;
        mov  de,hl                                          ; EX DE,HL          ; HL = y
-       .retc                                               ; RET               ; 
-project_vertex_from_cache:                                 ; >4a4c
-       ai   r1,scratch_buffer                              ; LD L,A / LD H,$E6 ; R1 -> this vertex's cache slot
-       mov  *r1+,bc                                        ; LD C,(HL) / ...   ; BC = x
-       mov  *r1,hl                                         ;                   ; HL = y
        .retc                                               ; RET               ; 
 
 ********************************************************************************

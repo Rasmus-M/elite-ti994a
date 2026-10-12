@@ -9624,38 +9624,58 @@ _84a3:                                                     ; >84a3
 * I:$EB82-$EB87 The vector's components (magnitudes)
 * O:HL Its length
 vector_length:                                             ; >84a6
-       .proc                                               ;                   ; 
-       clr  r0                                             ;                   ; 
+* TI: each component is squared with MPY, in line, where the MSX doubles its
+* logarithm (#R$8515): so the sum of the squares is exact, and the length -
+* still found by halving the logarithm of the sum - is up to 2% bigger than
+* the MSX's, which is slightly low. A leaf routine. Changes R0-R2, A, BC, DE.
+       clr  r0                                             ;                   ;
        movb @delta_x_hi,r0                                 ; LD A,($EB83)      ; combine the three components' high bytes
-       socb @delta_y_hi,r0                                 ; LD HL,$EB85 / OR (HL); 
-       socb @delta_z_hi,r0                                 ; LD HL,$EB87 / OR (HL); 
+       socb @delta_y_hi,r0                                 ; LD HL,$EB85 / OR (HL);
+       socb @delta_z_hi,r0                                 ; LD HL,$EB87 / OR (HL);
        jeq  _84b7                                          ; JR Z,$84B7        ; all under 256 - no shift
-       mov  r0,r1                                          ; LD L,A / LD H,$02 ; 
-       srl  r1,8                                           ;                   ; 
+       mov  r0,r1                                          ; LD L,A / LD H,$02 ;
+       srl  r1,8                                           ;                   ;
        movb @bit_length_table(r1),r0                       ; LD A,(HL)         ; A = shift needed to fit the biggest in a byte
 _84b7:                                                     ; >84b7
-       movb r0,@depth_shift                                ; LD ($EB9B),A      ; 
+       movb r0,@depth_shift                                ; LD ($EB9B),A      ;
+       srl  r0,8                                           ;                   ; R0 = the shift
        movb @delta_x_hi,hl                                 ; LD HL,($EB82)     ; HL = X
-       movb @abs_delta_x,@l                                ;                   ; 
-       bl   @vector_length_square                          ; CALL $8515        ; square X (shifted down)
-       movb a,@ef92_scaled_magnitude_1                     ; LD ($EF92),A      ; 
-       mov  hl,de                                          ; PUSH HL           ; BC:DE = the sum of the squares (TI: in registers)
-       clr  bc                                             ;                   ; 
+       movb @abs_delta_x,@l                                ;                   ;
+       mov  r0,r0                                          ;                   ;
+       jeq  !                                              ;                   ; no shift needed
+       srl  hl,0                                           ;                   ; shift it down (by R0)
+!
+       movb @l,@ef92_scaled_magnitude_1                    ; LD ($92),A        ; the component, shifted down
+       mov  hl,r1                                          ;                   ;
+       mpy  r1,r1                                          ; CALL $8515        ; R2 = its square
+       mov  r2,de                                          ; PUSH HL           ; BC:DE = the sum of the squares (TI: in registers)
+       clr  bc                                             ;                   ;
        movb @delta_y_hi,hl                                 ; LD HL,($EB84)     ; HL = Y
-       movb @abs_delta_y,@l                                ;                   ; 
-       bl   @vector_length_square                          ; CALL $8515        ; square Y
-       movb a,@ef93_scaled_magnitude_2                     ; LD ($EF93),A      ; 
-       a    hl,de                                          ; ADD HL,DE / ADC A,B; add it
-       jnc  vector_length_1                                ;                   ; 
-       inc  bc                                             ;                   ; 
-vector_length_1:                                           
+       movb @abs_delta_y,@l                                ;                   ;
+       mov  r0,r0                                          ;                   ;
+       jeq  !                                              ;                   ; no shift needed
+       srl  hl,0                                           ;                   ; shift it down (by R0)
+!
+       movb @l,@ef93_scaled_magnitude_2                    ; LD ($93),A        ; the component, shifted down
+       mov  hl,r1                                          ;                   ;
+       mpy  r1,r1                                          ; CALL $8515        ; R2 = its square
+       a    r2,de                                          ; ADD HL,DE / ADC A,B; add it
+       jnc  !                                              ;                   ;
+       inc  bc                                             ;                   ;
+!
        movb @delta_z_hi,hl                                 ; LD HL,($EB86)     ; HL = Z
-       movb @abs_delta_z,@l                                ;                   ; 
-       bl   @vector_length_square                          ; CALL $8515        ; square Z
-       movb a,@ef94_scaled_magnitude_3                     ; LD ($EF94),A      ; 
-       a    hl,de                                          ; ADD HL,DE / ADC A,B; add it
-       jnc  vector_length_2                                ;                   ; 
-       inc  bc                                             ;                   ; 
+       movb @abs_delta_z,@l                                ;                   ;
+       mov  r0,r0                                          ;                   ;
+       jeq  !                                              ;                   ; no shift needed
+       srl  hl,0                                           ;                   ; shift it down (by R0)
+!
+       movb @l,@ef94_scaled_magnitude_3                    ; LD ($94),A        ; the component, shifted down
+       mov  hl,r1                                          ;                   ;
+       mpy  r1,r1                                          ; CALL $8515        ; R2 = its square
+       a    r2,de                                          ; ADD HL,DE / ADC A,B; add it
+       jnc  !                                              ;                   ;
+       inc  bc                                             ;                   ;
+!
 vector_length_2:                                           
        clr  r2                                             ;                   ; R2 = the shift so far
        mov  bc,bc                                          ;                   ; under 65536?
@@ -9684,49 +9704,7 @@ _84f5:                                                     ; >84f5
        movb @depth_shift,r0                                ; LD A,($EB9B)      ; A = the components' shift
        sla  r0,2                                           ; ADD A,A / ADD A,A ; times 4
        a    r0,hl                                          ; ADD A,H / LD H,A  ; add it back
-       .pop r11                                            ;                   ; 
        b    @antilog16                                     ; JP $21A3          ; convert back: HL = the length
-
-********************************************************************************
-* Vector length: square one component
-* 
-* Used by the routine at #R$84A6.
-* .
-* Shifts the component in HL right by the shared exponent in ($EB9B)
-* (set by #R$84A6 so that the biggest component fits in a byte) and
-* squares it (#R$2191).
-* 
-* I:HL Vector component
-* O:A The component, shifted down
-* O:HL Its square
-vector_length_square:                                      ; >8515
-       clr  r0                                             ;                   ; 
-       movb @depth_shift,r0                                ; LD A,($EB9B) / OR A; 
-       jeq  _8522                                          ; JR Z,$8522        ; no shift needed
-       swpb r0                                             ; LD B,A            ; 
-       srl  hl,0                                           ; LD A,H / RRA / RR L / DJNZ $851D; shift the component down (by R0)
-_8522:                                                     ; >8522
-       movb @l,a                                           ; LD E,L / ... / LD A,E; A = the component, shifted down
-* TI: the square (#R$2191) is worked out here, the same way: L's log, doubled
-* and converted back (#R$21A3, inline, as it changes A).
-       sla  hl,1                                           ; SLA L / ADC A,$08 / LD H,A; 
-       mov  @log_table(hl),hl                              ; LD A,(HL) / INC L / LD H,(HL) / LD L,A; HL = log(L)
-       a    hl,hl                                          ; ADD HL,HL         ; HL = log(L * L)
-       joc  vector_length_square_0                         ; JP NC,$21A3       ; 
-       mov  hl,r1                                          ; LD A,H            ; 
-       andi r1,>4000                                       ; BIT 6,A           ; HL >= $4000?
-       jne  vector_length_square_max                       ; JR NZ,$21C0       ; too big - return $FFFF
-       mov  hl,r1                                          ;                   ; 
-       srl  r1,4                                           ;                   ; 
-       andi r1,>03fe                                       ;                   ; 
-       mov  @antilog_table(r1),hl                          ;                   ; HL = 2^(log / 1024)
-       rt                                                  ; RET               ; 
-vector_length_square_max:                                  
-       seto hl                                             ; LD HL,$FFFF       ; 
-       rt                                                  ; RET               ; 
-vector_length_square_0:                                    
-       clr  hl                                             ; LD HL,$0000       ; L = 0: return 0
-       rt                                                  ; RET               ; 
 
 ********************************************************************************
 * Read a block of VRAM into a Z80 RAM buffer
@@ -9830,69 +9808,72 @@ or_vram_next_byte:                                         ; >856d
 * TI: k is in R0, and the magnitude is returned in R1; the square, square
 * root and division are done with MPY and DIV.
 compass_coordinate:                                        ; >8570
-       .proc                                               ;                   ; 
-       .push hl                                            ; PUSH HL           ; save v
-       .push r0                                            ; PUSH AF           ; save k
+* TI: a native version. v and Z are shifted down together to fit in a byte and
+* squared with MPY; the square root of the sum is found by halving its
+* logarithm (as #R$84A6 does) rather than with #R$1F9C, and it isn't shifted
+* up again: the shifted-down v * k is divided by it instead. The result can
+* differ from the MSX's by one. A leaf routine. Changes R0-R2, BC, DE, HL.
+       mov  hl,de                                          ; PUSH HL           ; DE = v, for its sign
        abs  hl                                             ; BIT 7,H / ...     ; HL = the size of v
-       .push hl                                            ; PUSH HL           ; save its size
-       clr  r1                                             ;                   ; 
-       movb @delta_z_hi,r1                                 ; LD A,($EB87)      ; A = the high byte of Z...
-       socb hl,r1                                          ; OR H              ; ...ORed with v's
-       jeq  _8587                                          ; JR Z,$8587        ; both under 256 - no shift needed
-       swpb r1                                             ; LD C,A / LD B,$02 ; 
-       movb @bit_length_table(r1),r1                       ; LD A,(BC)         ; the shift needed
-_8587:                                                     ; >8587
-       movb r1,@depth_shift                                ; LD ($EB9B),A      ; save the shift count
-       jeq  _8594                                          ; OR A / JR Z,$8594 ; no shift
-       mov  r1,r0                                          ; LD B,A            ; 
-       srl  r0,8                                           ;                   ; 
+       movb @delta_z_hi,bc                                 ; LD HL,($EB86)     ; BC = the size of Z
+       movb @abs_delta_z,@c                                ;                   ;
+       mov  r0,a                                           ; PUSH AF           ; A = k
+       mov  hl,r1                                          ; LD A,($EB87) / OR H; both under 256?
+       soc  bc,r1                                          ;                   ;
+       srl  r1,8                                           ;                   ;
+       jeq  _8594                                          ; JR Z,$8587        ; yes - no shift needed
+       movb @bit_length_table(r1),r0                       ; LD A,(BC)         ; the shift needed
+       srl  r0,8                                           ;                   ;
        srl  hl,0                                           ; RRA / RR L / DJNZ $858F; shift the size of v right to fit in a byte
+       srl  bc,0                                           ; RRA / RR L / DJNZ $85A3; and the size of Z by the same amount
 _8594:                                                     ; >8594
-       bl   @square_l                                      ; CALL $1F5E        ; HL = its square
-       .push hl                                            ; PUSH HL           ; save it
-       movb @delta_z_hi,hl                                 ; LD HL,($EB86)     ; HL = the size of Z
-       movb @abs_delta_z,@l                                ;                   ; 
-       clr  r0                                             ;                   ; 
-       movb @depth_shift,r0                                ; LD A,($EB9B) / OR A; 
-       jeq  _85a8                                          ; JR Z,$85A8        ; no shift
-       swpb r0                                             ; LD B,A            ; 
-       srl  hl,0                                           ; RRA / RR L / DJNZ $85A3; shift the size of Z right by the same amount
-_85a8:                                                     ; >85a8
-       bl   @square_l                                      ; CALL $1F5E        ; HL = Z squared
-       .pop de                                             ; POP DE            ; DE = v squared
-       clr  a                                              ; XOR A             ; 
-       a    de,hl                                          ; ADD HL,DE         ; 
-       jnc  _85af                                          ; ADC A,A           ; A:HL = v^2 + Z^2
-       movb one,a                                          ;                   ; 
+       mov  hl,r1                                          ;                   ;
+       mpy  hl,r1                                          ; CALL $1F5E        ; R2 = v squared
+       mov  r2,r0                                          ;                   ;
+       mov  bc,r1                                          ;                   ;
+       mpy  bc,r1                                          ; CALL $1F5E        ; R2 = Z squared
+       clr  bc                                             ;                   ; BC = what to add to the shifted-down sum's logarithm
+       a    r0,r2                                          ; ADD HL,DE / ADC A,A; R2 = v^2 + Z^2
+       jnc  _85af                                          ;                   ;
+       srl  r2,2                                           ;                   ; 65536 or more: a quarter of it,
+       ori  r2,>4000                                       ;                   ;
+       li   bc,2048                                        ;                   ; which has 2048 less in its logarithm
 _85af:                                                     ; >85af
-       bl   @square_root                                   ; CALL $1F9C        ; HL = sqrt(v^2 + Z^2)
-       clr  r0                                             ;                   ; 
-       movb @depth_shift,r0                                ; LD A,($EB9B) / OR A; 
-       jeq  _85bc                                          ; JR Z,$85BC        ; no shift
-       swpb r0                                             ; LD B,A            ; 
-       sla  hl,0                                           ; ADD HL,HL / DJNZ $85B9; shift the root back up
-_85bc:                                                     ; >85bc
-       mov  hl,de                                          ; EX DE,HL          ; DE = the distance sqrt(v^2 + Z^2)
-       .pop r1                                             ; POP HL            ; R1 = the size of v
-       .pop r0                                             ; POP AF            ; R0 = k
-       mpy  r0,r1                                          ; CP $08 / ...      ; R1:R2 = the size of v * k
-       c    r1,de                                          ;                   ; does the quotient fit?
-       jl   compass_divide                                 ;                   ; yes
-       clr  r1                                             ;                   ; no (a distance of 0): 0
-       jmp  _85f3                                          ;                   ; 
-compass_divide:                                            
-       div  de,r1                                          ; LD B,$08 / ... / DJNZ $85E0; R1 = the size of v * k / the distance
+       mov  r2,r1                                          ; CALL $1F9C        ; the square root: the sum, shifted down to fit in a byte...
+       srl  r1,8                                           ;                   ;
+       jeq  !                                              ;                   ;
+       movb @bit_length_table(r1),r0                       ;                   ;
+       srl  r0,8                                           ;                   ;
+       srl  r2,0                                           ;                   ;
+       sla  r0,10                                          ;                   ; ...has 1024 less in its logarithm for each bit
+       a    r0,bc                                          ;                   ;
+!
+       sla  r2,1                                           ;                   ;
+       mov  @log_table(r2),r1                              ;                   ; R1 = the sum's logarithm:
+       a    bc,r1                                          ;                   ; with what the shifts took off
+       srl  r1,1                                           ;                   ; half the logarithm: the square root
+       srl  r1,4                                           ;                   ;
+       andi r1,>03fe                                       ;                   ; the word index log / 32, as an offset
+       mov  @antilog_table(r1),bc                          ;                   ; BC = sqrt(v^2 + Z^2), of the shifted-down v and Z
+       jeq  _85f3_zero                                     ;                   ; (nothing to divide by)
+       mov  hl,r1                                          ; POP HL            ;
+       mpy  a,r1                                           ; CP $08 / ...      ; R1:R2 = the size of v * k
+       div  bc,r1                                          ; LD B,$08 / ... / DJNZ $85E0; R1 = the size of v * k / the distance
+       c    r1,a                                           ;                   ; (TI: k at the most, as the root is not exact)
+       jle  _85f3                                          ;                   ;
+       mov  a,r1                                           ;                   ;
+       jmp  _85f3                                          ;                   ;
+_85f3_zero:
+       clr  r1                                             ;                   ;
 _85f3:                                                     ; >85f3
-       .pop r0                                             ; POP HL            ; R0 = v (for its sign)
        mov  r1,a                                           ; LD L,A            ; A = the magnitude...
-       swpb a                                              ;                   ; 
-       mov  r0,r0                                          ; BIT 7,H           ; v positive?
-       jlt  _85f8                                          ; RET Z             ; 
-       jmp  compass_coordinate_exit                        ;                   ; yes - done
+       swpb a                                              ;                   ;
+       mov  de,de                                          ; BIT 7,H           ; v positive?
+       jlt  _85f8                                          ; RET Z             ;
+       rt                                                  ;                   ; yes - done
 _85f8:                                                     ; >85f8
        neg  a                                              ; NEG               ; no: negate the result
-compass_coordinate_exit:
-       .endproc                                            ; RET               ; 
+       rt                                                  ; RET               ;
 
 ********************************************************************************
 * Compass: position the compass dot

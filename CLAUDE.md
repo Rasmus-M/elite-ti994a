@@ -179,6 +179,9 @@ words. A single-byte access to
   as it is in the blueprint, reading the face's scale and normal at HL. The dot product is the same in either frame; a
   face that is almost edge on can come out differently (about 1 in 800 when compared with the old code). The cached
   vertices' fast return in `project_vertex` and `clear_flags` (the vertex and edge flags, in words) are TI too.
+- **Distances and the compass**: `vector_length` (an object's distance, #R$84A6) squares each component with `MPY` in
+  line, so its result is up to 2% bigger than the MSX's, which is slightly low; `compass_coordinate` (#R$8570) is native,
+  with the square root found by halving a logarithm, and can differ from the MSX's by a pixel. Both are leaf routines.
 - **The space view's x isn't scaled**: the MSX multiplies x by 3/4 (its table at $0300, not on the TI) when it turns a projected point
   into a screen column, for the shape of a PAL television's pixels; the TI takes pixels to be square, so that circles
   are round: column = x + 87, and the view is x from -87 to 88 (-116 to 117 on the MSX) in `outcode`,

@@ -8602,6 +8602,9 @@ set_up_laser:                                              ; >6d82
        inc  hl                                             ; INC HL            ; 
        inc  hl                                             ;                   ; skip the pad byte
        mov  *hl,hl                                         ; LD L,A            ; HL = the RLE pattern stream pointer (record bytes 4-5)
+       movb *hl+,r0                                        ;                   ; (TI: the columns of the two sprites come first)
+       movb *hl+,@r0lb                                     ;                   ;
+       .push r0                                            ;                   ;
 ;      limi 0                                              ; DI                ; 
        sb   a,a                                            ; LD A,$00          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
@@ -8612,27 +8615,20 @@ set_up_laser:                                              ; >6d82
        movb a,@vdpwa                                       ; OUT ($99),A       ; VRAM address low byte
        movb @bytes+sprite_attr_write_hi,a                  ; LD A,$5B          ; 
        movb a,@vdpwa                                       ; OUT ($99),A       ; ...high byte, write mode: $1B00 (sprite attribute table)
-       li   bc,>3870                                       ; LD BC,$3870       ; initial (row, column)
-       sb   d,d                                            ; LD D,$00          ; pattern/colour base
-       movb @bytes+>02,@l                                  ; LD L,$02          ; 2 columns
-_6db8:                                                     ; >6db8
-       .push bc                                            ; PUSH BC           ; 
-       movb @bytes+>02,h                                   ; LD H,$02          ; 2 rows
-_6dbb:                                                     ; >6dbb
-       bl   @set_sprite                                    ; CALL $39A4        ; write this quadrant's sprite-attribute entry
-       movb b,a                                            ; LD A,B            ; 
-       ab   @bytes+>10,a                                   ; ADD A,$10         ; next row, 16 pixels down
-       movb a,b                                            ; LD B,A            ; 
-       sb   one,h                                          ; DEC H             ; 
-       jne  _6dbb                                          ; JR NZ,$6DBB       ; next row
-       .pop bc                                             ; POP BC            ; 
-       movb @c,a                                           ; LD A,C            ; 
-       ab   @bytes+>10,a                                   ; ADD A,$10         ; next column, 16 pixels across
-       movb a,@c                                           ; LD C,A            ; 
-       sb   one,@l                                         ; DEC L             ; 
-       jne  _6db8                                          ; JR NZ,$6DB8       ; next column
+* TI: two sprites, one above the other (see #R$6DEB), and sprites 2 and 3 hidden.
+       .pop r0                                             ;                   ;
+       li   bc,>3870                                       ; LD BC,$3870       ; the crosshair's row and column
+       ab   r0,@c                                          ;                   ; + the upper sprite's column
+       sb   d,d                                            ; LD D,$00          ; pattern 0
+       bl   @set_sprite                                    ; CALL $39A4        ; the upper sprite
+       li   bc,>4870                                       ;                   ; 16 pixels down
+       ab   @r0lb,@c                                       ;                   ; + the lower sprite's column
+       bl   @set_sprite                                    ; CALL $39A4        ; the lower sprite (pattern 4)
+       movb @bytes+>df,b                                   ;                   ; out of sight
+       bl   @set_sprite                                    ;                   ;
+       bl   @set_sprite                                    ;                   ;
        ; EI                                                ; EI                ;
-       .endproc                                            ; RET               ; 
+       .endproc                                            ; RET               ;
 
 ********************************************************************************
 * Refuse a flight command while docked
@@ -8667,50 +8663,45 @@ gauge_bar_patterns:                                        ; >6de3
 * Crosshair patterns
 * 
 * The crosshair sprite patterns for the four laser types (#R$6EB3), which
-* #R$6D82 uploads to sprite patterns 0-15 at $3800 and shows as four 16x16
-* sprites making up a 32x32 crosshair. Each is a run-length encoded stream
-* (#R$39B9) of (count, value) pairs, ending with 0, that expands to the 128
-* bytes of the four sprite patterns: pulse laser at #R$6DEB, mining laser
-* at #R$6E1A, beam laser at #R$6E47 and military laser at #R$6E80.
+* #R$6D82 uploads to the sprite patterns at $3800.
 * .
-* The beam laser's stream expands to only 127 bytes, so the last byte of
-* sprite pattern 15 keeps whatever the previous crosshair left there. The
-* other three streams all end with a run of zeros, so it's 0.
+* TI: generated by tools/crosshairs.py, where the crosshairs are drawn. A
+* crosshair is two 16x16 sprites here, one for its upper 16 lines and one for
+* its lower 16, rather than four in a square as on the MSX, so that it only
+* takes one of the four sprites the VDP shows on a line (a sprite counts on
+* all 16 of its lines) and leaves three for the ships (#R$4A86). For each: the
+* column of the upper sprite and of the lower one in the 32x32 crosshair, then
+* a run-length encoded stream (#R$39B9) of (count, value) pairs, ending with
+* 0, that expands to the 64 bytes of sprite patterns 0-3 and 4-7.
        .msxalign >6deb
 crosshair_patterns:                                        ; >6deb
-       byte >0F,>00,>01,>3F,>02,>00,>07,>01                          ; pulse laser: a cross with a gap in the middle
-       byte >06,>00,>01,>80,>01,>3F,>0F,>00
-       byte >01,>80,>06,>00,>07,>01,>04,>00
-       byte >07,>80,>06,>00,>01,>01,>0F,>00
-       byte >01,>FC,>01,>01,>06,>00,>07,>80
-       byte >02,>00,>01,>FC,>0F,>00
-       byte >00                                                      ; end
+       byte >02,>0F                                                  ; pulse laser: a cross with a gap in the middle: the two sprites' columns
+       byte >0E,>00,>02,>FE,>02,>00,>07,>06
+       byte >0E,>00,>07,>C0,>02,>00,>02,>FE
+       byte >0E,>00,>00
 crosshair_mining:                                          ; >6e1a
-       byte >05,>00,>01,>0F,>05,>0C,>05,>00                          ; mining laser: a box, open at the sides
-       byte >05,>00,>01,>FF,>0F,>00,>05,>0C
-       byte >01,>0F,>0F,>00,>01,>FF,>0A,>00
-       byte >01,>FF,>0F,>00,>01,>F0,>05,>30
-       byte >0F,>00,>01,>FF,>0A,>00,>05,>30
-       byte >01,>F0,>05,>00
-       byte >00                                                      ; end
+       byte >08,>08                                                  ; mining laser: a box, open at the sides: the two sprites' columns
+       byte >05,>00,>01,>FF,>05,>C0,>0A,>00
+       byte >01,>FF,>05,>03,>0A,>00,>05,>C0
+       byte >01,>FF,>0A,>00,>05,>03,>01,>FF
+       byte >05,>00,>00
 crosshair_beam:                                            ; >6e47
-       byte >01,>00,>01,>60,>01,>30,>01,>18                          ; beam laser: an X with a gap in the middle (127 bytes)
-       byte >01,>0C,>01,>06,>01,>03,>22,>00
+       byte >08,>08                                                  ; beam laser: an X with a gap in the middle: the two sprites' columns
+       byte >01,>00,>01,>C0,>01,>60,>01,>30
+       byte >01,>18,>01,>0C,>01,>06,>0A,>00
        byte >01,>03,>01,>06,>01,>0C,>01,>18
-       byte >01,>30,>01,>60,>22,>00,>01,>06
+       byte >01,>30,>01,>60,>12,>00,>01,>06
        byte >01,>0C,>01,>18,>01,>30,>01,>60
-       byte >01,>C0,>22,>00,>01,>C0,>01,>60
-       byte >01,>30,>01,>18,>01,>0C,>01,>06
-       byte >00                                                      ; end
+       byte >01,>C0,>0A,>00,>01,>60,>01,>30
+       byte >01,>18,>01,>0C,>01,>06,>01,>03
+       byte >01,>00,>00
 crosshair_military:                                        ; >6e80
-       byte >07,>00,>01,>0F,>03,>0C,>09,>00                          ; military laser: a box with a tick above and below
-       byte >03,>01,>01,>FF,>0D,>00,>03,>0C
-       byte >01,>0F,>0F,>00,>01,>FF,>03,>01
-       byte >08,>00,>03,>80,>01,>FF,>0F,>00
-       byte >01,>F0,>03,>30,>0D,>00,>01,>FF
-       byte >03,>80,>09,>00,>03,>30,>01,>F0
-       byte >07,>00
-       byte >00                                                      ; end
+       byte >08,>08                                                  ; military laser: a box with a tick above and below: the two sprites' columns
+       byte >04,>00,>03,>01,>01,>FF,>03,>C0
+       byte >09,>00,>03,>80,>01,>FF,>03,>03
+       byte >0A,>00,>03,>C0,>01,>FF,>03,>01
+       byte >09,>00,>03,>03,>01,>FF,>03,>80
+       byte >04,>00,>00
 
 ********************************************************************************
 * Laser types

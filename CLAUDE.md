@@ -180,6 +180,10 @@ words. A single-byte access to
   radius 3 at the most. The MSX's limit is 4; here `enter_flight_mode` sets it to `small_ship_radius` (`equates.a99`: 6),
   as drawing a small ship in full costs as much as a big one, and `title_screen` to `title_ship_radius` (2), where the
   ships and letters fly in from afar.
+- **The crosshair** is two 16x16 sprites (0 and 1), one for its upper 16 lines and one for its lower 16, not four in a
+  square as on the MSX: a sprite counts towards the VDP's four on a line for all 16 of its lines, so this leaves three
+  for other sprites on the crosshair's lines. The four designs are drawn in `tools/crosshairs.py`, which generates
+  `crosshair_patterns` (`python tools/crosshairs.py [preview.png]`): each half must fit in 16 columns.
 - **The stardust table** (`startup_code_stardust_table`) has 12 bytes a particle on the TI, not 11: X, Y and the two
   velocities are big-endian words at +0, +2, +4 and +6 (the pixel is the high byte, at the even offset), +8 to +10 are
   as on the MSX, and +11 is unused. So in the stardust routines `(IX+$01)` is `*ix`, `(IX+$00)` is `@>01(ix)`, and so on.

@@ -29,6 +29,21 @@ ti_setup_environment_1:
        movb *r1+,@vdpwd
        dec  r2
        jne  ti_setup_environment_1
+       li   r0,>19e0                   ; The small ships' sprite patterns (ship_sprite), also in ROM bank 6:
+       bl   @vwad                      ; the first 13 are sprite patterns 60 on
+       li   r1,ship_sprite_patterns
+       li   r2,ship_sprite_patterns_2-ship_sprite_patterns
+ti_setup_environment_2:
+       movb *r1+,@vdpwd
+       dec  r2
+       jne  ti_setup_environment_2
+       li   r0,>1e80                   ; and the rest are 208 on
+       bl   @vwad
+       li   r2,ship_sprite_patterns_end-ship_sprite_patterns_2
+ti_setup_environment_3:
+       movb *r1+,@vdpwd
+       dec  r2
+       jne  ti_setup_environment_3
        .endproc
 *// ti_setup_environment
 
@@ -263,6 +278,7 @@ vsbw:
 view_mark_all:
        clr  @star_count                ; and no particles of the stardust
        clr  @star_prev_count
+       clr  @ship_sprite_count         ; and no small ships
        li   r1,30
 view_mark_all_1:
        mov  @view_cells_from,@view_cells(r1); all 11 cells

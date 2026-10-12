@@ -2860,6 +2860,20 @@ copy_space_view_6:
        mov  r1,r1                                          ;                   ;
        jne  copy_space_view_6                              ;                   ;
 copy_space_view_7:
+       li   r0,sprite_attr_table+36+>4000                  ;                   ; (TI: and the small ships' sprites, 9 on: see ship_sprite)
+       swpb r0                                             ;                   ;
+       movb r0,@vdpwa                                      ;                   ;
+       swpb r0                                             ;                   ;
+       movb r0,@vdpwa                                      ;                   ;
+       mov  @ship_sprite_count,r1                          ;                   ;
+       jeq  copy_space_view_9                              ;                   ;
+       li   r0,ship_sprite_list                            ;                   ;
+copy_space_view_8:
+       movb *r0+,*r2                                       ;                   ;
+       dec  r1                                             ;                   ;
+       jne  copy_space_view_8                              ;                   ;
+copy_space_view_9:
+       movb @bytes+>d0,*r2                                 ;                   ; y = >D0 ends the sprites: none after them
        sb   @vram_busy_flag,@vram_busy_flag                ; LD ($EF9E),A      ; done writing to VRAM
        .endproc                                            ; RET               ; 
 
@@ -2923,6 +2937,7 @@ clear_space_view_7:
        jne  clear_space_view_7                             ;                   ;
        clr  @star_count                                    ;                   ;
 clear_space_view_8:
+       clr  @ship_sprite_count                             ;                   ; (TI: and no small ships' sprites)
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
        .endproc                                            ; RET               ; 
 * TI: the stardust's particles in the buffer (#R$68CD): for each, the address
@@ -2936,6 +2951,11 @@ star_count:
        data 0                                              ;                   ;
 star_list:
        bss  15*4                                           ;                   ;
+* TI: the small ships' sprites (ship_sprite): the sprite attributes of each
+ship_sprite_count:                                         ; 4 * the number of sprites
+       data 0                                              ;                   ;
+ship_sprite_list:
+       bss  ship_sprite_max*4                              ;                   ;
 
 ********************************************************************************
 * Decompress a full-screen picture (pattern + colour data) to VRAM
@@ -3306,6 +3326,9 @@ _3a2a:                                                     ; >3a2a
 * I:A Colour
 colour_space_view:                                         ; >3a4d
        .proc
+       movb a,r0                                           ;                   ; (TI: the small ships' sprites get the colour of the lines)
+       srl  r0,4                                           ;                   ;
+       movb r0,@view_sprite_colour                         ;                   ;
        li   hl,>2128                                       ; LD HL,$2128       ; HL = $2128: the colour table at row 1, column 5
        movb a,@e                                           ; LD E,A            ; 
        movb a,r1                                           ;                   ; R1 = the colour (A is needed for the address)
@@ -4608,7 +4631,7 @@ _427c:                                                     ; >427c
        bl   @on_screen                                     ; CALL $4A99        ; is it on screen?
        socb a,a                                            ; OR A              ; 
        jne  !                                              ; RET Z             ; no
-       jmp  draw_object_exit                               ;                   ; 
+       .endproc                                            ;                   ;
 !
        movb @object_status_byte,a                          ; LD A,($F7CD)      ; A = the object status byte
        andi a,>0800                                        ; AND $08           ; 
@@ -4619,7 +4642,11 @@ _427c:                                                     ; >427c
        c    hl,@small_ship_limit                           ; LD DE,$FFFC / ADD HL,DE; its radius on screen: under 4 on the MSX (TI: under small_ship_limit: 6 in
        jhe  draw_ship_1                                    ; JP NC,$4A86       ; flight, as a ship that small costs as much to draw as a big one and is only
        ;                                                   ;                   ; a blob, and 2 on the title screen, where the ship flies in from afar)
-       ci   hl,4                                           ;                   ; too small - draw it as a disc
+       ci   hl,2                                           ;                   ; too small - draw it as a disc
+       jl   !                                              ;                   ; (TI: of radius 1: a dot)
+       bl   @ship_sprite                                   ;                   ; (TI: of radius 2 to 5 - show it as a sprite; that returns only if it
+       ;                                                   ;                   ; can't: then draw the disc)
+       ci   hl,4                                           ;                   ;
        jl   !                                              ;                   ;
        li   hl,3                                           ;                   ; (TI: of radius 3 at the most, as on the MSX)
 !
@@ -5866,6 +5893,75 @@ vertex_relative_record:                                    ; >4a6a
        .retnc                                              ;                   
 !
        .retc                                               ; RET               ; and return with carry set
+
+********************************************************************************
+* TI: show a small ship as a sprite
+*
+* Used by the routine at #R$4255, for a ship of radius 2 to 5 on screen: adds
+* a sprite to the list that copy_space_view sends to the VDP (sprites 9 on).
+* The sprite isn't the ship's own shape but a pentagon that tumbles (8
+* frames, in 3 sizes: ship_sprite_numbers), so that it is seen as a ship and
+* not as a star; only the space station at radius 4 or 5 has its own. Then it
+* returns from draw_object. It returns to its caller instead, which then draws
+* a disc, if the list is full or the sprite would stick out of the space view
+* (sprites aren't clipped).
+*
+* I: HL = the radius; IX,IY = the ship's centre on screen (x: -87 to 88, y: 64 to -63)
+* I: IX,IY = the ship's centre on screen (x: -87 to 88, y: 64 to -63)
+* O: R0-R2 changed
+ship_sprite:
+       movb @ship_type,r1                                  ;                   ; R1 = the ship type
+       srl  r1,8                                           ;                   ;
+       ci   r1,32                                          ;                   ; a ship?
+       jhe  ship_sprite_1                                  ;                   ; no - the sun
+       mov  hl,r2                                          ;                   ; R2 = the size: 0 for radius 2, 1 for 3 and 2 for 4 or 5
+       dect r2                                             ;                   ;
+       ci   r2,2                                           ;                   ;
+       jl   ship_sprite_2                                  ;                   ;
+       li   r2,2                                           ;                   ;
+       ci   r1,>0001                                       ;                   ; the space station at radius 4 or 5?
+       jne  ship_sprite_2                                  ;                   ;
+       li   r2,24                                          ;                   ; yes: it has a pattern of its own, after the 3 * 8
+       jmp  ship_sprite_3                                  ;                   ;
+ship_sprite_2:
+       sla  r2,3                                           ;                   ; 8 frames a size: the frame goes on by one each time
+       movb @main_loop_tick_counter+1,r0                   ;                   ; round the main loop, and each object is 3 ahead of
+       ab   @current_slot,r0                               ;                   ; the one before it, so that they don't turn in step
+       ab   @current_slot,r0                               ;                   ;
+       ab   @current_slot,r0                               ;                   ;
+       andi r0,>0700                                       ;                   ;
+       swpb r0                                             ;                   ;
+       a    r0,r2                                          ;                   ;
+ship_sprite_3:
+       movb @ship_sprite_numbers(r2),r2                    ;                   ; R2 = the sprite pattern
+       mov  @ship_sprite_count,r1                          ;                   ; R1 = 4 * the number of sprites in the list
+       ci   r1,ship_sprite_max*4                           ;                   ;
+       jhe  ship_sprite_1                                  ;                   ; the list is full
+       mov  ix,r0                                          ;                   ; R0 = the column in the view (x + 87) - 6
+       ai   r0,87-6                                        ;                   ;
+       ci   r0,169-6                                       ;                   ; in 6-169, so that all of the widest sprite (the space station's 12 pixels) is in the view?
+       jh   ship_sprite_1                                  ;                   ; no
+       ai   r0,6+40-8                                      ;                   ; the sprite's x: the view is at 40, and the ship
+       swpb r0                                             ;                   ; is in the middle of the pattern
+       movb r0,@ship_sprite_list+1(r1)                     ;                   ;
+       li   r0,64-5                                        ;                   ; R0 = the row in the view (64 - y) - 5
+       s    iy,r0                                          ;                   ;
+       ci   r0,122-5                                       ;                   ; in 5-122?
+       jh   ship_sprite_1                                  ;                   ; no
+       ai   r0,5+8-8-1                                     ;                   ; the sprite's y: the view is at 8, and a sprite is
+       swpb r0                                             ;                   ; shown one line below its y
+       movb r0,@ship_sprite_list(r1)                       ;                   ;
+       movb r2,@ship_sprite_list+2(r1)                     ;                   ;
+       movb @view_sprite_colour,@ship_sprite_list+3(r1)    ;                   ; the colour of the view's lines
+       ai   r1,4                                           ;                   ;
+       mov  r1,@ship_sprite_count                          ;                   ;
+       b    @draw_object_exit                              ;                   ; the ship is drawn
+ship_sprite_1:
+       rt                                                  ;                   ;
+       copy "ship-sprite-table.a99"                        ; ship_sprite_numbers: the sprite patterns
+view_sprite_colour:                                        ; The colour of the small ships' sprites (colour_space_view)
+       byte >0a
+       even
 
 ********************************************************************************
 * Draw a ship: too small or far away
@@ -8936,6 +9032,7 @@ blank_screen_decompress_picture_recolour:                  ; >7139
        mov  @cockpit_picture_addr,hl                       ; LD HL,($F740)     ; HL -> the cockpit picture (#R$F740)
        bl   @decompress_picture                            ; CALL $390E        ; decompress it (#R$390E)
        .restore_bank                                       ;                   ; 
+       movb @bytes+>0a,@view_sprite_colour                 ;                   ; (TI: the picture colours the view $A1: the small ships' sprites too)
        movb @in_witchspace,a                               ; LD A,($EEC1) / OR A; in witchspace?
        jeq  _7157                                          ; JR Z,$7157        ; no
        movb @bytes+>51,a                                   ; LD A,$51          ; yes: colour the space view $51

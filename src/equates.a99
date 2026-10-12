@@ -170,3 +170,6 @@ small_ship_radius:
        equ  6
 title_ship_radius:
        equ  2
+* The most small ships shown as sprites at a time (ship_sprite)
+ship_sprite_max:
+       equ  8

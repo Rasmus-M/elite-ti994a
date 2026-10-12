@@ -127,7 +127,7 @@ words. A single-byte access to
   with `far_call_r0_r1`). Add a screen's key there when it's converted.
 - **ROM banks** (`src/rom-banks/`): every data bank starts with the math tables (`math-tables.a99`) at `>6040`,
   so they're readable whichever bank is selected. Bank 4 then holds the blueprints for ship types 1-22, bank 5
-  types 23+ (`blueprints_2_first_type`), bank 6 the cockpit picture, the font and the title music. Select a bank with
+  types 23+ (`blueprints_2_first_type`), bank 6 the cockpit picture, the font, the title music and the small ships' sprite patterns. Select a bank with
   `.select_bank ..._bank_select` (`equates.a99`; it changes R0) before reading its data - never a plain `seto`, as
   the music player selects the bank in `current_bank` again after each tick; `draw_object` and `get_blueprint_data` select
   the blueprint bank themselves (`select_blueprint_bank`). RAM routines that select a bank select the caller's bank
@@ -179,7 +179,21 @@ words. A single-byte access to
 - **Small ships**: a ship whose radius on screen is under `small_ship_limit` is drawn as a disc (`draw_small`), of
   radius 3 at the most. The MSX's limit is 4; here `enter_flight_mode` sets it to `small_ship_radius` (`equates.a99`: 6),
   as drawing a small ship in full costs as much as a big one, and `title_screen` to `title_ship_radius` (2), where the
-  ships and letters fly in from afar.
+  ships and letters fly in from afar. In between, at radius 2 to 5, a ship is shown as a **sprite**
+  (`ship_sprite`): not its own shape but a pentagon that tumbles, so that it is seen as a wireframe ship and not as a
+  star - 8 frames in each of 3 sizes (5, 7 and 9 pixels, for radius 2, 3, and 4 or 5); the frame is the main loop's
+  counter + 3 * the object's slot, so the ships don't turn in step. Only the space station at radius 4 or 5 has a
+  pattern of its own; and at radius 1 a ship is still a disc, a dot. `tools/ship-sprites.py` draws the frames
+  by turning the pentagon in 3D (`python tools/ship-sprites.py [preview.png]` writes `src/ship-sprites.a99`, in ROM
+  bank 6, and `src/ship-sprite-table.a99`: `ship_sprite_numbers`, the pattern of each size's frames and the
+  station's), and `ti_setup_environment` uploads them to sprite patterns 60-108 and 208-252: there is no room for more.
+  `ship_sprite` adds the sprite to
+  `ship_sprite_list` (`ship_sprite_max`: 8) and `copy_space_view` writes the list to sprites 9 on, followed by y = >D0,
+  which ends the VDP's sprite list - so sprites after those can't be used in the space view. `clear_space_view` and
+  `view_mark_all` empty the list. A sprite isn't clipped, so a ship within 5 or 6 pixels of the view's edge stays a disc, as
+  does one when the list is full. The sprites have the colour of the view's lines
+  (`view_sprite_colour`, set by `colour_space_view` and when the cockpit picture is drawn). Only four sprites show on
+  a scan line, and the crosshair is one of them.
 - **The crosshair** is two 16x16 sprites (0 and 1), one for its upper 16 lines and one for its lower 16, not four in a
   square as on the MSX: a sprite counts towards the VDP's four on a line for all 16 of its lines, so this leaves three
   for other sprites on the crosshair's lines. The four designs are drawn in `tools/crosshairs.py`, which generates
@@ -224,4 +238,4 @@ entry point, `ti-routines.a99` TI-specific hardware routines prefixed `ti_`, `ti
 the name table (>3800) and the sprite attribute table (>3B00), which are easy to set up again, are there, and the sprite
 patterns are at >1800. Use `sprite_attr_table`, `@bytes+sprite_attr_write_hi` and `@bytes+sprite_pattern_write_hi` where
 the MSX code has $1B00, $5B and $78; the MSX addresses in the comments are the MSX's. Sprite patterns 0-31 are used, and
-the font for the view messages is at >1B80->1E7F, so >1900->1B7F and >1E80->1FFF are free).
+the font for the view messages is at >1B80->1E7F, and the small ships' sprite patterns at >19E0->1B7F and >1E80->1FFF, so none are free; the disk routines' PAB and buffer are at >1900->19CA).

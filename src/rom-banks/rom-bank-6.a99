@@ -1,4 +1,4 @@
-* ROM bank 6: the math tables, the cockpit picture, the font and the title music
+* ROM bank 6: the math tables, the cockpit picture, the font, the title music and the small ships' sprite patterns
 * Copied into elite.a99 with main_program defined, only for its labels
        .ifdef main_program
        dorg >6000
@@ -14,6 +14,7 @@
        copy "../cockpit-picture.a99"
        copy "../font.a99"
        copy "../title-music.a99"
+       copy "../ship-sprites.a99"
 rom_bank_6_end:
        equ  $
        bss  >8000-$

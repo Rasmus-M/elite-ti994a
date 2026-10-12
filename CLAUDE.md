@@ -176,6 +176,10 @@ words. A single-byte access to
   (`title_letters_orientation`). On the charts (bank 9) the circles are round too: the local chart magnifies x by 4 like y (3 on the MSX), so its
   fuel range is a true circle, and the circle point lists (`circle_points`) are true circles. The galactic chart keeps
   the MSX's vertical stretch, so its round range circle is right across but short up and down.
+- **Small ships**: a ship whose radius on screen is under `small_ship_limit` is drawn as a disc (`draw_small`), of
+  radius 3 at the most. The MSX's limit is 4; here `enter_flight_mode` sets it to `small_ship_radius` (`equates.a99`: 6),
+  as drawing a small ship in full costs as much as a big one, and `title_screen` to `title_ship_radius` (2), where the
+  ships and letters fly in from afar.
 - **The stardust table** (`startup_code_stardust_table`) has 12 bytes a particle on the TI, not 11: X, Y and the two
   velocities are big-endian words at +0, +2, +4 and +6 (the pixel is the high byte, at the even offset), +8 to +10 are
   as on the MSX, and +11 is unused. So in the stardust routines `(IX+$01)` is `*ix`, `(IX+$00)` is `@>01(ix)`, and so on.

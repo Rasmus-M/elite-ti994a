@@ -62,6 +62,8 @@ title_screen:                                              ; >1c5c
        sb   one,a                                          ; DEC A             ;
        movb a,@e940_gate_flag                              ; LD ($E940),A      ; $E940 = $FF
        bl   @switch_to_front_view                          ; CALL $64A1        ; switch to the front view (drawing the cockpit screen)
+       li   r0,title_ship_radius                           ;                   ; (TI: on the title screen ships are drawn in full from further away, #R$4255;
+       mov  r0,@small_ship_limit                           ;                   ; after #R$64A1, which sets the limit for flight)
        movb @b255,a                                        ; LD A,$FF          ;
        movb a,@space_view_showing                          ; LD ($E903),A      ; space view showing...
        movb a,@docked                                      ; LD ($E90A),A      ; ...and docked

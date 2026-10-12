@@ -4616,11 +4616,15 @@ _427c:                                                     ; >427c
        b    @draw_small                                    ;                   
 !
        mov  @screen_radius,hl                              ; LD HL,($EB9E)     ; clear: HL = the cached value at $EB9E
-       li   de,>fffc                                       ; LD DE,$FFFC       ; DE = -4
-       a    de,hl                                          ; ADD HL,DE         ; HL -= 4 (carry reflects whether HL was >= 4)
-       joc  !                                              ; JP NC,$4A86       ; too far away - draw it small
-       b    @draw_small                                    ;                   
+       c    hl,@small_ship_limit                           ; LD DE,$FFFC / ADD HL,DE; its radius on screen: under 4 on the MSX (TI: under small_ship_limit: 6 in
+       jhe  draw_ship_1                                    ; JP NC,$4A86       ; flight, as a ship that small costs as much to draw as a big one and is only
+       ;                                                   ;                   ; a blob, and 2 on the title screen, where the ship flies in from afar)
+       ci   hl,4                                           ;                   ; too small - draw it as a disc
+       jl   !                                              ;                   ;
+       li   hl,3                                           ;                   ; (TI: of radius 3 at the most, as on the MSX)
 !
+       b    @draw_small_1                                  ;                   ;
+draw_ship_1:
        movb @ship_type,a                                   ; LD A,($F7E7)      ; else A = the current ship type
 _42bc:                                                     ; >42bc
        bl   @work_out_roof                                 ; CALL $4599        ; work out the third orientation vector
@@ -4893,6 +4897,8 @@ goatsoup_seed_word2:                                       ; >ead9
        data >0000
 scanner_background_space:                                  ; >eb03
        data >0000
+small_ship_limit:                                          ; The radius on screen below which a ship is drawn as a disc (#R$4255)
+       data small_ship_radius                              ;                   ;
 word_variables_end:
        equ  $
 * This entry point is used by the routines at #R$422E and #R$43C2.
@@ -5871,6 +5877,7 @@ vertex_relative_record:                                    ; >4a6a
 * or a distant ship - as a filled disc (#R$3DF4).
 draw_small:                                                ; >4a86
        mov  @screen_radius,hl                              ; LD HL,($EB9E)     ; HL = the cached range value (see #R$4735/#R$4738)
+draw_small_1:
        movb @ship_type,a                                   ; LD A,($F7E7)      ; A = the current ship type
        cb   a,@bytes+>64                                   ; CP $64            ; is it mode $64?
        jeq  !                                              ; JP NZ,$3DF4       ; no - dispatch to #R$3DF4
@@ -6675,6 +6682,8 @@ _63e0_no_borrow:
 * flight" counterpart.
 enter_flight_mode:                                         ; >63f1
        .proc
+       li   r0,small_ship_radius                           ;                   ; (TI: small ships are discs in flight, #R$4255)
+       mov  r0,@small_ship_limit                           ;                   ;
        bl   @view_mark_all                                 ;                   ; (TI: the whole space view has to be cleared and copied)
        sb   a,a                                            ; XOR A             ; 
        movb a,@chart_cursor_active_flag                    ; LD ($E70B),A      ; 

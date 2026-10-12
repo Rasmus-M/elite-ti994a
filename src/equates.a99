@@ -163,3 +163,10 @@ code_bank_13_select:                   ; Code (rom-bank-13.a99)
        equ  >601a
 code_bank_14_select:                   ; Code (rom-bank-14.a99)
        equ  >601c
+
+* The radius on screen below which a ship is drawn as a disc rather than in
+* full (#R$4255), in flight and on the title screen: 4 on the MSX
+small_ship_radius:
+       equ  6
+title_ship_radius:
+       equ  2

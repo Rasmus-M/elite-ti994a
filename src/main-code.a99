@@ -3837,165 +3837,111 @@ plot_pixel_mask:                                           ; >3d06
 * I:IX Centre x
 * I:IY Centre y
 draw_circle:                                               ; >3d0e
-       .proc
+* TI: a native version. Each (cos, sin) is scaled by the radius with one MPY
+* (the radius * the table's byte / 128) where the MSX multiplies an 8-bit
+* mantissa and shifts (#R$3D76), so the points can differ by a pixel; and the
+* four quadrants' previous points are kept as words in circle_slots (#R$3D8C).
+* IX and IY are not changed.
+       .proc                                               ;                   ;
 draw_circle_jmp:
-       movb h,a                                            ; LD A,H / OR A     ; A = the magnitude's high byte
-       jeq  _3d1d                                          ; JR Z,$3D1D        ; yes - shift count stays 0, skip the normalizing loop
-       sb   @c,@c                                          ; LD C,$00          ; C = shift count so far
-draw_circle_shift:                                         ; >3d14
-       ab   one,@c                                         ; INC C             ; count this shift
-       movb a,r0                                           ; RRA               ; shift A (the magnitude's high byte)...
-       movb @l,@r0lb                                       ; RR L              ; ...and L along with it
-       srl  r0,1                                           ;                   ; 
-       movb @r0lb,@l                                       ;                   ; 
-       movb r0,a                                           ; OR A              ; does the high byte still not fit in L alone?
-       jne  draw_circle_shift                              ; JP NZ,$3D14       ; keep shifting until it does
-!
-       movb @c,a                                           ; LD A,C            ; A = the final shift count
-_3d1d:                                                     ; >3d1d
-       movb a,@depth_shift                                 ; LD ($EB9B),A      ; cache the shift count
-       movb @l,a                                           ; LD A,L            ; A = the reduced mantissa (magnitude >> shift count)
-       movb a,@shared_normalize_mantissa                   ; LD ($EB9C),A      ; cache the mantissa for #R$3D76 to multiply against
-       movb a,@circle_first_step                           ; LD ($E80C),A      ; also seed the "first vertex" flag with it (nonzero unless the whole magnitude was 0)
-       mov  ix,@circle_centre_x                            ; LD ($E81F),IX     ; cache the caller's centre X
-       mov  iy,@circle_centre_y                            ; LD ($E821),IY     ; cache the caller's centre Y
-       li   hl,trig_table_coarse                           ; LD HL,$1311       ; HL -> #R$1311's coarse trig table
+       mov  hl,@circle_radius                              ;                   ;
+       seto @circle_first                                  ;                   ; the first step has no point before it
+       li   hl,trig_table_coarse                           ; LD HL,$1311       ; HL -> the cos/sin table
 _3d32:                                                     ; >3d32
-       .push bc                                            ; PUSH BC           ; save the outer step counter (B) and its partner C
-       .push de                                            ; PUSH DE           ; save the caller's per-step pointer stride (DE) too
-       movb *hl,@c                                         ; LD C,(HL)         ; C = this step's cos byte
-       inc  hl                                             ; INC HL            ; 
-       movb *hl,@e                                         ; LD E,(HL)         ; E = this step's sin byte
-       inc  hl                                             ; INC HL            ; HL now points past this step's record
-       .push hl                                            ; PUSH HL           ; save the table pointer
-       bl   @scale_by_trig_byte                            ; CALL $3D76        ; HL = the scaled sin offset (E was the sin byte)
-       .push hl                                            ; PUSH HL           ; save it
-       movb @c,@e                                          ; LD E,C            ; E = the cos byte this time
-       bl   @scale_by_trig_byte                            ; CALL $3D76        ; HL = the scaled cos offset
-       .ex_de_hl                                           ; EX DE,HL          ; DE = the scaled cos offset
-       .pop bc                                             ; POP BC            ; BC = the scaled sin offset (popped back in LIFO order)
-       movb @circle_first_step,a                           ; LD A,($E80C) / OR A; is this the very first step (flag still nonzero)?
-       jeq  plot_one_table_steps_vertex_all                ; JR Z,$3D4E        ; no - the 4 slots already hold the previous step's points
-       li   hl,circle_saved_sp                             ; LD HL,$E81D       ; yes - nothing to connect to yet; target the (still-empty) slots directly
-       jmp  _3d51                                          ; JR $3D51          ; 
-plot_one_table_steps_vertex_all:                           ; >3d4e
-       li   hl,circle_previous_points_top                  ; LD HL,$E819       ; entry for step 2 onward - the 4 slots here already hold step 1's vertices
-_3d51:                                                     ; >3d51
-       .push de                                            ; PUSH DE           ; save the scaled cos offset (about to be negated)
-       bl   @draw_circle_point                             ; CALL $3D8C        ; plot quadrant 1: (DE,BC)
-       neg  de                                             ; SUB E             ; DE = -DE
-       bl   @draw_circle_point                             ; CALL $3D8C        ; plot quadrant 2: (-DE,BC)
-       neg  bc                                             ; SUB C             ; BC = -BC
-       bl   @draw_circle_point                             ; CALL $3D8C        ; plot quadrant 3: (-DE,-BC)
-       .pop de                                             ; POP DE            ; DE = the original (positive) cos offset again
-       bl   @draw_circle_point                             ; CALL $3D8C        ; plot quadrant 4: (DE,-BC)
-       sb   a,a                                            ; XOR A             ; 
-       movb a,@circle_first_step                           ; LD ($E80C),A      ; clear the "first vertex" flag - later steps connect edges
-       .pop hl                                             ; POP HL            ; HL = the table pointer #R$3D32 saved
-       .pop de                                             ; POP DE            ; DE = the caller's per-step stride, saved untouched
-       .pop bc                                             ; POP BC            ; BC = the outer step counter (B) and its old partner C
-       a    de,hl                                          ; ADD HL,DE         ; advance the table pointer by the stride, on top of the 2 bytes already consumed reading this step's record
-       sb   one,b                                          ; DJNZ $3D32        ; loop for the next step
-       jne  _3d32                                          ;                   
-       .endproc                                            ; RET               ; 
-
-********************************************************************************
-* Scale #R$3D0E's magnitude by one #R$1311 trig byte
-* 
-* Used by the routine at #R$3D0E.
-* .
-* Multiplies the mantissa #R$3D0E cached at $EB9C by the trig-table byte
-* in E (#R$1F60: HL = A*E), then shifts the 16-bit product right by (7
-* minus the shift count #R$3D0E cached at $EB9B) to restore the
-* original magnitude's scale - undoing #R$1311's $80=1.0 fixed-point
-* format and #R$3D0E's own mantissa-reducing shift in a single pass. A
-* shift count of exactly 7 needs no further shift at all (#R$1F60's
-* product is already correctly scaled) and returns immediately. A shift
-* count over 8 (magnitude >= $8000, since #R$3D0E's count is the
-* original high byte's bit length) makes A wrap negative here, so B
-* becomes a large positive value and the DJNZ loop shifts far past
-* zero - silently collapsing the result to 0 rather than clamping; not
-* confirmed whether #R$3D0E's callers ever reach that far.
-* 
-* I:E A trig-table byte (cos or sin, #R$1311's format)
-* O:HL The magnitude, scaled by E/$80
-scale_by_trig_byte:                                        ; >3d76
-       .proc
-       movb @shared_normalize_mantissa,a                   ; LD A,($EB9C)      ; A = the cached mantissa
-       bl   @multiply_a_e_16bit                            ; CALL $1F60        ; HL = mantissa * E (the trig byte)
-       movb @depth_shift,a                                 ; LD A,($EB9B)      ; A = the cached shift count
-       sb   @bytes+>07,a                                   ; SUB $07           ; 
-       andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
-       neg a                                               ; NEG               ; A = 7 - shift count
-       jeq  scale_by_trig_byte_exit                        ; RET Z             ; already correctly scaled - done
+       .push bc                                            ; PUSH BC           ; save the step counter
+       .push de                                            ; PUSH DE           ; and the bytes to skip
+       movb *hl+,r1                                        ; LD C,(HL) / INC HL; this step's cos
+       srl  r1,8                                           ;                   ;
+       mpy  @circle_radius,r1                              ; CALL $3D76        ; R1:R2 = the radius * it
+       ai   r2,64                                          ;                   ; (rounded)
+       jnc  !                                              ;                   ;
+       inc  r1                                             ;                   ;
 !
-       movb a,b                                            ; LD B,A            ; B = the remaining shift count
-_3d85:                                                     ; >3d85
-       srl  h,1                                            ; SRL H             ; shift HL right...
-       ; RR L                                              ; RR L              ; ...one bit at a time (done by the SRL H above, which shifts all of HL)
-       sb   one,b                                          ; DJNZ $3D85        ; 
-       jne  _3d85                                          ;                   
-scale_by_trig_byte_exit:
-       .endproc                                            ; RET               ; 
+       srl  r2,7                                           ;                   ;
+       sla  r1,9                                           ;                   ;
+       a    r1,r2                                          ;                   ; / 128
+       mov  r2,de                                          ;                   ; DE = the x offset
+       movb *hl+,r1                                        ; LD E,(HL) / INC HL; this step's sin
+       srl  r1,8                                           ;                   ;
+       mpy  @circle_radius,r1                              ; CALL $3D76        ;
+       ai   r2,64                                          ;                   ;
+       jnc  !                                              ;                   ;
+       inc  r1                                             ;                   ;
+!
+       srl  r2,7                                           ;                   ;
+       sla  r1,9                                           ;                   ;
+       a    r1,r2                                          ;                   ;
+       mov  r2,bc                                          ;                   ; BC = the y offset
+       .push hl                                            ; PUSH HL           ; save the table pointer
+       li   hl,circle_slots                                ; LD HL,$E819       ; HL -> the four quadrants' previous points
+       bl   @draw_circle_point                             ; CALL $3D8C        ; quadrant 1: (x, y)
+       neg  de                                             ; SUB E             ;
+       bl   @draw_circle_point                             ; CALL $3D8C        ; quadrant 2: (-x, y)
+       neg  bc                                             ; SUB C             ;
+       bl   @draw_circle_point                             ; CALL $3D8C        ; quadrant 3: (-x, -y)
+       neg  de                                             ; POP DE            ;
+       bl   @draw_circle_point                             ; CALL $3D8C        ; quadrant 4: (x, -y)
+       clr  @circle_first                                  ; XOR A / LD ($E80C),A; later steps draw lines
+       .pop hl                                             ; POP HL            ; HL = the table pointer
+       .pop de                                             ; POP DE            ; DE = the bytes to skip
+       .pop bc                                             ; POP BC            ; B = the step counter
+       a    de,hl                                          ; ADD HL,DE         ; on to the next step's (cos, sin)
+       sb   one,b                                          ; DJNZ $3D32        ; loop for the next step
+       jne  _3d32                                          ;                   ;
+       .endproc                                            ; RET               ;
+circle_radius:                                             ; The circle's radius
+       data 0                                              ;                   ;
+circle_first:                                              ; Nonzero on the first step
+       data 0                                              ;                   ;
+circle_slots:                                              ; The x and y of each quadrant's point from the step before
+       bss  16                                             ;                   ;
 
 ********************************************************************************
 * Draw a circle: a point
 * 
 * Used by the routine at #R$3D0E.
 * .
-* Adds the offset (DE, BC) to the centre ($E81F, $E821). On the first step
-* (($E80C) set) just stores the point in the 4-byte slot below HL;
-* otherwise (at $3DAC) draws the line (#R$3AC2) to it from the point stored
-* there - the same quadrant's point from the step before - and stores the
-* new one. Uses SP to read and write the slot.
+* Adds the offset (DE, BC) to the centre (IX, IY). On the first step just
+* stores the point in the quadrant's slot; otherwise draws the line
+* (#R$3AC2) to it from the point stored there - the same quadrant's point
+* from the step before - and stores the new one. (TI: native; the MSX points
+* SP at the slots, #R$E80D.)
 * 
 * I:BC y offset
 * I:DE x offset
 * I:HL The slot
 * O:HL The next slot
 draw_circle_point:                                         ; >3d8c
-* TI: the slots are read and written through HL, rather than by pointing SP at
-* them (the stack grows up on the TI); a slot holds X at +2 and Y at +0.
-       .proc                                               ;                   ; 
-       movb @circle_first_step,a                           ; LD A,($E80C)      ; still the first step (nothing in the slot to connect to yet)?
-       jeq  write_vertex_and_draw_edge                     ; OR A / JR Z,$3DAC ; no - read the slot and draw the line
-       mov  @circle_centre_x,r0                            ; LD HL,($E81F)     ; R0 = the centre X...
-       a    de,r0                                          ; ADD HL,DE         ; ...+ this step's cos-scaled offset
-       movb r0,@-2(hl)                                     ; PUSH HL           ; the vertex's X, 2 bytes below the cursor
-       movb @r0lb,@-1(hl)                                  ;                   ; 
-       mov  @circle_centre_y,r0                            ; LD HL,($E821)     ; R0 = the centre Y...
-       a    bc,r0                                          ; ADD HL,BC         ; ...+ this step's sin-scaled offset
-       movb r0,@-4(hl)                                     ; PUSH HL           ; the vertex's Y, 4 bytes below the cursor
-       movb @r0lb,@-3(hl)                                  ;                   ; 
-       ai   hl,-4                                          ; LD HL,$0000 / ADD HL,SP; HL = the new cursor (old cursor - 4)
-       jmp  draw_circle_point_exit                         ; RET               ; 
+       mov  @circle_first,r0                               ; LD A,($E80C)      ; the first step?
+       jeq  write_vertex_and_draw_edge                     ; OR A / JR Z,$3DAC ; no - draw the line
+       mov  ix,r0                                          ; LD HL,($E81F)     ; the centre x...
+       a    de,r0                                          ; ADD HL,DE         ; ...+ the x offset
+       mov  r0,*hl+                                        ; PUSH HL           ;
+       mov  iy,r0                                          ; LD HL,($E821)     ; the centre y...
+       a    bc,r0                                          ; ADD HL,BC         ; ...+ the y offset
+       mov  r0,*hl+                                        ; PUSH HL           ;
+       rt                                                  ; RET               ;
 write_vertex_and_draw_edge:                                ; >3dac
-       movb *hl,r0                                         ; POP HL            ; R0 = the slot's old Y (this quadrant's vertex from the last step)
-       movb @1(hl),@r0lb                                   ;                   ; 
-       mov  r0,@clip_point2_y                              ; LD ($EB98),HL     ; -> point 2's Y
-       movb @2(hl),r0                                      ; POP HL            ; R0 = the slot's old X
-       movb @3(hl),@r0lb                                   ;                   ; 
-       mov  r0,@clip_point2_x                              ; LD ($EB96),HL     ; -> point 2's X
-       mov  @circle_centre_x,r0                            ; LD HL,($E81F)     ; R0 = the centre X...
-       a    de,r0                                          ; ADD HL,DE         ; ...+ this step's cos-scaled offset
-       mov  r0,@clip_point1_x                              ; LD ($EB92),HL     ; -> point 1's X
-       movb r0,@2(hl)                                      ; PUSH HL           ; and the slot's, for the next step
-       movb @r0lb,@3(hl)                                   ;                   ; 
-       mov  @circle_centre_y,r0                            ; LD HL,($E821)     ; R0 = the centre Y...
-       a    bc,r0                                          ; ADD HL,BC         ; ...+ this step's sin-scaled offset
-       mov  r0,@clip_point1_y                              ; LD ($EB94),HL     ; -> point 1's Y
-       movb r0,*hl                                         ; PUSH HL           ; and the slot's, for the next step
-       movb @r0lb,@1(hl)                                   ;                   ; 
-       ai   hl,-4                                          ; LD HL,$FFFC / ADD HL,SP; HL = the new cursor (old cursor - 4)
-       .push bc                                            ; PUSH BC           ; 
-       .push de                                            ; PUSH DE           ; 
-       .push hl                                            ; PUSH HL           ; save the registers across the line-draw call
-       bl   @clip_and_draw_line                            ; CALL $3AC2        ; clip and draw the edge from point 1 to point 2
-       .pop hl                                             ; POP HL            ; 
-       .pop de                                             ; POP DE            ; 
-       .pop bc                                             ; POP BC            ; 
-draw_circle_point_exit:
-       .endproc                                            ; RET               ; 
+       mov  *hl,@clip_point2_x                             ; POP HL / LD ($EB96),HL; point 2 = this quadrant's point from the step before
+       mov  @2(hl),@clip_point2_y                          ; POP HL / LD ($EB98),HL;
+       mov  ix,r0                                          ; LD HL,($E81F)     ;
+       a    de,r0                                          ; ADD HL,DE         ;
+       mov  r0,@clip_point1_x                              ; LD ($EB92),HL     ; point 1 = the new point
+       mov  r0,*hl+                                        ; PUSH HL           ; and the slot's, for the next step
+       mov  iy,r0                                          ; LD HL,($E821)     ;
+       a    bc,r0                                          ; ADD HL,BC         ;
+       mov  r0,@clip_point1_y                              ; LD ($EB94),HL     ;
+       mov  r0,*hl+                                        ; PUSH HL           ;
+       .push r11                                           ;                   ;
+       .push bc                                            ; PUSH BC           ;
+       .push de                                            ; PUSH DE           ;
+       .push hl                                            ; PUSH HL           ;
+       bl   @clip_and_draw_line                            ; CALL $3AC2        ; clip and draw the line
+       .pop hl                                             ; POP HL            ;
+       .pop de                                             ; POP DE            ;
+       .pop bc                                             ; POP BC            ;
+       .pop r11                                            ;                   ;
+       rt                                                  ; RET               ;
 
 ********************************************************************************
 * Clip-test and plot a single point [line-draw]
@@ -5874,7 +5820,12 @@ draw_small:                                                ; >4a86
        b    @draw_disc                                     ;                   
 !
        li   de,>0002                                       ; LD DE,$0002       ; yes: DE = 2
-       movb @bytes+>0a,b                                   ; LD B,$0A          ; B = 10
+       movb @bytes+>0a,b                                   ; LD B,$0A          ; B = 10: steps of 10 degrees
+       ci   hl,64                                          ;                   ; (TI: a small planet is drawn in 7 steps of 15 degrees, which are
+       jhe  !                                              ;                   ; within half a pixel of the circle)
+       li   de,>0004                                       ;                   ;
+       movb @bytes+>07,b                                   ;                   ;
+!
        b    @draw_circle_jmp                               ; JP $3D0E          ; dispatch to #R$3D0E instead
 
 ********************************************************************************

@@ -515,6 +515,17 @@ msg_mr_micro_ltd:                                          ; >1c34
        text 'Mr. Micro Ltd',>ae                                   ; 
 
 ********************************************************************************
+* TI: the messages "Version 2.0 2026", "TI-99/4A port by" and "Rasmus M and
+* Claude", which #R$1A8A shows after the MSX credits
+msg_version_2_0_2026:
+       text 'Version 2.0 202',>b6
+msg_ti_port_by:
+       text 'TI-99/4A port b',>f9
+msg_rasmus_m_and_claude:
+       text 'Rasmus M and Claud',>e5
+       byte 0                                                     ; (keeps what follows at the same parity)
+
+********************************************************************************
 * The message "Load New Commander ?"
        .msxalign >1ed7
 msg_load_new_commander:                                    ; >1ed7

@@ -587,6 +587,7 @@ _8cc7:                                                     ; >8cc7
 * press shows the next of six messages in the space view (#R$E8F3): the
 * game time (#R$F742: days, hours and minutes, zero-padded), the score
 * (at $1AD6, #R$EB13), and the four lines of credits (at $1AED, #R$1C42).
+* (TI: nine messages, as three lines of credits for the TI-99/4A port follow.)
 * They're shown for 30 frames, rather than the usual 10 (#R$E919).
 key_f5_info:                                               ; >1a8a
        .proc                                               ;                   ; 
@@ -635,9 +636,9 @@ _1afa:                                                     ; >1afa
        bl   @show_view_message                             ; CALL $39C8        ; show it
        movb @bytes+>9e,@message_timer                      ; LD A,$9E / LD ($E919),A; for 30 frames
        ab   one,@info_sub_page_index_key84_handler         ; LD HL,$E8F3 / INC (HL); the next message next time...
-       cb   @info_sub_page_index_key84_handler,@bytes+>06  ; LD A,(HL) / SUB $06; 
+       cb   @info_sub_page_index_key84_handler,@bytes+>09  ; LD A,(HL) / SUB $06; (TI: 9, with the three more lines of credits)
        jne  _1a8a_end                                      ; JR NZ,$1B0C       ; 
-       sb   @info_sub_page_index_key84_handler,@info_sub_page_index_key84_handler; LD (HL),A         ; ...after the sixth, the first
+       sb   @info_sub_page_index_key84_handler,@info_sub_page_index_key84_handler; LD (HL),A         ; ...after the last, the first
 _1a8a_end:                                                 
        .endproc                                            ; RET               ; 
 
@@ -648,6 +649,7 @@ _1a8a_end:
 * #R$1C34 - which #R$1A8A shows when the player presses 1-4.
 credits_screen_message_pointer_table_4:                    ; >1c42
        data msg_version_1_0_1987,msg_msx_conversion,msg_rob_nicholson,msg_mr_micro_ltd; 
+       data msg_version_2_0_2026,msg_ti_port_by,msg_rasmus_m_and_claude ; (TI: and the credits for the TI-99/4A port)
 
 ********************************************************************************
 * Missions: check for mission events on docking

@@ -261,6 +261,8 @@ vsbw:
 * main-code.a99). Changes R1.
 *
 view_mark_all:
+       clr  @star_count                ; and no particles of the stardust
+       clr  @star_prev_count
        li   r1,30
 view_mark_all_1:
        mov  @view_cells_from,@view_cells(r1); all 11 cells

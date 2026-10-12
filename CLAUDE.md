@@ -152,10 +152,13 @@ words. A single-byte access to
   `clear_space_view` clears only those cells and `copy_space_view` copies only those and the previous ones, a run of
   cells at a time. So everything that writes to the buffer must mark what it covers: `view_mark_line` (lines, the
   rectangle they're in; `draw_line_inside`, the fast path for lines that need no clipping, does the same in line), and
-  inline in `plot_single_pixel`, `move_and_plot_stardust`, `draw_view_message` and `fill_disc_row_span` (the rows of the
+  inline in `plot_single_pixel`, `draw_view_message` and `fill_disc_row_span` (the rows of the
   sun's disc, a native routine in low RAM where the MSX has #R$3F68). The tables `view_cell_bit`, `view_cells_from` and
   `view_cells_to_inv` (`ti-routines.a99`) give the bit of a cell, the bits from a cell on and the bits after a cell: a
-  range is `mov @view_cells_from(first*2),r` + `szc @view_cells_to_inv(last*2),r`. `view_mark_all` marks everything
+  range is `mov @view_cells_from(first*2),r` + `szc @view_cells_to_inv(last*2),r`. The stardust is the exception: `move_and_plot_stardust`
+  doesn't mark cells but lists each particle's byte (`star_list`: its address in the pattern table and its offset in the
+  buffer), and `copy_space_view` copies just those bytes and last time's (`star_prev_list`), and `clear_space_view`
+  clears them. `view_mark_all` marks everything
   (`enter_flight_mode`, as then neither the buffer nor the screen is known). `clear_space_view` mustn't change BC: its
   callers count with it.
 - **Rotating vertices** (`rotate_vertex`, and `face_visible` with it) is native code that multiplies with `MPY` where

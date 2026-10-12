@@ -165,7 +165,7 @@ words. A single-byte access to
   Projecting (`project_point`, `project_coordinate`) is native too: 128 * v / depth with `DIV`, exact where the MSX
   subtracts logarithms, with the depth itself in `projection_depth` (set by `project_point` and `ship_screen_size`)
   rather than its logarithm; `log_depth` is now only `ship_screen_size`'s own, for the planet's and the sun's radius.
-- **The space view's x isn't scaled**: the MSX multiplies x by 3/4 (`scale_3_4_table`) when it turns a projected point
+- **The space view's x isn't scaled**: the MSX multiplies x by 3/4 (its table at $0300, not on the TI) when it turns a projected point
   into a screen column, for the shape of a PAL television's pixels; the TI takes pixels to be square, so that circles
   are round: column = x + 87, and the view is x from -87 to 88 (-116 to 117 on the MSX) in `outcode`,
   `clip_and_draw_line`, `draw_line_inside`, `on_screen`, `draw_disc_fill_row` and the single point at #R$3DD7. The

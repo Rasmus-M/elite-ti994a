@@ -30,6 +30,11 @@ few frames a second in flight.
 
 There are no tests; verification is running the cartridge in an emulator.
 
+`python tools/profile.py [scene ...]` profiles flight frames in MAME (set `MAME_DIR`): it starts a game, launches, sets
+up each scene (`planet`, `station`, `close`, `empty`, `fight`: six ships in view) by writing to the object table with the
+debugger, traces it, and prints the frame time and the work by category; `-r routine,...` adds the calls and time of
+those routines and `-t N` the N routines with the most time. See its docstring.
+
 ## Two-stage conversion workflow
 
 1. **SkoolConverter** (`SkoolConverter/`, plain Java IntelliJ module, no build tool) reads
@@ -179,6 +184,9 @@ words. A single-byte access to
   as it is in the blueprint, reading the face's scale and normal at HL. The dot product is the same in either frame; a
   face that is almost edge on can come out differently (about 1 in 800 when compared with the old code). The cached
   vertices' fast return in `project_vertex` and `clear_flags` (the vertex and edge flags, in words) are TI too.
+  `draw_face_edges` has #R$496D (draw an edge) in line and keeps nothing on the stack while an edge is drawn: its
+  state is in `face_edge_ptr`, `face_edges_left` and `edge_vertex_1/_2`, `project_vertex` takes the vertex in R1, and
+  the flags are addressed with indexing (`@edge_flags(r1)`), so IX and IY are not used when a ship is drawn.
 - **Distances and the compass**: `vector_length` (an object's distance, #R$84A6) squares each component with `MPY` in
   line, so its result is up to 2% bigger than the MSX's, which is slightly low; `compass_coordinate` (#R$8570) is native,
   with the square root found by halving a logarithm, and can differ from the MSX's by a pixel. Both are leaf routines.

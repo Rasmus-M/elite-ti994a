@@ -417,8 +417,8 @@ _1e67:                                                     ; >1e67
        movb @bytes+>7f,a                                   ; LD A,$7F          ;
        bl   @pitch_object                                  ; CALL $2365        ; turn it 30 degrees
        movb @object_position_z+1,a                         ; LD A,($F7D2)      ;
-       sb   @bytes+>07,a                                   ; SUB $07           ;
-       movb a,@object_position_z+1                         ; LD ($F7D2),A      ; and move it 7 closer
+       sb   @bytes+>09,a                                   ; SUB $07           ; (TI: 9 rather than 7, see #R$1F1E)
+       movb a,@object_position_z+1                         ; LD ($F7D2),A      ; and move it closer
 _1e94:                                                     ; >1e94
        jmp  _1ea4                                          ; JR $1EA4          ;
 title_screen_letter_away:                                  ; >1e96
@@ -426,8 +426,8 @@ title_screen_letter_away:                                  ; >1e96
        movb @bytes+>81,a                                   ; LD A,$81          ;
        bl   @pitch_object                                  ; CALL $2365        ; turn it 30 degrees the other way
        movb @object_position_z+1,a                         ; LD A,($F7D2)      ;
-       ab   @bytes+>07,a                                   ; ADD A,$07         ;
-       movb a,@object_position_z+1                         ; LD ($F7D2),A      ; and move it 7 away
+       ab   @bytes+>09,a                                   ; ADD A,$07         ; (TI: 9)
+       movb a,@object_position_z+1                         ; LD ($F7D2),A      ; and move it away
 _1ea4:                                                     ; >1ea4
        bl   @draw_object                                   ; CALL $422E        ; draw it
        .pop de                                             ; POP DE            ;
@@ -479,8 +479,10 @@ title_letters:                                             ; >1f0c
 * orientation vectors.
        .msxalign >1f1e
 * (TI: big-endian words, as in the object workspace at #R$F7CD)
+* (TI: Z = 248 rather than 192, and the letters move 9 at a time rather than 7:
+* 4/3 as far away, as x isn't scaled by 3/4 in the view and they would not fit)
 title_letters_orientation:                                 ; >1f1e
-       byte >00,>00,>00,>C0,>40,>00,>00,>00
+       byte >00,>00,>00,>F8,>40,>00,>00,>00
        byte >00,>00,>00,>00,>00,>00,>40,>00
 
 ********************************************************************************

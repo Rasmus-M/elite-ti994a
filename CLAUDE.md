@@ -165,6 +165,14 @@ words. A single-byte access to
   Projecting (`project_point`, `project_coordinate`) is native too: 128 * v / depth with `DIV`, exact where the MSX
   subtracts logarithms, with the depth itself in `projection_depth` (set by `project_point` and `ship_screen_size`)
   rather than its logarithm; `log_depth` is now only `ship_screen_size`'s own, for the planet's and the sun's radius.
+- **The space view's x isn't scaled**: the MSX multiplies x by 3/4 (`scale_3_4_table`) when it turns a projected point
+  into a screen column, for the shape of a PAL television's pixels; the TI takes pixels to be square, so that circles
+  are round: column = x + 87, and the view is x from -87 to 88 (-116 to 117 on the MSX) in `outcode`,
+  `clip_and_draw_line`, `draw_line_inside`, `on_screen`, `draw_disc_fill_row` and the single point at #R$3DD7. The
+  horizontal field of view is a quarter narrower for it. The title screen's letters start 4/3 as far away to fit
+  (`title_letters_orientation`). On the charts (bank 9) the circles are round too: the local chart magnifies x by 4 like y (3 on the MSX), so its
+  fuel range is a true circle, and the circle point lists (`circle_points`) are true circles. The galactic chart keeps
+  the MSX's vertical stretch, so its round range circle is right across but short up and down.
 - **Lines** (`clip_and_draw_line`) are native on the TI: a line with both points inside the view is drawn by
   `draw_line_inside`; one with both points beyond the same edge is skipped; and any other is clipped against each edge
   in turn (`clip_line_low`, `clip_line_high`: the crossing point with `MPY` and `DIV`) where the MSX bisects it. The MSX's

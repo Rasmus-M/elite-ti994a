@@ -3278,7 +3278,8 @@ _3a5e:                                                     ; >3a5e
 * Used by the routines at #R$3AC2, #R$3BE0 and #R$3DD7.
 * .
 * Sets a bit in C for each edge of the clip window that the point is
-* beyond: bit 0 for x < $7F8C (-116), bit 1 for x > $8075 (+117), bit 2 for
+* beyond: bit 0 for x < $7F8C (-116), bit 1 for x > $8075 (+117) (TI: -87 and
+* +88, as x isn't scaled by 3/4 for the screen, so that circles are round), bit 2 for
 * y < $7FC1 (-63) and bit 3 for y > $8040 (+64). A point exactly on an edge
 * sets bit 4, 5, 6 or 7 instead. The x tests are at $3A72-$3A9B, the y
 * tests at $3A9D-$3ABF.
@@ -3288,7 +3289,7 @@ _3a5e:                                                     ; >3a5e
 * O:C The outcode
 outcode:                                                   ; >3a72
        sb   @c,@c                                          ; LD C,$00          ; C = 0 (the outcode accumulator)
-       ci   de,>7f8c                                       ; SBC A,$7F         ; compare X with the near boundary (16-bit, unsigned)
+       ci   de,>7fa9                                       ; SBC A,$7F         ; compare X with the near boundary (TI: -87, as x isn't scaled by 3/4)
        jhe  !                                              ; JP NC,$3A82       ; 
        socb @bit0,@c                                       ; SET 0,C           ; DE < $7F8C - X is beyond the near boundary
        jmp  outcode_y                                      ; JR $3A9D          ; 
@@ -3298,7 +3299,7 @@ outcodes_x_near_boundary_case_else:                        ; >3a82
        socb @bit4,@c                                       ; SET 4,C           ; exactly on the near boundary
        jmp  outcode_y                                      ; JR $3A9D          ; 
 outcodes_x_far_boundary_test_line:                         ; >3a8a
-       ci   de,>8075                                       ; SBC A,$80         ; compare X with the far boundary
+       ci   de,>8058                                       ; SBC A,$80         ; compare X with the far boundary (TI: 88)
        jl   outcode_y                                      ; JP C,$3A9D        ; DE < $8075 - X is within both bounds
        jne  outcodes_x_beyond_far_boundary_case            ; JR NZ,$3A9B       ; 
        socb @bit5,@c                                       ; SET 5,C           ; exactly on the far boundary
@@ -3342,14 +3343,8 @@ draw_line_inside:
        ai   a,>40                                          ;                   ; A = point 1's row: 64 - y
        neg  bc                                             ;                   ;
        ai   bc,>40                                         ;                   ; BC = point 2's row
-       andi r1,>00ff                                       ;                   ;
-       movb @scale_3_4_table(r1),r1                        ;                   ;
-       ab   @bytes+>57,r1                                  ;                   ;
-       srl  r1,8                                           ;                   ; R1 = point 1's column: 3/4 of x, + 87
-       andi r2,>00ff                                       ;                   ;
-       movb @scale_3_4_table(r2),r2                        ;                   ;
-       ab   @bytes+>57,r2                                  ;                   ;
-       srl  r2,8                                           ;                   ; R2 = point 2's column
+       ai   r1,87                                          ;                   ; R1 = point 1's column: x + 87 (the MSX scales x by 3/4 first, for the
+       ai   r2,87                                          ;                   ; shape of its pixels; here a pixel is taken to be square)
        c    a,bc                                           ;                   ;
        jle  draw_line_inside_1                             ;                   ;
        mov  a,r0                                           ;                   ; point 2 is the upper one: swap them
@@ -3452,13 +3447,13 @@ draw_line_inside_7:
 clip_and_draw_line:                                        ; >3ac2
        .proc                                               ;                   ;
 * TI: a fast path for a line that is all inside the view, as most are: each
-* coordinate is tested with one unsigned comparison (x from -116 to 117, y from
+* coordinate is tested with one unsigned comparison (x from -87 to 88, y from
 * -63 to 64, as in #R$3A72), and the line drawn by draw_line_inside. Otherwise
 * the points are still as they were, for the MSX code below.
        mov  @clip_point1_x,r1                              ;                   ; R1 = point 1's x
        mov  r1,r0                                          ;                   ;
-       ai   r0,116                                         ;                   ;
-       ci   r0,116+117                                     ;                   ;
+       ai   r0,87                                          ;                   ;
+       ci   r0,87+88                                       ;                   ;
        jh   clip_and_draw_line_1                           ;                   ; point 1's x is outside
        mov  @clip_point1_y,a                               ;                   ; A = its y
        mov  a,r0                                           ;                   ;
@@ -3467,8 +3462,8 @@ clip_and_draw_line:                                        ; >3ac2
        jh   clip_and_draw_line_1                           ;                   ;
        mov  @clip_point2_x,r2                              ;                   ; R2 = point 2's x
        mov  r2,r0                                          ;                   ;
-       ai   r0,116                                         ;                   ;
-       ci   r0,116+117                                     ;                   ;
+       ai   r0,87                                          ;                   ;
+       ci   r0,87+88                                       ;                   ;
        jh   clip_and_draw_line_1                           ;                   ;
        mov  @clip_point2_y,bc                              ;                   ; BC = its y
        mov  bc,r0                                          ;                   ;
@@ -3482,14 +3477,14 @@ clip_and_draw_line:                                        ; >3ac2
 clip_and_draw_line_1:
        mov  @clip_point1_x,r0                              ;                   ;
        mov  @clip_point2_x,r1                              ;                   ;
-       ci   r0,-117                                        ;                   ;
+       ci   r0,-88                                         ;                   ;
        jgt  clip_and_draw_line_2                           ;                   ;
-       ci   r1,-116                                        ;                   ;
+       ci   r1,-87                                         ;                   ;
        jlt  clip_and_draw_line_5                           ;                   ; both left of the view
 clip_and_draw_line_2:
-       ci   r0,118                                         ;                   ;
+       ci   r0,89                                          ;                   ;
        jlt  clip_and_draw_line_3                           ;                   ;
-       ci   r1,117                                         ;                   ;
+       ci   r1,88                                          ;                   ;
        jgt  clip_and_draw_line_5                           ;                   ; both right of it
 clip_and_draw_line_3:
        mov  @clip_point1_y,r0                              ;                   ;
@@ -3512,13 +3507,13 @@ clip_and_draw_line_5:
 * the line up to 16 times (#R$3B26-#R$3C27, which are not here). If both
 * points end up beyond the same edge, the line isn't drawn.
 clip_and_draw_line_6:
-       li   r1,clip_point1_x                               ;                   ; the left edge: x >= -116
+       li   r1,clip_point1_x                               ;                   ; the left edge: x >= -87
        li   r2,clip_point1_y                               ;                   ;
-       li   bc,-116                                        ;                   ;
+       li   bc,-87                                         ;                   ;
        bl   @clip_line_low                                 ;                   ;
-       li   r1,clip_point1_x                               ;                   ; the right edge: x <= 117
+       li   r1,clip_point1_x                               ;                   ; the right edge: x <= 88
        li   r2,clip_point1_y                               ;                   ;
-       li   bc,117                                         ;                   ;
+       li   bc,88                                          ;                   ;
        bl   @clip_line_high                                ;                   ;
        li   r1,clip_point1_y                               ;                   ; the bottom edge: y >= -63
        li   r2,clip_point1_x                               ;                   ;
@@ -4033,10 +4028,7 @@ clip_test_and_plot_single_point:                           ; >3dd7
        movb @bytes+>40,a                                   ; LD A,$40          ; 
        sb   @l,a                                           ; SUB L             ; A = $40 - raw row (the same row mirror #R$3C29 uses)
        movb a,b                                            ; LD B,A            ; B = screen-space row
-       movb @e,@l                                          ; LD L,E            ; L = raw column (X's low byte)
-       movb @l,r1                                          ; LD H,$03          ; R1 = the column, for the column-lookup table
-       srl  r1,8                                           ;                   ; 
-       movb @scale_3_4_table(r1),a                         ; LD A,(HL)         ; A = table[column]
+       movb @e,a                                           ; LD L,E / LD H,$03 / LD A,(HL); A = the column (TI: not scaled by 3/4)
        ab   @bytes+>57,a                                   ; ADD A,$57         ; 
        movb a,@c                                           ; LD C,A            ; C = screen-space column
        b    @plot_single_pixel_jmp                         ; JP $3CFD          ; plot the pixel at (B,C)
@@ -4261,17 +4253,15 @@ _3ee8:                                                     ; >3ee8
        socb a,a                                            ; OR A              ; 
        s    bc,hl                                          ; SBC HL,BC         ; HL = centre X - offset (left bound, raw)
        .ex_de_hl                                           ; EX DE,HL          ; DE = left bound
-       li   hl,>7f8a                                       ; LD HL,$7F8A       ; clip window test (near side)...
+       li   hl,>7fa7                                       ; LD HL,$7F8A       ; clip window test (near side)... (TI: x from -87 to 88)
        a    de,hl                                          ; ADD HL,DE         ; 
        joc  _3f64                                          ; JR C,$3F64        ; out of range - skip this bound
-       li   hl,>8074                                       ; LD HL,$8074       ; ...and far side
+       li   hl,>8057                                       ; LD HL,$8074       ; ...and far side
        a    de,hl                                          ; ADD HL,DE         ; 
        joc  _3f06                                          ; JR C,$3F06        ; in range
-       movb @bytes+>8c,@e                                  ; LD E,$8C          ; clamp to the boundary
+       movb @bytes+>a9,@e                                  ; LD E,$8C          ; clamp to the boundary
 _3f06:                                                     ; >3f06
-       movb @e,r1                                          ; LD D,$03          ; R1 = the column, for the column-lookup table
-       srl  r1,8                                           ;                   ; 
-       movb @scale_3_4_table(r1),a                         ; LD A,(DE)         ; A = table[column]
+       movb @e,a                                           ; LD D,$03 / LD A,(DE); A = the column (TI: not scaled by 3/4)
        ab   @bytes+>57,a                                   ; ADD A,$57         ; 
        movb a,@clip_point1_x+1                             ; LD ($EB92),A      ; cache the left bound's screen column
        mov  @circle_centre_x,hl                            ; LD HL,($E81F)     ; HL = the cached centre X again
@@ -4281,17 +4271,15 @@ _3f06:                                                     ; >3f06
        a    bc,hl                                          ; ADD HL,BC         ; HL = centre X + offset (right bound, raw)
        dec  hl                                             ; DEC HL            ; 
        .ex_de_hl                                           ; EX DE,HL          ; DE = right bound
-       li   hl,>8074                                       ; LD HL,$8074       ; clip window test (far side)...
+       li   hl,>8057                                       ; LD HL,$8074       ; clip window test (far side)...
        a    de,hl                                          ; ADD HL,DE         ; 
        jnc  _3f64                                          ; JR NC,$3F64       ; out of range - skip
-       li   hl,>7f8a                                       ; LD HL,$7F8A       ; ...and near side
+       li   hl,>7fa7                                       ; LD HL,$7F8A       ; ...and near side
        a    de,hl                                          ; ADD HL,DE         ; 
        jnc  _3f28                                          ; JR NC,$3F28       ; in range
-       movb @bytes+>75,@e                                  ; LD E,$75          ; clamp to the boundary
+       movb @bytes+>58,@e                                  ; LD E,$75          ; clamp to the boundary
 _3f28:                                                     ; >3f28
-       movb @e,r1                                          ; LD D,$03          ; R1 = the column, for the column-lookup table
-       srl  r1,8                                           ;                   ; 
-       movb @scale_3_4_table(r1),a                         ; LD A,(DE)         ; A = table[column]
+       movb @e,a                                           ; LD D,$03 / LD A,(DE); A = the column (TI: not scaled by 3/4)
        ab   @bytes+>57,a                                   ; ADD A,$57         ; 
        movb a,@clip_point2_x+1                             ; LD ($EB96),A      ; cache the right bound's screen column
        movb @disc_row_offset+1,bc                          ; LD BC,($E824)     ; BC = this row's row offset
@@ -5930,14 +5918,14 @@ on_screen:                                                 ; >4a99
        mov  hl,@on_screen_top                              ; LD ($E6E4),HL     ; store a second upper bound
        sb   a,a                                            ; XOR A             ; A = 0 (the "out of range" return value)
        mov  @on_screen_left,hl                             ; LD HL,($E6E0)     ; HL = the first lower bound
-       li   de,>8076                                       ; LD DE,$8076       ; 
+       li   de,>8059                                       ; LD DE,$8076       ; (TI: x from -87 to 88)
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; compare against $8076
        jnc  !                                              ; RET NC            ; still >= - out of range, return with A=0
        rt                                                  ;                   
 !
        mov  @on_screen_right,hl                            ; LD HL,($E6E2)     ; HL = the first upper bound
-       li   de,>7f8c                                       ; LD DE,$7F8C       ; 
+       li   de,>7fa9                                       ; LD DE,$7F8C       ; 
        socb a,a                                            ; OR A              ; 
        s    de,hl                                          ; SBC HL,DE         ; compare against $7F8C
        joc  !                                              ; RET C             ; below it - out of range, return with A=0

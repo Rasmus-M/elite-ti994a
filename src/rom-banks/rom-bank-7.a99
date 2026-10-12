@@ -537,9 +537,28 @@ disk_set_name_4:
        movb r0,@disk_name_length                           ;                   ; 
        rt                                                  ;                   ; 
 
-* TI: option 3, "Catalog tape" (#R$A3C7), isn't on the menu: it asks again
+* TI: option 3, "Catalog tape" (#R$A3C7), isn't on the menu. Here it is a
+* cheat for testing: it fits the ship with all the best equipment (#R$F775) -
+* full fuel, 4 missiles, military lasers on all four mounts and every other
+* item, also the naval energy unit, the ECM jammer and the cloaking device
+* that are rewards for missions - and goes back to the menu.
 menu_catalog_tape:
-       b    @commander_menu_ask                            ;                   ; 
+       li   hl,cheat_equipment                             ;                   ;
+       li   de,fuel_level                                  ;                   ; the 20 bytes of fuel and equipment
+       li   bc,>0014                                       ;                   ;
+       .ldir                                               ;                   ;
+       b    @commander_menu_jmp                            ;                   ; back to the menu
+cheat_equipment:
+       byte >46                                                   ; fuel: 7.0 light years
+       byte >04                                                   ; 4 missiles
+       byte >01,>01                                               ; large cargo bay, ECM system
+       byte >80,>80                                               ; no pulse or beam lasers
+       byte >01,>01,>01                                           ; fuel scoop, escape capsule, energy bomb
+       byte >02                                                   ; naval energy unit
+       byte >01,>01                                               ; docking computer, galactic hyperdrive
+       byte >80,>8F                                               ; no mining laser; military lasers on all four mounts
+       byte >01,>01                                               ; ECM jammer, cloaking device
+       byte >00,>00,>00,>00                                       ; no documents; unused
 
 disk_device:
        text 'DSK1.'                                               ; 

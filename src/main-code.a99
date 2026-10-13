@@ -1164,18 +1164,32 @@ _21f6:                                                     ; >21f6
 * 
 * Used by the routines at #R$1837 and #R$6BE1.
 refresh_roll_table:                                        ; >2209
+       .proc                                               ;                   ;
        movb @roll_rate,a                                   ; LD A,($F815)      ; 
        li   de,live_roll_coeff_table                       ; LD DE,$EB76       ; #R$22C0's table
-       b    @lookup_rotation_coeffs                        ; JP $21DA          ; 
+       bl   @lookup_rotation_coeffs                        ; JP $21DA          ;
+       movb @roll_rate,a                                   ;                   ; (TI: and the record that the multiplications use)
+       mov  ix,de                                          ;                   ; (IX is kept for the callers)
+       li   ix,live_roll_words                             ;                   ;
+       bl   @rotation_words                                ;                   ;
+       mov  de,ix                                          ;                   ;
+       .endproc                                            ;                   ;
 
 ********************************************************************************
 * Refresh the live "cos"-role rotation table from the pitch rate at $F816
 * 
 * Used by the routine at #R$6BE1.
 refresh_pitch_table:                                       ; >2212
+       .proc                                               ;                   ;
        movb @pitch_rate,a                                  ; LD A,($F816)      ; 
        li   de,live_pitch_coeff_table                      ; LD DE,$EB7C       ; #R$221B's table
-       b    @lookup_rotation_coeffs                        ; JP $21DA          ; 
+       bl   @lookup_rotation_coeffs                        ; JP $21DA          ;
+       movb @pitch_rate,a                                  ;                   ; (TI: and the record that the multiplications use)
+       mov  ix,de                                          ;                   ; (IX is kept for the callers)
+       li   ix,live_pitch_words                            ;                   ;
+       bl   @rotation_words                                ;                   ;
+       mov  de,ix                                          ;                   ;
+       .endproc                                            ;                   ;
 
 ********************************************************************************
 * Apply the player's pitch to the object (its position, side and nose vectors)
@@ -1210,7 +1224,7 @@ refresh_pitch_table:                                       ; >2212
 * I:$F7CD Object status byte (bit 3 gates the two orientation vectors)
 step_pitch_rotation:                                       ; >221b
        .proc                                               ;                   ; 
-       li   ix,live_pitch_coeff_table                      ; LD IX,$EB7C       ; IX -> the live pitch-rotation coefficient table
+       li   ix,live_pitch_words                            ; LD IX,$EB7C       ; IX -> the rotation record (TI: the one of words)
        mov  @object_position_y,bc                          ; LD BC,($F7D0)     ; BC = y
        mov  @object_position_z,de                          ; LD DE,($F7D2)     ; DE = z
        bl   @rotate_pair                                   ; CALL $2450        ; rotate (y, z) by one pitch step
@@ -1248,7 +1262,7 @@ _221b_end:
 * I:$F7CD Object status byte (bit 3 gates the two orientation vectors)
 step_roll_rotation:                                        ; >22c0
        .proc                                               ;                   ; 
-       li   ix,live_roll_coeff_table                       ; LD IX,$EB76       ; IX -> the live roll-rotation coefficient table
+       li   ix,live_roll_words                             ; LD IX,$EB76       ; IX -> the rotation record (TI: the one of words)
        mov  @object_position_x,bc                          ; LD BC,($F7CE)     ; BC = x
        mov  @object_position_y,de                          ; LD DE,($F7D0)     ; DE = y
        bl   @rotate_pair                                   ; CALL $2450        ; rotate (x, y) by one roll step
@@ -1282,9 +1296,12 @@ _22c0_end:
 * I:A The angle, in half-degrees (see #R$21DA)
 pitch_object:                                              ; >2365
        .proc
-       li   de,pitch_roll_rotation                         ; LD DE,$E7FC       ; set up the rotation record for angle A
-       bl   @lookup_rotation_coeffs                        ; CALL $21DA        ; (#R$21DA)
-       li   ix,pitch_roll_rotation                         ; LD IX,$E7FC       ; IX -> the rotation record
+       li   ix,object_turn_words                           ; LD DE,$E7FC       ; set up the rotation record for angle A
+       cb   a,@object_turn_rate                            ;                   ; (TI: the record of words, see #R$24A7 - unless it is
+       jeq  !                                              ;                   ; already the one for this angle)
+       movb a,@object_turn_rate                            ;                   ;
+       bl   @rotation_words                                ; CALL $21DA        ;
+!
        bl   @work_out_roof                                 ; CALL $4599        ; make sure the roof vector is up to date (#R$4599)
        li   hl,object_status_byte                          ; LD HL,$F7CD       ; 
        szcb @bit7,*hl                                      ; RES 7,(HL)        ; it will need working out again
@@ -1348,9 +1365,12 @@ pitch_object_nose_z:                                       ; >23d1
 * I:A The angle, in half-degrees (see #R$21DA)
 roll_object:                                               ; >23d9
        .proc
-       li   de,pitch_roll_rotation                         ; LD DE,$E7FC       ; set up the rotation record for angle A
-       bl   @lookup_rotation_coeffs                        ; CALL $21DA        ; (#R$21DA)
-       li   ix,pitch_roll_rotation                         ; LD IX,$E7FC       ; IX -> the rotation record
+       li   ix,object_turn_words                           ; LD DE,$E7FC       ; set up the rotation record for angle A
+       cb   a,@object_turn_rate                            ;                   ; (TI: the record of words, see #R$24A7 - unless it is
+       jeq  !                                              ;                   ; already the one for this angle)
+       movb a,@object_turn_rate                            ;                   ;
+       bl   @rotation_words                                ; CALL $21DA        ;
+!
        bl   @work_out_roof                                 ; CALL $4599        ; make sure the roof vector is up to date (#R$4599)
        li   hl,object_status_byte                          ; LD HL,$F7CD       ; 
        szcb @bit7,*hl                                      ; RES 7,(HL)        ; it will need working out again
@@ -1531,11 +1551,25 @@ rotate_pair_exit:
 * I:IX Pointer to the rotation record
 * O:HL HL * sin, rounded (two's complement)
 multiply_by_sin:                                           ; >24a7
-       movb @>05(ix),r0                                    ; LD A,(IX+$05)     ; 
+* TI: one MPY, with the sine as a 16-bit fraction from the TI's own rotation
+* record (rotation_words): the result can differ by one from the 24-bit
+* multiplication's. Changes R0-R2 only.
+       mov  @4(ix),r0                                      ; LD A,(IX+$05)     ;
        xor  hl,r0                                          ; XOR H             ; R0 bit 15 = the result's sign: sin's sign XOR the input's
-       mov  ix,iy                                          ;                   ; 
-       ai   iy,3                                           ; LD A,(IX+$03)     ; IY -> sin, the 24-bit value at IX+3
-       jmp  _24f5                                          ; JR $24F5          ; 
+       andi hl,>7fff                                       ; RES 7,H           ; HL = the magnitude
+       mov  @2(ix),r1                                      ;                   ; R1 = sin * 65536
+       mpy  hl,r1                                          ; CALL $1F86        ; R1 = magnitude * sin,
+       sla  r2,1                                           ;                   ; rounded
+       jnc  !                                              ;                   ;
+       inc  r1                                             ;                   ;
+!
+       mov  r1,hl                                          ;                   ;
+       mov  r0,r0                                          ; EX AF,AF'         ; result negative?
+       jlt  !                                              ; RET P             ; no - done
+       rt                                                  ;                   ;
+!
+       neg  hl                                             ; SUB L             ; yes: negate HL
+       rt                                                  ; RET               ;
 
 ********************************************************************************
 * Multiply by a rotation record's cosine
@@ -1554,40 +1588,84 @@ multiply_by_sin:                                           ; >24a7
 * I:IX Pointer to the rotation record
 * O:HL HL * cos, rounded (two's complement)
 multiply_by_cos:                                           ; >24d1
+* TI: one MPY: the record (rotation_words) has (1 - cos) * 2^18, and the
+* result is the magnitude less the rounded product. It can differ by one
+* from the 24-bit multiplication's. Changes R0-R2 only.
        mov  hl,r0                                          ; LD A,H            ; R0 bit 15 = the result's sign: the input's
-       mov  ix,iy                                          ; LD A,(IX+$00)     ; IY -> cos, the 24-bit value at IX+0
-* This entry point is used by the routine at #R$24A7.
-_24f5:                                                     ; >24f5
-       mov  hl,de                                          ; RES 7,H           ; 
-       andi de,>7fff                                       ;                   ; DE = the magnitude
-       movb *iy,a                                          ; CALL $1F86        ; 
-       srl  a,8                                            ;                   ; A (R4) = the value's low byte
-       mpy  de,a                                           ;                   ; R4:R5 = magnitude * low byte
-       sla  a,8                                            ;                   ; 
-       srl  bc,8                                           ;                   ; 
-       soc  bc,a                                           ;                   ; A (R4) = that product >> 8
-       movb @2(iy),r1                                      ;                   ; 
-       movb @1(iy),@r1lb                                   ;                   ; 
-       andi r1,>7fff                                       ; AND $7F           ; R1 = the value's top two bytes, without the sign bit
-       mpy  de,r1                                          ;                   ; R1:R2 = magnitude * top two bytes
-       a    a,r2                                           ; ADD IY,BC         ; R1:R2 = the product >> 8...
-       jnc  !                                              ;                   ; 
-       inc  r1                                             ;                   ; 
-!
-       ai   r2,>2000                                       ; RL L              ; ...rounded with bit 21 of the product
-       jnc  !                                              ;                   ; 
-       inc  r1                                             ;                   ; 
-!
-       sla  r1,2                                           ; ADD HL,HL         ; 
-       srl  r2,14                                          ; RLA               ; 
-       soc  r2,r1                                          ;                   ; 
-       mov  r1,hl                                          ; LD H,A            ; HL = round(magnitude * value / 2^22)
+       andi hl,>7fff                                       ; RES 7,H           ; HL = the magnitude
+       mov  *ix,r1                                         ; LD A,(IX+$00)     ; R1 = (1 - cos) * 2^18
+       mpy  hl,r1                                          ; CALL $1F86        ; R1 = magnitude * (1 - cos) * 4,
+       inct r1                                             ;                   ; rounded
+       srl  r1,2                                           ;                   ;
+       s    r1,hl                                          ;                   ; HL = round(magnitude * cos)
        mov  r0,r0                                          ; EX AF,AF'         ; result negative?
        jlt  !                                              ; RET P             ; no - done
-       rt                                                  ;                   ; 
+       rt                                                  ;                   ;
 !
        neg  hl                                             ; SUB L             ; yes: negate HL
-       rt                                                  ; RET               ; 
+       rt                                                  ; RET               ;
+
+********************************************************************************
+* TI: set up a rotation record for the multiplications
+*
+* #R$24A7 and #R$24D1 multiply by 16-bit fractions, not by the 24-bit values
+* of the records that #R$21DA copies. This makes a record of three words for
+* a turn rate, from the same tables (#R$121B, or #R$2522 for a rate of 127):
+* (1 - cos) * 2^18, sin * 2^16, and >8000 if the rate is negative (else 0).
+*
+* I: A = the turn rate (-40 to 40, or -127/127); IX -> the record
+* Changes R0-R2
+rotation_words:
+       movb a,r0                                           ;                   ;
+       andi r0,>8000                                       ;                   ;
+       mov  r0,@4(ix)                                      ;                   ; the rate's sign
+       movb a,r1                                           ;                   ;
+       sra  r1,8                                           ;                   ;
+       abs  r1                                             ;                   ; R1 = the size of the rate
+       ci   r1,>007f                                       ;                   ; 127?
+       jne  rotation_words_1                               ;                   ;
+       li   r2,rotation_30_degrees                         ;                   ; yes - the 30-degree record
+       jmp  rotation_words_2                               ;                   ;
+rotation_words_1:
+       mov  r1,r2                                          ;                   ; no: R2 -> the record in the table, of 6 bytes
+       sla  r2,1                                           ;                   ;
+       a    r1,r2                                          ;                   ;
+       sla  r2,1                                           ;                   ;
+       ai   r2,trig_table_fine                             ;                   ;
+rotation_words_2:
+       movb *r2+,r0                                        ;                   ; R0 = cos's low byte
+       movb @1(r2),r1                                      ;                   ; R1 = its top two bytes
+       movb *r2,@r1lb                                      ;                   ;
+       neg  r1                                             ;                   ;
+       ai   r1,>4000                                       ;                   ; R1 = (1 - cos) * 2^14, rounded up...
+       srl  r0,8                                           ;                   ;
+       jeq  !                                              ;                   ;
+       dec  r1                                             ;                   ; ...or down, if there are 8 more bits of it:
+       neg  r0                                             ;                   ;
+       andi r0,>00ff                                       ;                   ; R0 = those
+!
+       sla  r1,4                                           ;                   ;
+       srl  r0,4                                           ;                   ;
+       soc  r0,r1                                          ;                   ;
+       mov  r1,*ix                                         ;                   ; (1 - cos) * 2^18
+       movb @4(r2),r1                                      ;                   ; R1 = sin's top two bytes: sin * 2^14
+       movb @3(r2),@r1lb                                   ;                   ;
+       andi r1,>7fff                                       ;                   ;
+       sla  r1,2                                           ;                   ;
+       movb @2(r2),r0                                      ;                   ; and two more bits from its low byte
+       srl  r0,14                                          ;                   ;
+       soc  r0,r1                                          ;                   ;
+       mov  r1,@2(ix)                                      ;                   ; sin * 2^16
+       rt                                                  ;                   ;
+live_roll_words:                                           ; The record for the player's roll (#R$22C0),
+       data 0,0,0                                          ;                   ;
+live_pitch_words:                                          ; for the pitch (#R$221B)
+       data 0,0,0                                          ;                   ;
+object_turn_words:                                         ; and for an object's own turn (#R$2365, #R$23D9)
+       data 0,0,0                                          ;                   ;
+object_turn_rate:                                          ; The turn rate that object_turn_words is for
+       byte 0                                              ;                   ;
+       even                                                ;                   ;
 
 ********************************************************************************
 * Rotation coefficients for a 30-degree turn

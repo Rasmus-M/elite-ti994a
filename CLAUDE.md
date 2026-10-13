@@ -190,6 +190,11 @@ words. A single-byte access to
 - **Distances and the compass**: `vector_length` (an object's distance, #R$84A6) squares each component with `MPY` in
   line, so its result is up to 2% bigger than the MSX's, which is slightly low; `compass_coordinate` (#R$8570) is native,
   with the square root found by halving a logarithm, and can differ from the MSX's by a pixel. Both are leaf routines.
+- **Rotations** (`multiply_by_cos`, `multiply_by_sin`: the player's roll and pitch of every object, and the objects' own
+  turns) take one `MPY` each, with 16-bit fractions from a TI rotation record of three words that `rotation_words` makes
+  for a turn rate: (1 - cos) * 2^18, sin * 2^16 and the rate's sign (`live_roll_words`, `live_pitch_words`,
+  `object_turn_words`). A result can differ by one from the MSX's 24-bit multiplication. The MSX's 6-byte records
+  (`live_roll_coeff_table`, `live_pitch_coeff_table`) are still set up, as the stardust reads them.
 - **The space view's x isn't scaled**: the MSX multiplies x by 3/4 (its table at $0300, not on the TI) when it turns a projected point
   into a screen column, for the shape of a PAL television's pixels; the TI takes pixels to be square, so that circles
   are round: column = x + 87, and the view is x from -87 to 88 (-116 to 117 on the MSX) in `outcode`,

@@ -32,10 +32,10 @@ The MSX game was disassembled first, and the source code was reengineered in the
 project (elite-msx-skoolkit). The comments in the TI-99/4A source code refer to the addresses in that disassembly.
 
 The MSX source code was then converted to TMS9900 assembly using a Java program (SkoolConverter). The basis for the
-conversion is a fixed mapping of the Z80 registers onto TMS9900 registers (see src/equates.a99), a simulated stack,
+conversion was a fixed mapping of the Z80 registers onto TMS9900 registers (see src/equates.a99), a simulated stack,
 and a number of macros for the Z80 instructions that need several TMS9900 instructions, like call, push and pop.
 
-The result (temp-src/main-code.a99) is a fairly accurate conversion, but one that cannot run as it is: there are
+The result (temp-src/main-code.a99) wss a fairly accurate conversion, but one that could not run as it was: there were
 peripheral hardware differences, instructions the converter could not handle, differences in how the two CPUs set
 their flags, and little- versus big-endian issues. So the routines were copied from there into src/ a few at a time
 and fixed by hand, and each line still shows the Z80 instruction it came from.
@@ -104,30 +104,30 @@ doesn't have (the function keys, STOP, TAB, Esc and `[`).
 
 ### Navigation
 
-| Key | Action                                                  |
-|-----|---------------------------------------------------------|
-| H   | Hyperspace to the selected system (10-second countdown) |
-| G   | Galactic hyperspace (30-second countdown)               |
-| 5   | Galactic chart                                          |
-| 6   | Local chart                                             |
-| 7   | Data on system                                          |
-| F   | Find a system by name (on a chart)                      |
-| D   | Distance to the system nearest the cursor (on a chart)  |
-| B or FCTN-8 (HOME) | Bring the chart cursor back to the current system |
+| Key                | Action                                                  |
+|--------------------|---------------------------------------------------------|
+| H                  | Hyperspace to the selected system (10-second countdown) |
+| G                  | Galactic hyperspace (30-second countdown)               |
+| 5                  | Galactic chart                                          |
+| 6                  | Local chart                                             |
+| 7                  | Data on system                                          |
+| F                  | Find a system by name (on a chart)                      |
+| D                  | Distance to the system nearest the cursor (on a chart)  |
+| B or FCTN-8 (HOME) | Bring the chart cursor back to the current system       |
 
 On a chart, the joystick or the S, X, comma and full stop keys move the cursor.
 
 ### Docked
 
-| Key        | Action                   |
-|------------|--------------------------|
-| 1          | Launch                   |
-| 2          | Buy cargo                |
-| 3          | Sell cargo               |
-| 4          | Equip ship               |
-| 8          | Market prices            |
-| 9          | Commander status         |
-| 0          | Inventory                |
+| Key          | Action                   |
+|--------------|--------------------------|
+| 1            | Launch                   |
+| 2            | Buy cargo                |
+| 3            | Sell cargo               |
+| 4            | Equip ship               |
+| 8            | Market prices            |
+| 9            | Commander status         |
+| 0            | Inventory                |
 | FCTN-R (`[`) | Load/save commander menu |
 
 The commander menu saves a commander as the file DSK1.<name>, and loads it again by name. If no name is typed, the

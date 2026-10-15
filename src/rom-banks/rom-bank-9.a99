@@ -1484,6 +1484,7 @@ nearest_and_furthest_systems:                              ; >5325
        clr  bc                                             ;                   ; (TI: B = 0 for 256 systems)
 _533c:                                                     ; >533c
        .push bc                                            ; PUSH BC           ; 
+       bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, as interrupts are off, so the sound effects play on)
        bl   @next_system_coordinates                       ; CALL $4C80        ; BC = this system's coordinates
        mov  @system_search_point,de                        ; LD DE,($E61B)     ; DE = the point
        bl   @squared_distance_2d                           ; CALL $205D        ; AHL = distance squared

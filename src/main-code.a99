@@ -2264,44 +2264,97 @@ _35af:                                                     ; >35af
 * I:B Height in pixel-rows (a multiple of 8)
 * I:C Width in characters
 fill_vram_rect:                                            ; >35b8
-;      limi 0                                              ; DI                ; 
-       movb a,@e                                           ; LD E,A            ; Keep the fill byte in E; A is about to be reused for
-       movb @bytes+>07,d                                   ; LD D,$07          ; address bytes. D = row-within-character wrap mask
-_35bc:                                                     ; >35bc
-       .push bc                                            ; PUSH BC           ; 
-       .push hl                                            ; PUSH HL           ; Remember this column's start address
-       movb @l,a                                           ; LD A,L            ; 
-       movb a,@vdpwa                                       ; OUT ($99),A       ; 
-       movb h,a                                            ; LD A,H            ; 
-       socb @bytes+>40,a                                   ; OR $40            ; 
-       movb a,@vdpwa                                       ; OUT ($99),A       ; Point the VDP at this column
-_35c6:                                                     ; >35c6
-       movb @e,a                                           ; LD A,E            ; 
-       movb a,@vdpwd                                       ; OUT ($98),A       ; Write the fill byte
-       ab   one,@l                                         ; INC L             ; 
-       movb @l,a                                           ; LD A,L            ; 
-       andi a,>0700                                        ; AND D             ; D is always 7 here
-       jne  _35db                                          ; JR NZ,$35DB       ; Still inside this character's 8 pixel-rows
-       movb @l,a                                           ; LD A,L            ; 
-       sb   one,a                                          ; DEC A             ; 
-       andi a,>f800                                        ; AND $F8           ; Back to this character's row 0...
-       movb a,@l                                           ; LD L,A            ; 
-       movb a,@vdpwa                                       ; OUT ($99),A       ; 
-       ab   one,h                                          ; INC H             ; ...but one name-table row down (+256 = 32 characters)
-       movb h,a                                            ; LD A,H            ; 
-       socb @bytes+>40,a                                   ; OR $40            ; 
-       movb a,@vdpwa                                       ; OUT ($99),A       ; 
-_35db:                                                     ; >35db
-       sb   one,b                                          ; DJNZ $35C6        ; 
-       jne  _35c6                                          ;                   
-       .pop hl                                             ; POP HL            ; 
-       movb @l,a                                           ; LD A,L            ; 
-       ab   @bytes+>08,a                                   ; ADD A,$08         ; Next character along the row
-       movb a,@l                                           ; LD L,A            ; 
-       .pop bc                                             ; POP BC            ; 
-       sb   one,@c                                         ; DEC C             ; 
-       jne  _35bc                                          ; JR NZ,$35BC       ; 
-       rt                                                  ; RET               ; 
+* TI: a native version, which fills a row of characters at a time: where a
+* row's 8 pixel rows are all filled, its C characters are one run of 8 * C
+* bytes; otherwise (the first and last rows of a fill that doesn't start or
+* end on a character boundary) each character's part is written in turn. It
+* polls for VBlank between rows, as clearing the page takes several frames
+* (and a sound effect plays on until it's called). Returns what the MSX's
+* does: HL with L + 8 * C (without a carry into H), B, C = 0, D = 7, E = A.
+       mov  r11,@fill_vram_rect_return                     ;                   ;
+       mov  hl,@fill_vram_rect_start                       ;                   ;
+       mov  bc,@fill_vram_rect_bc                          ;                   ;
+       clr  r1                                             ;                   ;
+       movb b,r1                                           ;                   ;
+       swpb r1                                             ;                   ; R1 = the pixel rows left
+       movb @c,r6                                          ;                   ;
+       srl  r6,8                                           ;                   ;
+       mov  r6,@fill_vram_rect_width                       ;                   ; the width in characters
+       li   r2,vdpwd                                       ;                   ;
+       jmp  fill_vram_rect_2                               ;                   ;
+fill_vram_rect_1:
+       bl   @ti_poll_vblank                                ;                   ; (between rows)
+fill_vram_rect_2:
+       mov  hl,r0                                          ;                   ;
+       andi r0,7                                           ;                   ; R0 = the pixel row in the character to start at
+       li   bc,8                                           ;                   ;
+       s    r0,bc                                          ;                   ;
+       c    bc,r1                                          ;                   ;
+       jle  !                                              ;                   ;
+       mov  r1,bc                                          ;                   ; BC = the pixel rows to fill in this row of characters
+!      mov  hl,r0                                          ;                   ;
+       ori  r0,>4000                                       ;                   ;
+       swpb r0                                             ;                   ;
+       movb r0,@vdpwa                                      ;                   ;
+       swpb r0                                             ;                   ;
+       movb r0,@vdpwa                                      ;                   ; point the VDP at the first character
+       mov  @fill_vram_rect_width,r6                       ;                   ; R6 = the characters
+       ci   bc,8                                           ;                   ;
+       jeq  fill_vram_rect_3                               ;                   ;
+       mov  r6,@fill_vram_rect_count                       ;                   ; (or in memory, for some of the rows)
+       jmp  fill_vram_rect_5                               ;                   ;
+fill_vram_rect_3:                                          ;                   ; all 8 pixel rows: 8 * C bytes in a run
+       movb a,*r2                                          ;                   ;
+       movb a,*r2                                          ;                   ;
+       movb a,*r2                                          ;                   ;
+       movb a,*r2                                          ;                   ;
+       movb a,*r2                                          ;                   ;
+       movb a,*r2                                          ;                   ;
+       movb a,*r2                                          ;                   ;
+       movb a,*r2                                          ;                   ;
+       dec  r6                                             ;                   ;
+       jne  fill_vram_rect_3                               ;                   ;
+       jmp  fill_vram_rect_7                               ;                   ;
+fill_vram_rect_4:
+       ai   r0,8                                           ;                   ; the next character
+       swpb r0                                             ;                   ;
+       movb r0,@vdpwa                                      ;                   ;
+       swpb r0                                             ;                   ;
+       movb r0,@vdpwa                                      ;                   ;
+fill_vram_rect_5:                                          ;                   ; some of them: BC bytes in each character
+       mov  bc,r6                                          ;                   ;
+!      movb a,*r2                                          ;                   ;
+       dec  r6                                             ;                   ;
+       jne  -!                                             ;                   ;
+       dec  @fill_vram_rect_count                          ;                   ;
+       jne  fill_vram_rect_4                               ;                   ;
+fill_vram_rect_7:
+       s    bc,r1                                          ;                   ;
+       jeq  fill_vram_rect_8                               ;                   ; done
+       andi hl,>fff8                                       ;                   ;
+       ai   hl,>0100                                       ;                   ; the next row of characters, from its first pixel row
+       jmp  fill_vram_rect_1                               ;                   ;
+fill_vram_rect_8:
+       mov  @fill_vram_rect_start,hl                       ;                   ;
+       mov  @fill_vram_rect_width,r0                       ;                   ;
+       sla  r0,3                                           ;                   ;
+       ab   @r0lb,@l                                       ;                   ; L += 8 * C
+       mov  @fill_vram_rect_bc,bc                          ;                   ;
+       sb   @c,@c                                          ;                   ; B, C = 0
+       movb a,@e                                           ;                   ; E = the fill byte
+       movb @bytes+>07,d                                   ;                   ; D = 7
+       mov  @fill_vram_rect_return,r11                     ;                   ;
+       rt                                                  ; RET               ;
+fill_vram_rect_return:
+       data 0
+fill_vram_rect_start:
+       data 0
+fill_vram_rect_bc:
+       data 0
+fill_vram_rect_width:
+       data 0
+fill_vram_rect_count:
+       data 0
 
 ********************************************************************************
 * Wait for a keypress, blinking the text-input cursor meanwhile [text]

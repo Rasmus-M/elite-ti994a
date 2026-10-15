@@ -4746,6 +4746,11 @@ _427c:                                                     ; >427c
        b    @draw_small                                    ;                   
 !
        mov  @screen_radius,hl                              ; LD HL,($EB9E)     ; clear: HL = the cached value at $EB9E
+       cb   @ship_type,one                                 ;                   ; (TI: the space station of radius 4 or more is drawn
+       jne  !                                              ;                   ; in full: as a sprite it doesn't look like itself)
+       ci   hl,4                                           ;                   ;
+       jhe  draw_ship_1                                    ;                   ;
+!
        c    hl,@small_ship_limit                           ; LD DE,$FFFC / ADD HL,DE; its radius on screen: under 4 on the MSX (TI: under small_ship_limit: 6 in
        jhe  draw_ship_1                                    ; JP NC,$4A86       ; flight, as a ship that small costs as much to draw as a big one and is only
        ;                                                   ;                   ; a blob, and 2 on the title screen, where the ship flies in from afar)
@@ -5997,7 +6002,7 @@ vertex_relative_record:                                    ; >4a6a
 * a sprite to the list that copy_space_view sends to the VDP (sprites 9 on).
 * The sprite isn't the ship's own shape but a pentagon that tumbles (8
 * frames, in 3 sizes: ship_sprite_numbers), so that it is seen as a ship and
-* not as a star; only the space station at radius 4 or 5 has its own. Then it
+* not as a star (the space station at radius 4 or 5 is drawn in full). Then it
 * returns from draw_object. It returns to its caller instead, which then draws
 * a disc, if the list is full or the sprite would stick out of the space view
 * (sprites aren't clipped).
@@ -6015,10 +6020,6 @@ ship_sprite:
        ci   r2,2                                           ;                   ;
        jl   ship_sprite_2                                  ;                   ;
        li   r2,2                                           ;                   ;
-       ci   r1,>0001                                       ;                   ; the space station at radius 4 or 5?
-       jne  ship_sprite_2                                  ;                   ;
-       li   r2,24                                          ;                   ; yes: it has a pattern of its own, after the 3 * 8
-       jmp  ship_sprite_3                                  ;                   ;
 ship_sprite_2:
        sla  r2,3                                           ;                   ; 8 frames a size: the frame goes on by one each time
        movb @main_loop_tick_counter+1,r0                   ;                   ; round the main loop, and each object is 3 ahead of
@@ -6028,14 +6029,13 @@ ship_sprite_2:
        andi r0,>0700                                       ;                   ;
        swpb r0                                             ;                   ;
        a    r0,r2                                          ;                   ;
-ship_sprite_3:
        movb @ship_sprite_numbers(r2),r2                    ;                   ; R2 = the sprite pattern
        mov  @ship_sprite_count,r1                          ;                   ; R1 = 4 * the number of sprites in the list
        ci   r1,ship_sprite_max*4                           ;                   ;
        jhe  ship_sprite_1                                  ;                   ; the list is full
        mov  ix,r0                                          ;                   ; R0 = the column in the view (x + 87) - 6
        ai   r0,87-6                                        ;                   ;
-       ci   r0,169-6                                       ;                   ; in 6-169, so that all of the widest sprite (the space station's 12 pixels) is in the view?
+       ci   r0,169-6                                       ;                   ; in 6-169, so that all of the sprite is in the view?
        jh   ship_sprite_1                                  ;                   ; no
        ai   r0,6+40-8                                      ;                   ; the sprite's x: the view is at 40, and the ship
        swpb r0                                             ;                   ; is in the middle of the pattern

@@ -210,11 +210,11 @@ words. A single-byte access to
   ships and letters fly in from afar. In between, at radius 2 to 5, a ship is shown as a **sprite**
   (`ship_sprite`): not its own shape but a pentagon that tumbles, so that it is seen as a wireframe ship and not as a
   star - 8 frames in each of 3 sizes (5, 7 and 9 pixels, for radius 2, 3, and 4 or 5); the frame is the main loop's
-  counter + 3 * the object's slot, so the ships don't turn in step. Only the space station at radius 4 or 5 has a
-  pattern of its own; and at radius 1 a ship is still a disc, a dot. `tools/ship-sprites.py` draws the frames
+  counter + 3 * the object's slot, so the ships don't turn in step. The space station at radius 4 or 5 is drawn in
+  full (`draw_object`), as the pentagon doesn't look like it; and at radius 1 a ship is still a disc, a dot. `tools/ship-sprites.py` draws the frames
   by turning the pentagon in 3D (`python tools/ship-sprites.py [preview.png]` writes `src/ship-sprites.a99`, in ROM
-  bank 6, and `src/ship-sprite-table.a99`: `ship_sprite_numbers`, the pattern of each size's frames and the
-  station's), and `ti_setup_environment` uploads them to sprite patterns 60-108 and 208-252: there is no room for more.
+  bank 6, and `src/ship-sprite-table.a99`: `ship_sprite_numbers`, the pattern of each size's frames), and
+  `ti_setup_environment` uploads them to sprite patterns 60-108 and 208-248; 252 is free.
   `ship_sprite` adds the sprite to
   `ship_sprite_list` (`ship_sprite_max`: 8) and `copy_space_view` writes the list to sprites 9 on, followed by y = >D0,
   which ends the VDP's sprite list - so sprites after those can't be used in the space view. `clear_space_view` and
@@ -269,4 +269,4 @@ entry point, `ti-routines.a99` TI-specific hardware routines prefixed `ti_`, `ti
 the name table (>3800) and the sprite attribute table (>3B00), which are easy to set up again, are there, and the sprite
 patterns are at >1800. Use `sprite_attr_table`, `@bytes+sprite_attr_write_hi` and `@bytes+sprite_pattern_write_hi` where
 the MSX code has $1B00, $5B and $78; the MSX addresses in the comments are the MSX's. Sprite patterns 0-31 are used, and
-the font for the view messages is at >1B80->1E7F, and the small ships' sprite patterns at >19E0->1B7F and >1E80->1FFF, so none are free; the disk routines' PAB and buffer are at >1900->19CA).
+the font for the view messages is at >1B80->1E7F, and the small ships' sprite patterns at >19E0->1B7F and >1E80->1FDF, so only >1FE0->1FFF (pattern 252) is free; the disk routines' PAB and buffer are at >1900->19CA).

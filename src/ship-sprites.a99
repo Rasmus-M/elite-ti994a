@@ -4,8 +4,8 @@
 *
 * 16x16 sprite patterns (32 bytes: the left 8 columns, then the right 8)
 * for the ships that are small on screen (ship_sprite in main-code.a99):
-* 8 frames of a tumbling pentagon in each of 3 sizes, and the space
-* station. ti_setup_environment uploads the first 13 to sprite patterns
+* 8 frames of a tumbling pentagon in each of 3 sizes.
+* ti_setup_environment uploads the first 13 to sprite patterns
 * 60 on, and the rest to 208 on.
 *
 ship_sprite_patterns:
@@ -57,8 +57,6 @@ ship_sprite_patterns:
        byte >00,>00,>00,>00,>00,>C0,>20,>10,>08,>10,>20,>C0,>00,>00,>00,>00
        byte >00,>00,>00,>00,>00,>00,>01,>02,>04,>02,>02,>01,>00,>00,>00,>00 ; 9 pixels, frame 7
        byte >00,>00,>00,>00,>00,>00,>F0,>10,>20,>20,>C0,>00,>00,>00,>00,>00
-       byte >00,>00,>00,>03,>04,>0A,>10,>21,>22,>11,>14,>08,>07,>00,>00,>00 ; the space station
-       byte >00,>00,>00,>E0,>10,>28,>88,>44,>94,>08,>10,>20,>C0,>00,>00,>00
 ship_sprite_patterns_2:
        equ  ship_sprite_patterns+416
 ship_sprite_patterns_end:

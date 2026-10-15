@@ -2968,39 +2968,6 @@ copy_space_view_3:
        inc  r1                                             ; INC D             ; next character row
        ci   r1,16                                          ; DEC A             ;
        jne  _3855                                          ; JR NZ,$3855       ;
-* TI: the stardust isn't marked in view_cells: each particle's byte is copied
-* on its own, and so is the byte of each particle that was copied last time
-* (star_list, star_prev_list).
-       mov  @star_prev_count,r1                            ;                   ;
-       jeq  copy_space_view_5                              ;                   ;
-copy_space_view_4:
-       ai   r1,-4                                          ;                   ;
-       mov  @star_prev_list(r1),r0                         ;                   ; the byte's address in the pattern table, for writing
-       swpb r0                                             ;                   ;
-       movb r0,@vdpwa                                      ;                   ;
-       swpb r0                                             ;                   ;
-       movb r0,@vdpwa                                      ;                   ;
-       mov  @star_prev_list+2(r1),a                        ;                   ; and its offset in the buffer
-       movb @space_view_buffer(a),*r2                      ;                   ;
-       mov  r1,r1                                          ;                   ;
-       jne  copy_space_view_4                              ;                   ;
-copy_space_view_5:
-       mov  @star_count,r1                                 ;                   ;
-       mov  r1,@star_prev_count                            ;                   ; this time's particles are the next time's previous ones
-       jeq  copy_space_view_7                              ;                   ;
-copy_space_view_6:
-       ai   r1,-4                                          ;                   ;
-       mov  @star_list(r1),r0                              ;                   ;
-       mov  r0,@star_prev_list(r1)                         ;                   ;
-       swpb r0                                             ;                   ;
-       movb r0,@vdpwa                                      ;                   ;
-       swpb r0                                             ;                   ;
-       movb r0,@vdpwa                                      ;                   ;
-       mov  @star_list+2(r1),a                             ;                   ;
-       mov  a,@star_prev_list+2(r1)                        ;                   ;
-       movb @space_view_buffer(a),*r2                      ;                   ;
-       mov  r1,r1                                          ;                   ;
-       jne  copy_space_view_6                              ;                   ;
 copy_space_view_7:
        li   r0,sprite_attr_table+36+>4000                  ;                   ; (TI: and the small ships' sprites, 9 on: see ship_sprite)
        swpb r0                                             ;                   ;
@@ -3015,7 +2982,20 @@ copy_space_view_8:
        dec  r1                                             ;                   ;
        jne  copy_space_view_8                              ;                   ;
 copy_space_view_9:
+       mov  @star_sprite_count,r1                          ;                   ; then the stardust's (move_and_plot_stardust)
+       jeq  copy_space_view_11                             ;                   ;
+       li   r0,star_sprite_list                            ;                   ;
+copy_space_view_10:
+       movb *r0+,*r2                                       ;                   ;
+       dec  r1                                             ;                   ;
+       jne  copy_space_view_10                             ;                   ;
+copy_space_view_11:
+       mov  @ship_sprite_count,r1                          ;                   ;
+       a    @star_sprite_count,r1                          ;                   ;
+       ci   r1,(32-9)*4                                    ;                   ; up to sprite 31 used?
+       jeq  copy_space_view_12                             ;                   ; yes (and after the table is the disk DSR's VRAM)
        movb @bytes+>d0,*r2                                 ;                   ; y = >D0 ends the sprites: none after them
+copy_space_view_12:
        sb   @vram_busy_flag,@vram_busy_flag                ; LD ($EF9E),A      ; done writing to VRAM
        .endproc                                            ; RET               ; 
 
@@ -3069,35 +3049,20 @@ clear_space_view_5:
        inct r1                                             ;                   ;
        ci   r1,view_cells+32                               ;                   ;
        jne  clear_space_view_1                             ;                   ;
-       mov  @star_count,r1                                 ;                   ; (TI: and the bytes of the stardust's particles, see #R$3846)
-       jeq  clear_space_view_8                             ;                   ;
-clear_space_view_7:
-       ai   r1,-4                                          ;                   ;
-       mov  @star_list+2(r1),hl                            ;                   ;
-       sb   @space_view_buffer(hl),@space_view_buffer(hl)  ;                   ;
-       mov  r1,r1                                          ;                   ;
-       jne  clear_space_view_7                             ;                   ;
-       clr  @star_count                                    ;                   ;
-clear_space_view_8:
+       clr  @star_sprite_count                             ;                   ; (TI: and no stardust sprites)
        clr  @ship_sprite_count                             ;                   ; (TI: and no small ships' sprites)
        bl   @ti_poll_vblank                                ;                   ; (TI: poll for VBlank, interrupts are off)
        .endproc                                            ; RET               ; 
-* TI: the stardust's particles in the buffer (#R$68CD): for each, the address
-* of its byte in the pattern table (for writing) and the byte's offset in the
-* buffer; and those that were copied to the screen last.
-star_prev_count:                                           ; 4 * the number of particles
-       data 0                                              ;                   ;
-star_prev_list:
-       bss  15*4                                           ;                   ;
-star_count:
-       data 0                                              ;                   ;
-star_list:
-       bss  15*4                                           ;                   ;
 * TI: the small ships' sprites (ship_sprite): the sprite attributes of each
 ship_sprite_count:                                         ; 4 * the number of sprites
        data 0                                              ;                   ;
 ship_sprite_list:
        bss  ship_sprite_max*4                              ;                   ;
+* TI: the stardust's sprites (move_and_plot_stardust), after the small ships'
+star_sprite_count:                                         ; 4 * the number of sprites
+       data 0                                              ;                   ;
+star_sprite_list:
+       bss  15*4                                           ;                   ;
 
 ********************************************************************************
 * Decompress a full-screen picture (pattern + colour data) to VRAM
@@ -7847,11 +7812,12 @@ _68de:                                                     ; >68de
        li   hl,stardust_pitch_handlers                     ; LD HL,$6EE5       ; HL -> the per-view pitch handlers
        bl   @jump_to_view_handler                          ; CALL $67A8        ; pitch the stardust for this view
 _68ea:                                                     ; >68ea
-* TI: a native loop, with words in registers; the particle is plotted in line
-* (#R$3CFD) and listed in star_list rather than marked in view_cells, so that
-* only its byte is copied to the screen and cleared. The list has room for
-* the 15 particles; during a jump (#R$872E), when they are plotted several
-* times a frame, the cells of the rest are marked.
+* TI: a native loop, with words in registers. A particle is shown as a sprite
+* (star_sprite_list, which copy_space_view sends to the VDP after the small
+* ships' sprites), so that it isn't in the buffer, which then needn't be
+* copied or cleared for it. But during a jump (#R$872E), when the particles are
+* plotted several times a frame to draw streaks, they are plotted in the
+* buffer (#R$3CFD), and their cells marked in view_cells.
        mov  @reclaimed_range_start,ix                      ; LD IX,($EFA6)     ; IX -> the stardust table
 _68f0:                                                     ; >68f0
        movb *ix,r1                                         ; LD E,(IX+$01)     ;
@@ -7878,31 +7844,23 @@ _6915:                                                     ; >6915
        ci   r0,10                                          ; CP $0A            ;
        jl   stardust_flag_respawn                          ; JR C,$6950        ; abs Y < 10 too - reached the centre, respawn it
 _6931:                                                     ; >6931
-       ai   r1,87                                          ; ADD A,$57         ; R1 = the screen column (view centre is column 87)
-       ai   r2,63                                          ; ADD A,$3F         ; R2 = the screen row (view centre is row 63)
-       mov  r2,hl                                          ;                   ;
-       andi hl,>0078                                       ;                   ;
-       sla  hl,5                                           ;                   ; 256 for each character row
-       mov  r1,r0                                          ;                   ;
-       andi r0,>00f8                                       ;                   ;
-       a    r0,hl                                          ;                   ; + 8 for each character
-       mov  r2,r0                                          ;                   ;
-       andi r0,>0007                                       ;                   ;
-       a    r0,hl                                          ;                   ; + the row in the character
-       ai   hl,>4128                                       ;                   ; HL = the address of its byte in the pattern table, for writing
-       mov  r1,r0                                          ;                   ;
-       srl  r0,3                                           ;                   ;
-       sla  r2,5                                           ;                   ;
-       a    r0,r2                                          ; CALL $3CFD        ; R2 = the offset of its byte in the buffer: row * 32 + column / 8
-       andi r1,7                                           ;                   ;
-       socb @pixel_bitmask_table(r1),@space_view_buffer(r2);                   ; plot the particle
-       mov  @star_count,a                                  ;                   ; and list it, for #R$3846 to copy and #R$388F to clear
-       ci   a,15*4                                         ;                   ; (full during a jump, when it is plotted up to 7 times
-       jhe  stardust_mark_cell                             ;                   ; a frame: then mark its cell instead)
-       mov  hl,@star_list(a)                               ;                   ;
-       mov  r2,@star_list+2(a)                             ;                   ;
+       ai   r1,87                                          ; ADD A,$57         ; R1 = the column in the view (its centre is column 87)
+       ai   r2,63                                          ; ADD A,$3F         ; R2 = the row in the view (its centre is row 63)
+       movb @jump_in_progress,r0                           ;                   ; a jump?
+       jne  stardust_plot                                  ;                   ; yes: plot it in the buffer
+       mov  @star_sprite_count,a                           ;                   ;
+       ci   a,15*4                                         ;                   ; (the list can't be full, but just in case)
+       jhe  stardust_plot                                  ;                   ;
+       ai   r2,8-1                                         ;                   ; the sprite's y: the view is at 8, and a sprite is
+       swpb r2                                             ;                   ; shown one line below its y
+       movb r2,@star_sprite_list(a)                        ;                   ;
+       ai   r1,40                                          ;                   ; its x: the view is at 40
+       swpb r1                                             ;                   ;
+       movb r1,@star_sprite_list+1(a)                      ;                   ;
+       movb @bytes+star_sprite_pattern,@star_sprite_list+2(a);                  ; a dot
+       movb @view_sprite_colour,@star_sprite_list+3(a)     ;                   ; in the colour of the view's lines
        ai   a,4                                            ;                   ;
-       mov  a,@star_count                                  ;                   ;
+       mov  a,@star_sprite_count                           ;                   ;
 _6940:                                                     ; >6940
        movb @>08(ix),a                                     ; LD A,(IX+$08) / OR A; Z flag = particle doesn't need respawning
 stardust_move_handler:                                     ; >6944
@@ -7912,7 +7870,13 @@ stardust_move_handler:                                     ; >6944
        jne  _68f0                                          ;                   ;
 move_and_plot_stardust_exit:
        .endproc                                            ; RET               ;
-stardust_mark_cell:
+stardust_plot:
+       mov  r1,r0                                          ;                   ;
+       srl  r0,3                                           ;                   ;
+       sla  r2,5                                           ;                   ;
+       a    r0,r2                                          ; CALL $3CFD        ; R2 = the offset of its byte in the buffer: row * 32 + column / 8
+       andi r1,7                                           ;                   ;
+       socb @pixel_bitmask_table(r1),@space_view_buffer(r2);                   ; plot the particle
        mov  r2,hl                                          ;                   ;
        andi hl,>001e                                       ;                   ; HL = its cell * 2 (two characters)
        srl  r2,7                                           ;                   ;

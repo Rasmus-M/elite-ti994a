@@ -165,10 +165,10 @@ words. A single-byte access to
   inline in `plot_single_pixel`, `draw_view_message` and `fill_disc_row_span` (the rows of the
   sun's disc, a native routine in low RAM where the MSX has #R$3F68). The tables `view_cell_bit`, `view_cells_from` and
   `view_cells_to_inv` (`ti-routines.a99`) give the bit of a cell, the bits from a cell on and the bits after a cell: a
-  range is `mov @view_cells_from(first*2),r` + `szc @view_cells_to_inv(last*2),r`. The stardust is the exception: `move_and_plot_stardust`
-  doesn't mark cells but lists each particle's byte (`star_list`: its address in the pattern table and its offset in the
-  buffer), and `copy_space_view` copies just those bytes and last time's (`star_prev_list`), and `clear_space_view`
-  clears them. `view_mark_all` marks everything
+  range is `mov @view_cells_from(first*2),r` + `szc @view_cells_to_inv(last*2),r`. The stardust is the exception: in flight
+  `move_and_plot_stardust` shows each particle as a sprite (see the small ships, below), so it isn't in the buffer; only
+  during a jump, when it is plotted up to 7 times a frame to draw streaks, is it plotted in the buffer and its cells
+  marked. `view_mark_all` marks everything
   (`enter_flight_mode`, as then neither the buffer nor the screen is known). `clear_space_view` mustn't change BC: its
   callers count with it.
 - **Rotating vertices** (`rotate_vertex`) is native code that multiplies with `MPY` where
@@ -218,7 +218,10 @@ words. A single-byte access to
   `ship_sprite` adds the sprite to
   `ship_sprite_list` (`ship_sprite_max`: 8) and `copy_space_view` writes the list to sprites 9 on, followed by y = >D0,
   which ends the VDP's sprite list - so sprites after those can't be used in the space view. `clear_space_view` and
-  `view_mark_all` empty the list. A sprite isn't clipped, so a ship within 5 or 6 pixels of the view's edge stays a disc, as
+  `view_mark_all` empty the list. After them come the stardust's sprites (`star_sprite_list`, 15 at the most, so that
+  sprite 31 is the last, as >D0 can't be written after the table; pattern `star_sprite_pattern`, 204, a dot drawn in
+  the view font's unused codes >7C->7F), which the VDP leaves out first when there are more than four on a line. A
+  sprite isn't clipped, so a ship within 5 or 6 pixels of the view's edge stays a disc, as
   does one when the list is full. The sprites have the colour of the view's lines
   (`view_sprite_colour`, set by `colour_space_view` and when the cockpit picture is drawn). Only four sprites show on
   a scan line, and the crosshair is one of them.

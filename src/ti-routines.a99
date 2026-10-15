@@ -277,8 +277,7 @@ vsbw:
 * main-code.a99). Changes R1.
 *
 view_mark_all:
-       clr  @star_count                ; and no particles of the stardust
-       clr  @star_prev_count
+       clr  @star_sprite_count         ; and no stardust sprites
        clr  @ship_sprite_count         ; and no small ships
        li   r1,30
 view_mark_all_1:

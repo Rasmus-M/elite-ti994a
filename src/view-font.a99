@@ -7,7 +7,8 @@
 * the game (../elite-msx-skoolkit/snapshot/elite.vram.bin). Only the codes the
 * messages use have glyphs: the space, "!", "-", ".", the digits, ":", "?",
 * the letters, and $60, the copyright sign; the rest hold whatever is in
-* VRAM there on the MSX (or nothing, from $7B on).
+* VRAM there on the MSX (or nothing, from $7B on). On the TI, $7C-$7F are also
+* the stardust's 16x16 sprite pattern (star_sprite_pattern): a dot in $7C.
 * .
 * On the TI it's in ROM bank 5 (view_font_bank_select), and ti_setup_environment
 * copies it to VRAM >1B80.
@@ -104,7 +105,7 @@ view_font:
        byte >00,>00,>24,>6C,>6C,>7C,>0C,>78                          ; "y"
        byte >00,>00,>7C,>0C,>18,>30,>60,>7C                          ; "z"
        byte >00,>00,>00,>00,>00,>00,>00,>00                          ; $7B (not a glyph)
-       byte >00,>00,>00,>00,>00,>00,>00,>00                          ; $7C (not a glyph)
+       byte >80,>00,>00,>00,>00,>00,>00,>00                          ; $7C (TI: the stardust's sprite, a dot: with $7D-$7F, sprite pattern 204)
        byte >00,>00,>00,>00,>00,>00,>00,>00                          ; $7D (not a glyph)
        byte >00,>00,>00,>00,>00,>00,>00,>00                          ; $7E (not a glyph)
        byte >00,>00,>00,>00,>00,>00,>00,>00                          ; $7F (not a glyph)

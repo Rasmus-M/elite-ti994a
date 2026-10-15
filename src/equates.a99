@@ -183,5 +183,7 @@ small_ship_radius:
 title_ship_radius:
        equ  2
 * The most small ships shown as sprites at a time (ship_sprite)
+star_sprite_pattern:                   ; The stardust's sprite pattern: a dot, in the view messages' font's
+       equ  204                        ; unused codes >7C->7F (view-font.a99)
 ship_sprite_max:
        equ  8

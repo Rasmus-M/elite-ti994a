@@ -123,7 +123,7 @@ r      requ 0
 *
 * As on the MSX (screen 2), but for the name table and the sprite tables: the
 * disk controller's DSR keeps its buffers at the top of the VDP RAM (from
-* >37D8), so the two tables that are easy to set up again (the name table
+* >37D8, or >37D2 with a CF7 or a NanoPEB), so the two tables that are easy to set up again (the name table
 * and the sprite attribute table) are there, and the sprite patterns are
 * where the MSX has those two. The MSX addresses in the comments of the
 * converted code ($1800, $1B00 and $3800) are the MSX's.

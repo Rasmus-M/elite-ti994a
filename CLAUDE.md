@@ -239,9 +239,9 @@ words. A single-byte access to
 - **Disk operations** (the routines in ROM bank 14, `rom-bank-14.a99`; their entry point `disk_entry`, which selects the bank, and their data in `ti-disk.a99`, low RAM): the commander menu (bank 7) loads and saves commanders on disk where the
   MSX uses tape: the file `DSK1.<name>`, a program file of 139 bytes (the record at #R$D606: the name and the commander
   file). Set `disk_opcode`, `disk_name` and `disk_name_length`, `blwp @disk_vector`, and check `disk_error`. The disk DSR
-  needs the scratchpad as the console left it and its buffers at the top of the VDP RAM (from >37D8, starting in the
-  last 40 bytes of the color table), so `ti_save_console_state` saves both as the first thing the program does (before
-  `lwpi wrksp`), `ti_setup_environment` doesn't clear the VDP RAM from >37D8, and `ti_disk_operation` swaps them in
+  needs the scratchpad as the console left it and its buffers at the top of the VDP RAM (from the address after the one in >8370: >37D8, or >37D2 with a CF7 or NanoPEB, starting in the
+  last 40 or 46 bytes of the color table; up to `dsr_color_max`, 48, are kept), so `ti_save_console_state` saves both as the first thing the program does (before
+  `lwpi wrksp`), `ti_setup_environment` doesn't clear the VDP RAM from >37D0, and `ti_disk_operation` swaps them in
   around the DSR call (`ti_dsrlnk`), clears the DSR's buffers under the name table and the sprite attribute table first,
   and sets those two tables up again afterwards (so the screen is blank meanwhile). It all runs in `disk_ws`, a
   workspace in low RAM, as the main workspace is in the scratchpad. The PAB and the file's buffer are in VDP RAM at

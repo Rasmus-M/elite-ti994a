@@ -585,7 +585,7 @@ ti_save_console_state_1:
 ti_save_console_state_2:
        ci   r2,dsr_color_max
        jle  ti_save_console_state_3
-       li   r2,dsr_color_max           ; (more than three files: only the last 40 bytes are kept)
+       li   r2,dsr_color_max           ; (more than three files: only the last dsr_color_max bytes are kept)
        li   r0,color_table+>1800-dsr_color_max
 ti_save_console_state_3:
        mov  r0,@dsr_color_address
@@ -614,6 +614,7 @@ ti_save_console_state_5:
 * scratchpad and its part of the color table back, calls it, and then puts
 * the game's back and sets up the name table and the sprite attribute table
 * again (all sprites off the screen), as the DSR's buffers are under them.
+* The display is off meanwhile, as the DSR's data would show as characters.
 *
 * I:disk_opcode disk_load or disk_save (the high byte)
 * I:disk_name The file's name, with the device ("DSK1.JAMESON")
@@ -657,6 +658,11 @@ ti_disk_operation_2:
        dec  r2
        jne  ti_disk_operation_2
 ti_disk_operation_3:
+       movb @vdp_reg1_cache,r0         ; Turn the display off, as the DSR's buffers are under
+       srl  r0,8                       ; the name table (VDP register 1, bit 6)
+       andi r0,>00bf
+       ori  r0,>8100
+       bl   @ti_disk_vdp_address
        bl   @ti_swap_pad               ; The console's scratchpad
        bl   @ti_swap_dsr_colors        ; and the DSR's part of the color table
        mov  @dsr_color_length,r2
@@ -707,6 +713,10 @@ ti_disk_operation_9:
        movb r3,@vdpwd
        dec  r2
        jne  ti_disk_operation_9
+       movb @vdp_reg1_cache,r0         ; Turn the display on again
+       srl  r0,8
+       ori  r0,>8100
+       bl   @ti_disk_vdp_address
        b    *r10
 *// ti_disk_operation
 

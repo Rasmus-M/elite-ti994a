@@ -14,9 +14,10 @@
 *   all of it: the main workspace, the bit masks, the routines copy_to_pad
 *   installs and pad_ws.
 * - Its buffers at the top of the VDP RAM, from the address after the one
-*   in >8370 (>37D8 with the usual three files). They start with a header
-*   that the DSR checks, in the last 40 bytes of the color table (the
-*   colors of the bottom right five characters of the screen); the rest of
+*   in >8370 (>37D8 with the usual three files and a TI disk controller,
+*   >37D2 with a CF7 or a NanoPEB). They start with a header
+*   that the DSR checks, in the last 40 (or 46) bytes of the color table (the
+*   colors of the bottom right five or six characters of the screen); the rest of
 *   the area is under the name table and the sprite attribute table, and
 *   above them (which the game leaves alone: ti_setup_environment doesn't
 *   clear it).
@@ -69,8 +70,8 @@ disk_name_length:                      ; The length of the file's name
 disk_name:                             ; The file's name: "DSK1." and up to 10 characters
        bss  15
        even
-dsr_color_max:                         ; The most bytes of the color table that are kept
-       equ  40
+dsr_color_max:                         ; The most bytes of the color table that are kept (46 with a CF7 or a NanoPEB,
+       equ  48                         ; whose buffers start 6 bytes lower)
 dsr_color_address:                     ; The VDP address of the DSR's part of the color table
        data 0
 dsr_color_length:                      ; and its length (0 if there is none)

@@ -7796,7 +7796,9 @@ _68de:                                                     ; >68de
 _68ea:                                                     ; >68ea
 * TI: a native loop, with words in registers; the particle is plotted in line
 * (#R$3CFD) and listed in star_list rather than marked in view_cells, so that
-* only its byte is copied to the screen and cleared.
+* only its byte is copied to the screen and cleared. The list has room for
+* the 15 particles; during a jump (#R$872E), when they are plotted several
+* times a frame, the cells of the rest are marked.
        mov  @reclaimed_range_start,ix                      ; LD IX,($EFA6)     ; IX -> the stardust table
 _68f0:                                                     ; >68f0
        movb *ix,r1                                         ; LD E,(IX+$01)     ;
@@ -7842,8 +7844,8 @@ _6931:                                                     ; >6931
        andi r1,7                                           ;                   ;
        socb @pixel_bitmask_table(r1),@space_view_buffer(r2);                   ; plot the particle
        mov  @star_count,a                                  ;                   ; and list it, for #R$3846 to copy and #R$388F to clear
-       ci   a,15*4                                         ;                   ;
-       jhe  _6940                                          ;                   ;
+       ci   a,15*4                                         ;                   ; (full during a jump, when it is plotted up to 7 times
+       jhe  stardust_mark_cell                             ;                   ; a frame: then mark its cell instead)
        mov  hl,@star_list(a)                               ;                   ;
        mov  r2,@star_list+2(a)                             ;                   ;
        ai   a,4                                            ;                   ;
@@ -7857,6 +7859,13 @@ stardust_move_handler:                                     ; >6944
        jne  _68f0                                          ;                   ;
 move_and_plot_stardust_exit:
        .endproc                                            ; RET               ;
+stardust_mark_cell:
+       mov  r2,hl                                          ;                   ;
+       andi hl,>001e                                       ;                   ; HL = its cell * 2 (two characters)
+       srl  r2,7                                           ;                   ;
+       andi r2,>001e                                       ;                   ; R2 = its character row * 2
+       soc  @view_cell_bit(hl),@view_cells(r2)             ;                   ; mark it as drawn in (see view_mark_line)
+       jmp  _6940                                          ;                   ;
 stardust_flag_respawn:                                     ; >6950
        movb @b255,@>08(ix)                                 ; LD (IX+$08),$FF   ; flag the particle for respawning
        jmp  _6940                                          ; JR $6940          ; go call the move handler

@@ -649,7 +649,7 @@ _1a8a_end:
 * #R$1C34 - which #R$1A8A shows when the player presses 1-4.
 credits_screen_message_pointer_table_4:                    ; >1c42
        data msg_version_1_0_1987,msg_msx_conversion,msg_rob_nicholson,msg_mr_micro_ltd; 
-       data msg_version_2_0_2026,msg_ti_port_by,msg_rasmus_m_and_claude ; (TI: and the credits for the TI-99/4A port)
+       data msg_version_2_1_2026,msg_ti_port_by,msg_rasmus_m_and_claude ; (TI: and the credits for the TI-99/4A port)
 
 ********************************************************************************
 * Missions: check for mission events on docking

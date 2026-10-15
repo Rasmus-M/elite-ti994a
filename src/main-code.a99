@@ -515,10 +515,10 @@ msg_mr_micro_ltd:                                          ; >1c34
        text 'Mr. Micro Ltd',>ae                                   ; 
 
 ********************************************************************************
-* TI: the messages "Version 2.0 2026", "TI-99/4A port by" and "Rasmus M and
+* TI: the messages "Version 2.1 2026", "TI-99/4A port by" and "Rasmus M and
 * Claude", which #R$1A8A shows after the MSX credits
-msg_version_2_0_2026:
-       text 'Version 2.0 202',>b6
+msg_version_2_1_2026:
+       text 'Version 2.1 202',>b6
 msg_ti_port_by:
        text 'TI-99/4A port b',>f9
 msg_rasmus_m_and_claude:

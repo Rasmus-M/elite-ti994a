@@ -136,7 +136,8 @@ words. A single-byte access to
   with `far_call_r0_r1`). Add a screen's key there when it's converted.
 - **ROM banks** (`src/rom-banks/`): every data bank starts with the math tables (`math-tables.a99`) at `>6040`,
   so they're readable whichever bank is selected. Bank 4 then holds the blueprints for ship types 1-22, bank 5
-  types 23+ (`blueprints_2_first_type`), bank 6 the cockpit picture, the font, the title music and the small ships' sprite patterns. Select a bank with
+  types 23+ (`blueprints_2_first_type`) and the view messages' bold font (`view-font.a99`, a copy of the MSX's VRAM;
+  `ti_setup_environment` copies it to >1B80), bank 6 the cockpit picture, the font, the title music and the small ships' sprite patterns. Select a bank with
   `.select_bank ..._bank_select` (`equates.a99`; it changes R0) before reading its data - never a plain `seto`, as
   the music player selects the bank in `current_bank` again after each tick; `draw_object` and `get_blueprint_data` select
   the blueprint bank themselves (`select_blueprint_bank`). RAM routines that select a bank select the caller's bank

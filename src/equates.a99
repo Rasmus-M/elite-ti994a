@@ -155,6 +155,8 @@ cockpit_picture_bank_select:
        equ  >600c
 font_bank_select:
        equ  >600c
+view_font_bank_select:                 ; The view messages' font (view-font.a99)
+       equ  >600a
 music_bank_select:
        equ  >600c
 code_bank_7_select:                    ; Code (rom-bank-7.a99)

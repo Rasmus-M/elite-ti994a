@@ -1,4 +1,4 @@
-* ROM bank 5: the math tables and the blueprints for ship types 23-31
+* ROM bank 5: the math tables, the blueprints for ship types 23-31 and the view messages' font
 * Copied into elite.a99 with main_program defined, only for its labels
        .ifdef main_program
        dorg >6000
@@ -12,6 +12,7 @@
        copy "../math-tables.a99"
        .endif
        copy "../ship-blueprints-2.a99"
+       copy "../view-font.a99"
 rom_bank_5_end:
        equ  $
        bss  >8000-$

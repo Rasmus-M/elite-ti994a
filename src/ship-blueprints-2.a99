@@ -14,7 +14,7 @@ ship_adder_header:                                         ; >adc3
 *
 * The message "Adder".
 ship_adder_name:                                           ; >addd
-       text 'ADDE',>f2
+       text 'Adde',>f2
 
 * Adder: vertex array (6 bytes/vertex)
 ship_adder_vertices:                                       ; >ade2
@@ -85,7 +85,7 @@ ship_mamba_header:                                         ; >bd0e
 *
 * The message "Mamba".
 ship_mamba_name:                                           ; >bd28
-       text 'MAMB',>e1
+       text 'Mamb',>e1
 
 * Mamba: vertex array (6 bytes/vertex)
 ship_mamba_vertices:                                       ; >bd2d
@@ -151,7 +151,7 @@ ship_asp_mkii_header:                                      ; >ac4b
 *
 * The message "Asp MkII".
 ship_asp_mkii_name:                                        ; >ac65
-       text 'ASP MKI',>c9
+       text 'Asp MkI',>c9
 
 * Asp MkII: vertex array (6 bytes/vertex)
 ship_asp_mkii_vertices:                                    ; >ac6d
@@ -229,7 +229,7 @@ ship_sidewinder_header:                                    ; >c081
 *
 * The message "Sidewinder".
 ship_sidewinder_name:                                      ; >c09b
-       text 'SIDEWINDE',>f2
+       text 'Sidewinde',>f2
 
 * Sidewinder: vertex array (6 bytes/vertex)
 ship_sidewinder_vertices:                                  ; >c0a5
@@ -282,7 +282,7 @@ ship_wolf_mkii_header:                                     ; >c692
 *
 * The message "Wolf MKII".
 ship_wolf_mkii_name:                                       ; >c6ac
-       text 'WOLF MKI',>c9
+       text 'Wolf MKI',>c9
 
 * Wolf MKII: vertex array (6 bytes/vertex)
 ship_wolf_mkii_vertices:                                   ; >c6b5
@@ -374,7 +374,7 @@ ship_orbit_shuttle_header:                                 ; >b3d1
 *
 * The message "Orbit Shuttle".
 ship_orbit_shuttle_name:                                   ; >b3eb
-       text 'ORBIT SHUTTL',>e5
+       text 'Orbit Shuttl',>e5
 
 * Orbit Shuttle: vertex array (6 bytes/vertex)
 ship_orbit_shuttle_vertices:                               ; >b3f8
@@ -446,7 +446,7 @@ ship_transporter_header:                                   ; >c2a7
 *
 * The message "Transporter".
 ship_transporter_name:                                     ; >c2c1
-       text 'TRANSPORTE',>f2
+       text 'Transporte',>f2
 
 * Transporter: vertex array (6 bytes/vertex)
 ship_transporter_vertices:                                 ; >c2cc
@@ -568,7 +568,7 @@ ship_cougar_header:                                        ; >a817
 * The Cougar's name, which its blueprint header points to (#R$A817), ending
 * with a bit-7-set "r" like the other messages (see #R$4223).
 ship_cougar_name:                                          ; >a831
-       text 'COUGA',>f2
+       text 'Couga',>f2
 
 * Cougar: vertex array (6 bytes/vertex)
 *
@@ -646,7 +646,7 @@ ship_constrictor_header:                                   ; >a941
 *
 * The message "Constrictor".
 ship_constrictor_name:                                     ; >a95b
-       text 'CONSTRICTO',>f2
+       text 'Constricto',>f2
 
 * Constrictor: vertex array (6 bytes/vertex)
 ship_constrictor_vertices:                                 ; >a966

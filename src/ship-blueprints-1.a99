@@ -14,7 +14,7 @@ ship_space_station_header:                                 ; >af26
 *
 * The message "Space Station".
 ship_space_station_name:                                   ; >af40
-       text 'SPACE STATIO',>ee
+       text 'Space Statio',>ee
 
 * Space Station: vertex array (6 bytes/vertex)
 ship_space_station_vertices:                               ; >af4d
@@ -83,7 +83,7 @@ ship_missile_header:                                       ; >b258
 *
 * The message "Missile".
 ship_missile_name:                                         ; >b272
-       text 'MISSIL',>e5
+       text 'Missil',>e5
 
 * Missile: vertex array (6 bytes/vertex)
 ship_missile_vertices:                                     ; >b279
@@ -147,7 +147,7 @@ ship_cargo_canister_header:                                ; >b089
 *
 * The message "Cargo Canister".
 ship_cargo_canister_name:                                  ; >b0a3
-       text 'CARGO CANISTE',>f2
+       text 'Cargo Caniste',>f2
 
 * Cargo Canister: vertex array (6 bytes/vertex)
 ship_cargo_canister_vertices:                              ; >b0b1
@@ -199,7 +199,7 @@ ship_asteroid_header:                                      ; >b869
 *
 * The message "Asteroid".
 ship_asteroid_name:                                        ; >b883
-       text 'ASTEROI',>e4
+       text 'Asteroi',>e4
 
 * Asteroid: vertex array (6 bytes/vertex)
 ship_asteroid_vertices:                                    ; >b88b
@@ -261,7 +261,7 @@ ship_escape_capsule_header:                                ; >b63f
 *
 * The message "Escape Capsule".
 ship_escape_capsule_name:                                  ; >b659
-       text 'ESCAPE CAPSUL',>e5
+       text 'Escape Capsul',>e5
 
 * Escape Capsule: vertex array (6 bytes/vertex)
 ship_escape_capsule_vertices:                              ; >b667
@@ -315,7 +315,7 @@ ship_thargon_header:                                       ; >c5c1
 *
 * The message "Thargon".
 ship_thargon_name:                                         ; >c5db
-       text 'THARGO',>ee
+       text 'Thargo',>ee
 
 * Thargon: vertex array (6 bytes/vertex)
 ship_thargon_vertices:                                     ; >c5e2
@@ -367,7 +367,7 @@ ship_platlet_header:                                       ; >b38b
 *
 * The message "Platlet".
 ship_platlet_name:                                         ; >b3a5
-       text 'PLATLE',>f4
+       text 'Platle',>f4
 
 * Platlet: vertex array (6 bytes/vertex)
 ship_platlet_vertices:                                     ; >b3ac
@@ -560,7 +560,7 @@ ship_viper_header:                                         ; >c4c6
 *
 * The message "Viper".
 ship_viper_name:                                           ; >c4e0
-       text 'VIPE',>f2
+       text 'Vipe',>f2
 
 * Viper: vertex array (6 bytes/vertex)
 ship_viper_vertices:                                       ; >c4e5
@@ -618,7 +618,7 @@ ship_fer_de_lance_header:                                  ; >bbc3
 *
 * The message "Fer-De-Lance".
 ship_fer_de_lance_name:                                    ; >bbdd
-       text 'FER-DE-LANC',>e5
+       text 'Fer-De-Lanc',>e5
 
 * Fer-De-Lance: vertex array (6 bytes/vertex)
 ship_fer_de_lance_vertices:                                ; >bbe9
@@ -686,7 +686,7 @@ ship_cobra_mkiii_header:                                   ; >aa7c
 *
 * The message "Cobra MkIII".
 ship_cobra_mkiii_name:                                     ; >aa96
-       text 'COBRA MKII',>c9
+       text 'Cobra MkII',>c9
 
 * Cobra MkIII: vertex array (6 bytes/vertex)
 ship_cobra_mkiii_vertices:                                 ; >aaa1
@@ -769,7 +769,7 @@ ship_python_header:                                        ; >bf53
 *
 * The message "Python".
 ship_python_name:                                          ; >bf6d
-       text 'PYTHO',>ee
+       text 'Pytho',>ee
 
 * Python: vertex array (6 bytes/vertex)
 ship_python_vertices:                                      ; >bf73
@@ -833,7 +833,7 @@ ship_anaconda_header:                                      ; >b729
 *
 * The message "Anaconda".
 ship_anaconda_name:                                        ; >b743
-       text 'ANACOND',>e1
+       text 'Anacond',>e1
 
 * Anaconda: vertex array (6 bytes/vertex)
 ship_anaconda_vertices:                                    ; >b74b
@@ -900,7 +900,7 @@ ship_cobra_mk1_header:                                     ; >bac6
 *
 * The message "Cobra MK1".
 ship_cobra_mk1_name:                                       ; >bae0
-       text 'COBRA MK',>b1
+       text 'Cobra MK',>b1
 
 * Cobra MK1: vertex array (6 bytes/vertex)
 ship_cobra_mk1_vertices:                                   ; >bae9
@@ -958,7 +958,7 @@ ship_krait_header:                                         ; >b540
 *
 * The message "Krait".
 ship_krait_name:                                           ; >b55a
-       text 'KRAI',>f4
+       text 'Krai',>f4
 
 * Krait: vertex array (6 bytes/vertex)
 ship_krait_vertices:                                       ; >b55f
@@ -1016,7 +1016,7 @@ ship_thargoid_header:                                      ; >c157
 *
 * The message "Thargoid".
 ship_thargoid_name:                                        ; >c171
-       text 'THARGOI',>e4
+       text 'Thargoi',>e4
 
 * Thargoid: vertex array (6 bytes/vertex)
 ship_thargoid_vertices:                                    ; >c179
@@ -1084,7 +1084,7 @@ ship_boa_class_cruiser_header:                             ; >b985
 *
 * The message "Boa Class Cruiser".
 ship_boa_class_cruiser_name:                               ; >b99f
-       text 'BOA CLASS CRUISE',>f2
+       text 'Boa Class Cruise',>f2
 
 * Boa Class Cruiser: vertex array (6 bytes/vertex)
 ship_boa_class_cruiser_vertices:                           ; >b9b0
@@ -1148,7 +1148,7 @@ ship_gecko_header:                                         ; >b161
 *
 * The message "Gecko".
 ship_gecko_name:                                           ; >b17b
-       text 'GECK',>ef
+       text 'Geck',>ef
 
 * Gecko: vertex array (6 bytes/vertex)
 ship_gecko_vertices:                                       ; >b180
@@ -1205,7 +1205,7 @@ ship_moray_star_boat_header:                               ; >be47
 *
 * The message "Moray Star Boat".
 ship_moray_star_boat_name:                                 ; >be61
-       text 'MORAY STAR BOA',>f4
+       text 'Moray Star Boa',>f4
 
 * Moray Star Boat: vertex array (6 bytes/vertex)
 ship_moray_star_boat_vertices:                             ; >be70

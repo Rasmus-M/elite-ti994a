@@ -1,0 +1,110 @@
+********************************************************************************
+* Font for the view messages: 8x8 character bitmaps for codes $20-$7F
+*
+* The MSX reads the view messages' characters (#R$3A03) from VRAM ($1A80 +
+* 8 * code), where the game has a bold font of its own, not the one it prints
+* the pages with (#R$0A9F). This is a copy of VRAM $1B80-$1E7F as it is in
+* the game (../elite-msx-skoolkit/snapshot/elite.vram.bin). Only the codes the
+* messages use have glyphs: the space, "!", "-", ".", the digits, ":", "?",
+* the letters, and $60, the copyright sign; the rest hold whatever is in
+* VRAM there on the MSX (or nothing, from $7B on).
+* .
+* On the TI it's in ROM bank 5 (view_font_bank_select), and ti_setup_environment
+* copies it to VRAM >1B80.
+view_font:
+       byte >00,>00,>00,>00,>00,>00,>00,>00                          ; space
+       byte >00,>1C,>1C,>1C,>18,>18,>00,>18                          ; "!"
+       byte >91,>4E,>C3,>02,>54,>C3,>3C,>4F                          ; $22 (not a glyph)
+       byte >C3,>3F,>4F,>C3,>05,>52,>C3,>1F                          ; $23 (not a glyph)
+       byte >51,>C3,>12,>50,>C3,>91,>4E,>C3                          ; $24 (not a glyph)
+       byte >14,>4F,>C3,>B1,>39,>C3,>91,>4E                          ; $25 (not a glyph)
+       byte >C3,>91,>4E,>C3,>91,>4E,>C3,>79                          ; $26 (not a glyph)
+       byte >3A,>C3,>22,>55,>C3,>B3,>55,>C3                          ; $27 (not a glyph)
+       byte >1A,>54,>C3,>B0,>55,>C3,>B3,>55                          ; $28 (not a glyph)
+       byte >C3,>66,>52,>C3,>3A,>51,>C3,>21                          ; $29 (not a glyph)
+       byte >50,>C3,>A0,>56,>C3,>62,>55,>C3                          ; $2A (not a glyph)
+       byte >B1,>39,>C3,>F7,>54,>C3,>FC,>54                          ; $2B (not a glyph)
+       byte >C3,>F7,>55,>C3,>79,>3A,>C3,>78                          ; $2C (not a glyph)
+       byte >00,>00,>00,>7E,>7E,>00,>00,>00                          ; "-"
+       byte >00,>00,>00,>00,>00,>00,>18,>18                          ; "."
+       byte >C3,>45,>51,>C3,>3B,>58,>C3,>31                          ; $2F (not a glyph)
+       byte >00,>7E,>C6,>CE,>D6,>E6,>C6,>FC                          ; "0"
+       byte >00,>38,>18,>18,>18,>18,>18,>38                          ; "1"
+       byte >00,>FE,>06,>06,>7C,>C0,>C0,>FE                          ; "2"
+       byte >00,>3E,>06,>06,>7E,>06,>06,>FC                          ; "3"
+       byte >00,>42,>C6,>C6,>FE,>06,>06,>04                          ; "4"
+       byte >00,>7E,>C0,>C0,>FE,>06,>06,>FC                          ; "5"
+       byte >00,>40,>C0,>C0,>FE,>C6,>C6,>FC                          ; "6"
+       byte >00,>FE,>06,>06,>06,>06,>06,>04                          ; "7"
+       byte >00,>7E,>C6,>C6,>7C,>C6,>C6,>FC                          ; "8"
+       byte >00,>7E,>C6,>C6,>FE,>06,>06,>04                          ; "9"
+       byte >00,>00,>30,>30,>00,>30,>30,>00                          ; ":"
+       byte >C3,>17,>13,>C3,>91,>4E,>3E,>0F                          ; $3B (not a glyph)
+       byte >C9,>C3,>E0,>12,>C3,>E0,>12,>C3                          ; $3C (not a glyph)
+       byte >E0,>12,>C3,>17,>13,>C3,>A8,>0C                          ; $3D (not a glyph)
+       byte >C3,>D3,>0C,>C3,>9C,>0B,>C3,>19                          ; $3E (not a glyph)
+       byte >00,>3C,>66,>06,>0C,>18,>00,>18                          ; "?"
+       byte >F7,>4B,>C3,>19,>13,>C3,>17,>13                          ; $40 (not a glyph)
+       byte >00,>7E,>C6,>C6,>FE,>C6,>C6,>84                          ; "A"
+       byte >00,>7E,>C6,>C6,>FC,>C6,>C6,>FC                          ; "B"
+       byte >00,>7E,>C6,>C0,>C0,>C0,>C6,>FC                          ; "C"
+       byte >00,>7E,>C6,>C2,>C2,>C2,>C6,>FC                          ; "D"
+       byte >00,>7E,>C0,>C0,>F8,>C0,>C0,>FC                          ; "E"
+       byte >00,>7E,>C0,>C0,>F8,>C0,>C0,>80                          ; "F"
+       byte >00,>7E,>C0,>C0,>CE,>C6,>C6,>FC                          ; "G"
+       byte >00,>42,>C6,>C6,>FE,>C6,>C6,>84                          ; "H"
+       byte >00,>7E,>08,>18,>18,>18,>10,>7E                          ; "I"
+       byte >00,>FE,>06,>06,>06,>06,>C6,>7C                          ; "J"
+       byte >00,>44,>C8,>D0,>E0,>D0,>C8,>84                          ; "K"
+       byte >00,>40,>C0,>C0,>C0,>C0,>C0,>FE                          ; "L"
+       byte >00,>7E,>D6,>D6,>D6,>C6,>C6,>84                          ; "M"
+       byte >00,>46,>C6,>E6,>D6,>CE,>C6,>84                          ; "N"
+       byte >00,>7E,>C6,>C6,>C6,>C6,>C6,>FC                          ; "O"
+       byte >00,>7E,>C6,>C6,>FC,>C0,>C0,>80                          ; "P"
+       byte >00,>7E,>C6,>C6,>C6,>D4,>C8,>F4                          ; "Q"
+       byte >00,>7E,>C6,>C6,>F8,>C6,>C6,>84                          ; "R"
+       byte >00,>7E,>C0,>C0,>FE,>06,>06,>FC                          ; "S"
+       byte >00,>7E,>08,>18,>18,>18,>18,>10                          ; "T"
+       byte >00,>42,>C6,>C6,>C6,>C6,>C6,>FC                          ; "U"
+       byte >00,>42,>C6,>C6,>C6,>6C,>38,>10                          ; "V"
+       byte >00,>42,>C6,>C6,>D6,>D6,>D6,>FC                          ; "W"
+       byte >00,>C6,>6C,>38,>38,>6C,>C6,>82                          ; "X"
+       byte >00,>22,>66,>66,>7E,>0C,>18,>30                          ; "Y"
+       byte >00,>FE,>06,>0C,>18,>30,>60,>FE                          ; "Z"
+       byte >2A,>09,>68,>03,>37,>ED,>42,>28                          ; $5B (not a glyph)
+       byte >2E,>CB,>3C,>CB,>1D,>CB,>C5,>09                          ; $5C (not a glyph)
+       byte >E5,>5E,>23,>56,>2A,>26,>13,>19                          ; $5D (not a glyph)
+       byte >11,>F0,>68,>1A,>BE,>20,>0D,>13                          ; $5E (not a glyph)
+       byte >23,>B7,>20,>F7,>E1,>5E,>23,>56                          ; $5F (not a glyph)
+       byte >00,>38,>44,>BA,>A2,>BA,>44,>38                          ; copyright sign
+       byte >00,>00,>7C,>0C,>3C,>6C,>6C,>78                          ; "a"
+       byte >00,>20,>60,>7C,>6C,>6C,>6C,>78                          ; "b"
+       byte >00,>00,>3C,>60,>60,>60,>60,>78                          ; "c"
+       byte >00,>04,>0C,>3C,>6C,>6C,>6C,>78                          ; "d"
+       byte >00,>00,>3C,>6C,>6C,>78,>60,>78                          ; "e"
+       byte >00,>00,>1C,>30,>78,>30,>30,>20                          ; "f"
+       byte >00,>00,>3C,>6C,>6C,>7C,>0C,>78                          ; "g"
+       byte >00,>20,>60,>7C,>6C,>6C,>6C,>48                          ; "h"
+       byte >00,>18,>00,>08,>18,>18,>18,>10                          ; "i"
+       byte >00,>18,>00,>08,>18,>18,>18,>30                          ; "j"
+       byte >00,>20,>60,>64,>68,>70,>68,>44                          ; "k"
+       byte >00,>08,>18,>18,>18,>18,>18,>10                          ; "l"
+       byte >00,>00,>3E,>6E,>6E,>66,>66,>44                          ; "m"
+       byte >00,>00,>3C,>6C,>6C,>6C,>6C,>48                          ; "n"
+       byte >00,>00,>3C,>6C,>6C,>6C,>6C,>78                          ; "o"
+       byte >00,>3C,>6C,>6C,>78,>60,>60,>40                          ; "p"
+       byte >00,>3C,>6C,>6C,>7C,>0C,>0C,>08                          ; "q"
+       byte >00,>00,>28,>74,>60,>60,>60,>40                          ; "r"
+       byte >00,>00,>3C,>60,>7C,>0C,>0C,>78                          ; "s"
+       byte >00,>10,>30,>78,>30,>30,>30,>3C                          ; "t"
+       byte >00,>00,>24,>6C,>6C,>6C,>6C,>78                          ; "u"
+       byte >00,>00,>24,>6C,>6C,>6C,>38,>10                          ; "v"
+       byte >00,>00,>22,>66,>66,>6E,>6E,>7C                          ; "w"
+       byte >00,>00,>66,>3C,>18,>3C,>66,>42                          ; "x"
+       byte >00,>00,>24,>6C,>6C,>7C,>0C,>78                          ; "y"
+       byte >00,>00,>7C,>0C,>18,>30,>60,>7C                          ; "z"
+       byte >00,>00,>00,>00,>00,>00,>00,>00                          ; $7B (not a glyph)
+       byte >00,>00,>00,>00,>00,>00,>00,>00                          ; $7C (not a glyph)
+       byte >00,>00,>00,>00,>00,>00,>00,>00                          ; $7D (not a glyph)
+       byte >00,>00,>00,>00,>00,>00,>00,>00                          ; $7E (not a glyph)
+       byte >00,>00,>00,>00,>00,>00,>00,>00                          ; $7F (not a glyph)

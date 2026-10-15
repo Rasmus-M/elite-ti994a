@@ -3063,6 +3063,32 @@ star_sprite_count:                                         ; 4 * the number of s
        data 0                                              ;                   ;
 star_sprite_list:
        bss  15*4                                           ;                   ;
+* TI: the number of times a particle of the stardust moves by its velocity in a
+* frame (#R$6520, #R$65C1): the bit length of |X| / 4 (#R$0200), for X the
+* high byte of the coordinate, read as signed; indexed by that byte, so that it
+* needn't be made positive and shifted first.
+stardust_steps:
+       byte >01,>01,>01,>01,>01,>01,>01,>01,>02,>02,>02,>02,>02,>02,>02,>02      ; X = 0 to 15
+       byte >03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03      ; X = 16 to 31
+       byte >04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04      ; X = 32 to 47
+       byte >04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04      ; X = 48 to 63
+       byte >05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05      ; X = 64 to 79
+       byte >05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05      ; X = 80 to 95
+       byte >05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05      ; X = 96 to 111
+       byte >05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05      ; X = 112 to 127
+       byte >06,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05      ; X = -128 to -113
+       byte >05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05      ; X = -112 to -97
+       byte >05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05      ; X = -96 to -81
+       byte >05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05,>05      ; X = -80 to -65
+       byte >05,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04      ; X = -64 to -49
+       byte >04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04,>04      ; X = -48 to -33
+       byte >04,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03,>03      ; X = -32 to -17
+       byte >03,>02,>02,>02,>02,>02,>02,>02,>02,>01,>01,>01,>01,>01,>01,>01      ; X = -16 to -1
+stardust_iy:                                               ; The caller's IY, kept by move_and_plot_stardust
+       data 0                                              ;                   ;
+stardust_slow:                                             ; Nonzero if the particles can't simply be listed as sprites
+       byte 0                                              ;                   ;
+       even                                                ;                   ;
 
 ********************************************************************************
 * Decompress a full-screen picture (pattern + colour data) to VRAM
@@ -7069,19 +7095,10 @@ _6514:                                                     ; >6514
 stardust_move_outwards:                                    ; >6520
        mov  *ix,hl                                         ; LD L,(IX+$00)     ;
        mov  @>04(ix),de                                    ; LD E,(IX+$04)     ;
-       movb h,a                                            ; LD A,H / OR A     ; 
-       jgt  stardust_front_x                               ; JP P,$6533        ; 
-       jeq  stardust_front_x                               ;                   ; 
-!
-       andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
-       neg a                                               ; NEG               ; A = |X|
 stardust_front_x:                                          ; >6533
-       srl  a,2                                            ; SRL A             ; 
-       ;                                                   ; SRL A             ; A = |X| / 4
-       movb a,@c                                           ; LD C,A            ; 
-       movb a,r1                                           ; LD B,$02          ; 
-       srl  r1,8                                           ;                   ; 
-       movb @bit_length_table(r1),r1                       ; LD A,(BC) / LD B,A; R1 = number of steps from the bit length table
+       mov  hl,r1                                          ; LD A,H / OR A ... ; (TI: from a table indexed by the high byte)
+       srl  r1,8                                           ; SRL A / SRL A     ;
+       movb @stardust_steps(r1),r1                         ; LD A,(BC) / LD B,A; R1 = number of steps: the bit length of |X| / 4
        srl  r1,8                                           ;                   ;
 _653c:                                                     ; >653c
        mpy  de,r1                                          ; ADD HL,DE         ; move along X that many times (TI: a multiplication; the low word is
@@ -7089,19 +7106,10 @@ _653c:                                                     ; >653c
        mov  hl,*ix                                         ; LD (IX+$00),L     ;
        mov  @>02(ix),hl                                    ; LD L,(IX+$02)     ;
        mov  @>06(ix),de                                    ; LD E,(IX+$06)     ;
-       movb h,a                                            ; LD A,H / OR A     ; 
-       jgt  stardust_front_y                               ; JP P,$6558        ; 
-       jeq  stardust_front_y                               ;                   ; 
-!
-       andi a,>ff00                                        ;                   ; (NEG negates the whole of R4, so clear F first)
-       neg a                                               ; NEG               ; A = |Y|
 stardust_front_y:                                          ; >6558
-       srl  a,2                                            ; SRL A             ; 
-       ;                                                   ; SRL A             ; A = |Y| / 4
-       movb a,@c                                           ; LD C,A            ; 
-       movb a,r1                                           ; LD B,$02          ; 
-       srl  r1,8                                           ;                   ; 
-       movb @bit_length_table(r1),r1                       ; LD A,(BC) / LD B,A; R1 = number of steps from the bit length table
+       mov  hl,r1                                          ; LD A,H / OR A ... ;
+       srl  r1,8                                           ; SRL A / SRL A     ;
+       movb @stardust_steps(r1),r1                         ; LD A,(BC) / LD B,A; R1 = number of steps: the bit length of |Y| / 4
        srl  r1,8                                           ;                   ;
 _6561:                                                     ; >6561
        mpy  de,r1                                          ; ADD HL,DE         ; move along Y that many times (TI: a multiplication; the low word is
@@ -7207,17 +7215,11 @@ _6627:                                                     ; >6627
 * (#R$6520), returning the status of HL xor its old value, so negative if it
 * changed sign (from $65C5-$65E9 and $65F8-$661C).
 stardust_move_back:
-       movb h,a                                            ; LD C,H / LD A,H   ;
-       mov  hl,r0                                          ;                   ; R0 = the old value
-       jgt  stardust_move_back_1                           ; OR A / JP P,$65CF ;
-       jeq  stardust_move_back_1                           ;                   ;
-       andi a,>ff00                                        ; NEG               ; A = abs H
-       neg  a                                              ;                   ;
+       mov  hl,r0                                          ; LD C,H            ; R0 = the old value
 stardust_move_back_1:
-       srl  a,2                                            ; SRL A / SRL A     ; abs H / 4
-       movb a,r1                                           ; LD E,A / LD D,$02 ;
-       srl  r1,8                                           ;                   ;
-       movb @bit_length_table(r1),r1                       ; LD A,(DE) / LD B,A; R1 = number of steps from the bit length table
+       mov  hl,r1                                          ; LD A,H / OR A ... ;
+       srl  r1,8                                           ; SRL A / SRL A     ;
+       movb @stardust_steps(r1),r1                         ; LD A,(DE) / LD B,A; R1 = number of steps: the bit length of abs H / 4
        srl  r1,8                                           ;                   ;
        mpy  de,r1                                          ; OR A / SBC HL,DE  ; move back that many times (TI: a multiplication)
        s    r2,hl                                          ; DJNZ $65DE        ;
@@ -7812,55 +7814,44 @@ _68de:                                                     ; >68de
        li   hl,stardust_pitch_handlers                     ; LD HL,$6EE5       ; HL -> the per-view pitch handlers
        bl   @jump_to_view_handler                          ; CALL $67A8        ; pitch the stardust for this view
 _68ea:                                                     ; >68ea
-* TI: a native loop, with words in registers. A particle is shown as a sprite
-* (star_sprite_list, which copy_space_view sends to the VDP after the small
-* ships' sprites), so that it isn't in the buffer, which then needn't be
-* copied or cleared for it. But during a jump (#R$872E), when the particles are
-* plotted several times a frame to draw streaks, they are plotted in the
-* buffer (#R$3CFD), and their cells marked in view_cells.
+* TI: a native loop. A particle is shown as a sprite (star_sprite_list, which
+* copy_space_view sends to the VDP after the small ships' sprites), so that it
+* isn't in the buffer, which then needn't be copied or cleared for it. But
+* during a jump (#R$872E), when the particles are plotted several times a frame
+* to draw streaks, they are plotted in the buffer (#R$3CFD), and their cells
+* marked in view_cells. The coordinates are tested and converted as bytes: X
+* + 87 is 0-175 (and Y + 63 0-127), wrapping round, just when the particle is
+* in the view. What is the same for every particle - the rear view, a jump, or
+* sprites in the list already - is worked out first (stardust_slow), so that
+* the usual case is quick. IY points into the list (the caller's is kept).
+       mov  iy,@stardust_iy                                ;                   ;
+       li   iy,star_sprite_list                            ;                   ;
+       a    @star_sprite_count,iy                          ;                   ; IY -> the next sprite in the list
+       movb @jump_in_progress,r0                           ;                   ; a jump,
+       socb @star_sprite_count+1,r0                        ;                   ; sprites in the list already (the count is up to 60),
+       cb   @current_view,one                              ;                   ;
+       jne  !                                              ;                   ;
+       seto r0                                             ;                   ; or the rear view?
+!      movb r0,@stardust_slow                              ;                   ;
        mov  @reclaimed_range_start,ix                      ; LD IX,($EFA6)     ; IX -> the stardust table
 _68f0:                                                     ; >68f0
-       movb *ix,r1                                         ; LD E,(IX+$01)     ;
-       sra  r1,8                                           ;                   ; R1 = X, the pixel offset from the centre
-       movb @>02(ix),r2                                    ; LD D,(IX+$03)     ;
-       sra  r2,8                                           ;                   ; R2 = Y
-       mov  r1,r0                                          ;                   ;
-       ai   r0,87                                          ;                   ;
-       ci   r0,87+88                                       ; CP $59 / CP $A9   ; X from -87 to 88?
+       movb *ix,r1                                         ; LD E,(IX+$01)     ; X, the pixel offset from the centre
+       ab   @bytes+87,r1                                   ;                   ; R1 (high byte) = the column in the view (its centre is column 87)
+       cb   r1,@bytes+87+88                                ; CP $59 / CP $A9   ; X from -87 to 88?
        jh   stardust_flag_respawn                          ; JR NC,$6950       ; no - off the left or right edge, respawn it
-       mov  r2,r0                                          ;                   ;
-       ai   r0,63                                          ;                   ;
-       ci   r0,63+64                                       ; CP $41 / CP $C1   ; Y from -63 to 64?
+       movb @>02(ix),r2                                    ; LD D,(IX+$03)     ; Y
+       ab   @bytes+63,r2                                   ;                   ; R2 (high byte) = the row in the view (its centre is row 63)
+       cb   r2,@bytes+63+64                                ; CP $41 / CP $C1   ; Y from -63 to 64?
        jh   stardust_flag_respawn                          ; JR NC,$6950       ; no - off the top or bottom edge, respawn it
-_6915:                                                     ; >6915
-       cb   @current_view,one                              ; LD A,($EB9A) / DEC A; the rear view?
-       jne  _6931                                          ; JR NZ,$6931       ; no - go plot it
-       mov  r1,r0                                          ;                   ;
-       abs  r0                                             ;                   ;
-       ci   r0,10                                          ; CP $0A            ;
-       jhe  _6931                                          ; JR NC,$6931       ; abs X >= 10 - go plot it
-       mov  r2,r0                                          ;                   ;
-       abs  r0                                             ;                   ;
-       ci   r0,10                                          ; CP $0A            ;
-       jl   stardust_flag_respawn                          ; JR C,$6950        ; abs Y < 10 too - reached the centre, respawn it
-_6931:                                                     ; >6931
-       ai   r1,87                                          ; ADD A,$57         ; R1 = the column in the view (its centre is column 87)
-       ai   r2,63                                          ; ADD A,$3F         ; R2 = the row in the view (its centre is row 63)
-       movb @jump_in_progress,r0                           ;                   ; a jump?
-       jne  stardust_plot                                  ;                   ; yes: plot it in the buffer
-       mov  @star_sprite_count,a                           ;                   ;
-       ci   a,15*4                                         ;                   ; (the list can't be full, but just in case)
-       jhe  stardust_plot                                  ;                   ;
-       ai   r2,8-1                                         ;                   ; the sprite's y: the view is at 8, and a sprite is
-       swpb r2                                             ;                   ; shown one line below its y
-       movb r2,@star_sprite_list(a)                        ;                   ;
-       ai   r1,40                                          ;                   ; its x: the view is at 40
-       swpb r1                                             ;                   ;
-       movb r1,@star_sprite_list+1(a)                      ;                   ;
-       movb @bytes+star_sprite_pattern,@star_sprite_list+2(a);                  ; a dot
-       movb @view_sprite_colour,@star_sprite_list+3(a)     ;                   ; in the colour of the view's lines
-       ai   a,4                                            ;                   ;
-       mov  a,@star_sprite_count                           ;                   ;
+       movb @stardust_slow,r0                              ;                   ;
+       jne  stardust_slow_path                             ;                   ;
+stardust_sprite:
+       ab   @bytes+8-1,r2                                  ;                   ; the sprite's y: the view is at 8, and a sprite is
+       movb r2,*iy+                                        ;                   ; shown one line below its y
+       ab   @bytes+40,r1                                   ;                   ; its x: the view is at 40
+       movb r1,*iy+                                        ;                   ;
+       movb @bytes+star_sprite_pattern,*iy+                ;                   ; a dot
+       movb @view_sprite_colour,*iy+                       ;                   ; in the colour of the view's lines
 _6940:                                                     ; >6940
        movb @>08(ix),a                                     ; LD A,(IX+$08) / OR A; Z flag = particle doesn't need respawning
 stardust_move_handler:                                     ; >6944
@@ -7868,9 +7859,31 @@ stardust_move_handler:                                     ; >6944
        ai   ix,12                                          ; LD DE,$000B / ADD IX,DE; IX -> next particle
        ci   ix,startup_code_stardust_table+(15*12)         ; DJNZ $68F0        ; loop for all 15 particles
        jne  _68f0                                          ;                   ;
+       ai   iy,-star_sprite_list                           ;                   ;
+       mov  iy,@star_sprite_count                          ;                   ; the sprites in the list
+       mov  @stardust_iy,iy                                ;                   ;
 move_and_plot_stardust_exit:
        .endproc                                            ; RET               ;
+stardust_slow_path:
+       cb   @current_view,one                              ; LD A,($EB9A) / DEC A; the rear view?
+       jne  stardust_slow_path_1                           ; JR NZ,$6931       ; no - go plot it
+       movb r1,r0                                          ;                   ;
+       sb   @bytes+87-9,r0                                 ;                   ;
+       cb   r0,@bytes+18                                   ; CP $0A            ;
+       jh   stardust_slow_path_1                           ; JR NC,$6931       ; abs X >= 10 - go plot it
+       movb r2,r0                                          ;                   ;
+       sb   @bytes+63-9,r0                                 ;                   ;
+       cb   r0,@bytes+18                                   ; CP $0A            ;
+       jh   stardust_slow_path_1                           ;                   ;
+       jmp  stardust_flag_respawn                          ; JR C,$6950        ; abs Y < 10 too - reached the centre, respawn it
+stardust_slow_path_1:
+       movb @jump_in_progress,r0                           ;                   ; a jump?
+       jne  stardust_plot                                  ;                   ; yes: plot it in the buffer
+       ci   iy,star_sprite_list+15*4                       ;                   ; (the list can't be full, but just in case)
+       jl   stardust_sprite                                ;                   ;
 stardust_plot:
+       srl  r1,8                                           ;                   ; R1 = the column
+       srl  r2,8                                           ;                   ; R2 = the row
        mov  r1,r0                                          ;                   ;
        srl  r0,3                                           ;                   ;
        sla  r2,5                                           ;                   ;
